@@ -1,10 +1,10 @@
-import { ATTR_KEYS, MAP_VERSION, MAX_LEVEL, questById, skillById, totalXpFor } from './data';
+import { ATTR_KEYS, MAP_VERSION, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, questById, skillById, totalXpFor } from './data';
 import { isWalkable } from './path';
 import { LEGENDARIES, SETS, TEMPLATES, type Item } from './items';
 import { maxHpOf, maxManaOf, type Actor, type World } from './world';
 
 const KEYS = [
-  'x', 'y', 'hp', 'mana', 'level', 'xp', 'statPoints', 'attrs', 'gold', 'skills', 'inventory', 'equipment', 'stash', 'maxHp', 'quests',
+  'x', 'y', 'hp', 'mana', 'level', 'xp', 'statPoints', 'attrs', 'gold', 'skills', 'inventory', 'equipment', 'stash', 'maxHp', 'quests', 'skillRanks', 'skillPoints',
 ] as const;
 
 const EQUIP_SLOTS = ['weapon', 'head', 'chest', 'hands', 'feet', 'ring', 'quiver'];
@@ -43,6 +43,13 @@ export function importPlayer(w: World, p: Actor, json: string): boolean {
     p.maxHp = Math.max(10, num(s.maxHp, p.maxHp));
     for (const k of ATTR_KEYS) p.attrs[k] = Math.max(1, Math.floor(num((s.attrs as Record<string, number> | undefined)?.[k], 10)));
     p.skills = Array.isArray(s.skills) ? s.skills.filter((id) => typeof id === 'string' && skillById(id)) : [];
+    // Ränge: alte Spielstände ohne Ränge bekommen Rang 1 für jeden gelernten Skill
+    p.skillRanks = {};
+    const savedRanks = (s.skillRanks ?? {}) as Record<string, number>;
+    for (const id of p.skills) p.skillRanks[id] = Math.min(MAX_SKILL_RANK, Math.max(1, Math.floor(num(savedRanks[id], 1))));
+    const spent = Object.values(p.skillRanks).reduce((n, r) => n + r, 0);
+    const earned = SKILL_POINTS_START + SKILL_POINTS_PER_LEVEL * (p.level - 1);
+    p.skillPoints = typeof s.skillPoints === 'number' ? Math.max(0, Math.floor(s.skillPoints)) : Math.max(0, earned - spent);
     p.inventory = Array.isArray(s.inventory) ? s.inventory.filter(isItem) : [];
     p.stash = Array.isArray(s.stash) ? s.stash.filter(isItem) : [];
     p.equipment = {};

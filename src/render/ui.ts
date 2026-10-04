@@ -1,4 +1,4 @@
-import { ATTR_KEYS, ATTR_NAME, SKILLS, SHOPS, QUESTS, questById, totalXpFor, MAX_LEVEL, monsterKind, type SkillDef } from '../sim/data';
+import { ATTR_KEYS, ATTR_NAME, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, type SkillDef } from '../sim/data';
 import { POWER_TEXT, itemReq, setById, templateById, type Item, type Slot } from '../sim/items';
 import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
@@ -54,6 +54,8 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''):
 
 const CSS = `
 .a-win{position:fixed;background:linear-gradient(180deg,#1b1620 0%,#120f16 100%);border:2px solid #6b5a48;box-shadow:0 0 0 1px #14100c,0 0 0 3px #3a2f26,0 8px 30px rgba(0,0,0,.7);color:#d4c4a8;font:13px/1.4 Georgia,'Times New Roman',serif;display:none;z-index:10;user-select:none}
+.a-win{max-height:calc(100vh - 24px)}
+@media (max-width:1000px){.a-win{zoom:.76}}
 .a-win h3{margin:0;padding:6px 10px;font:bold 14px Georgia,serif;letter-spacing:.5px;color:#e8d4a8;background:linear-gradient(180deg,#3a2f26,#241d18);border-bottom:1px solid #6b5a48}
 .a-tabs{display:flex;background:#241d18;border-bottom:1px solid #6b5a48}
 .a-tab{flex:1;padding:6px 4px;text-align:center;cursor:pointer;color:#9a8a70;border-right:1px solid #3a2f26;font-size:12px}
@@ -147,7 +149,7 @@ export class Ui {
     document.head.appendChild(style);
 
     Object.assign(this.main.style, { right: '12px', top: '12px', width: '420px' });
-    Object.assign(this.side.style, { left: '12px', top: '190px', width: '380px' });
+    Object.assign(this.side.style, { left: '12px', top: '190px', width: '420px' });
 
     this.hud.style.cssText = 'position:fixed;left:50%;bottom:8px;transform:translateX(-50%);display:flex;align-items:flex-end;gap:10px;pointer-events:none;z-index:5';
     const mid = el('div');
@@ -229,7 +231,7 @@ export class Ui {
     this.lastW = w;
     this.updateHud(p, target);
     const near = w.npcs.filter((n) => Math.hypot(n.x - p.x, n.y - p.y) <= NPC_RANGE);
-    const key = JSON.stringify([this.open, this.tab, p.inventory, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.gold, p.level, near.map((n) => n.id), p.quests, p.xp > 0]);
+    const key = JSON.stringify([this.open, this.tab, p.inventory, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.gold, p.level, near.map((n) => n.id), p.quests, p.xp > 0]);
     if (key === this.key || this.dragging) return;
     this.key = key;
     if (this.open) this.renderMain(w, p);
@@ -251,7 +253,7 @@ export class Ui {
     const into = Math.max(0, p.xp - totalXpFor(p.level));
     const frac = p.level >= MAX_LEVEL ? 1 : Math.min(1, into / Math.max(1, span));
     this.xpFill.style.width = `${frac * 100}%`;
-    this.xpText.textContent = `Stufe ${p.level} · ${p.level >= MAX_LEVEL ? 'Maximum' : `${into} / ${span} XP`} · ${p.gold} Gold${p.statPoints ? ` · ${p.statPoints} Attributpunkte (C)` : ''}`;
+    this.xpText.textContent = `Stufe ${p.level} · ${p.level >= MAX_LEVEL ? 'Maximum' : `${into} / ${span} XP`} · ${p.gold} Gold${p.statPoints ? ` · ${p.statPoints} Attributpunkte (C)` : ''}${p.skillPoints ? ` · ${p.skillPoints} Skillpunkte` : ''}`;
 
     // Schnellleiste: Tränke (Q/E) und Skills (1–9); Elemente bleiben bestehen, nur Zustand wird aktualisiert
     const hk = p.skills.join(',');
@@ -394,7 +396,11 @@ export class Ui {
 
   private perform(d: Drag, zone: string | null): void {
     if (!zone) {
-      if (d.from === 'bag') this.send({ type: 'drop', itemId: d.item.id });
+      if (d.from === 'bag') {
+        const valuable = d.item.rarity === 'rare' || d.item.rarity === 'set' || d.item.rarity === 'legendary';
+        if (valuable && !confirm(`${d.item.name} wirklich auf den Boden werfen?`)) return;
+        this.send({ type: 'drop', itemId: d.item.id });
+      }
       this.onDropToWorld?.(d.item);
       return;
     }
@@ -636,14 +642,14 @@ export class Ui {
   }
 
   private renderSkills(body: HTMLElement, p: Actor): void {
-    body.append(el('div', 'a-sec', 'Gelernte Fertigkeiten'));
+    body.append(el('div', 'a-sec', `Gelernte Fertigkeiten – ${p.skillPoints} Skillpunkte übrig`));
     if (!p.skills.length) body.append(el('div', 'a-note', 'Noch keine – Lehrer in den Städten bringen dir Fertigkeiten bei.'));
     p.skills.forEach((id, i) => {
       const s = SKILLS.find((x) => x.id === id)!;
       const c = el('div', 'a-card');
       c.append(Object.assign(el('img'), { src: skillIcon(s) }));
       const t = el('div');
-      t.append(el('div', '', `${s.name}${i < 9 ? ` [${i + 1}]` : ''} · ${s.area}`), el('div', 'a-note', `${s.mana} Mana · ${Math.round(s.cooldown / TICK_RATE)} s Abklingzeit`), el('div', 'a-note', s.desc));
+      t.append(el('div', '', `${s.name}${i < 9 ? ` [${i + 1}]` : ''} · ${s.area} · Rang ${p.skillRanks[s.id] ?? 1}`), el('div', 'a-note', `${s.mana} Mana · ${Math.round(s.cooldown / TICK_RATE)} s Abklingzeit`), el('div', 'a-note', s.desc));
       c.append(t);
       body.append(c);
     });
@@ -720,7 +726,14 @@ export class Ui {
       body.append(grid, el('div', 'a-note', 'Gegenstände aus dem Rucksack hierher ziehen (und zurück).'));
     }
     if (trainer) {
-      body.append(el('div', 'a-sec', `${trainer.name} – Lehrer`));
+      body.append(el('div', 'a-sec', `${trainer.name} – Lehrer · ${p.skillPoints} Skillpunkte`));
+      const rs = el('button', 'a-btn', `Alles neu verteilen (${respecPrice(p.level)}g)`);
+      rs.title = 'Setzt Attribute und Fertigkeiten zurück, du bekommst alle Punkte zurück.';
+      rs.style.marginBottom = '6px';
+      rs.onclick = () => {
+        if (confirm(`Attribute und Fertigkeiten für ${respecPrice(p.level)} Gold zurücksetzen?`)) this.send({ type: 'respec' });
+      };
+      body.append(rs);
       for (const s of SKILLS.filter((x) => x.tier <= (trainer.tier ?? 1))) body.append(this.skillCard(s, p));
     }
     if (smith) {
@@ -785,18 +798,24 @@ export class Ui {
   }
 
   private skillCard(s: SkillDef, p: Actor): HTMLElement {
-    const learned = p.skills.includes(s.id);
+    const known = p.skills.includes(s.id);
+    const rank = known ? (p.skillRanks[s.id] ?? 1) : 0;
     const c = el('div', 'a-card');
     c.append(Object.assign(el('img'), { src: skillIcon(s) }));
     const t = el('div');
     t.style.flex = '1';
-    t.append(el('div', '', `${s.name} · ${s.area}`), el('div', 'a-note', `${s.desc} Ab Stufe ${s.levelReq}.`));
+    const head = el('div', '', `${s.name} · ${s.area}${known ? ` · Rang ${rank}/${MAX_SKILL_RANK}` : ''}`);
+    t.append(head, el('div', 'a-note', `${s.desc} Ab Stufe ${s.levelReq}.`));
     c.append(t);
-    if (learned) c.append(el('i', 'a-note', 'gelernt'));
+    if (rank >= MAX_SKILL_RANK) c.append(el('i', 'a-note', 'Maximum'));
     else {
-      const can = p.level >= s.levelReq && p.gold >= s.price;
-      const b = el('button', `a-btn${can ? '' : ' off'}`, `Lernen ${s.price}g`);
-      b.onclick = () => this.send({ type: 'learnSkill', skillId: s.id });
+      const next = rank + 1;
+      const price = rankPrice(s.price, next);
+      const lvl = rankLevelReq(s.levelReq, next);
+      const can = p.level >= lvl && p.gold >= price && p.skillPoints >= 1;
+      const b = el('button', `a-btn${can ? '' : ' off'}`, known ? `Rang ${next}: 1 Pkt · ${price}g` : `Lernen: 1 Pkt · ${price}g`);
+      b.title = p.level < lvl ? `Benötigt Stufe ${lvl}` : p.skillPoints < 1 ? 'Keine Skillpunkte' : p.gold < price ? 'Nicht genug Gold' : '';
+      b.onclick = () => this.send({ type: known ? 'trainSkill' : 'learnSkill', skillId: s.id });
       c.append(b);
     }
     return c;

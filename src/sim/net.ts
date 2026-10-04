@@ -28,8 +28,10 @@ export function validateCommand(w: World, c: unknown): Command | null {
       return ['weapon', 'head', 'chest', 'hands', 'feet', 'ring', 'quiver'].includes(o.slot as string) ? { type: 'unequip', slot: o.slot as 'weapon' } : null;
     case 'spendStat':
       return ATTR_KEYS.includes(o.attr as never) ? { type: 'spendStat', attr: o.attr as never } : null;
-    case 'learnSkill':
-      return str(o.skillId) ? { type: 'learnSkill', skillId: o.skillId } : null;
+    case 'learnSkill': case 'trainSkill':
+      return str(o.skillId) ? ({ type: o.type, skillId: o.skillId } as Command) : null;
+    case 'respec':
+      return { type: 'respec' };
     case 'useSkill':
       return str(o.skillId) && (o.targetId === undefined || int(o.targetId)) ? { type: 'useSkill', skillId: o.skillId, targetId: o.targetId as number | undefined } : null;
     case 'buy':
@@ -109,7 +111,7 @@ export function actorFromLite(l: ActorLite, tick: number): Actor {
   return {
     id: l.id, kind: l.kind, kindId: l.kindId, name: l.name, x: l.x, y: l.y, hp: l.hp, maxHp: l.maxHp, damage: [1, 1], speed: 0.1,
     attackCooldown: 20, cooldownLeft: 0, path: [], targetId: l.targetId, aggroRange: 0, alive: l.alive, level: l.level, xp: 0,
-    statPoints: 0, attrs: { kraft: 10, gewandtheit: 10, ausdauer: 10, verstand: 10, willenskraft: 10 }, mana: 0, gold: 0, skills: [],
+    statPoints: 0, attrs: { kraft: 10, gewandtheit: 10, ausdauer: 10, verstand: 10, willenskraft: 10 }, mana: 0, gold: 0, skills: [], skillRanks: {}, skillPoints: 0,
     skillCd: {}, potionCd: 0, quests: {}, inventory: [], equipment: l.equipment ?? {}, stash: [], pickupId: null, chestId: null, diedAt: l.diedAt,
     boss: l.boss, enraged: l.enraged, autoAttack: true, repathAt: 0, dot: null, lastHitAt: -9999, packId: 0, pkUntil: l.pk ? tick + 1e6 : 0,
     attackedBy: null, damagers: {},

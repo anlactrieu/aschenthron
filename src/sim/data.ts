@@ -9,6 +9,20 @@ export const MAP_VERSION = 3;
 
 export const MAX_LEVEL = 30;
 export const STAT_POINTS_PER_LEVEL = 5;
+/** Skillpunkte: wenige, damit Entscheidungen zählen (Rang 1–5 je Skill, jeder Rang kostet 1 Punkt) */
+export const SKILL_POINTS_START = 2;
+export const SKILL_POINTS_PER_LEVEL = 1;
+export const MAX_SKILL_RANK = 5;
+/** Rang-Wirkung: Schaden/Heilung +18 % je Rang, Mana +6 %, Abklingzeit −6 % */
+export const rankDamage = (rank: number): number => 1 + 0.18 * (rank - 1);
+export const rankMana = (rank: number): number => 1 + 0.06 * (rank - 1);
+export const rankCooldown = (rank: number): number => Math.max(0.6, 1 - 0.06 * (rank - 1));
+/** Stufe, ab der Rang `rank` möglich ist */
+export const rankLevelReq = (levelReq: number, rank: number): number => levelReq + (rank - 1) * 3;
+/** Goldkosten: Rang 1 = Lernpreis, danach halber Preis mal Rang */
+export const rankPrice = (price: number, rank: number): number => (rank <= 1 ? price : Math.round(price * 0.5 * rank));
+/** Umverteilen: teuer, aber möglich */
+export const respecPrice = (level: number): number => 100 + level * level * 8;
 export const START_STAT_POINTS = 10;
 
 /** XP, die von Level `l` auf `l+1` nötig sind. Kill-XP wächst mit L^1.3; der Faktor (1 + l/6) streckt die Kurve nach oben (mehr Kills pro Level im Endgame). */

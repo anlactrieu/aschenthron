@@ -476,3 +476,106 @@ describe('Bogen braucht Köcher mit Pfeilen', () => {
     expect(strong).toBeGreaterThan(base + 30 * 25);
   });
 });
+
+describe('Skillpunkte, Ränge und Neuverteilen', () => {
+  const town = () => {
+    const f = fresh();
+    addNpc(f.w, 'trainer', 'Lehrer', 11, 10, { tier: 2 });
+    return f;
+  };
+
+  it('Skills kosten Punkte und Gold, Ränge steigern sich bis 5 mit Stufenanforderung', () => {
+    const { w, p } = town();
+    p.gold = 100000;
+    p.level = 30;
+    p.skillPoints = 10;
+    applyCommand(w, p.id, { type: 'trainSkill', skillId: 'ember_bolt' });
+    expect(p.skills).toEqual([]); // erst lernen
+    applyCommand(w, p.id, { type: 'learnSkill', skillId: 'ember_bolt' });
+    expect(p.skillRanks['ember_bolt']).toBe(1);
+    for (let i = 0; i < 6; i++) applyCommand(w, p.id, { type: 'trainSkill', skillId: 'ember_bolt' });
+    expect(p.skillRanks['ember_bolt']).toBe(5);
+    expect(p.skillPoints).toBe(10 - 5);
+    applyCommand(w, p.id, { type: 'learnSkill', skillId: 'ember_bolt' });
+    expect(p.skillRanks['ember_bolt']).toBe(5);
+  });
+
+  it('ohne Punkte, Gold oder Stufe geht es nicht', () => {
+    const { w, p } = town();
+    p.skillPoints = 0;
+    applyCommand(w, p.id, { type: 'learnSkill', skillId: 'power_strike' });
+    expect(p.skills).toEqual([]);
+    p.skillPoints = 3;
+    p.gold = 0;
+    p.level = 5;
+    applyCommand(w, p.id, { type: 'learnSkill', skillId: 'power_strike' });
+    expect(p.skills).toEqual([]);
+    p.gold = 500;
+    applyCommand(w, p.id, { type: 'learnSkill', skillId: 'power_strike' });
+    applyCommand(w, p.id, { type: 'trainSkill', skillId: 'power_strike' }); // Rang 2 braucht Stufe 5, ok
+    applyCommand(w, p.id, { type: 'trainSkill', skillId: 'power_strike' }); // Rang 3 braucht Stufe 8
+    expect(p.skillRanks['power_strike']).toBe(2);
+  });
+
+  it('höhere Ränge machen mehr Schaden', () => {
+    const dmg = (rank: number) => {
+      const { w, p } = fresh();
+      p.level = 10;
+      p.skills.push('ember_bolt');
+      p.skillRanks['ember_bolt'] = rank;
+      let total = 0;
+      for (let i = 0; i < 40; i++) {
+        const m = spawnMonster(w, 14, 10, 'wild_hound');
+        m.aggroRange = 0;
+        m.maxHp = 99999;
+        m.hp = 99999;
+        p.mana = 500;
+        p.skillCd = {};
+        applyCommand(w, p.id, { type: 'useSkill', skillId: 'ember_bolt', targetId: m.id });
+        total += 99999 - m.hp;
+      }
+      return total;
+    };
+    expect(dmg(5)).toBeGreaterThan(dmg(1) * 1.5);
+  });
+
+  it('Neuverteilen kostet Gold, setzt Attribute und Skills zurück und gibt alle Punkte', () => {
+    const { w, p } = town();
+    p.level = 6;
+    p.gold = 100000;
+    p.attrs.kraft = 30;
+    p.statPoints = 0;
+    p.skills.push('power_strike');
+    p.skillRanks['power_strike'] = 2;
+    p.skillPoints = 0;
+    const heavy = generateItem(w.rng, w.nextId++, 'steel_sword', 'normal');
+    p.inventory.push(heavy);
+    p.attrs.kraft = 30;
+    p.level = 30;
+    applyCommand(w, p.id, { type: 'equip', itemId: heavy.id });
+    expect(p.equipment.weapon).toBe(heavy);
+    p.level = 6;
+    const g0 = p.gold;
+    applyCommand(w, p.id, { type: 'respec' });
+    expect(p.gold).toBeLessThan(g0);
+    expect(p.attrs.kraft).toBe(10);
+    expect(p.statPoints).toBe(10 + 5 * 5);
+    expect(p.skills).toEqual([]);
+    expect(p.skillPoints).toBe(2 + 5);
+    expect(p.equipment.weapon).toBeUndefined();
+    expect(p.inventory).toContain(heavy);
+    p.gold = 1;
+    p.statPoints = 0;
+    applyCommand(w, p.id, { type: 'respec' });
+    expect(p.statPoints).toBe(0); // zu wenig Gold
+  });
+
+  it('alter Spielstand: gelernte Skills werden Rang 1, übrige Punkte werden erstattet', async () => {
+    const { importPlayer } = await import('./save');
+    const { w, p } = fresh();
+    const old = JSON.stringify({ v: 1, player: { level: 5, skills: ['power_strike', 'ember_bolt'] } });
+    importPlayer(w, p, old);
+    expect(p.skillRanks).toEqual({ power_strike: 1, ember_bolt: 1 });
+    expect(p.skillPoints).toBe(2 + 4 - 2);
+  });
+});

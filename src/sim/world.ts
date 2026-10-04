@@ -2,7 +2,7 @@ import { Rng } from './rng';
 import { findPath, isWalkable, type Grid, type Pt } from './path';
 import { itemReq, rollArrows, rollDrop, rollPotion, rollSpecial, templateById, generateItem, rerollAffixes, extendAffixes, SETS, type Item, type PowerId, type SetBonus, type Slot, type Stat } from './items';
 import {
-  ATTR_KEYS, MAX_LEVEL, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
+  ATTR_KEYS, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
   monsterKind, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
 } from './data';
 
@@ -27,6 +27,8 @@ export type Command =
   | { type: 'usePotion'; itemId: number }
   | { type: 'spendStat'; attr: AttrKey }
   | { type: 'learnSkill'; skillId: string }
+  | { type: 'trainSkill'; skillId: string }
+  | { type: 'respec' }
   | { type: 'useSkill'; skillId: string; targetId?: number }
   | { type: 'buy'; templateId: string }
   | { type: 'sell'; itemId: number }
@@ -67,6 +69,9 @@ export interface Actor {
   mana: number;
   gold: number;
   skills: string[];
+  /** Rang je gelerntem Skill (1–5) */
+  skillRanks: Record<string, number>;
+  skillPoints: number;
   skillCd: Record<string, number>;
   potionCd: number;
   quests: Record<string, { state: 'active' | 'done' | 'turned'; progress: number }>;
@@ -148,7 +153,7 @@ type GameEventBase =
   | { type: 'xp'; amount: number }
   | { type: 'levelUp'; level: number }
   | { type: 'gold'; amount: number }
-  | { type: 'learned'; skillId: string }
+  | { type: 'learned'; skillId: string; rank?: number }
   | { type: 'deathPenalty'; xpLost: number; dropped: Item[] }
   | { type: 'respawned' }
   | { type: 'potion'; item: Item }
@@ -159,7 +164,8 @@ type GameEventBase =
   | { type: 'fail'; reason: string }
   | { type: 'pk'; id: number }
   | { type: 'chestOpened'; chestId: number }
-  | { type: 'refilled'; arrows: number };
+  | { type: 'refilled'; arrows: number }
+  | { type: 'respecced' };
 
 /** `to`: nur für diesen Akteur bestimmt (sonst sichtbar für alle in der Nähe). */
 export type GameEvent = GameEventBase & { to?: number };
@@ -201,7 +207,7 @@ function baseActor(w: World, kind: Actor['kind'], name: string, x: number, y: nu
     id: w.nextId++, kind, name, x, y, hp: 100, maxHp: 100, damage: [1, 2], speed: 0.1, attackCooldown: 20,
     cooldownLeft: 0, path: [], targetId: null, aggroRange: 0, alive: true, level: 1, xp: 0, statPoints: 0,
     attrs: { kraft: 10, gewandtheit: 10, ausdauer: 10, verstand: 10, willenskraft: 10 },
-    mana: 20, gold: 0, skills: [], skillCd: {}, potionCd: 0, quests: {}, inventory: [], equipment: {}, stash: [], pickupId: null, chestId: null,
+    mana: 20, gold: 0, skills: [], skillRanks: {}, skillPoints: 0, skillCd: {}, potionCd: 0, quests: {}, inventory: [], equipment: {}, stash: [], pickupId: null, chestId: null,
     diedAt: -1, boss: false, enraged: false, autoAttack: true, repathAt: 0, dot: null, lastHitAt: -9999, packId: 0, pkUntil: 0, attackedBy: null, damagers: {},
   };
   w.actors.push(a);
@@ -210,7 +216,7 @@ function baseActor(w: World, kind: Actor['kind'], name: string, x: number, y: nu
 
 export function spawnPlayer(w: World, x: number, y: number, name = 'Held'): Actor {
   const a = baseActor(w, 'player', name, x, y);
-  Object.assign(a, { damage: [4, 7] as [number, number], speed: 0.15, attackCooldown: 14, statPoints: START_STAT_POINTS, gold: 20 });
+  Object.assign(a, { damage: [4, 7] as [number, number], speed: 0.15, attackCooldown: 14, statPoints: START_STAT_POINTS, gold: 20, skillPoints: SKILL_POINTS_START });
   a.hp = maxHpOf(a);
   a.mana = maxManaOf(a);
   if (w.towns.length === 0) w.start = { x, y };
@@ -455,18 +461,53 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       a.statPoints--;
       a.attrs[cmd.attr]++;
       break;
-    case 'learnSkill': {
+    case 'learnSkill':
+    case 'trainSkill': {
       const s = skillById(cmd.skillId);
       if (!s) return;
       const trainer = nearNpc(w, a, 'trainer');
       if (!trainer) return fail(w, 'Kein Lehrer in der Nähe.');
       if ((trainer.tier ?? 1) < s.tier) return fail(w, 'Das lehrt dieser Lehrer nicht.');
-      if (a.skills.includes(s.id)) return fail(w, 'Bereits gelernt.');
-      if (a.level < s.levelReq) return fail(w, `Benötigt Level ${s.levelReq}.`);
-      if (a.gold < s.price) return fail(w, 'Nicht genug Gold.');
-      a.gold -= s.price;
-      a.skills.push(s.id);
-      w.events.push({ type: 'learned', skillId: s.id, to: a.id });
+      const known = a.skills.includes(s.id);
+      const rank = known ? (a.skillRanks[s.id] ?? 1) : 0;
+      if (cmd.type === 'learnSkill' && known) return fail(w, 'Bereits gelernt – Ränge steigerst du mit dem Plus.');
+      if (cmd.type === 'trainSkill' && !known) return fail(w, 'Erst lernen.');
+      if (rank >= MAX_SKILL_RANK) return fail(w, 'Höchster Rang erreicht.');
+      const next = rank + 1;
+      if (a.level < rankLevelReq(s.levelReq, next)) return fail(w, `Rang ${next} benötigt Stufe ${rankLevelReq(s.levelReq, next)}.`);
+      if (a.skillPoints < 1) return fail(w, 'Keine Skillpunkte übrig.');
+      const price = rankPrice(s.price, next);
+      if (a.gold < price) return fail(w, 'Nicht genug Gold.');
+      a.gold -= price;
+      a.skillPoints--;
+      a.skillRanks[s.id] = next;
+      if (!known) a.skills.push(s.id);
+      w.events.push({ type: 'learned', skillId: s.id, rank: next, to: a.id });
+      break;
+    }
+    case 'respec': {
+      const trainer = nearNpc(w, a, 'trainer');
+      if (!trainer) return fail(w, 'Kein Lehrer in der Nähe.');
+      const price = respecPrice(a.level);
+      if (a.gold < price) return fail(w, `Neuverteilen kostet ${price} Gold.`);
+      a.gold -= price;
+      for (const k of ATTR_KEYS) a.attrs[k] = 10;
+      a.statPoints = START_STAT_POINTS + STAT_POINTS_PER_LEVEL * (a.level - 1);
+      a.skills = [];
+      a.skillRanks = {};
+      a.skillCd = {};
+      a.skillPoints = SKILL_POINTS_START + SKILL_POINTS_PER_LEVEL * (a.level - 1);
+      // Ausrüstung, die nun die Anforderungen verfehlt, wandert in den Rucksack
+      for (const slot of Object.keys(a.equipment) as Slot[]) {
+        const it = a.equipment[slot];
+        if (it && slot !== 'quiver' && missingReq(a, it).length) {
+          delete a.equipment[slot];
+          a.inventory.push(it);
+        }
+      }
+      a.hp = Math.min(a.hp, maxHpOf(a));
+      a.mana = Math.min(a.mana, maxManaOf(a));
+      w.events.push({ type: 'respecced', to: a.id });
       break;
     }
     case 'useSkill':
@@ -601,13 +642,15 @@ function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void 
   const s = skillById(skillId);
   if (!s || !a.skills.includes(s.id)) return fail(w, 'Fertigkeit nicht gelernt.');
   if ((a.skillCd[s.id] ?? 0) > 0) return;
-  if (a.mana < s.mana) return fail(w, 'Nicht genug Mana.');
+  const rank = a.skillRanks[s.id] ?? 1;
+  const manaCost = Math.round(s.mana * rankMana(rank));
+  if (a.mana < manaCost) return fail(w, 'Nicht genug Mana.');
   const lvl = 1 + a.level * 0.1;
   if (s.heal !== undefined) {
     const scale = s.scales ? Math.max(0, a.attrs[s.scales] - 10) * 3 : 0;
-    const amount = Math.round((s.heal + scale) * lvl);
-    a.mana -= s.mana;
-    a.skillCd[s.id] = s.cooldown;
+    const amount = Math.round((s.heal + scale) * lvl * rankDamage(rank));
+    a.mana -= manaCost;
+    a.skillCd[s.id] = Math.round(s.cooldown * rankCooldown(rank));
     const before = a.hp;
     a.hp = Math.min(maxHpOf(a), a.hp + amount);
     w.events.push({ type: 'healed', amount: Math.round(a.hp - before), to: a.id });
@@ -632,8 +675,8 @@ function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void 
     victims = [first!, ...w.actors.filter((x) => enemy(x) && x.id !== first!.id && Math.hypot(x.x - a.x, x.y - a.y) <= range).sort((p, q) => Math.hypot(p.x - a.x, p.y - a.y) - Math.hypot(q.x - a.x, q.y - a.y))].slice(0, s.targets);
   } else victims = [first!];
   if (!victims.length) return fail(w, 'Kein Ziel.');
-  a.mana -= s.mana;
-  a.skillCd[s.id] = s.cooldown;
+  a.mana -= manaCost;
+  a.skillCd[s.id] = Math.round(s.cooldown * rankCooldown(rank));
   const quiver = bowShot ? a.equipment.quiver : undefined;
   if (quiver) quiver.ammo = (quiver.ammo ?? 1) - 1;
   // Fern-/Magie-Skills lösen keine Nahkampf-Verfolgung aus; Nahkampf-Skills schon
@@ -647,14 +690,14 @@ function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void 
     let amount: number;
     if (s.mult) {
       const [lo, hi] = damageRange(a);
-      amount = Math.round(w.rng.int(lo, hi) * s.mult);
+      amount = Math.round(w.rng.int(lo, hi) * s.mult * rankDamage(rank));
     } else {
       const [lo, hi] = s.base!;
       const scale = s.scales ? Math.max(0, a.attrs[s.scales] - 10) * (1 + a.level * 0.08) : 0;
       const wp = a.equipment.weapon;
       const matches = wp?.damage && ((s.area === 'Fernkampf' && wp.kind === 'bow') || (s.area === 'Magie' && wp.kind === 'staff'));
       const weaponBonus = matches ? ((wp!.damage![0] + wp!.damage![1]) / 2) * 0.9 : 0;
-      amount = Math.round(w.rng.int(lo, hi) * lvl + scale + weaponBonus + (quiver?.arrowBonus ?? 0));
+      amount = Math.round((w.rng.int(lo, hi) * lvl + scale + weaponBonus + (quiver?.arrowBonus ?? 0)) * rankDamage(rank));
     }
     dealDamage(w, a, v, amount, s.ignoresArmor, s.id);
     if (s.dot && v.alive) v.dot = { perSec: Math.max(1, Math.round((amount * s.dot.factor) / s.dot.seconds)), until: w.tick + s.dot.seconds * TICK_RATE, srcId: a.id };
@@ -818,6 +861,7 @@ export function gainXp(w: World, a: Actor, amount: number): void {
   while (a.level < MAX_LEVEL && a.xp >= totalXpFor(a.level + 1)) {
     a.level++;
     a.statPoints += STAT_POINTS_PER_LEVEL;
+    a.skillPoints += SKILL_POINTS_PER_LEVEL;
     a.maxHp += 10;
     a.hp = maxHpOf(a);
     a.mana = maxManaOf(a);

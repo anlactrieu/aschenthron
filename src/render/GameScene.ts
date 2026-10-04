@@ -446,6 +446,7 @@ export class GameScene extends Phaser.Scene {
           } else if (r === 'rare') say(`Beute: ${e.item.name}`);
           break;
         }
+        case 'respecced': say('Alles neu verteilt: Attribute und Fertigkeiten sind zurückgesetzt.'); this.sfx.quest(); break;
         case 'refilled': say(`Köcher aufgefüllt: +${e.arrows} Pfeile`); this.sfx.pickup(); break;
         case 'chestOpened': {
           this.sfx.chest();
@@ -472,7 +473,7 @@ export class GameScene extends Phaser.Scene {
           break;
         }
         case 'levelUp': {
-          say(`LEVEL ${e.level}! +5 Attributpunkte (C)`);
+          say(`LEVEL ${e.level}! +5 Attributpunkte (C), +1 Skillpunkt`);
           this.sfx.levelUp();
           const pos = this.bodyPos(this.player());
           if (pos) {
@@ -482,7 +483,7 @@ export class GameScene extends Phaser.Scene {
           this.ui.banner(`Stufe ${e.level}!`, '#ffe45a');
           break;
         }
-        case 'learned': say(`Gelernt: ${SKILLS.find((s) => s.id === e.skillId)?.name}`); this.sfx.quest(); break;
+        case 'learned': say(`${SKILLS.find((s) => s.id === e.skillId)?.name}: Rang ${e.rank ?? 1}`); this.sfx.quest(); break;
         case 'enraged': {
           const boss = getActor(w, e.id);
           const pos = this.bodyPos(boss);
