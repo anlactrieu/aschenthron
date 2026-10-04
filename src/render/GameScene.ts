@@ -43,6 +43,8 @@ interface ActorView {
   flip: boolean;
   swingUntil?: number;
   swingStart?: number;
+  /** läuft im Bild nach oben: Rückansicht */
+  up?: boolean;
 }
 
 export class GameScene extends Phaser.Scene {
@@ -367,6 +369,7 @@ export class GameScene extends Phaser.Scene {
               v.swingStart = this.now;
               v.swingUntil = this.now + SWING_MS * this.ts;
               v.flip = sxv < 0;
+              v.up = syv < 0;
             }
             delay = SWING_MS * 0.4 * this.ts;
             this.later(delay, () => this.kick(at.id, (sxv / len) * (projectile ? -1 : 10), (syv / len) * (projectile ? -0.5 : 10)));
@@ -972,6 +975,7 @@ export class GameScene extends Phaser.Scene {
         // Bildschirm-Richtung: iso x-y
         const screenDx = dx - dy;
         if (Math.abs(screenDx) > 0.0005) view.flip = screenDx < 0;
+        if (Math.abs(dx + dy) > 0.0005) view.up = dx + dy < 0;
       }
       view.lastX = pos.x;
       view.lastY = pos.y;
@@ -981,12 +985,12 @@ export class GameScene extends Phaser.Scene {
       const img = view.img;
       if (a.kind === 'player') {
         const look = lookOf(a);
-        const key = `pl_${look.chest}_${look.head}_${look.weapon}_${look.hands}_${look.weaponKind}_${look.robe ? 1 : 0}_${look.quiver ? 1 : 0}_${frame}`;
-        img.setTexture(ensureTexture(this, key, () => playerCanvas(look, frame)));
+        const key = `pl_${look.chest}_${look.head}_${look.weapon}_${look.hands}_${look.weaponKind}_${look.robe ? 1 : 0}_${look.quiver ? 1 : 0}_${frame}${view.up ? 'b' : ''}`;
+        img.setTexture(ensureTexture(this, key, () => playerCanvas(look, frame, !!view.up)));
       } else {
         const k = monsterKind(a.kindId!);
-        const key = `mon_${k.id}_${frame}`;
-        img.setTexture(ensureTexture(this, key, () => monsterCanvas(k.id, k.family, k.color, !!k.boss, frame)));
+        const key = `mon_${k.id}_${frame}${view.up ? 'b' : ''}`;
+        img.setTexture(ensureTexture(this, key, () => monsterCanvas(k.id, k.family, k.color, !!k.boss, frame, !!view.up)));
       }
       // Rückstoß/Ausfallschritt aus Treffern, klingt schnell ab
       const kk = this.kicks.get(a.id);

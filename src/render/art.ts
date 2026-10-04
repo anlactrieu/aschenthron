@@ -325,6 +325,8 @@ const SKIN = 0xd8b088;
 
 type Pose = 'idle' | 'wind' | 'strike';
 let POSE: Pose = 'idle';
+/** Blick nach hinten (Figur läuft im Bild nach oben): Haare statt Gesicht */
+let BACK = false;
 
 /** Waffe je nach Haltung: Ruhe senkrecht, Ausholen über dem Kopf, Schlag waagerecht nach vorn. */
 function weapon(x: Ctx, blade: number, len: number, hilt = 0x6a4a2a): void {
@@ -361,9 +363,11 @@ function humanoidBase(x: Ctx, f: number, o: { skin: number; body: number; legs: 
     rect(x, 15, 8, 1, 2, o.skin);
     rect(x, 4, 7, 8, 8, shade(o.body, 1.08));
   }
-  rect(x, 5, 2, 6, 5, o.skin);
-  rect(x, 6, 4, 1, 1, 0x1a1418);
-  rect(x, 9, 4, 1, 1, 0x1a1418);
+  rect(x, 5, 2, 6, 5, BACK ? (o.hair ?? shade(o.skin, 0.55)) : o.skin);
+  if (!BACK) {
+    rect(x, 6, 4, 1, 1, 0x1a1418);
+    rect(x, 9, 4, 1, 1, 0x1a1418);
+  }
   if (o.hair !== undefined) rect(x, 5, 1, 6, 2, o.hair);
 }
 
@@ -508,8 +512,9 @@ function actorCanvas(key: string, build: (x: Ctx) => void, scale: number): HTMLC
   return out;
 }
 
-export function monsterCanvas(id: string, family: MonsterFamily, color: number, boss: boolean, frame: number): HTMLCanvasElement {
-  return actorCanvas(`mon_${id}_${frame}`, (x) => {
+export function monsterCanvas(id: string, family: MonsterFamily, color: number, boss: boolean, frame: number, back = false): HTMLCanvasElement {
+  return actorCanvas(`mon_${id}_${frame}${back ? 'b' : ''}`, (x) => {
+    BACK = back && ['humanoid', 'undead', 'ghoul', 'demon'].includes(family);
     POSE = frame === 2 ? 'wind' : frame === 3 ? 'strike' : 'idle';
     const r = rng(id.length * 91 + id.charCodeAt(0));
     FAMILY[family](x, frame, color, r);
@@ -553,9 +558,10 @@ export function lookOf(a: Actor): Look {
   };
 }
 
-export function playerCanvas(look: Look, frame: number): HTMLCanvasElement {
-  const key = `pl_${look.chest}_${look.head}_${look.weapon}_${look.hands}_${look.weaponKind}_${look.robe ? 1 : 0}_${look.quiver ? 1 : 0}_${frame}`;
+export function playerCanvas(look: Look, frame: number, back = false): HTMLCanvasElement {
+  const key = `pl_${look.chest}_${look.head}_${look.weapon}_${look.hands}_${look.weaponKind}_${look.robe ? 1 : 0}_${look.quiver ? 1 : 0}_${frame}${back ? 'b' : ''}`;
   return actorCanvas(key, (x) => {
+    BACK = back;
     POSE = frame === 2 ? 'wind' : frame === 3 ? 'strike' : 'idle';
     const body = look.chest >= 0 ? TIER_COL[look.chest]! : 0x4a68a0;
     humanoidBase(x, frame, { skin: SKIN, body, legs: look.chest >= 0 ? shade(body, 0.6) : 0x3a3a52, hair: 0x4a3020, arms: look.hands >= 0 ? TIER_COL[look.hands]! : body });
@@ -614,6 +620,7 @@ export function playerCanvas(look: Look, frame: number): HTMLCanvasElement {
 
 export function npcCanvas(kind: string): HTMLCanvasElement {
   return actorCanvas(`npc_${kind}`, (x) => {
+    BACK = false;
     POSE = 'idle';
     if (kind === 'stash') {
       rect(x, 2, 12, 12, 9, 0x7a5a30);

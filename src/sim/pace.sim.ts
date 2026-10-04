@@ -57,6 +57,7 @@ describe('Level-Tempo (Messung)', () => {
     const p = getActor(w, playerId)!;
     const reached: Record<number, number> = {};
     let deaths = 0;
+    const deathLevels: Record<number, number> = {};
     let trips = 0;
     let mode: 'hunt' | 'town' = 'hunt';
     const maxTicks = TICK_RATE * 3600 * 12;
@@ -64,7 +65,10 @@ describe('Level-Tempo (Messung)', () => {
       tick(w);
       for (const e of drainEvents(w)) {
         if (e.type === 'levelUp') reached[e.level] ??= w.tick;
-        if (e.type === 'deathPenalty') deaths++;
+        if (e.type === 'deathPenalty') {
+          deaths++;
+          deathLevels[p.level] = (deathLevels[p.level] ?? 0) + 1;
+        }
       }
       if (p.level >= MAX_LEVEL) break;
       if (t % 10 !== 0) continue;
@@ -110,6 +114,6 @@ describe('Level-Tempo (Messung)', () => {
       }
     }
     const mins = (tk?: number) => (tk ? `${(tk / TICK_RATE / 60).toFixed(0)} min` : 'nicht erreicht');
-    console.log(`PACE Level5 ${mins(reached[5])} | Level10 ${mins(reached[10])} | Level20 ${mins(reached[20])} | Level30 ${mins(reached[30])} | Tode ${deaths} | Stadtfahrten ${trips} | Endlevel ${p.level} | XP-Bedarf Cap ${totalXpFor(MAX_LEVEL)} | Spielzeit ${(w.tick / TICK_RATE / 3600).toFixed(1)} h | kleinster Stufenabstand ok`);
+    console.log(`PACE Level5 ${mins(reached[5])} | Level10 ${mins(reached[10])} | Level20 ${mins(reached[20])} | Level30 ${mins(reached[30])} | Tode ${deaths} | Stadtfahrten ${trips} | Endlevel ${p.level} | XP-Bedarf Cap ${totalXpFor(MAX_LEVEL)} | Spielzeit ${(w.tick / TICK_RATE / 3600).toFixed(1)} h | Tode je Level ${JSON.stringify(deathLevels)}`);
   }, 900000);
 });

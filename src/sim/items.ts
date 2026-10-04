@@ -457,3 +457,11 @@ export function rollUniqueSpecial(rng: Rng, nextId: () => number, level: number)
   }
   return null;
 }
+
+/** Wertebereich eines Affixes für einen Gegenstand dieser Stufe (für die Anzeige der Wurfqualität). */
+export function affixRange(stat: Stat, minLevel: number): [number, number] {
+  const d = AFFIXES.find((a) => a.stat === stat);
+  if (!d) return [1, 1];
+  const scale = stat === 'kraft' ? 1 + minLevel / 20 : 1 + minLevel / 8;
+  return [Math.max(1, Math.round(d.min * scale)), Math.max(1, Math.round(d.max * scale))];
+}

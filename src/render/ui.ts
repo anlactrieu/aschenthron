@@ -1,5 +1,5 @@
 import { ATTR_KEYS, ATTR_NAME, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, type SkillDef } from '../sim/data';
-import { POWER_TEXT, itemReq, setById, templateById, type Item, type Slot } from '../sim/items';
+import { POWER_TEXT, affixRange, itemReq, setById, templateById, type Item, type Slot } from '../sim/items';
 import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
   maxHpOf, maxManaOf, missingReq, nearNpc, powerOf, type Actor, type Command, type Npc, type World,
@@ -9,6 +9,26 @@ import { lookOf, playerCanvas } from './art';
 
 const RARITY_COLOR: Record<Item['rarity'], string> = { normal: '#c9c4bd', magic: '#7f9fff', rare: '#f2c94c', set: '#5fd070', legendary: '#ff8a2a' };
 const SLOT_NAME: Record<Slot, string> = { weapon: 'Waffe', head: 'Kopf', chest: 'Brust', hands: 'Hände', feet: 'Füße', ring: 'Ring', quiver: 'Köcher' };
+
+const AFFIX_WEIGHT: Record<string, number> = { damage: 3, armor: 2, maxHp: 0.25, kraft: 2.5, maxMana: 0.2 };
+
+/** Grobe Gesamtwertung eines Ausrüstungsstücks (für den ▲-Hinweis auf Verbesserungen). */
+function gearScore(i: Item): number {
+  let v = 0;
+  if (i.damage) v += ((i.damage[0] + i.damage[1]) / 2) * (i.kind === 'bow' || i.kind === 'staff' ? 1.2 : 1.5);
+  if (i.armor) v += i.armor * 2;
+  for (const a of i.affixes) v += a.value * (AFFIX_WEIGHT[a.stat] ?? 1);
+  if (i.power) v += 12;
+  if (i.rarity === 'set') v += 8;
+  return v;
+}
+
+function isUpgrade(p: Actor, it: Item): boolean {
+  if (it.slot === 'potion' || it.slot === 'ammo' || it.slot === 'quiver') return false;
+  if (missingReq(p, it, p.equipment[it.slot]).length) return false;
+  const cur = p.equipment[it.slot];
+  return !cur || gearScore(it) > gearScore(cur) * 1.05;
+}
 
 /** Das angelegte Stück im selben Slot (Tränke und Pfeilbündel haben keins). */
 function equippedFor(p: Actor, it: Item): Item | undefined {
@@ -342,6 +362,20 @@ export class Ui {
       if (part.startsWith('Benötigt ')) continue;
       box.append(el('div', '', part));
     }
+    if (it.affixes.length && it.slot !== 'potion' && it.slot !== 'ammo') {
+      const t = templateById(it.templateId);
+      const base = t.base?.length ?? 0;
+      const q = el('div');
+      q.style.cssText = 'margin-top:4px;font-size:11px';
+      it.affixes.slice(base).forEach((a) => {
+        const [lo, hi] = affixRange(a.stat, t.minLevel);
+        const pct = hi > lo ? Math.round(((a.value - lo) / (hi - lo)) * 100) : 100;
+        const line = el('div', '', `${STAT_NAME[a.stat]}: ${a.value} (Wurf ${Math.max(0, Math.min(100, pct))} %)`);
+        line.style.color = pct >= 85 ? '#6fe08a' : pct >= 50 ? '#d8c890' : '#9a8a78';
+        q.append(line);
+      });
+      if (q.childNodes.length) box.append(q);
+    }
     const labels = reqLabels(it);
     if (labels.length && it.slot !== 'potion') {
       const missing = this.lastP ? missingReq(this.lastP, it, equipped) : [];
@@ -575,6 +609,11 @@ export class Ui {
       if (st) {
         if (st.n > 1) s.append(el('div', 'n', String(st.n)));
         const it = st.item;
+        if (isUpgrade(p, it)) {
+          const up = el('div', 'n', '▲');
+          up.style.cssText = 'right:auto;left:3px;bottom:auto;top:1px;color:#6fe08a;font-size:12px';
+          s.append(up);
+        }
         this.makeDraggable(s, { item: it, from: 'bag' }, equippedFor(p, it), () =>
           this.send(it.slot === 'potion' ? { type: 'usePotion', itemId: it.id } : it.slot === 'ammo' ? { type: 'refillQuiver', itemId: it.id } : { type: 'equip', itemId: it.id }),
         );
