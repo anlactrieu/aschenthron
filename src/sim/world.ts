@@ -142,10 +142,12 @@ export interface World {
   start: Pt;
   /** Wiedererwachen nach dem Tod: nächste Stadt */
   towns: Pt[];
+  /** Benannte Zonen (nur Anzeige) */
+  regions: (Rect & { name: string; levels: string })[];
 }
 
 export function createWorld(seed: number, grid: Grid, safe: Rect[] = []): World {
-  return { tick: 0, grid, rng: new Rng(seed), actors: [], nextId: 1, events: [], ground: [], safe, npcs: [], start: { x: 1, y: 1 }, towns: [] };
+  return { tick: 0, grid, rng: new Rng(seed), actors: [], nextId: 1, events: [], ground: [], safe, npcs: [], start: { x: 1, y: 1 }, towns: [], regions: [] };
 }
 
 export function addNpc(w: World, kind: NpcKind, name: string, x: number, y: number, extra: Partial<Npc> = {}): Npc {

@@ -27,8 +27,8 @@ export interface TiledMap {
   layers: TiledLayer[];
 }
 
-/** Nicht begehbare Tile-IDs: 2 Wand, 6 Wasser, 10 Baum, 11 Fels/Grabstein, 12 Lava, 0 leer */
-const BLOCKED = new Set([0, 2, 6, 10, 11, 12]);
+/** Nicht begehbare Tile-IDs: 2 Wand, 6 Wasser, 10 Baum, 11 Fels, 12 Lava, 13 Grabstein, 14 Säule, 0 leer */
+const BLOCKED = new Set([0, 2, 6, 10, 11, 12, 13, 14]);
 
 export interface LoadedMap {
   grid: Grid;
@@ -54,6 +54,9 @@ export function buildWorld(seed: number, map: TiledMap): { world: World; tiles: 
     .filter((o) => o.type === 'safezone')
     .map((o) => ({ x: o.x / ts, y: o.y / ts, w: o.width / ts, h: o.height / ts }));
   const world = createWorld(seed, grid, safe);
+  world.regions = objs
+    .filter((o) => o.type === 'region')
+    .map((o) => ({ name: o.name, levels: prop(o, 'levels') ?? '', x: o.x / ts, y: o.y / ts, w: o.width / ts, h: o.height / ts }));
   const start = objs.find((o) => o.type === 'start');
   if (!start) throw new Error('Tiled-Karte braucht ein Objekt vom Typ "start"');
   for (const o of objs) {

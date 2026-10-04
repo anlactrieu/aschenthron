@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Erzeugt src/data/aschenthron.json (Tiled-JSON, orthogonal, 32px) – die Insel „Aschental“.
 Gids: 1 Stadtstein, 2 Wand, 3 Sumpf, 4 Gras, 5 Dungeonboden, 6 Wasser, 7 Weg, 8 Hochland, 9 Asche,
-10 Baum (blockiert), 11 Fels/Grabstein (blockiert), 12 Lava (blockiert).
+10 Baum, 11 Fels, 12 Lava, 13 Grabstein, 14 Säule (alle blockiert).
 Alles hier ist eigener Entwurf. Danach in Tiled editierbar; das Spiel liest nur die JSON-Datei."""
 import json, random, collections, sys
 
 W, H, TS = 160, 120, 32
 random.seed(20261004)
 g = [[6] * W for _ in range(H)]
-BLOCK = {2, 6, 10, 11, 12}
+BLOCK = {2, 6, 10, 11, 12, 13, 14}
 objs, oid = [], [1]
 
 def fill(r, gid):
@@ -80,7 +80,7 @@ scatter(R['farm'], 4, 10, 0.03); scatter(R['farm'], 4, 11, 0.01)
 scatter(R['forest'], 4, 10, 0.20)
 scatter(R['camp'], 7, 11, 0.04); scatter(R['camp'], 7, 10, 0.03)
 blobs(R['swamp'], 3, 6, 14, 3); scatter(R['swamp'], 3, 10, 0.04)
-scatter(R['grave'], 4, 11, 0.09); scatter(R['grave'], 4, 10, 0.02)
+scatter(R['grave'], 4, 13, 0.09); scatter(R['grave'], 4, 10, 0.02)
 scatter(R['hills'], 8, 11, 0.12); scatter(R['hills'], 8, 10, 0.02)
 blobs(R['ash'], 9, 12, 12, 3); scatter(R['ash'], 9, 11, 0.10)
 
@@ -151,7 +151,7 @@ def dungeon(box, entrance, cell=(11, 9), room=(8, 6), pillars=0.05, loops=3):
         for y in range(ry0 + 1, ry1):
             for x in range(rx0 + 1, rx1):
                 if g[y][x] == 5 and random.random() < pillars and abs(x - (rx0 + rx1) // 2) > 1 and abs(y - (ry0 + ry1) // 2) > 1:
-                    g[y][x] = 11
+                    g[y][x] = 14
     # Eingang: nächster Raum zum Eintrittspunkt
     ex, ey = entrance
     ent = min(rooms, key=lambda k: abs((rooms[k][0] + rooms[k][2]) // 2 - ex) + abs((rooms[k][1] + rooms[k][3]) // 2 - ey))
@@ -188,6 +188,15 @@ obj("Aschenhafen", "townstart", 22, 99)
 obj("Felsenwacht", "townstart", 78, 50)
 obj("Aschenhafen", "safezone", 13, 87, 22, 21)
 obj("Felsenwacht", "safezone", 67, 39, 23, 21)
+# Zonen (für Namensanzeige und Minikarte): Name, Rechteck, Level-Spanne
+for nm, r, lv in [("Aschenhafen", (13, 87, 34, 108), "Stadt"), ("Roggenfelder", (35, 80, 66, 112), "1-3"),
+                  ("Düsterwald", (14, 46, 62, 79), "3-7"), ("Räuberlager", (14, 24, 46, 44), "8-12"),
+                  ("Moorlande", (68, 62, 112, 96), "6-11"), ("Felsenwacht", (67, 39, 90, 60), "Stadt"),
+                  ("Totenacker", (70, 98, 112, 114), "9-13"), ("Hochland", (92, 26, 130, 58), "13-19"),
+                  ("Aschenöde", (114, 60, 152, 92), "21-29"),
+                  ("Gruft der Moorhexe", DUNGEONS['sumpf']['box'], "10-16"), ("Katakomben", DUNGEONS['kata']['box'], "13-18"),
+                  ("Tiefenmine", DUNGEONS['mine']['box'], "17-22"), ("Thron der Asche", DUNGEONS['thron']['box'], "26-30")]:
+    obj(nm, "region", r[0], r[1], r[2] - r[0] + 1, r[3] - r[1] + 1, levels=lv)
 # NPCs Aschenhafen
 obj("Lehrer Varn", "npc", 20, 94, kind="trainer", tier=1)
 obj("Händlerin Mirel", "npc", 24, 94, kind="merchant", shop="basic")
@@ -205,18 +214,21 @@ obj("Späher Ruven", "npc", 78, 44, kind="quest", quests="q_mine,q_ash,q_katacom
 
 # Monster
 SPAWN_BUFFER = 8
+SPACING = 4   # Mindestabstand zwischen Monstern (vermeidet Massen-Aggro)
+DENSITY = 1.0  # Anteil der Monster pro Patch
 safe_rects = [(13, 87, 34, 108), (67, 39, 90, 60)]
 def in_safe(x, y, pad=0):
     return any(a - pad <= x <= b + pad and c - pad <= y <= d + pad for a, c, b, d in safe_rects)
 taken = []
 def spawn(kind, n, r, ground=None, pad=SPAWN_BUFFER, tries=4000):
     x0, y0, x1, y1 = r
+    n = max(1, round(n * DENSITY))
     placed, t = 0, 0
     while placed < n and t < tries:
         t += 1
         x, y = random.randint(x0, x1), random.randint(y0, y1)
         if not free(x, y) or (ground is not None and g[y][x] not in ground): continue
-        if in_safe(x, y, pad) or any(abs(x - a) < 3 and abs(y - b) < 3 for a, b in taken): continue
+        if in_safe(x, y, pad) or any(abs(x - a) < SPACING and abs(y - b) < SPACING for a, b in taken): continue
         if g[y][x] == 7 and r[0] != r[1]: pass
         taken.append((x, y)); obj(kind, "monster", x, y, kind=kind); placed += 1
     if placed < n: print("WARN nur", placed, "von", n, kind, r, file=sys.stderr)
@@ -299,6 +311,6 @@ json.dump(tmj, open("src/data/aschenthron.json", "w"), ensure_ascii=False)
 mons = [o for o in objs if o["type"] == "monster"]
 print("ok:", len(mons), "Monster,", sum(1 for o in objs if o["type"] == "npc"), "NPCs, erreichbare Tiles:", len(seen))
 if "--preview" in sys.argv:
-    ch = {1: 'T', 2: '#', 3: '~', 4: '.', 5: '_', 6: ' ', 7: '=', 8: ',', 9: ':', 10: 'f', 11: 'o', 12: '!'}
+    ch = {1: 'T', 2: '#', 3: '~', 4: '.', 5: '_', 6: ' ', 7: '=', 8: ',', 9: ':', 10: 'f', 11: 'o', 12: '!', 13: 't', 14: 'i'}
     for y in range(0, H, 2):
         print(''.join(ch[g[y][x]] for x in range(0, W, 2)))

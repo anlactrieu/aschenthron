@@ -65,7 +65,7 @@ function mk(
     damage: [Math.max(1, Math.round(avg * 0.7)), Math.max(2, Math.round(avg * 1.3))],
     speed: o.speed ?? 0.1,
     attackCooldown: o.cd ?? 20,
-    aggroRange: o.aggro ?? Math.min(9, 5 + Math.floor(level / 8)),
+    aggroRange: o.aggro ?? Math.min(7, 4 + Math.floor(level / 10)),
     xp: Math.round(SCALE.xp(level) * (o.boss ? SCALE.bossXp : 1)),
     gold: [Math.round(level * 1.5 + 1), Math.round(level * 3 + 3)],
     dropChance: o.boss ? 1 : (o.drop ?? 0.5),

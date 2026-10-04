@@ -1,8 +1,10 @@
 # HANDOFF – Aschenthron
 
 ## Stand
-Meilensteine 1–6 der `SPEC.md` umgesetzt und committet (Code-Stand `e4a6e2f`): Karte/Bewegung/Kampf, Drops/Inventar/Gewicht/Affixe, Attribute/Leveln/Lehrer/Skills, Todesstrafe (XP-Verlust + Item-Drop + Leichenlauf 5 Min.), Hub (Händler, Truhe, Safe-Zone ohne Kampf), Dungeon + Boss (Aschenkönig). Tränke (Heil/Mana, Q/E, 5 s Cooldown, Händler + Drops; Ausrüstungs-Drops auf 40 % gesenkt, Tränke 30 %). Speichern in localStorage. 33 Tests, Lint und Build grün.
-Befehle: `npm run dev | test | lint | build | pace` (pace = Bot-Messlauf Level-Tempo). Reset: `?neu` an die URL oder Button im Panel.
+Nachtarbeit läuft (Auftrag des Users: alles ausführen, morgen früh ein komplettes Gebiet in T4C-Insel-Größe spielbar). Reihenfolge laut Advisor: Pfadfindung → Save-Migration → Gebiet (A) → Balance (B) → Grafik/Sound (C) → Stufe-2-Loot (D) → Mehrspieler (E, nur auf eigenem Branch/Einstiegspunkt, Singleplayer bleibt Standard).
+Fertig + committet: A (Insel „Aschental“ 160×120, 2 Städte, 4 Dungeons, 5 Bosse, 22 Monsterarten, 14 Quests, Level 1–30, ~290 Monster), B (Bot-Messung ~6 h bis Cap), C (prozedurale Pixel-Art, WebAudio-Sound, Minikarte N, Zonenbanner).
+Befehle: `npm run dev | test | lint | build | pace`. Reset: `?neu`. Karte neu erzeugen: `python3 scripts/gen_map.py [--preview]` (schreibt `src/data/aschenthron.json`).
+Annahmen für den User: siehe `SPEC.md` Abschnitt „Annahmen ohne Rückfrage“.
 `Browserspiele/` und `Spiele/` sind per `.gitignore` bewusst nicht im Repo.
 
 ## Letzte 3 Entscheidungen

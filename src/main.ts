@@ -3,6 +3,7 @@ import { GameScene } from './render/GameScene';
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
+  pixelArt: true,
   parent: 'game',
   width: window.innerWidth,
   height: window.innerHeight,

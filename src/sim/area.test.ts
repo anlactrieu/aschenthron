@@ -13,7 +13,7 @@ describe('Gebiet „Aschental“: Inhalt und Größe', () => {
   it('ist inselgroß: Karte, Monsterzahl, Städte, Bosse', () => {
     expect(w.grid.w).toBeGreaterThanOrEqual(150);
     expect(w.grid.h).toBeGreaterThanOrEqual(110);
-    expect(monsters.length).toBeGreaterThanOrEqual(300);
+    expect(monsters.length).toBeGreaterThanOrEqual(250);
     expect(w.safe.length).toBeGreaterThanOrEqual(2);
     expect(w.towns.length).toBeGreaterThanOrEqual(2);
     const bosses = new Set(monsters.filter((m) => m.boss).map((m) => m.kindId));

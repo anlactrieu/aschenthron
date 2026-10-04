@@ -39,6 +39,8 @@ export class Ui {
   private hotbar = el('div', 'display:flex;gap:6px;pointer-events:auto');
   private target = el('div', 'position:fixed;left:50%;top:10px;transform:translateX(-50%);background:rgba(14,12,18,.85);border:1px solid #4b3f3a;color:#c9b79c;font:13px system-ui,sans-serif;padding:4px 10px;display:none;text-align:center');
   private toast = el('div', 'position:fixed;left:12px;bottom:84px;width:420px;color:#c9b79c;font:13px/1.35 system-ui,sans-serif;pointer-events:none;text-shadow:0 1px 2px #000');
+  private bannerEl = el('div', 'position:fixed;left:50%;top:70px;transform:translateX(-50%);color:#e8d9b0;font:bold 22px system-ui,sans-serif;text-shadow:0 2px 6px #000;letter-spacing:1px;opacity:0;transition:opacity .6s;pointer-events:none');
+  private bannerTimer = 0;
   private msgs: string[] = [];
   private key = '';
   private open = false;
@@ -46,7 +48,7 @@ export class Ui {
   constructor(private send: (c: Command) => void, private useSkillSlot: (i: number) => void, private usePotionKind: (kind: 'heal' | 'mana') => void, private newGame: () => void) {
     this.buildBars();
     this.hud.append(this.hotbar, this.bars);
-    document.body.append(this.panel, this.hud, this.target, this.toast);
+    document.body.append(this.panel, this.hud, this.target, this.toast, this.bannerEl);
     window.addEventListener('keydown', (e) => {
       const k = e.key.toLowerCase();
       if (k === 'i' || k === 'c') this.toggle();
@@ -60,6 +62,13 @@ export class Ui {
     this.open = force ?? !this.open;
     this.panel.style.display = this.open ? 'block' : 'none';
     this.key = '';
+  }
+
+  banner(text: string): void {
+    this.bannerEl.textContent = text;
+    this.bannerEl.style.opacity = '1';
+    window.clearTimeout(this.bannerTimer);
+    this.bannerTimer = window.setTimeout(() => (this.bannerEl.style.opacity = '0'), 2800);
   }
 
   say(m: string): void {
