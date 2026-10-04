@@ -101,3 +101,16 @@ describe('Items', () => {
     expect(new Set(TEMPLATES.map((t) => t.id)).size).toBe(TEMPLATES.length);
   });
 });
+
+describe('Drop-Pool', () => {
+  it('jeder Slot hat für jede Monsterstufe passende Drops', async () => {
+    const { TEMPLATES } = await import('./items');
+    const slots = ['weapon', 'head', 'chest', 'hands', 'feet', 'ring'];
+    for (let lvl = 2; lvl <= 16; lvl++) {
+      for (const slot of slots) {
+        const ok = TEMPLATES.some((t) => t.slot === slot && t.minLevel <= lvl && t.minLevel >= lvl - 8);
+        expect(ok, `Slot ${slot} bei Level ${lvl}`).toBe(true);
+      }
+    }
+  });
+});

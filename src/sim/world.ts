@@ -1,9 +1,9 @@
 import { Rng } from './rng';
 import { findPath, isWalkable, type Grid, type Pt } from './path';
-import { rollDrop, TEMPLATES, templateById, generateItem, type Item, type Slot } from './items';
+import { rollDrop, templateById, generateItem, type Item, type Slot } from './items';
 import {
   ATTR_KEYS, MAX_LEVEL, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
-  monsterKind, skillById, totalXpFor, type AttrKey,
+  monsterKind, skillById, totalXpFor, SHOP_ITEMS, type AttrKey,
 } from './data';
 
 export const TICK_RATE = 20;
@@ -276,7 +276,9 @@ export function applyCommand(w: World, actorId: number, cmd: Command): void {
     case 'equip': {
       const it = a.inventory.find((i) => i.id === cmd.itemId);
       if (!it) return;
-      if (effectiveKraft(a) < it.reqKraft) {
+      const replaced = a.equipment[it.slot];
+      const bonusLost = replaced ? replaced.affixes.filter((f) => f.stat === 'kraft').reduce((n, f) => n + f.value, 0) : 0;
+      if (effectiveKraft(a) - bonusLost < it.reqKraft) {
         w.events.push({ type: 'cannotEquip', item: it, reason: `Benötigt Kraft ${it.reqKraft}` });
         return;
       }
@@ -324,7 +326,7 @@ export function applyCommand(w: World, actorId: number, cmd: Command): void {
       break;
     case 'buy': {
       if (!nearNpc(w, a, 'merchant')) return fail(w, 'Kein Händler in der Nähe.');
-      if (!TEMPLATES.some((t) => t.id === cmd.templateId)) return;
+      if (!SHOP_ITEMS.includes(cmd.templateId)) return fail(w, 'Das führt die Händlerin nicht.');
       const price = buyPrice(cmd.templateId);
       if (a.gold < price) return fail(w, 'Nicht genug Gold.');
       const item = generateItem(w.rng, w.nextId++, cmd.templateId, 'normal');
@@ -378,6 +380,7 @@ function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void 
   const t = getActor(w, targetId ?? a.targetId ?? -1);
   if (!t || !t.alive || t.id === a.id) return fail(w, 'Kein Ziel.');
   if (Math.hypot(a.x - t.x, a.y - t.y) > s.range) return fail(w, 'Ziel außer Reichweite.');
+  if (a.kind === 'player' && inSafeZone(w, a.x, a.y)) return fail(w, 'In der Stadt ist Kämpfen verboten.');
   a.mana -= s.mana;
   a.skillCd[s.id] = s.cooldown;
   let amount: number;
@@ -442,6 +445,7 @@ function chase(w: World, a: Actor, t: Actor): void {
 
 function fight(w: World, a: Actor, t: Actor): void {
   if (a.cooldownLeft > 0) return;
+  if (a.kind === 'player' && inSafeZone(w, a.x, a.y)) return;
   a.cooldownLeft = attackCooldownOf(a);
   const [lo, hi] = damageRange(a);
   dealDamage(w, a, t, w.rng.int(lo, hi), false);

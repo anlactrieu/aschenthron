@@ -74,3 +74,6 @@ export function skillById(id: string): SkillDef | undefined {
 
 export const SAFE_REGEN = 0.5;
 export const FIELD_REGEN = 0.02;
+
+/** Sortiment der Händlerin (Normalqualität, Vorlagen-IDs). */
+export const SHOP_ITEMS = ['rusty_sword', 'bone_club', 'steel_sword', 'leather_cap', 'iron_helm', 'ash_mail', 'worn_gloves', 'cloth_boots', 'iron_greaves', 'iron_ring'];

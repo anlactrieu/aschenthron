@@ -82,5 +82,5 @@ Orientierung an T4C nur bei Spielprinzipien (Mechaniken lassen sich nicht schüt
 TypeScript + Vite (Build), Vitest (Tests), ESLint (Lint), Phaser nur fürs Rendering. Versionen in der Umsetzungs-Session prüfen, nicht aus dem Gedächtnis. Vor jeder „fertig“-Meldung: Tests, Build, Lint laufen lassen.
 
 ## Prozess
-Umsetzung in frischer Session mit dieser SPEC.md. Git-Repo ist angelegt (`main`).
+Umsetzung auf Wunsch des Users in derselben Session (statt frischer Session). Stand: Meilensteine 1–6 umgesetzt, siehe HANDOFF.md. Git-Repo (`main`).
 Advisor (Opus) an den Checkpoints laut ~/.claude/CLAUDE.md.

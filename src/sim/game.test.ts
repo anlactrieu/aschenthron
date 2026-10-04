@@ -56,7 +56,10 @@ describe('Charakter und Leveln (M3)', () => {
   it('Skill verbraucht Mana, hat Cooldown und Reichweite', () => {
     const { w, p } = fresh();
     p.skills.push('ember_bolt');
-    const m = spawnMonster(w, 6, 1, 'bog_ghoul');
+    p.x = 8;
+    p.y = 8;
+    const m = spawnMonster(w, 12, 8, 'bog_ghoul');
+    m.aggroRange = 0;
     const mana0 = p.mana;
     applyCommand(w, p.id, { type: 'useSkill', skillId: 'ember_bolt', targetId: m.id });
     expect(m.hp).toBeLessThan(m.maxHp);
@@ -65,6 +68,7 @@ describe('Charakter und Leveln (M3)', () => {
     applyCommand(w, p.id, { type: 'useSkill', skillId: 'ember_bolt', targetId: m.id });
     expect(m.hp).toBe(hp1); // Cooldown
     const far = spawnMonster(w, 19, 19);
+    far.aggroRange = 0;
     p.skillCd = {};
     applyCommand(w, p.id, { type: 'useSkill', skillId: 'ember_bolt', targetId: far.id });
     expect(far.hp).toBe(far.maxHp);
@@ -270,5 +274,41 @@ describe('Fernkampf', () => {
     applyCommand(w, p.id, { type: 'useSkill', skillId: 'power_strike', targetId: m.id });
     run(w, TICK_RATE * 5);
     expect(m.alive).toBe(false);
+  });
+});
+
+describe('Safe-Zone und Sortiment', () => {
+  it('Spieler kann aus der Safe-Zone weder zaubern noch zuschlagen', () => {
+    const { w, p } = fresh();
+    p.skills.push('ember_bolt');
+    p.damage = [999, 999];
+    const m = spawnMonster(w, 4, 2, 'grave_rat');
+    m.aggroRange = 0;
+    p.x = 3;
+    p.y = 2;
+    applyCommand(w, p.id, { type: 'useSkill', skillId: 'ember_bolt', targetId: m.id });
+    applyCommand(w, p.id, { type: 'attack', targetId: m.id });
+    run(w, TICK_RATE * 2);
+    expect(m.hp).toBe(m.maxHp);
+  });
+
+  it('Händler verkauft nur sein Sortiment', () => {
+    const { w, p } = fresh();
+    addNpc(w, 'merchant', 'H', 2, 2);
+    p.gold = 9999;
+    applyCommand(w, p.id, { type: 'buy', templateId: 'cinder_axe' });
+    expect(p.inventory).toHaveLength(0);
+  });
+
+  it('Kraft-Bonus des ersetzten Items zählt nicht für die Anforderung', () => {
+    const { w, p } = fresh();
+    p.attrs.kraft = 12;
+    const boost = generateItem(w.rng, w.nextId++, 'bone_club', 'normal');
+    boost.affixes.push({ stat: 'kraft', value: 6 });
+    p.equipment.weapon = boost;
+    const heavy = generateItem(w.rng, w.nextId++, 'steel_sword', 'normal'); // Kraft 15
+    p.inventory.push(heavy);
+    applyCommand(w, p.id, { type: 'equip', itemId: heavy.id });
+    expect(p.equipment.weapon).toBe(boost);
   });
 });

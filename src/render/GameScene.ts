@@ -79,7 +79,11 @@ export class GameScene extends Phaser.Scene {
 
   private save(): void {
     if (this.resetting) return;
-    safeStorage()?.setItem(SAVE_KEY, exportPlayer(this.player()));
+    try {
+      safeStorage()?.setItem(SAVE_KEY, exportPlayer(this.player()));
+    } catch {
+      /* Speicher voll oder gesperrt: Spiel läuft ohne Speichern weiter */
+    }
   }
 
   private useSkillSlot(i: number): void {
@@ -224,17 +228,25 @@ export class GameScene extends Phaser.Scene {
     t.setPosition(pos.sx, pos.sy + dy);
   }
 
-  private diamond(g: Phaser.GameObjects.Graphics, sx: number, sy: number, color: number): void {
+  private pool = [0, 1, 2, 3].map(() => new Phaser.Math.Vector2());
+
+  /** Zeichnet ein Viereck mit wiederverwendeten Punkten (vermeidet Allokationen pro Kachel und Frame). */
+  private quad(g: Phaser.GameObjects.Graphics, color: number, c: number[]): void {
     g.fillStyle(color, 1);
-    g.fillPoints([new Phaser.Math.Vector2(sx, sy - TILE_H / 2), new Phaser.Math.Vector2(sx + TILE_W / 2, sy), new Phaser.Math.Vector2(sx, sy + TILE_H / 2), new Phaser.Math.Vector2(sx - TILE_W / 2, sy)], true);
+    for (let i = 0; i < 4; i++) this.pool[i]!.set(c[i * 2]!, c[i * 2 + 1]!);
+    g.fillPoints(this.pool, true);
+  }
+
+  private diamond(g: Phaser.GameObjects.Graphics, sx: number, sy: number, color: number): void {
+    this.quad(g, color, [sx, sy - TILE_H / 2, sx + TILE_W / 2, sy, sx, sy + TILE_H / 2, sx - TILE_W / 2, sy]);
   }
 
   private drawBlock(g: Phaser.GameObjects.Graphics, sx: number, sy: number): void {
     const h = 20;
-    g.fillStyle(0x3a302d, 1);
-    g.fillPoints([new Phaser.Math.Vector2(sx - TILE_W / 2, sy), new Phaser.Math.Vector2(sx, sy + TILE_H / 2), new Phaser.Math.Vector2(sx, sy + TILE_H / 2 - h), new Phaser.Math.Vector2(sx - TILE_W / 2, sy - h)], true);
-    g.fillStyle(0x2c2422, 1);
-    g.fillPoints([new Phaser.Math.Vector2(sx + TILE_W / 2, sy), new Phaser.Math.Vector2(sx, sy + TILE_H / 2), new Phaser.Math.Vector2(sx, sy + TILE_H / 2 - h), new Phaser.Math.Vector2(sx + TILE_W / 2, sy - h)], true);
+    const hw = TILE_W / 2;
+    const hh = TILE_H / 2;
+    this.quad(g, 0x3a302d, [sx - hw, sy, sx, sy + hh, sx, sy + hh - h, sx - hw, sy - h]);
+    this.quad(g, 0x2c2422, [sx + hw, sy, sx, sy + hh, sx, sy + hh - h, sx + hw, sy - h]);
     this.diamond(g, sx, sy - h, 0x4b3f3a);
   }
 
@@ -251,7 +263,7 @@ export class GameScene extends Phaser.Scene {
   private drawActor(g: Phaser.GameObjects.Graphics, a: Actor): void {
     const { sx, sy } = toScreen(a.x, a.y);
     if (!a.alive) {
-      if (this.world.tick - a.diedAt < 60 && a.kind === 'monster') {
+      if (this.world.tick - a.diedAt < TICK_RATE * 3 && a.kind === 'monster') {
         g.fillStyle(0x3b2a2a, 1);
         g.fillEllipse(sx, sy, 28, 12);
       }

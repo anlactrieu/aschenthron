@@ -3,7 +3,7 @@
 ## Stand
 Meilensteine 1–6 umgesetzt: Karte/Bewegung/Kampf, Drops/Inventar/Gewicht/Affixe, Attribute/Leveln/Lehrer/Skills, Todesstrafe (XP-Verlust + Item-Drop + Leichenlauf 5 Min.), Hub (Händler, Truhe, Safe-Zone), Dungeon + Boss (Aschenkönig, wütet <30 % LP, garantiert Seltenes). Speichern in localStorage.
 Code: `src/sim/` (reine Logik: world, items, data, tiled, save, path, rng), `src/render/` (Phaser `GameScene`, DOM `ui.ts`). Karte: `src/data/aschenthron.json` (Tiled-Format, erzeugt von `scripts/gen_map.py`, in Tiled editierbar).
-Befehle: `npm run dev | test | lint | build`. `Browserspiele/` und `Spiele/` sind per `.gitignore` bewusst nicht im Repo.
+Befehle: `npm run dev | test | lint | build | pace` (pace = Bot-Messlauf Level-Tempo). Start-Reset: `?neu` an die URL oder Button im Panel. `Browserspiele/` und `Spiele/` sind per `.gitignore` bewusst nicht im Repo.
 
 ## Letzte 3 Entscheidungen
 1. **Pivot auf T4C-Vorbild** (D4O = Die Vierte Offenbarung, nicht Diablo 4): feste offene Welt, klassenlos, Extraction gestrichen. Grund: das Spielgefühl, das der User will.
@@ -11,6 +11,7 @@ Befehle: `npm run dev | test | lint | build`. `Browserspiele/` und `Spiele/` sin
 3. **Haltbarkeit/Reparatur und Dunkle Künste nicht im Scope.** Grund: User hat sie bewusst nicht gewählt.
 
 ## Offene TODOs
+- Offen aus Code-Review: UI-Panel serialisiert pro Frame JSON (Dirty-Flag wäre besser); A* in `chase` läuft fast jeden Tick pro Monster (Neuberechnung drosseln, Heap)
 - Balancing per Spieltest (XP-Kurve, Monsterstärke, Drop-Raten)
 - Echte Grafik statt Platzhalter, Sound
 - Stufe 2 der Spec (Crafting, Sets, legendäre Effekte, mehr Skills), dann Server/PvP

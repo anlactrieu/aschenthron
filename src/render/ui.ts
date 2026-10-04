@@ -1,7 +1,7 @@
-import { ATTR_KEYS, ATTR_NAME, SKILLS, totalXpFor, MAX_LEVEL, monsterKind } from '../sim/data';
-import { TEMPLATES, type Item, type Slot } from '../sim/items';
+import { ATTR_KEYS, ATTR_NAME, SKILLS, SHOP_ITEMS, totalXpFor, MAX_LEVEL, monsterKind } from '../sim/data';
+import { templateById, type Item, type Slot } from '../sim/items';
 import {
-  armorOf, buyPrice, carriedWeight, carryCapacity, damageRange, maxHpOf, maxManaOf, nearNpc, sellPrice,
+  TICK_RATE, armorOf, buyPrice, carriedWeight, carryCapacity, damageRange, maxHpOf, maxManaOf, nearNpc, sellPrice,
   type Actor, type Command, type World,
 } from '../sim/world';
 
@@ -125,7 +125,7 @@ export class Ui {
     p.skills.forEach((id, i) => {
       const s = SKILLS.find((x) => x.id === id)!;
       const cd = p.skillCd[id] ?? 0;
-      const label = `${i + 1} ${s.name}${cd > 0 ? ` (${Math.ceil(cd / 20)}s)` : ''}`;
+      const label = `${i + 1} ${s.name}${cd > 0 ? ` (${Math.ceil(cd / TICK_RATE)}s)` : ''}`;
       const b = this.hotButtons[i]!;
       if (b.textContent !== label) b.textContent = label;
     });
@@ -192,7 +192,7 @@ export class Ui {
     }
     if (merchant) {
       h('Händlerin Mirel');
-      for (const t of TEMPLATES.filter((x) => x.minLevel <= 6)) {
+      for (const t of SHOP_ITEMS.map(templateById)) {
         const row = el('div', 'display:flex;justify-content:space-between;align-items:center;margin:2px 0');
         row.append(el('span', '', `${t.name} (${t.weight})`), this.btn(`${buyPrice(t.id)}g`, () => this.send({ type: 'buy', templateId: t.id })));
         out.push(row);
