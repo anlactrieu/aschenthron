@@ -86,11 +86,14 @@ describe('Items', () => {
       p.damage = [500, 500];
       const m = spawnMonster(w, 3, 1);
       applyCommand(w, p.id, { type: 'attack', targetId: m.id });
-      for (let i = 0; i < 200 && m.alive; i++) tick(w);
+      for (let i = 0; i < 600 && m.alive; i++) tick(w);
       if (w.ground.length === 0) continue;
-      applyCommand(w, p.id, { type: 'pickup', groundId: w.ground[0]!.id });
-      for (let i = 0; i < 100; i++) tick(w);
-      expect(p.inventory).toHaveLength(1);
+      const n = w.ground.length;
+      for (const g of [...w.ground]) {
+        applyCommand(w, p.id, { type: 'pickup', groundId: g.id });
+        for (let i = 0; i < 100; i++) tick(w);
+      }
+      expect(p.inventory).toHaveLength(n);
       expect(w.ground).toHaveLength(0);
       return;
     }

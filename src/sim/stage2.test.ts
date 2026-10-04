@@ -579,3 +579,34 @@ describe('Skillpunkte, Ränge und Neuverteilen', () => {
     expect(p.skillPoints).toBe(2 + 4 - 2);
   });
 });
+
+describe('Treffer und Ausweichen', () => {
+  it('Trefferchance steigt mit Angreiferwert und fällt mit Gewandtheit des Ziels', async () => {
+    const { hitChance } = await import('./world');
+    const { w, p } = fresh();
+    const m = spawnMonster(w, 14, 10, 'bandit');
+    const base = hitChance(m, p);
+    p.attrs.gewandtheit = 40;
+    expect(hitChance(m, p)).toBeLessThan(base);
+    const weak = spawnMonster(w, 15, 10, 'field_rat');
+    p.level = 20;
+    expect(hitChance(p, weak)).toBeGreaterThan(0.85);
+    expect(hitChance(m, p)).toBeGreaterThanOrEqual(0.35);
+    expect(hitChance(p, m)).toBeLessThanOrEqual(0.97);
+  });
+
+  it('Fehlschläge treten auf, erzeugen miss-Ereignisse und zählen als Gefecht', () => {
+    const { w, p } = fresh();
+    p.damage = [1, 1];
+    const m = spawnMonster(w, 11, 10, 'bandit_captain'); // deutlich höhere Stufe: oft verfehlt
+    m.maxHp = 99999;
+    m.hp = 99999;
+    applyCommand(w, p.id, { type: 'attack', targetId: m.id });
+    run(w, TICK_RATE * 60);
+    const ev = drainEvents(w);
+    const misses = ev.filter((e) => e.type === 'miss' && e.attackerId === p.id).length;
+    const hits = ev.filter((e) => e.type === 'hit' && e.attackerId === p.id).length;
+    expect(misses).toBeGreaterThan(0);
+    expect(hits).toBeGreaterThan(misses);
+  });
+});

@@ -419,6 +419,23 @@ export class GameScene extends Phaser.Scene {
           }
           break;
         }
+        case 'miss': {
+          const at = getActor(w, e.attackerId);
+          const tg = getActor(w, e.targetId);
+          const v = at ? this.actorViews.get(at.id) : undefined;
+          if (v) {
+            v.swingStart = this.now;
+            v.swingUntil = this.now + SWING_MS * this.ts;
+          }
+          this.later(SWING_MS * 0.4 * this.ts, () => {
+            const pos = this.bodyPos(tg);
+            if (!pos) return;
+            const toPlayer = e.targetId === this.playerId;
+            this.fx.floatText(pos.x, pos.y - 26, toPlayer ? 'Ausgewichen' : 'Verfehlt', toPlayer ? '#7fe0ff' : '#b0b0b8', 13);
+            if (e.attackerId === this.playerId || toPlayer) this.sfx.miss();
+          });
+          break;
+        }
         case 'died': {
           const dead = getActor(w, e.id);
           if (e.id !== this.playerId) {

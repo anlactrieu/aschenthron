@@ -254,7 +254,7 @@ export function generateItem(rng: Rng, id: number, templateId: string, rarityIn:
 }
 
 export function rollDrop(rng: Rng, nextId: () => number, monsterLevel: number, forceRarity?: Rarity): Item {
-  const pool = TEMPLATES.filter((t) => t.slot !== 'potion' && t.slot !== 'ammo' && t.minLevel <= monsterLevel && t.minLevel >= monsterLevel - 8);
+  const pool = TEMPLATES.filter((t) => t.slot !== 'potion' && t.slot !== 'ammo' && (!forceRarity || t.slot !== 'quiver') && t.minLevel <= monsterLevel && t.minLevel >= monsterLevel - 8);
   const t = pool[rng.int(0, pool.length - 1)]!;
   return generateItem(rng, nextId(), t.id, forceRarity ?? rollRarity(rng));
 }

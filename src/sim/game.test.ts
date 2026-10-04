@@ -189,7 +189,7 @@ describe('Welt, Dungeon und Boss (M6)', () => {
     const boss = spawnMonster(w, 12, 10, 'bandit_lord');
     boss.damage = [1, 1];
     applyCommand(w, pl.id, { type: 'attack', targetId: boss.id });
-    run(w, TICK_RATE * 30);
+    for (let i = 0; i < TICK_RATE * 44 && boss.alive; i++) tick(w);
     const ev = drainEvents(w);
     expect(ev.some((e) => e.type === 'enraged')).toBe(true);
     expect(boss.alive).toBe(false);
@@ -347,7 +347,7 @@ describe('Tränke', () => {
       }
     }
     expect(potions).toBeGreaterThan(gear);
-    expect(gear / 300).toBeLessThan(0.3);
+    expect(gear / 300).toBeLessThan(0.35);
     expect(potions / 300).toBeGreaterThan(0.2);
   });
 

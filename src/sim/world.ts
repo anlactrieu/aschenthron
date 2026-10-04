@@ -164,6 +164,7 @@ type GameEventBase =
   | { type: 'fail'; reason: string }
   | { type: 'pk'; id: number }
   | { type: 'chestOpened'; chestId: number }
+  | { type: 'miss'; attackerId: number; targetId: number }
   | { type: 'refilled'; arrows: number }
   | { type: 'respecced' };
 
@@ -327,6 +328,19 @@ export function missingReq(a: Actor, it: Item, replaced?: Item): string[] {
     if ((r[k] ?? 0) > a.attrs[k]) out.push(`${label} ${r[k]}`);
   }
   return out;
+}
+
+/** Angriffs- und Verteidigungswert (Stufe, Gewandtheit, Rüstung): Treffer-/Ausweichformel als Verhältnis. */
+export function attackRating(a: Actor): number {
+  return a.kind === 'player' ? 20 + 3 * a.level + 2 * a.attrs.gewandtheit : 20 + 4 * a.level;
+}
+export function defenseRating(a: Actor): number {
+  return a.kind === 'player' ? 10 + 2 * a.level + 2 * a.attrs.gewandtheit + armorOf(a) * 0.5 : 10 + 3 * a.level;
+}
+/** Trefferchance 35–97 %: ATK / (ATK + 0,2 · DEF). Gleichstark ≈ 83 %. */
+export function hitChance(att: Actor, def: Actor): number {
+  const atk = attackRating(att);
+  return Math.min(0.97, Math.max(0.35, atk / (atk + 0.2 * defenseRating(def))));
 }
 
 export function carryCapacity(a: Actor): number {
@@ -699,7 +713,7 @@ function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void 
       const weaponBonus = matches ? ((wp!.damage![0] + wp!.damage![1]) / 2) * 0.9 : 0;
       amount = Math.round((w.rng.int(lo, hi) * lvl + scale + weaponBonus + (quiver?.arrowBonus ?? 0)) * rankDamage(rank));
     }
-    dealDamage(w, a, v, amount, s.ignoresArmor, s.id);
+    dealDamage(w, a, v, amount, s.ignoresArmor, s.id, false, !s.ignoresArmor);
     if (s.dot && v.alive) v.dot = { perSec: Math.max(1, Math.round((amount * s.dot.factor) / s.dot.seconds)), until: w.tick + s.dot.seconds * TICK_RATE, srcId: a.id };
   }
 }
@@ -754,11 +768,21 @@ function fight(w: World, a: Actor, t: Actor): void {
   if (a.kind === 'player' && inSafeZone(w, a.x, a.y)) return;
   a.cooldownLeft = attackCooldownOf(a);
   const [lo, hi] = damageRange(a);
-  dealDamage(w, a, t, w.rng.int(lo, hi), false);
+  dealDamage(w, a, t, w.rng.int(lo, hi), false, undefined, false, true);
 }
 
-function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: boolean, skill?: string, noReflect = false): void {
+function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: boolean, skill?: string, noReflect = false, canMiss = false): void {
   if (t.kind === 'player' && inSafeZone(w, t.x, t.y) && t.pkUntil <= w.tick) return;
+  if (canMiss && !noReflect && w.rng.next() > hitChance(a, t)) {
+    t.lastHitAt = w.tick;
+    if (t.kind === 'monster' && a.kind === 'player' && t.alive && t.targetId === null) {
+      t.targetId = a.id;
+      t.autoAttack = true;
+      alertPack(w, t, a.id);
+    }
+    w.events.push({ type: 'miss', attackerId: a.id, targetId: t.id });
+    return;
+  }
   let raw = rawIn;
   let crit = false;
   if (a.kind === 'player' && !noReflect) {

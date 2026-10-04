@@ -148,6 +148,11 @@ export class Sfx {
     this.tone(180, 1.2, 'sawtooth', 0.25, 40);
     this.noise(0.9, 0.3, 500);
   }
+  miss(): void {
+    if (!this.gate('miss', 80)) return;
+    this.noise(0.08, 0.2, 3500);
+    this.tone(500, 0.08, 'sine', 0.06, 250);
+  }
   chest(): void {
     if (!this.gate('chest', 200)) return;
     this.tone(120, 0.25, 'sawtooth', 0.12, 80);
