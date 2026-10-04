@@ -759,6 +759,7 @@ describe('Review-Fixes: DoT, Helfer, Netz, Spielstand', () => {
     boss.targetId = null;
     run(w, boss.respawnTicks + 5);
     expect(boss.alive).toBe(true);
+    run(w, 110); // nächstes Aufräumen
     expect(w.actors.filter((a) => a.summonedBy === boss.id)).toHaveLength(0);
   });
 
@@ -935,7 +936,16 @@ describe('Balance bei Vollausrüstung (Level 30)', () => {
     r.p.maxHp = 99999;
     const h0 = r.p.hp;
     run(r.w, TICK_RATE * 10);
-    expect(r.p.hp - h0).toBeLessThan(MAX_REGEN_PER_SEC * 10 + 200 * 0.5 + 20);
+    // Vergleichslauf ohne Regenerations-Affix: der Unterschied darf höchstens die Obergrenze sein
+    const base = fresh();
+    gear(base.w, base.p, 'haste', 1);
+    base.p.x = 15;
+    base.p.y = 15;
+    base.p.hp = 1;
+    base.p.maxHp = 99999;
+    run(base.w, TICK_RATE * 10);
+    expect(r.p.hp - h0 - (base.p.hp - 1)).toBeLessThanOrEqual(MAX_REGEN_PER_SEC * 10 + 1);
+    expect(r.p.hp - h0 - (base.p.hp - 1)).toBeGreaterThan(MAX_REGEN_PER_SEC * 10 - 5);
   });
 
   it('ein voll ausgerüsteter Held verliert gegen ein Rudel Stufe-29-Gegner trotzdem Leben', () => {
@@ -961,5 +971,34 @@ describe('Balance bei Vollausrüstung (Level 30)', () => {
     expect(affixRange('crit', 26)[1]).toBeLessThanOrEqual(6);
     expect(affixRange('regen', 26)[1]).toBeLessThanOrEqual(4);
     expect(affixRange('haste', 26)[1]).toBeLessThanOrEqual(10);
+  });
+});
+
+
+describe('Unerreichbare Ziele und Rast-Randfälle', () => {
+  it('Angriff auf ein Monster hinter Wasser meldet "nicht erreichbar" und setzt kein Ziel', () => {
+    const g = open();
+    for (let y = 0; y < 30; y++) g.walkable[y * 30 + 15] = false; // Wasserstreifen quer durch die Karte
+    const w = createWorld(3, g);
+    const p = spawnPlayer(w, 10, 10);
+    const m = spawnMonster(w, 20, 10, 'field_rat');
+    m.aggroRange = 0;
+    applyCommand(w, p.id, { type: 'attack', targetId: m.id });
+    expect(p.targetId).toBeNull();
+    expect(drainEvents(w).some((e) => e.type === 'fail' && e.reason.includes('erreichbar'))).toBe(true);
+    applyCommand(w, p.id, { type: 'rest' });
+    expect(p.resting).toBe(true);
+  });
+
+  it('verfehlte Angriffe beenden die Rast', () => {
+    const { w, p } = fresh();
+    p.x = 15;
+    p.y = 15;
+    p.attrs.gewandtheit = 90;
+    applyCommand(w, p.id, { type: 'rest' });
+    const m = spawnMonster(w, 16, 15, 'field_rat');
+    m.targetId = p.id;
+    run(w, TICK_RATE * 6);
+    expect(p.resting).toBe(false);
   });
 });

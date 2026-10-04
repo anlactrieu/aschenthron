@@ -120,7 +120,7 @@ export function actorFromLite(l: ActorLite, tick: number): Actor {
     id: l.id, kind: l.kind, kindId: l.kindId, name: l.name, x: l.x, y: l.y, hp: l.hp, maxHp: l.maxHp, damage: [1, 1], speed: 0.1,
     attackCooldown: 20, cooldownLeft: 0, path: [], targetId: l.targetId, aggroRange: 0, alive: l.alive, level: l.level, xp: 0,
     statPoints: 0, attrs: { kraft: 10, gewandtheit: 10, ausdauer: 10, verstand: 10, willenskraft: 10 }, mana: 0, gold: 0, skills: [], skillRanks: {}, skillPoints: 0,
-    skillCd: {}, potionCd: 0, quests: {}, inventory: [], equipment: l.equipment ?? {}, stash: [], pickupId: null, chestId: null, resting: false, diedAt: l.diedAt,
+    skillCd: {}, potionCd: 0, quests: {}, inventory: [], equipment: l.equipment ?? {}, stash: [], pickupId: null, chestId: null, resting: false, stuck: 0, diedAt: l.diedAt,
     boss: l.boss, enraged: l.enraged, autoAttack: true, repathAt: 0, dot: null, lastHitAt: -9999, packId: 0, abilities: [], abilityAt: 0, chargeAt: 0, chargeUntil: 0, summoned: false, respawnTicks: 0, rewardMult: 1, champ: l.champ, unique: l.unique, pkUntil: l.pk ? tick + 1e6 : 0,
     attackedBy: null, damagers: {},
   };

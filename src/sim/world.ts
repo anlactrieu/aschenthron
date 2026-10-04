@@ -81,6 +81,8 @@ export interface Actor {
   stash: Item[];
   pickupId: number | null;
   chestId: number | null;
+  /** Ticks, in denen der Verfolgungspfad zum Ziel leer blieb (Ziel unerreichbar) */
+  stuck: number;
   /** rastet: Leben und Mana füllen sich schneller, jede Aktion oder jeder Treffer beendet es */
   resting: boolean;
   home?: Pt;
@@ -230,7 +232,7 @@ function baseActor(w: World, kind: Actor['kind'], name: string, x: number, y: nu
     id: w.nextId++, kind, name, x, y, hp: 100, maxHp: 100, damage: [1, 2], speed: 0.1, attackCooldown: 20,
     cooldownLeft: 0, path: [], targetId: null, aggroRange: 0, alive: true, level: 1, xp: 0, statPoints: 0,
     attrs: { kraft: 10, gewandtheit: 10, ausdauer: 10, verstand: 10, willenskraft: 10 },
-    mana: 20, gold: 0, skills: [], skillRanks: {}, skillPoints: 0, skillCd: {}, potionCd: 0, quests: {}, inventory: [], equipment: {}, stash: [], pickupId: null, chestId: null, resting: false,
+    mana: 20, gold: 0, skills: [], skillRanks: {}, skillPoints: 0, skillCd: {}, potionCd: 0, quests: {}, inventory: [], equipment: {}, stash: [], pickupId: null, chestId: null, resting: false, stuck: 0,
     diedAt: -1, boss: false, enraged: false, autoAttack: true, repathAt: 0, dot: null, lastHitAt: -9999, packId: 0, abilities: [], abilityAt: 0, chargeAt: 0, chargeUntil: 0, summoned: false, respawnTicks: MONSTER_RESPAWN_TICKS, rewardMult: 1, pkUntil: 0, attackedBy: null, damagers: {},
   };
   w.actors.push(a);
@@ -483,6 +485,8 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       const t = getActor(w, cmd.targetId);
       if (!t || !t.alive || t.id === a.id) return;
       if (t.kind === 'player' && !canPvp(w, a, t)) return fail(w, 'Hier ist kein Kampf gegen Spieler erlaubt.');
+      if (Math.hypot(a.x - t.x, a.y - t.y) > MELEE_RANGE + 0.5 && !findPath(w.grid, { x: Math.round(a.x), y: Math.round(a.y) }, { x: Math.round(t.x), y: Math.round(t.y) }).length) return fail(w, 'Das Ziel ist nicht erreichbar.');
+      a.stuck = 0;
       a.targetId = t.id;
       a.autoAttack = true;
       a.pickupId = null;
@@ -854,6 +858,7 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
   if (t.kind === 'player' && inSafeZone(w, t.x, t.y) && t.pkUntil <= w.tick) return;
   if (canMiss && !noReflect && w.rng.next() > hitChance(a, t)) {
     t.lastHitAt = w.tick;
+    t.resting = false;
     if (t.kind === 'monster' && a.kind === 'player' && t.alive && t.targetId === null) {
       t.targetId = a.id;
       t.autoAttack = true;
@@ -1081,9 +1086,19 @@ export function tick(w: World): void {
     if (t && t.alive && a.autoAttack && a.targetId !== null) {
       if (dist(a, t) <= MELEE_RANGE) {
         a.path = [];
+        a.stuck = 0;
         fight(w, a, t);
       } else {
+        const before = a.x + a.y;
         chase(w, a, t);
+        if (a.kind === 'player') {
+          a.stuck = a.x + a.y === before ? a.stuck + 1 : 0;
+          if (a.stuck > TICK_RATE * 2) {
+            a.stuck = 0;
+            a.targetId = null;
+            w.events.push({ type: 'fail', reason: 'Das Ziel ist nicht erreichbar.', to: a.id });
+          }
+        }
       }
     } else {
       stepAlong(a, w.tick);
@@ -1116,7 +1131,16 @@ function regen(w: World, p: Actor): void {
 
 function reviveMonster(w: World, m: Actor): void {
   // Helfer vom letzten Mal verschwinden, sonst häufen sie sich über Respawns
-  if (m.abilities.includes('summon')) w.actors = w.actors.filter((x) => x.summonedBy !== m.id);
+  if (m.abilities.includes('summon')) {
+    for (const x of w.actors) {
+      if (x.summonedBy === m.id && x.alive) {
+        x.alive = false;
+        x.hp = 0;
+        x.targetId = null;
+        x.diedAt = w.tick - TICK_RATE * 7; // wird vom nächsten Aufräumen entfernt
+      }
+    }
+  }
   m.alive = true;
   m.hp = m.maxHp;
   m.x = m.home!.x;

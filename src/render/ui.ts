@@ -10,6 +10,11 @@ import { lookOf, playerCanvas } from './art';
 const RARITY_COLOR: Record<Item['rarity'], string> = { normal: '#c9c4bd', magic: '#7f9fff', rare: '#f2c94c', set: '#5fd070', legendary: '#ff8a2a' };
 const SLOT_NAME: Record<Slot, string> = { weapon: 'Waffe', head: 'Kopf', chest: 'Brust', hands: 'Hände', feet: 'Füße', ring: 'Ring', quiver: 'Köcher' };
 
+/** Affixzeile: Prozent-Werte als "+3 % Angriffstempo", sonst "+3 Schaden". */
+function affixText(a: { stat: keyof typeof STAT_NAME; value: number }): string {
+  return `+${a.value} ${STAT_NAME[a.stat]}`;
+}
+
 const AFFIX_WEIGHT: Record<string, number> = { damage: 3, armor: 2, maxHp: 0.25, kraft: 2.5, maxMana: 0.2, haste: 4, crit: 5, regen: 6, accuracy: 0.8, evasion: 0.8 };
 
 /** Grobe Gesamtwertung eines Ausrüstungsstücks (für den ▲-Hinweis auf Verbesserungen). */
@@ -373,7 +378,7 @@ export class Ui {
       it.affixes.slice(base).forEach((a) => {
         const [lo, hi] = affixRange(a.stat, t.minLevel);
         const pct = hi > lo ? Math.round(((a.value - lo) / (hi - lo)) * 100) : 100;
-        const line = el('div', '', `${STAT_NAME[a.stat]}: ${a.value} (Wurf ${Math.max(0, Math.min(100, pct))} %)`);
+        const line = el('div', '', `${affixText(a)} (Wurf ${Math.max(0, Math.min(100, pct))} %)`);
         line.style.color = pct >= 85 ? '#6fe08a' : pct >= 50 ? '#d8c890' : '#9a8a78';
         q.append(line);
       });
