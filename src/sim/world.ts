@@ -1,11 +1,16 @@
 import { Rng } from './rng';
 import { findPath, type Grid, type Pt } from './path';
+import { rollDrop, type Item, type Slot } from './items';
 
 export const TICK_RATE = 20;
 
 export type Command =
   | { type: 'moveTo'; x: number; y: number }
-  | { type: 'attack'; targetId: number };
+  | { type: 'attack'; targetId: number }
+  | { type: 'pickup'; groundId: number }
+  | { type: 'equip'; itemId: number }
+  | { type: 'unequip'; slot: Slot }
+  | { type: 'drop'; itemId: number };
 
 export interface Actor {
   id: number;
@@ -24,6 +29,17 @@ export interface Actor {
   targetId: number | null;
   aggroRange: number;
   alive: boolean;
+  kraft: number;
+  inventory: Item[];
+  equipment: Partial<Record<Slot, Item>>;
+  pickupId: number | null;
+}
+
+export interface GroundItem {
+  id: number;
+  x: number;
+  y: number;
+  item: Item;
 }
 
 export interface World {
@@ -33,16 +49,21 @@ export interface World {
   actors: Actor[];
   nextId: number;
   events: GameEvent[];
+  ground: GroundItem[];
 }
 
 export type GameEvent =
   | { type: 'hit'; attackerId: number; targetId: number; amount: number }
-  | { type: 'died'; id: number };
+  | { type: 'died'; id: number }
+  | { type: 'loot'; item: Item; x: number; y: number }
+  | { type: 'pickedUp'; item: Item }
+  | { type: 'tooHeavy'; item: Item }
+  | { type: 'cannotEquip'; item: Item; reason: string };
 
 const MELEE_RANGE = 1.5;
 
 export function createWorld(seed: number, grid: Grid): World {
-  const w: World = { tick: 0, grid, rng: new Rng(seed), actors: [], nextId: 1, events: [] };
+  const w: World = { tick: 0, grid, rng: new Rng(seed), actors: [], nextId: 1, events: [], ground: [] };
   return w;
 }
 
@@ -58,9 +79,55 @@ function addActor(
   w: World,
   a: Pick<Actor, 'kind' | 'x' | 'y' | 'hp' | 'maxHp' | 'damage' | 'speed' | 'attackCooldown' | 'aggroRange'>,
 ): Actor {
-  const actor: Actor = { ...a, id: w.nextId++, cooldownLeft: 0, path: [], targetId: null, alive: true };
+  const actor: Actor = { ...a, id: w.nextId++, cooldownLeft: 0, path: [], targetId: null, alive: true, kraft: 10, inventory: [], equipment: {}, pickupId: null };
   w.actors.push(actor);
   return actor;
+}
+
+export const BASE_CARRY = 30;
+export const CARRY_PER_KRAFT = 2;
+
+export function equippedItems(a: Actor): Item[] {
+  return Object.values(a.equipment).filter((i): i is Item => !!i);
+}
+
+function affixSum(a: Actor, stat: 'damage' | 'maxHp' | 'kraft' | 'armor'): number {
+  let sum = 0;
+  for (const it of equippedItems(a)) for (const f of it.affixes) if (f.stat === stat) sum += f.value;
+  return sum;
+}
+
+export function effectiveKraft(a: Actor): number {
+  return a.kraft + affixSum(a, 'kraft');
+}
+
+export function armorOf(a: Actor): number {
+  let sum = affixSum(a, 'armor');
+  for (const it of equippedItems(a)) sum += it.armor ?? 0;
+  return sum;
+}
+
+export function damageRange(a: Actor): [number, number] {
+  let [lo, hi] = a.damage;
+  const wpn = a.equipment.weapon;
+  if (wpn?.damage) {
+    lo += wpn.damage[0];
+    hi += wpn.damage[1];
+  }
+  const bonus = affixSum(a, 'damage');
+  return [lo + bonus, hi + bonus];
+}
+
+export function maxHpOf(a: Actor): number {
+  return a.maxHp + affixSum(a, 'maxHp');
+}
+
+export function carryCapacity(a: Actor): number {
+  return BASE_CARRY + CARRY_PER_KRAFT * effectiveKraft(a);
+}
+
+export function carriedWeight(a: Actor): number {
+  return [...a.inventory, ...equippedItems(a)].reduce((s, i) => s + i.weight, 0);
 }
 
 export function getActor(w: World, id: number): Actor | undefined {
@@ -72,7 +139,37 @@ export function applyCommand(w: World, actorId: number, cmd: Command): void {
   if (!a || !a.alive) return;
   if (cmd.type === 'moveTo') {
     a.targetId = null;
+    a.pickupId = null;
     a.path = findPath(w.grid, { x: Math.round(a.x), y: Math.round(a.y) }, { x: cmd.x, y: cmd.y });
+  } else if (cmd.type === 'pickup') {
+    const g = w.ground.find((x) => x.id === cmd.groundId);
+    if (!g) return;
+    a.targetId = null;
+    a.pickupId = g.id;
+    a.path = findPath(w.grid, { x: Math.round(a.x), y: Math.round(a.y) }, { x: g.x, y: g.y });
+  } else if (cmd.type === 'equip') {
+    const it = a.inventory.find((i) => i.id === cmd.itemId);
+    if (!it) return;
+    if (effectiveKraft(a) < it.reqKraft) {
+      w.events.push({ type: 'cannotEquip', item: it, reason: `Benötigt Kraft ${it.reqKraft}` });
+      return;
+    }
+    const old = a.equipment[it.slot];
+    a.inventory = a.inventory.filter((i) => i.id !== it.id);
+    if (old) a.inventory.push(old);
+    a.equipment[it.slot] = it;
+    a.hp = Math.min(a.hp, maxHpOf(a));
+  } else if (cmd.type === 'unequip') {
+    const it = a.equipment[cmd.slot];
+    if (!it) return;
+    delete a.equipment[cmd.slot];
+    a.inventory.push(it);
+    a.hp = Math.min(a.hp, maxHpOf(a));
+  } else if (cmd.type === 'drop') {
+    const it = a.inventory.find((i) => i.id === cmd.itemId);
+    if (!it) return;
+    a.inventory = a.inventory.filter((i) => i.id !== it.id);
+    w.ground.push({ id: w.nextId++, x: Math.round(a.x), y: Math.round(a.y), item: it });
   } else {
     const t = getActor(w, cmd.targetId);
     if (!t || !t.alive || t.id === a.id) return;
@@ -116,19 +213,35 @@ function chase(w: World, a: Actor, t: Actor): void {
 function fight(w: World, a: Actor, t: Actor): void {
   if (a.cooldownLeft > 0) return;
   a.cooldownLeft = a.attackCooldown;
-  const amount = w.rng.int(a.damage[0], a.damage[1]);
+  const [lo, hi] = damageRange(a);
+  const amount = Math.max(1, w.rng.int(lo, hi) - armorOf(t));
   t.hp = Math.max(0, t.hp - amount);
   w.events.push({ type: 'hit', attackerId: a.id, targetId: t.id, amount });
   if (t.hp === 0) {
     t.alive = false;
     t.path = [];
     w.events.push({ type: 'died', id: t.id });
+    if (t.kind === 'monster') {
+      const item = rollDrop(w.rng, () => w.nextId++);
+      if (item) {
+        const x = Math.round(t.x);
+        const y = Math.round(t.y);
+        w.ground.push({ id: w.nextId++, x, y, item });
+        w.events.push({ type: 'loot', item, x, y });
+      }
+    }
   }
+}
+
+/** Liefert angefallene Ereignisse und leert die Liste. */
+export function drainEvents(w: World): GameEvent[] {
+  const e = w.events;
+  w.events = [];
+  return e;
 }
 
 export function tick(w: World): void {
   w.tick++;
-  w.events = [];
   for (const a of w.actors) {
     if (!a.alive) continue;
     if (a.cooldownLeft > 0) a.cooldownLeft--;
@@ -152,6 +265,28 @@ export function tick(w: World): void {
       }
     } else {
       stepAlong(a);
+      if (a.pickupId !== null) tryPickup(w, a);
     }
   }
+}
+
+function tryPickup(w: World, a: Actor): void {
+  const g = w.ground.find((x) => x.id === a.pickupId);
+  if (!g) {
+    a.pickupId = null;
+    return;
+  }
+  if (Math.hypot(a.x - g.x, a.y - g.y) > 1.2) {
+    if (a.path.length === 0) a.pickupId = null;
+    return;
+  }
+  a.pickupId = null;
+  a.path = [];
+  if (carriedWeight(a) + g.item.weight > carryCapacity(a)) {
+    w.events.push({ type: 'tooHeavy', item: g.item });
+    return;
+  }
+  w.ground = w.ground.filter((x) => x.id !== g.id);
+  a.inventory.push(g.item);
+  w.events.push({ type: 'pickedUp', item: g.item });
 }

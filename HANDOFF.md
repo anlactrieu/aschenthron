@@ -1,7 +1,7 @@
 # HANDOFF – Aschenthron
 
 ## Stand
-Spec-Phase abgeschlossen, noch kein Code. Git-Repo (`main`), 3 Commits. Alles Wichtige steht in `SPEC.md`.
+Meilenstein 1 (Karte, Bewegung, Kampf) und 2 (Drops, Inventar, Gewicht, Affixe) fertig. Code in `src/sim` (reine Logik) und `src/render` (Phaser + DOM-Inventar, Taste I). Nächster Schritt: Meilenstein 3 (Attribute, Leveln, Lehrer). Dev: `npm run dev`. Git-Repo (`main`). Alles Wichtige steht in `SPEC.md`.
 `Browserspiele/` und `Spiele/` sind per `.gitignore` bewusst nicht im Repo.
 
 ## Letzte 3 Entscheidungen

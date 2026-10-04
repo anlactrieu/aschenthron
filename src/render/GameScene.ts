@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { applyCommand, createWorld, spawnMonster, spawnPlayer, tick, TICK_RATE, type Actor, type World } from '../sim/world';
+import { applyCommand, createWorld, drainEvents, spawnMonster, spawnPlayer, tick, TICK_RATE, type Actor, type Command, type World } from '../sim/world';
+import { InventoryPanel, describeItem } from './InventoryPanel';
 import { isWalkable, type Grid } from '../sim/path';
 import { TILE_H, TILE_W, toScreen, toTile } from './iso';
 
@@ -22,6 +23,7 @@ export class GameScene extends Phaser.Scene {
   private acc = 0;
   private log!: Phaser.GameObjects.Text;
   private msgs: string[] = [];
+  private panel!: InventoryPanel;
 
   constructor() {
     super('game');
@@ -32,11 +34,12 @@ export class GameScene extends Phaser.Scene {
     this.playerId = spawnPlayer(this.world, 3, 3).id;
     spawnMonster(this.world, 15, 12);
     spawnMonster(this.world, 14, 4);
+    this.panel = new InventoryPanel((c: Command) => applyCommand(this.world, this.playerId, c));
     this.gfx = this.add.graphics();
     this.log = this.add.text(12, 10, '', { color: '#c9b79c', fontSize: '14px' }).setScrollFactor(0).setDepth(10);
     this.cameras.main.setBackgroundColor('#0b0a0d');
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.onClick(p));
-    this.say('Linksklick: laufen. Auf Monster klicken: angreifen.');
+    this.say('Linksklick: laufen · Monster: angreifen · Beute: aufheben · I: Inventar');
   }
 
   private say(m: string): void {
@@ -47,6 +50,11 @@ export class GameScene extends Phaser.Scene {
 
   private onClick(p: Phaser.Input.Pointer): void {
     const t = toTile(p.worldX, p.worldY);
+    const loot = this.world.ground.find((g) => Math.hypot(g.x - t.x, g.y - t.y) < 0.8);
+    if (loot) {
+      applyCommand(this.world, this.playerId, { type: 'pickup', groundId: loot.id });
+      return;
+    }
     const target = this.world.actors.find(
       (a) => a.kind === 'monster' && a.alive && Math.hypot(a.x - t.x, a.y - t.y) < 0.9,
     );
@@ -65,11 +73,17 @@ export class GameScene extends Phaser.Scene {
     while (this.acc >= step) {
       this.acc -= step;
       tick(this.world);
-      for (const e of this.world.events) {
-        if (e.type === 'hit') this.say(`${e.attackerId === this.playerId ? 'Du triffst' : 'Treffer auf dich'}: ${e.amount}`);
-        if (e.type === 'died') this.say(e.id === this.playerId ? 'Du bist gestorben.' : 'Monster besiegt.');
-      }
     }
+    for (const e of drainEvents(this.world)) {
+      if (e.type === 'hit') this.say(`${e.attackerId === this.playerId ? 'Du triffst' : 'Treffer auf dich'}: ${e.amount}`);
+      if (e.type === 'died') this.say(e.id === this.playerId ? 'Du bist gestorben.' : 'Monster besiegt.');
+      if (e.type === 'loot') this.say(`Beute: ${e.item.name}`);
+      if (e.type === 'pickedUp') this.say(`Aufgehoben: ${e.item.name} (${describeItem(e.item)})`);
+      if (e.type === 'tooHeavy') this.say(`Zu schwer: ${e.item.name}`);
+      if (e.type === 'cannotEquip') this.say(`${e.item.name}: ${e.reason}`);
+    }
+    const pl = this.world.actors.find((a) => a.id === this.playerId);
+    if (pl) this.panel.update(pl);
     this.draw();
   }
 
@@ -90,6 +104,13 @@ export class GameScene extends Phaser.Scene {
         g.closePath();
         g.fillPath();
       }
+    }
+    const COLORS = { normal: 0xc9c4bd, magic: 0x6f8fff, rare: 0xf2c94c };
+    for (const gi of this.world.ground) {
+      const { sx, sy } = toScreen(gi.x, gi.y);
+      g.fillStyle(COLORS[gi.item.rarity], 1);
+      g.fillTriangle(sx, sy - 12, sx + 8, sy, sx - 8, sy);
+      g.fillTriangle(sx, sy + 6, sx + 8, sy, sx - 8, sy);
     }
     const sorted = [...this.world.actors].sort((a, b) => a.x + a.y - (b.x + b.y));
     for (const a of sorted) this.drawActor(g, a);
