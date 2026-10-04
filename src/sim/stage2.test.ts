@@ -874,7 +874,7 @@ describe('Abwechslungsreiche Aufgaben', () => {
 
 describe('Rasten', () => {
   it('Rast beschleunigt die Erholung im Feld und endet bei Bewegung oder Treffer', () => {
-    const regenAfter = (rest: boolean) => {
+    const regenAfter = (rest: boolean): [number, number] => {
       const { w, p } = fresh();
       p.x = 15;
       p.y = 15;
@@ -905,5 +905,61 @@ describe('Rasten', () => {
     applyCommand(w, p.id, { type: 'rest' });
     expect(p.resting).toBe(false); // im Kampf nicht möglich
     expect(drainEvents(w).some((e) => e.type === 'fail')).toBe(true);
+  });
+});
+
+describe('Balance bei Vollausrüstung (Level 30)', () => {
+  const gear = (w: World, p: ReturnType<typeof fresh>['p'], stat: 'crit' | 'regen' | 'haste', value: number) => {
+    p.level = 30;
+    p.attrs.kraft = 60;
+    p.attrs.ausdauer = 60;
+    p.attrs.gewandtheit = 40;
+    for (const id of ['ash_greatsword', 'ash_visor', 'ash_cuirass', 'ash_gauntlets', 'ash_boots', 'ash_band']) {
+      const it = generateItem(w.rng, w.nextId++, id, 'normal');
+      it.affixes.push({ stat, value });
+      p.inventory.push(it);
+      applyCommand(w, p.id, { type: 'equip', itemId: it.id });
+    }
+  };
+
+  it('Kritisch-Chance ist bei 50 % gedeckelt, Regeneration bei 10 LP/s', async () => {
+    const { critChance, MAX_REGEN_PER_SEC, MAX_CRIT_PERCENT } = await import('./world');
+    const { w, p } = fresh();
+    gear(w, p, 'crit', 40);
+    expect(critChance(p)).toBe(MAX_CRIT_PERCENT);
+    const r = fresh();
+    gear(r.w, r.p, 'regen', 40);
+    r.p.x = 15;
+    r.p.y = 15;
+    r.p.hp = 1;
+    r.p.maxHp = 99999;
+    const h0 = r.p.hp;
+    run(r.w, TICK_RATE * 10);
+    expect(r.p.hp - h0).toBeLessThan(MAX_REGEN_PER_SEC * 10 + 200 * 0.5 + 20);
+  });
+
+  it('ein voll ausgerüsteter Held verliert gegen ein Rudel Stufe-29-Gegner trotzdem Leben', () => {
+    const { w, p } = fresh();
+    gear(w, p, 'regen', 3);
+    p.x = 15;
+    p.y = 15;
+    p.hp = maxHpOf(p);
+    let low = p.hp;
+    for (let i = 0; i < 3; i++) {
+      const m = spawnMonster(w, 16 + i, 15, 'hell_spawn');
+      m.targetId = p.id;
+    }
+    for (let i = 0; i < TICK_RATE * 15; i++) {
+      tick(w);
+      low = Math.min(low, p.hp);
+    }
+    expect(low).toBeLessThan(maxHpOf(p) * 0.8);
+  });
+
+  it('Roll-Bereiche für Tempo/Kritisch/Regeneration bleiben auch bei Stufe-26-Gegenständen klein', async () => {
+    const { affixRange } = await import('./items');
+    expect(affixRange('crit', 26)[1]).toBeLessThanOrEqual(6);
+    expect(affixRange('regen', 26)[1]).toBeLessThanOrEqual(4);
+    expect(affixRange('haste', 26)[1]).toBeLessThanOrEqual(10);
   });
 });

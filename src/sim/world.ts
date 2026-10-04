@@ -298,6 +298,10 @@ export function spawnMonster(w: World, x: number, y: number, kindId = 'field_rat
 
 /* ---------- abgeleitete Werte ---------- */
 
+/** Obergrenzen für gestapelte Boni (Balance) */
+export const MAX_CRIT_PERCENT = 50;
+export const MAX_REGEN_PER_SEC = 10;
+
 export const BASE_CARRY = 30;
 export const CARRY_PER_KRAFT = 2;
 
@@ -320,6 +324,11 @@ function affixSum(a: Actor, stat: Stat): number {
   for (const it of equippedItems(a)) for (const f of it.affixes) if (f.stat === stat) sum += f.value;
   for (const set of activeSetBonuses(a)) for (const [, b] of set.bonuses) for (const f of b.affixes ?? []) if (f.stat === stat) sum += f.value;
   return sum;
+}
+
+/** Kritische Trefferchance in Prozent: Unikate, Sets und Affixe zusammen, höchstens 50 %. */
+export function critChance(a: Actor): number {
+  return Math.min(MAX_CRIT_PERCENT, powerOf(a, 'crit') + affixSum(a, 'crit'));
 }
 
 /** Summe eines besonderen Effekts aus Gegenständen und Set-Boni. */
@@ -856,7 +865,7 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
   let raw = rawIn;
   let crit = false;
   if (a.kind === 'player' && !noReflect) {
-    const chance = powerOf(a, 'crit') + affixSum(a, 'crit');
+    const chance = critChance(a);
     if (chance > 0 && w.rng.next() * 100 < chance) {
       raw *= 2;
       crit = true;
@@ -1100,7 +1109,7 @@ function regen(w: World, p: Actor): void {
   if (p.resting && (p.path.length > 0 || p.targetId !== null)) p.resting = false;
   const boost = p.resting ? 5 : 1;
   const max = maxHpOf(p);
-  p.hp = Math.min(max, p.hp + ((safe ? SAFE_REGEN : FIELD_REGEN + (p.attrs.ausdauer - 10) * 0.002) + affixSum(p, 'regen') / TICK_RATE) * (safe ? 1 : boost));
+  p.hp = Math.min(max, p.hp + ((safe ? SAFE_REGEN : FIELD_REGEN + (p.attrs.ausdauer - 10) * 0.002) + Math.min(MAX_REGEN_PER_SEC, affixSum(p, 'regen')) / TICK_RATE) * (safe ? 1 : boost));
   const mmax = maxManaOf(p);
   p.mana = Math.min(mmax, p.mana + (0.02 + (p.attrs.willenskraft - 10) * 0.005 + (safe ? 0.2 : 0)) * boost);
 }

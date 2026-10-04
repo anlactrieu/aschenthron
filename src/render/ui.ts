@@ -2,7 +2,7 @@ import { ATTR_KEYS, ATTR_NAME, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById,
 import { POWER_TEXT, affixRange, itemReq, setById, templateById, type Item, type Slot } from '../sim/items';
 import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
-  maxHpOf, maxManaOf, missingReq, nearNpc, powerOf, type Actor, type Command, type Npc, type World,
+  critChance, maxHpOf, maxManaOf, missingReq, nearNpc, powerOf, type Actor, type Command, type Npc, type World,
 } from '../sim/world';
 import { arrowIcon, itemIcon, potionIcon, skillIcon } from './icons';
 import { lookOf, playerCanvas } from './art';
@@ -654,7 +654,7 @@ export class Ui {
       ['Leben', `${Math.ceil(p.hp)} / ${maxHpOf(p)}`], ['Mana', `${Math.floor(p.mana)} / ${maxManaOf(p)}`], ['Schaden pro Hieb', `${lo}–${hi}`],
       ['Rüstung', String(armorOf(p))], ['Angriffstempo', `${(TICK_RATE / attackCooldownOf(p)).toFixed(2)} Hiebe/s`],
       ['Tragkraft', `${carriedWeight(p).toFixed(1)} / ${carryCapacity(p)}`],
-      ['Kritisch', `${powerOf(p, 'crit')} %`], ['Lebensraub', `${powerOf(p, 'lifesteal')} %`], ['Dornen', `${powerOf(p, 'thorns')} %`],
+      ['Kritisch', `${critChance(p)} %`], ['Lebensraub', `${powerOf(p, 'lifesteal')} %`], ['Dornen', `${powerOf(p, 'thorns')} %`],
     ];
     for (const [a, b] of rows) {
       const r = el('div', 'a-row');

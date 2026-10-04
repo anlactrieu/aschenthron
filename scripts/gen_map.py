@@ -233,7 +233,7 @@ def place_ok(x, y, ground, pad, gap):
     if in_safe(x, y, pad): return False
     return not any(abs(x - a) < gap and abs(y - b) < gap for a, b in taken)
 
-def spawn_pack(kinds, x, y, ground, size, leader=None, gap=3):
+def spawn_pack(kinds, x, y, ground, size, leader=None, gap=3, champions=True):
     """Ein Rudel um (x,y): Anführer (falls angegeben) und size-1 Mitglieder in 3 Tiles Umkreis."""
     pack_counter[0] += 1
     pid = pack_counter[0]
@@ -246,7 +246,7 @@ def spawn_pack(kinds, x, y, ground, size, leader=None, gap=3):
         mx, my = cx + random.randint(-3, 3), cy + random.randint(-3, 3)
         if free(mx, my) and (ground is None or g[my][mx] in ground) and not in_safe(mx, my) and not any(abs(mx - a) < 2 and abs(my - b) < 2 for _, a, b in members):
             members.append((random.choice(kinds), mx, my))
-    champ_roll = size >= 2 and random.random() < 0.10
+    champ_roll = champions and size >= 2 and random.random() < 0.10
     for idx, (kind, mx, my) in enumerate(members):
         if idx == 0 and champ_roll:
             obj(kind, "monster", mx, my, kind=kind, pack=pid, champ=random.choice(['swift', 'armored', 'fiery', 'vampiric', 'thorned']))
@@ -269,8 +269,10 @@ def zone_packs(zone, entry, bands, n_packs, ground):
         band = next((b for b in bands if f <= b[0]), bands[-1])
         kinds = [k for k, w in band[1] for _ in range(w)]
         size = random.choices([1, 2, 3, 4, 5], weights=[3, 4, 4, 3, 2] if f < 0.7 else [3, 4, 3, 2, 1])[0]
+        if f < 0.25:
+            size = random.choice([1, 1, 2])   # nahe am Zoneneingang: kleine Rudel, damit die ersten Minuten fair bleiben
         leader = band[2] if band[2] and size >= 3 and random.random() < 0.5 else None
-        total += spawn_pack(kinds, x, y, ground, size, leader)
+        total += spawn_pack(kinds, x, y, ground, size, leader, champions=f >= 0.3)
         placed += 1
     if placed < n_packs: print("WARN nur", placed, "von", n_packs, "Rudeln in", zone, file=sys.stderr)
     return total

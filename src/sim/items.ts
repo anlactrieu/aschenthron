@@ -215,10 +215,16 @@ export function templateById(id: string): ItemTemplate {
   return t;
 }
 
+/** Stufenskalierung je Affixart: Tempo/Kritisch/Regeneration wachsen nur sanft (sonst wären Vollausrüstungen unverwundbar). */
+function affixScale(stat: Stat, minLevel: number): number {
+  if (stat === 'haste' || stat === 'crit' || stat === 'regen') return 1 + minLevel / 30;
+  if (stat === 'kraft') return 1 + minLevel / 20;
+  return 1 + minLevel / 8;
+}
+
 function rollAffix(rng: Rng, pool: AffixDef[], minLevel: number): Affix {
   const def = pool.splice(rng.int(0, pool.length - 1), 1)[0]!;
-  const scale = 1 + minLevel / 8;
-  return { stat: def.stat, value: Math.max(1, Math.round(rng.int(def.min, def.max) * (def.stat === 'kraft' ? 1 + minLevel / 20 : scale))) };
+  return { stat: def.stat, value: Math.max(1, Math.round(rng.int(def.min, def.max) * affixScale(def.stat, minLevel))) };
 }
 
 export function rollRarity(rng: Rng): Rarity {
@@ -467,6 +473,6 @@ export function rollUniqueSpecial(rng: Rng, nextId: () => number, level: number)
 export function affixRange(stat: Stat, minLevel: number): [number, number] {
   const d = AFFIXES.find((a) => a.stat === stat);
   if (!d) return [1, 1];
-  const scale = stat === 'kraft' ? 1 + minLevel / 20 : 1 + minLevel / 8;
+  const scale = affixScale(stat, minLevel);
   return [Math.max(1, Math.round(d.min * scale)), Math.max(1, Math.round(d.max * scale))];
 }

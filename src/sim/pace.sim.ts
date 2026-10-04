@@ -53,7 +53,7 @@ function townTrip(w: World, p: Actor): boolean {
 
 describe('Level-Tempo (Messung)', () => {
   it('Bot-Lauf: Zeit bis Level 5/10/20/30', () => {
-    const { world: w, playerId } = buildWorld(2024, mapJson as unknown as TiledMap);
+    const { world: w, playerId } = buildWorld(Number(process.env.PACE_SEED ?? 2024), mapJson as unknown as TiledMap);
     const p = getActor(w, playerId)!;
     const reached: Record<number, number> = {};
     let deaths = 0;
@@ -74,7 +74,7 @@ describe('Level-Tempo (Messung)', () => {
       if (t % 10 !== 0) continue;
       if (p.statPoints > 0) applyCommand(w, p.id, { type: 'spendStat', attr: (['kraft', 'ausdauer', 'kraft', 'gewandtheit', 'ausdauer'] as const)[p.statPoints % 5]! });
       for (const it of [...p.inventory]) {
-        if (it.slot === 'potion' || it.slot === 'ammo') continue;
+        if (it.slot === 'potion' || it.slot === 'ammo' || it.kind === 'bow' || it.kind === 'staff') continue;
         const cur = p.equipment[it.slot];
         if ((!cur || score(it) > score(cur)) && missingReq(p, it).length === 0) applyCommand(w, p.id, { type: 'equip', itemId: it.id });
       }
@@ -104,12 +104,12 @@ describe('Level-Tempo (Messung)', () => {
         continue;
       }
       const m = w.actors
-        .filter((a) => a.kind === 'monster' && a.alive && !a.boss && a.level <= p.level + 1 && a.level >= p.level - 4)
+        .filter((a) => a.kind === 'monster' && a.alive && !a.boss && !a.unique && a.level <= p.level + 1 && a.level >= p.level - 4)
         .sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
       if (m) applyCommand(w, p.id, { type: 'attack', targetId: m.id });
       else if (p.level >= 1) {
         // keine passenden Gegner nah: zum nächsten passenden laufen (beliebig weit)
-        const far = w.actors.filter((a) => a.kind === 'monster' && a.alive && !a.boss && a.level <= p.level + 2).sort((a, b) => b.level - a.level)[0];
+        const far = w.actors.filter((a) => a.kind === 'monster' && a.alive && !a.boss && !a.unique && a.level <= p.level + 2).sort((a, b) => b.level - a.level)[0];
         if (far) applyCommand(w, p.id, { type: 'attack', targetId: far.id });
       }
     }
