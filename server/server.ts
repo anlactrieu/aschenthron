@@ -57,7 +57,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
 
   /** Spielstand inkl. verbleibender Mörder-Zeit (die Welt-Ticks sind nach einem Neustart nicht vergleichbar). */
   const snapshotSave = (a: Actor): string => {
-    const d = JSON.parse(exportPlayer(a)) as { v: number; player: Record<string, unknown> };
+    const d = JSON.parse(exportPlayer(a)) as { v: number; mapV: number; player: Record<string, unknown> };
     d.player.pkLeft = Math.max(0, a.pkUntil - w.tick);
     return JSON.stringify(d);
   };

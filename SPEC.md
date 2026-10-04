@@ -113,3 +113,15 @@ Die Zielgröße „wie die erste Insel von T4C“ ist als messbare Ziele umgeset
 - Mehrere Spieler teilen XP, Gold und Questfortschritt, wenn sie zuletzt Schaden an einem Monster gemacht haben und in der Nähe sind.
 - Spielstände auf dem Server pro Name (Datei); keine Passwörter. Nicht für das offene Internet gedacht.
 - Offen: Chat, Gruppen/Gilden, Handel zwischen Spielern, Anti-Cheat jenseits der Befehlsvalidierung.
+
+## T4C-Recherche (Mechanik-Prinzipien, Quellenlage teils dünn; keine Inhalte übernommen)
+Übernehmen: klassenlos mit Attributen + Skills (Skillpunkte bei Trainern gegen Gold) · Gegenstände mit Anforderungen (Ausrüstung als Ziel für Attribute) · Trefferchance als Verhältnis Angriff/Ausweichen, Rüstung als Abzug · Echtzeit-Klick mit Auto-Angriff · Gebiete als Level-Bänder mit Gegnerfamilien in Stufen · konfigurierbare Todesstrafe · Leichen-/Todesstellen-Bergung · Gruppen-XP-Teilung (später) · Atmosphäre vor Grafikfülle.
+Abwandeln: Rebuild-Problem (Umverteilen gegen viel Gold erlauben) · HP/Mana aus aktuellen Attributen statt festgeschrieben · Grind durch Elite-Gegner, Mini-Bosse, Truhen und Ereignisse auflockern · Quests nicht nur „töte N“ · milde Todesstrafe als Standard · PvP nur in Zonen/mit Markierung.
+Vermeiden: Endlos-Grind/Rebirth-Schleifen · harte Verluste ohne Schutz · unumkehrbare Fehlentscheidungen · Pflicht-Stat-Reihenfolge · Teleport-Items, die die Weltgröße entwerten · Dupe-Exploits (alles serverseitig validieren).
+
+## Asset-Recherche (nur gelesen, NICHTS heruntergeladen – Download braucht deine Freigabe)
+Es gibt kein fertiges, düsteres, einheitliches, lizenzsauberes Pixel-Iso-Paket mit Animationen. Empfehlung des Recherche-Agenten:
+1. Isometric Stone Soup (CC0, 1895 Iso-Tiles 64x32 Boden/Wand) – https://opengameart.org/content/isometric-stone-soup
+2. Dungeon Crawl 32x32 Tiles (CC0, >3000 Einzelbilder: Items, Monster, Effekte) – https://opengameart.org/content/dungeon-crawl-32x32-tiles
+3. Clint Bellanger Figuren (CC-BY 3.0, Namensnennung nötig; gerenderte 3D-Sprites in 8 Richtungen mit Lauf-/Angriffsframes): Isometric Hero and Heroine, Isometric Hero and Creatures, Skeleton Warrior, Zombie, Goblin – Links auf opengameart.org (siehe Titel).
+Grassland Tileset (CC-BY-SA) wird wegen ShareAlike nicht empfohlen. Bäume, Felsen, Wasser, Lava, Wölfe, Ratten, Spinnen, Golems, Dämonen und Effekte bleiben prozedural. Mischstil-Warnung: gerenderte Figuren + Pixel-Tiles brauchen einheitliche Palette/Skalierung. Lizenzdateien in den ZIPs vor dem Einbau prüfen; Credits-Seite im Spiel nötig.

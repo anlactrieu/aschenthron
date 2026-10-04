@@ -4,6 +4,9 @@ export const ATTR_NAME: Record<AttrKey, string> = {
   kraft: 'Kraft', gewandtheit: 'Gewandtheit', ausdauer: 'Ausdauer', verstand: 'Verstand', willenskraft: 'Willenskraft',
 };
 
+/** Version der Weltkarte: Spielstände mit anderer Version starten in der Stadt (Koordinaten passen nicht mehr). */
+export const MAP_VERSION = 3;
+
 export const MAX_LEVEL = 30;
 export const STAT_POINTS_PER_LEVEL = 5;
 export const START_STAT_POINTS = 10;

@@ -1,10 +1,10 @@
 # HANDOFF – Aschenthron
 
 ## Stand
-Nachtarbeit abgeschlossen (letzter Feinschliff: Klick-Erkennung im Bildraum gegen die Sprites, Chunk-Budget, `?fps`-Overlay) (Auftrag: alles ausführen, Gebiet in T4C-Insel-Größe). Fertig und committet: A Gebiet „Aschental“ (160×120, 2 Städte, 4 Dungeons, 5 Bosse, 22 Monsterarten, 14 Quests, Level 1–30), B Balance per Bot (~5,8 h bis Cap), C prozedurale Pixel-Art + WebAudio + Minikarte, D Stufe 2 (12 Skills, Unikate, 3 Sets, Schmied), E Mehrspieler-Server mit PvP (`server/`, `src/net/`, `src/sim/net.ts`).
-Befehle: `npm run dev | server | test | lint | build | pace`. README.md erklärt Start und Mehrspieler. Karte: `python3 scripts/gen_map.py`.
-Annahmen für den User: `SPEC.md` Abschnitt „Annahmen ohne Rückfrage“. Neue Abhängigkeiten (`ws`, `tsx`, `@types/ws`): nach dem Pull `npm install`.
-`Browserspiele/` und `Spiele/` sind per `.gitignore` bewusst nicht im Repo.
+Seit der ersten Nachtarbeit dazugekommen: Insel „Aschental“ v3 (240×180, MAP_VERSION 3, ~650 Monster in Rudeln, 76 Truhen, Monsterfamilien in Stufen: Ratten, Hunde/Wölfe, Goblins, Banditen, Spinnen, Sumpf, Untote, Trolle/Golems, Würmer, Asche), Item-Anforderungen (Stufe + Attribute), Bögen/Stäbe/Roben/Lederwämser, Köcher + Pfeilbündel (Fernkampf-Skills brauchen Bogen + Pfeile), Schatztruhen (anklicken), neues Inventar (Figur mit Slots, Icon-Raster, Drag-and-drop, Tooltip-Vergleich, Anforderungen rot), HP/MP-Orbs + Schnellleiste, Juice (Kampfzahlen, Hiebe mit Ausholen/Schlag, Pfeile/Zauber mit Einschlag, Bodenschatten, Schritt-Wippen), Avatar zeigt Waffe/Köcher/Robe. Mehrspieler-Server (Branch gemergt) unverändert.
+Befehle: `npm run dev | server | test | lint | build | pace`; Karte neu: `python3 scripts/gen_map.py`; URL-Parameter: `?neu` (Neustart), `?fps`, `?slowfx`, `?server=…&name=…`.
+Recherche-Ergebnisse (T4C-Prinzipien, Sprite-Pakete): siehe SPEC.md. Nichts wurde heruntergeladen.
+Offene Arbeit (Reihenfolge): echter Drag-Test, Skillpunkte + Ränge + Respec, Treffer/Ausweichen, Champions + Mini-Bosse + Boss-Mechaniken, Rückseiten-Sprites, Balance der ersten Minuten, Code-Review, FPS auf großer Karte.
 
 ## Verifikation (Stand Nachtarbeit)
 - 69 Unit- und Server-Tests (echte WebSocket-Verbindungen, 2 lokale Clients), Lint, Build grün.

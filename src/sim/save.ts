@@ -1,4 +1,4 @@
-import { ATTR_KEYS, MAX_LEVEL, questById, skillById, totalXpFor } from './data';
+import { ATTR_KEYS, MAP_VERSION, MAX_LEVEL, questById, skillById, totalXpFor } from './data';
 import { isWalkable } from './path';
 import { LEGENDARIES, SETS, TEMPLATES, type Item } from './items';
 import { maxHpOf, maxManaOf, type Actor, type World } from './world';
@@ -13,7 +13,7 @@ const EQUIP_SLOTS = ['weapon', 'head', 'chest', 'hands', 'feet', 'ring', 'quiver
 export function exportPlayer(p: Actor): string {
   const o: Record<string, unknown> = {};
   for (const k of KEYS) o[k] = p[k];
-  return JSON.stringify({ v: 1, player: o });
+  return JSON.stringify({ v: 1, mapV: MAP_VERSION, player: o });
 }
 
 const isItem = (i: unknown): i is Item => {
@@ -32,7 +32,7 @@ const isItem = (i: unknown): i is Item => {
  */
 export function importPlayer(w: World, p: Actor, json: string): boolean {
   try {
-    const d = JSON.parse(json) as { v: number; player: Partial<Actor> };
+    const d = JSON.parse(json) as { v: number; mapV?: number; player: Partial<Actor> };
     if (d.v !== 1 || !d.player || typeof d.player !== 'object') return false;
     const s = d.player;
     const num = (v: unknown, def: number) => (typeof v === 'number' && Number.isFinite(v) ? v : def);
@@ -52,7 +52,8 @@ export function importPlayer(w: World, p: Actor, json: string): boolean {
     }
     const x = Math.round(num(s.x, w.start.x));
     const y = Math.round(num(s.y, w.start.y));
-    if (isWalkable(w.grid, x, y)) {
+    // Position nur übernehmen, wenn der Spielstand zur selben Karte gehört
+    if (d.mapV === MAP_VERSION && isWalkable(w.grid, x, y)) {
       p.x = num(s.x, w.start.x);
       p.y = num(s.y, w.start.y);
     } else {

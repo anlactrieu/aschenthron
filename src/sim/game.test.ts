@@ -388,3 +388,22 @@ describe('Speichern: Migration', () => {
     expect([p.x, p.y]).toEqual([2, 2]);
   });
 });
+
+describe('Speichern: Kartenversion', () => {
+  it('alter Spielstand ohne passende Kartenversion startet in der Stadt, gleiche Version behält die Position', async () => {
+    const { importPlayer, exportPlayer } = await import('./save');
+    const w = createWorld(1, open());
+    const p = spawnPlayer(w, 2, 2);
+    const old = JSON.stringify({ v: 1, player: { x: 12, y: 13, level: 3 } });
+    expect(importPlayer(w, p, old)).toBe(true);
+    expect([p.x, p.y]).toEqual([2, 2]);
+    expect(p.level).toBe(3);
+    p.x = 9;
+    p.y = 9;
+    const json = exportPlayer(p);
+    p.x = 2;
+    p.y = 2;
+    importPlayer(w, p, json);
+    expect([p.x, p.y]).toEqual([9, 9]);
+  });
+});
