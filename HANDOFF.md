@@ -1,8 +1,9 @@
 # HANDOFF – Aschenthron
 
 ## Stand
-Meilenstein 1 (Karte, Bewegung, Kampf) und 2 (Drops, Inventar, Gewicht, Affixe) fertig. Code in `src/sim` (reine Logik) und `src/render` (Phaser + DOM-Inventar, Taste I). Nächster Schritt: Meilenstein 3 (Attribute, Leveln, Lehrer). Dev: `npm run dev`. Git-Repo (`main`). Alles Wichtige steht in `SPEC.md`.
-`Browserspiele/` und `Spiele/` sind per `.gitignore` bewusst nicht im Repo.
+Meilensteine 1–6 umgesetzt: Karte/Bewegung/Kampf, Drops/Inventar/Gewicht/Affixe, Attribute/Leveln/Lehrer/Skills, Todesstrafe (XP-Verlust + Item-Drop + Leichenlauf 5 Min.), Hub (Händler, Truhe, Safe-Zone), Dungeon + Boss (Aschenkönig, wütet <30 % LP, garantiert Seltenes). Speichern in localStorage.
+Code: `src/sim/` (reine Logik: world, items, data, tiled, save, path, rng), `src/render/` (Phaser `GameScene`, DOM `ui.ts`). Karte: `src/data/aschenthron.json` (Tiled-Format, erzeugt von `scripts/gen_map.py`, in Tiled editierbar).
+Befehle: `npm run dev | test | lint | build`. `Browserspiele/` und `Spiele/` sind per `.gitignore` bewusst nicht im Repo.
 
 ## Letzte 3 Entscheidungen
 1. **Pivot auf T4C-Vorbild** (D4O = Die Vierte Offenbarung, nicht Diablo 4): feste offene Welt, klassenlos, Extraction gestrichen. Grund: das Spielgefühl, das der User will.
@@ -10,14 +11,19 @@ Meilenstein 1 (Karte, Bewegung, Kampf) und 2 (Drops, Inventar, Gewicht, Affixe) 
 3. **Haltbarkeit/Reparatur und Dunkle Künste nicht im Scope.** Grund: User hat sie bewusst nicht gewählt.
 
 ## Offene TODOs
-- Frische Session starten, SPEC.md lesen, mit Meilenstein 1 beginnen
+- Balancing per Spieltest (XP-Kurve, Monsterstärke, Drop-Raten)
+- Echte Grafik statt Platzhalter, Sound
+- Stufe 2 der Spec (Crafting, Sets, legendäre Effekte, mehr Skills), dann Server/PvP
 - Asset-Pack wählen (oder Platzhalter-Diamant-Tiles) vor dem Kartenbau, Lizenzen in `ASSETS.md`
 - Skill-Liste, Monster, Items, Lore eigenständig entwerfen (nichts aus T4C kopieren)
 - Bibliotheksversionen prüfen, nicht aus dem Gedächtnis
 
 ## Dateien
-- `SPEC.md` (Single Source of Truth), `.gitignore`, diese `HANDOFF.md`
+- `SPEC.md`, `src/sim/world.ts` (Kern), `src/sim/data.ts` (Monster, Skills, XP), `src/render/ui.ts`
 
 ## Learnings
 - "D4O" des Users = T4C, nie als Diablo 4 deuten.
 - `AskUserQuestion`: max. 4 Fragen und max. 4 Optionen pro Frage.
+- Bot-Test im Browser fand Verfolgungs-Bug bei Bruchteil-Positionen (chase blieb stehen); Sim-Tests mit ganzzahligen Positionen übersehen so etwas.
+- macOS: `sed -i` braucht `''`, lieber python für Edits.
+- Browser-Pane pausiert rAF im Hintergrund; Verhalten per `window.__game` (nur Dev) skripten.

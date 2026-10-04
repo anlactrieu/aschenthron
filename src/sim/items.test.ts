@@ -39,7 +39,7 @@ describe('Items', () => {
   it('Ausrüsten erhöht Schaden und Rüstung', () => {
     const w = createWorld(1, grid());
     const p = spawnPlayer(w, 1, 1);
-    p.kraft = 12;
+    p.attrs.kraft = 12;
     const base = damageRange(p);
     const { it: sword } = giveItem(w, 'bone_club');
     const { it: mail } = giveItem(w, 'ash_mail');
@@ -53,7 +53,7 @@ describe('Items', () => {
   it('Anforderung verhindert Ausrüsten', () => {
     const w = createWorld(1, grid());
     const p = spawnPlayer(w, 1, 1);
-    p.kraft = 5;
+    p.attrs.kraft = 5;
     const { it } = giveItem(w, 'ash_mail');
     applyCommand(w, p.id, { type: 'equip', itemId: it.id });
     expect(p.equipment.chest).toBeUndefined();
@@ -66,12 +66,12 @@ describe('Items', () => {
     expect(carryCapacity(p)).toBe(50);
     for (let i = 0; i < 4; i++) giveItem(w, 'ash_mail'); // 48 Gewicht
     const heavy = generateItem(w.rng, w.nextId++, 'bone_club', 'normal'); // 9
-    w.ground.push({ id: w.nextId++, x: 2, y: 1, item: heavy });
+    w.ground.push({ id: w.nextId++, x: 2, y: 1, item: heavy, expiresAt: null });
     applyCommand(w, p.id, { type: 'pickup', groundId: w.ground[0]!.id });
     for (let i = 0; i < 100; i++) tick(w);
     expect(w.ground).toHaveLength(1);
     expect(drainEvents(w).some((e) => e.type === 'tooHeavy')).toBe(true);
-    p.kraft = 20;
+    p.attrs.kraft = 20;
     applyCommand(w, p.id, { type: 'pickup', groundId: w.ground[0]!.id });
     for (let i = 0; i < 100; i++) tick(w);
     expect(w.ground).toHaveLength(0);
