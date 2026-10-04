@@ -121,7 +121,7 @@ export class GameScene extends Phaser.Scene {
     this.minimap = new Minimap(this.world, this.tiles);
     if (this.remote) this.ui.say(`Verbunden als ${p.name}${this.remote.pvp ? ' – PvP außerhalb der Städte aktiv, Angreifer werden zu Mördern' : ''}. Klick auf Spieler greift an.`);
     else if (saved && importPlayer(this.world, p, saved)) this.ui.say('Spielstand geladen.');
-    else this.ui.say('Willkommen in Aschenthron. C: Charakter (Attributpunkte verteilen!) · Q/E: Heil-/Manatrank · N: Karte · M: Ton · Klick: laufen/angreifen/aufheben · Lehrer, Händlerin, Schmiede, Truhe und Aufgaben in der Stadt.');
+    else this.ui.say('Willkommen in Aschenthron. C: Charakter (Attributpunkte verteilen!) · Q/E: Heil-/Manatrank · R: Rasten · N: Karte · M: Ton · Klick: laufen/angreifen/aufheben · Lehrer, Händlerin, Schmiede, Truhe und Aufgaben in der Stadt.');
     this.gfx = this.add.graphics().setDepth(OVERLAY_DEPTH);
     this.gfxGround = this.add.graphics().setDepth(-9e5);
     this.gfxShimmer = this.add.graphics().setDepth(-9e5 + 1);
@@ -1036,6 +1036,10 @@ export class GameScene extends Phaser.Scene {
       else if (a.dot) img.setTint(0x9aff9a);
       else if (a.enraged) img.setTint(0xff9a8a);
       else img.clearTint();
+      if (a.resting && this.frame % 40 === 0) {
+        this.fx.floatText(sx + 10, sy - 38, 'z', '#bfd8ff', 14, 1400);
+        this.fx.sparkle(sx, sy - 6, 0x9fd0ff, 900);
+      }
       const hovered = this.hover?.actor?.id === a.id;
       if (a.champ || a.unique) {
         const col = a.unique ? 0xff9a2a : ({ swift: 0x6fe0ff, armored: 0xa0b0d0, fiery: 0xff7a2a, vampiric: 0xe03a4a, thorned: 0x7fe070 } as Record<string, number>)[a.champ!] ?? 0xffe45a;

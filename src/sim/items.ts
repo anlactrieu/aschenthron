@@ -4,7 +4,7 @@ export type Slot = 'weapon' | 'head' | 'chest' | 'hands' | 'feet' | 'ring' | 'qu
 /** Verbrauchsgegenstände belegen keinen Ausrüstungsslot */
 export type ItemSlot = Slot | 'potion' | 'ammo';
 export type Rarity = 'normal' | 'magic' | 'rare' | 'set' | 'legendary';
-export type Stat = 'damage' | 'armor' | 'maxHp' | 'kraft' | 'maxMana';
+export type Stat = 'damage' | 'armor' | 'maxHp' | 'kraft' | 'maxMana' | 'haste' | 'crit' | 'regen' | 'accuracy' | 'evasion';
 /** Besondere Effekte legendärer Gegenstände und Set-Boni */
 export type PowerId = 'lifesteal' | 'crit' | 'thorns' | 'manaKill' | 'xpBonus' | 'goldBonus';
 export interface Power {
@@ -181,6 +181,11 @@ const AFFIXES: AffixDef[] = [
   { stat: 'maxHp', name: 'der Zähigkeit', min: 5, max: 20 },
   { stat: 'kraft', name: 'der Stärke', min: 1, max: 3 },
   { stat: 'maxMana', name: 'der Weisheit', min: 3, max: 10 },
+  { stat: 'haste', name: 'der Eile', min: 2, max: 5 },
+  { stat: 'crit', name: 'der Präzision', min: 1, max: 3 },
+  { stat: 'regen', name: 'der Erneuerung', min: 1, max: 2 },
+  { stat: 'accuracy', name: 'des Treffers', min: 3, max: 8 },
+  { stat: 'evasion', name: 'der Behändigkeit', min: 3, max: 8 },
 ];
 
 const RARITY_VALUE: Record<Rarity, number> = { normal: 1, magic: 3, rare: 8, set: 14, legendary: 25 };

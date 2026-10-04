@@ -788,3 +788,122 @@ describe('Review-Fixes: DoT, Helfer, Netz, Spielstand', () => {
     expect(drainEvents(w).some((e) => e.type === 'fail' && e.reason.includes('nicht geladen'))).toBe(true);
   });
 });
+
+describe('Neue Affixe wirken', () => {
+  const wear = (w: World, p: ReturnType<typeof fresh>['p'], stat: 'haste' | 'crit' | 'regen' | 'accuracy' | 'evasion', value: number) => {
+    const ring = generateItem(w.rng, w.nextId++, 'iron_ring', 'normal');
+    ring.affixes.push({ stat, value });
+    p.inventory.push(ring);
+    applyCommand(w, p.id, { type: 'equip', itemId: ring.id });
+  };
+
+  it('Eile verkürzt die Angriffspause (höchstens 40 %)', async () => {
+    const { attackCooldownOf } = await import('./world');
+    const { w, p } = fresh();
+    const base = attackCooldownOf(p);
+    wear(w, p, 'haste', 20);
+    expect(attackCooldownOf(p)).toBeLessThan(base);
+    p.equipment.ring!.affixes[0]!.value = 999;
+    expect(attackCooldownOf(p)).toBeGreaterThanOrEqual(Math.round(base * 0.6) - 1);
+  });
+
+  it('Regeneration heilt im Feld, Treffsicherheit/Ausweichen verschieben die Trefferchance', async () => {
+    const { hitChance } = await import('./world');
+    const { w, p } = fresh();
+    p.x = 15;
+    p.y = 15;
+    p.hp = 10;
+    wear(w, p, 'regen', 2);
+    run(w, TICK_RATE * 10);
+    expect(p.hp).toBeGreaterThan(10 + 15);
+    const m = spawnMonster(w, 16, 16, 'bandit');
+    const q = fresh();
+    const base = hitChance(q.p, m);
+    wear(q.w, q.p, 'accuracy', 40);
+    expect(hitChance(q.p, m)).toBeGreaterThan(base);
+    const r = fresh();
+    const mm = spawnMonster(r.w, 16, 16, 'bandit');
+    const b2 = hitChance(mm, r.p);
+    wear(r.w, r.p, 'evasion', 40);
+    expect(hitChance(mm, r.p)).toBeLessThan(b2);
+  });
+
+  it('Kritisch-Affix verdoppelt Schaden mit der angegebenen Chance', () => {
+    const { w, p } = fresh();
+    wear(w, p, 'crit', 50);
+    p.maxHp = 99999;
+    p.hp = 99999;
+    let crits = 0;
+    const m = spawnMonster(w, 11, 10, 'wild_hound');
+    m.maxHp = 9e9;
+    m.hp = 9e9;
+    m.damage = [1, 1];
+    applyCommand(w, p.id, { type: 'attack', targetId: m.id });
+    run(w, TICK_RATE * 60);
+    for (const e of drainEvents(w)) if (e.type === 'hit' && e.attackerId === p.id && e.crit) crits++;
+    expect(crits).toBeGreaterThan(8);
+  });
+});
+
+describe('Abwechslungsreiche Aufgaben', () => {
+  it('Truhen-, Champion- und Mini-Boss-Aufgaben zählen ihren Fortschritt', () => {
+    const { w, p } = fresh();
+    p.level = 20;
+    p.quests['q_chests1'] = { state: 'active', progress: 0 };
+    p.quests['q_champs1'] = { state: 'active', progress: 0 };
+    p.quests['q_unique1'] = { state: 'active', progress: 0 };
+    for (let i = 0; i < 3; i++) w.chests.push({ id: w.nextId++, x: 11, y: 10 + i, level: 3, tier: 'wood', opened: false, respawnAt: 0 });
+    for (const c of w.chests) {
+      applyCommand(w, p.id, { type: 'openChest', chestId: c.id });
+      run(w, 60);
+    }
+    expect(p.quests['q_chests1']).toEqual({ state: 'done', progress: 3 });
+    p.damage = [99999, 99999];
+    for (let i = 0; i < 4; i++) {
+      const c = spawnMonster(w, 12, 12, 'wolf', { champ: 'swift' });
+      applyCommand(w, p.id, { type: 'attack', targetId: c.id });
+      run(w, 120);
+    }
+    expect(p.quests['q_champs1']!.progress).toBeGreaterThanOrEqual(3);
+    const u = spawnMonster(w, 12, 13, 'giant_rat', { unique: 'rat_king' });
+    applyCommand(w, p.id, { type: 'attack', targetId: u.id });
+    run(w, 200);
+    expect(p.quests['q_unique1']!.state).toBe('done');
+  });
+});
+
+describe('Rasten', () => {
+  it('Rast beschleunigt die Erholung im Feld und endet bei Bewegung oder Treffer', () => {
+    const regenAfter = (rest: boolean) => {
+      const { w, p } = fresh();
+      p.x = 15;
+      p.y = 15;
+      p.hp = 10;
+      p.mana = 0;
+      if (rest) applyCommand(w, p.id, { type: 'rest' });
+      run(w, TICK_RATE * 10);
+      return [p.hp, p.mana];
+    };
+    const [hr, mr] = regenAfter(true);
+    const [hn, mn] = regenAfter(false);
+    expect(hr).toBeGreaterThan(hn + 1);
+    expect(mr).toBeGreaterThan(mn);
+
+    const { w, p } = fresh();
+    p.x = 15;
+    p.y = 15;
+    applyCommand(w, p.id, { type: 'rest' });
+    expect(p.resting).toBe(true);
+    applyCommand(w, p.id, { type: 'moveTo', x: 18, y: 15 });
+    expect(p.resting).toBe(false);
+    applyCommand(w, p.id, { type: 'rest' });
+    const m = spawnMonster(w, 16, 15, 'field_rat');
+    m.targetId = p.id;
+    run(w, TICK_RATE * 3);
+    expect(p.resting).toBe(false);
+    drainEvents(w);
+    applyCommand(w, p.id, { type: 'rest' });
+    expect(p.resting).toBe(false); // im Kampf nicht möglich
+    expect(drainEvents(w).some((e) => e.type === 'fail')).toBe(true);
+  });
+});

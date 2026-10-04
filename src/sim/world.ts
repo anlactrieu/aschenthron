@@ -29,6 +29,7 @@ export type Command =
   | { type: 'learnSkill'; skillId: string }
   | { type: 'trainSkill'; skillId: string }
   | { type: 'respec' }
+  | { type: 'rest' }
   | { type: 'useSkill'; skillId: string; targetId?: number }
   | { type: 'buy'; templateId: string }
   | { type: 'sell'; itemId: number }
@@ -80,6 +81,8 @@ export interface Actor {
   stash: Item[];
   pickupId: number | null;
   chestId: number | null;
+  /** rastet: Leben und Mana füllen sich schneller, jede Aktion oder jeder Treffer beendet es */
+  resting: boolean;
   home?: Pt;
   diedAt: number;
   boss: boolean;
@@ -227,7 +230,7 @@ function baseActor(w: World, kind: Actor['kind'], name: string, x: number, y: nu
     id: w.nextId++, kind, name, x, y, hp: 100, maxHp: 100, damage: [1, 2], speed: 0.1, attackCooldown: 20,
     cooldownLeft: 0, path: [], targetId: null, aggroRange: 0, alive: true, level: 1, xp: 0, statPoints: 0,
     attrs: { kraft: 10, gewandtheit: 10, ausdauer: 10, verstand: 10, willenskraft: 10 },
-    mana: 20, gold: 0, skills: [], skillRanks: {}, skillPoints: 0, skillCd: {}, potionCd: 0, quests: {}, inventory: [], equipment: {}, stash: [], pickupId: null, chestId: null,
+    mana: 20, gold: 0, skills: [], skillRanks: {}, skillPoints: 0, skillCd: {}, potionCd: 0, quests: {}, inventory: [], equipment: {}, stash: [], pickupId: null, chestId: null, resting: false,
     diedAt: -1, boss: false, enraged: false, autoAttack: true, repathAt: 0, dot: null, lastHitAt: -9999, packId: 0, abilities: [], abilityAt: 0, chargeAt: 0, chargeUntil: 0, summoned: false, respawnTicks: MONSTER_RESPAWN_TICKS, rewardMult: 1, pkUntil: 0, attackedBy: null, damagers: {},
   };
   w.actors.push(a);
@@ -359,7 +362,9 @@ export function maxManaOf(a: Actor): number {
 }
 
 export function attackCooldownOf(a: Actor): number {
-  return Math.max(6, a.attackCooldown - Math.floor((a.attrs.gewandtheit - 10) / 2));
+  const base = a.attackCooldown - Math.floor((a.attrs.gewandtheit - 10) / 2);
+  // Eile (Affix): bis zu 40 % schneller
+  return Math.max(6, Math.round(base * (1 - Math.min(0.4, affixSum(a, 'haste') / 100))));
 }
 
 /** Fehlende Anforderungen für einen Gegenstand (leer = anlegbar). `replaced`: ersetztes Stück, dessen Kraft-Bonus nicht zählt. */
@@ -377,10 +382,10 @@ export function missingReq(a: Actor, it: Item, replaced?: Item): string[] {
 
 /** Angriffs- und Verteidigungswert (Stufe, Gewandtheit, Rüstung): Treffer-/Ausweichformel als Verhältnis. */
 export function attackRating(a: Actor): number {
-  return a.kind === 'player' ? 20 + 3 * a.level + 2 * a.attrs.gewandtheit : 20 + 4 * a.level;
+  return a.kind === 'player' ? 20 + 3 * a.level + 2 * a.attrs.gewandtheit + affixSum(a, 'accuracy') : 20 + 4 * a.level;
 }
 export function defenseRating(a: Actor): number {
-  return a.kind === 'player' ? 10 + 2 * a.level + 2 * a.attrs.gewandtheit + armorOf(a) * 0.5 : 10 + 3 * a.level;
+  return a.kind === 'player' ? 10 + 2 * a.level + 2 * a.attrs.gewandtheit + armorOf(a) * 0.5 + affixSum(a, 'evasion') : 10 + 3 * a.level;
 }
 /** Trefferchance 35–97 %: ATK / (ATK + 0,2 · DEF). Gleichstark ≈ 83 %. */
 export function hitChance(att: Actor, def: Actor): number {
@@ -445,6 +450,19 @@ export function applyCommand(w: World, actorId: number, cmd: Command): void {
 function execCommand(w: World, actorId: number, cmd: Command): void {
   const a = getActor(w, actorId);
   if (!a || !a.alive) return;
+  if (cmd.type === 'rest') {
+    if (a.resting) a.resting = false;
+    else if (a.targetId !== null || (w.tick - a.lastHitAt) < TICK_RATE * 3) return fail(w, 'Mitten im Kampf kannst du nicht rasten.');
+    else {
+      a.resting = true;
+      a.path = [];
+      a.pickupId = null;
+      a.chestId = null;
+    }
+    return;
+  }
+  // jede andere Handlung beendet die Rast
+  if (cmd.type !== 'spendStat' && cmd.type !== 'equip' && cmd.type !== 'unequip') a.resting = false;
   switch (cmd.type) {
     case 'moveTo':
       a.targetId = null;
@@ -838,7 +856,7 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
   let raw = rawIn;
   let crit = false;
   if (a.kind === 'player' && !noReflect) {
-    const chance = powerOf(a, 'crit');
+    const chance = powerOf(a, 'crit') + affixSum(a, 'crit');
     if (chance > 0 && w.rng.next() * 100 < chance) {
       raw *= 2;
       crit = true;
@@ -847,6 +865,7 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
   const amount = Math.max(1, Math.round(ignoreArmor ? raw : (raw * ARMOR_K) / (ARMOR_K + armorOf(t))));
   t.hp = Math.max(0, t.hp - amount);
   t.lastHitAt = w.tick;
+  t.resting = false;
   // Wer angegriffen wird, wehrt sich (auch gegen Fernkämpfer außerhalb der Aggro-Reichweite)
   if (t.kind === 'monster' && a.kind === 'player' && t.alive && t.targetId === null) {
     t.targetId = a.id;
@@ -907,7 +926,8 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
   for (const pl of credited.values()) {
     for (const q of QUESTS) {
       const st = pl.quests[q.id];
-      if (st?.state === 'active' && q.target === m.kindId) {
+      const matches = q.kind === 'kill' ? q.target === m.kindId : q.kind === 'champion' ? !!m.champ : q.kind === 'unique' ? !!m.unique : false;
+      if (st?.state === 'active' && matches) {
         st.progress++;
         w.events.push({ type: 'questProgress', questId: q.id, progress: st.progress, count: q.count, to: pl.id });
         if (st.progress >= q.count) {
@@ -1077,10 +1097,12 @@ function cleanupSummons(w: World): void {
 
 function regen(w: World, p: Actor): void {
   const safe = inSafeZone(w, p.x, p.y);
+  if (p.resting && (p.path.length > 0 || p.targetId !== null)) p.resting = false;
+  const boost = p.resting ? 5 : 1;
   const max = maxHpOf(p);
-  p.hp = Math.min(max, p.hp + (safe ? SAFE_REGEN : FIELD_REGEN + (p.attrs.ausdauer - 10) * 0.002));
+  p.hp = Math.min(max, p.hp + ((safe ? SAFE_REGEN : FIELD_REGEN + (p.attrs.ausdauer - 10) * 0.002) + affixSum(p, 'regen') / TICK_RATE) * (safe ? 1 : boost));
   const mmax = maxManaOf(p);
-  p.mana = Math.min(mmax, p.mana + 0.02 + (p.attrs.willenskraft - 10) * 0.005 + (safe ? 0.2 : 0));
+  p.mana = Math.min(mmax, p.mana + (0.02 + (p.attrs.willenskraft - 10) * 0.005 + (safe ? 0.2 : 0)) * boost);
 }
 
 function reviveMonster(w: World, m: Actor): void {
@@ -1214,6 +1236,16 @@ function tryOpenChest(w: World, a: Actor): void {
 function openChest(w: World, a: Actor, c: Chest): void {
   c.opened = true;
   c.respawnAt = w.tick + CHEST_RESPAWN_TICKS;
+  for (const q of QUESTS) {
+    const st = a.quests[q.id];
+    if (q.kind !== 'chest' || st?.state !== 'active') continue;
+    st.progress++;
+    w.events.push({ type: 'questProgress', questId: q.id, progress: st.progress, count: q.count, to: a.id });
+    if (st.progress >= q.count) {
+      st.state = 'done';
+      w.events.push({ type: 'questDone', questId: q.id, to: a.id });
+    }
+  }
   const mult = { wood: 1, iron: 1.8, gold: 3 }[c.tier];
   const gold = Math.round(w.rng.int(c.level * 6, c.level * 14 + 10) * mult);
   a.gold += gold;

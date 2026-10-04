@@ -10,7 +10,7 @@ import { lookOf, playerCanvas } from './art';
 const RARITY_COLOR: Record<Item['rarity'], string> = { normal: '#c9c4bd', magic: '#7f9fff', rare: '#f2c94c', set: '#5fd070', legendary: '#ff8a2a' };
 const SLOT_NAME: Record<Slot, string> = { weapon: 'Waffe', head: 'Kopf', chest: 'Brust', hands: 'Hände', feet: 'Füße', ring: 'Ring', quiver: 'Köcher' };
 
-const AFFIX_WEIGHT: Record<string, number> = { damage: 3, armor: 2, maxHp: 0.25, kraft: 2.5, maxMana: 0.2 };
+const AFFIX_WEIGHT: Record<string, number> = { damage: 3, armor: 2, maxHp: 0.25, kraft: 2.5, maxMana: 0.2, haste: 4, crit: 5, regen: 6, accuracy: 0.8, evasion: 0.8 };
 
 /** Grobe Gesamtwertung eines Ausrüstungsstücks (für den ▲-Hinweis auf Verbesserungen). */
 function gearScore(i: Item): number {
@@ -34,7 +34,10 @@ function isUpgrade(p: Actor, it: Item): boolean {
 function equippedFor(p: Actor, it: Item): Item | undefined {
   return it.slot === 'potion' || it.slot === 'ammo' ? undefined : p.equipment[it.slot];
 }
-const STAT_NAME = { damage: 'Schaden', armor: 'Rüstung', maxHp: 'Leben', kraft: 'Kraft', maxMana: 'Mana' } as const;
+const STAT_NAME = {
+  damage: 'Schaden', armor: 'Rüstung', maxHp: 'Leben', kraft: 'Kraft', maxMana: 'Mana', haste: '% Angriffstempo', crit: '% Kritisch', regen: 'Leben/s',
+  accuracy: 'Treffsicherheit', evasion: 'Ausweichen',
+} as const;
 const BAG_COLS = 8;
 
 export function describeItem(i: Item): string {
@@ -196,6 +199,7 @@ export class Ui {
       if (k === 'j') this.toggleTab('quests');
       if (k === 'escape') this.toggle(false);
       if (k >= '1' && k <= '9') this.useSkillSlot(Number(k) - 1);
+      if (k === 'r') this.send({ type: 'rest' });
       if (k === 'q') this.usePotionKind('heal');
       if (k === 'e') this.usePotionKind('mana');
     });

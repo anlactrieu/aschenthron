@@ -271,8 +271,12 @@ export const POTION_COOLDOWN_TICKS = 100;
 /** Rüstungs-Formel: Schaden * K / (K + Rüstung) */
 export const ARMOR_K = 30;
 
+export type QuestKind = 'kill' | 'chest' | 'champion' | 'unique';
+
 export interface QuestDef {
   id: string;
+  /** kill: Monsterart `target`; chest: Truhen öffnen; champion: Champions töten; unique: benannte Mini-Bosse töten */
+  kind: QuestKind;
   name: string;
   text: string;
   minLevel: number;
@@ -285,8 +289,15 @@ export interface QuestDef {
 
 const q = (id: string, name: string, text: string, minLevel: number, target: string, count: number, xpMul: number, goldMul: number): QuestDef => {
   const k = MONSTERS.find((m) => m.id === target)!;
-  return { id, name, text, minLevel, target, count, xp: Math.round(k.xp * count * xpMul), gold: Math.round(k.gold[1] * count * goldMul) };
+  return { id, kind: 'kill', name, text, minLevel, target, count, xp: Math.round(k.xp * count * xpMul), gold: Math.round(k.gold[1] * count * goldMul) };
 };
+
+/** Abwechslungsreichere Aufträge: Truhen, Champions, Mini-Bosse (Belohnung nach Stufe). */
+const qv = (id: string, name: string, text: string, minLevel: number, kind: QuestKind, count: number, mult: number): QuestDef => ({
+  id, kind, name, text, minLevel, target: '', count,
+  xp: Math.round(SCALE.xp(minLevel + 1) * count * mult),
+  gold: Math.round((minLevel * 3 + 3) * count * mult),
+});
 
 export const QUESTS: QuestDef[] = [
   q('q_rats', 'Rattenplage', 'Die Felder sind voller Ratten. Erlege 8 Feldratten.', 1, 'field_rat', 8, 1.5, 1.5),
@@ -307,6 +318,15 @@ export const QUESTS: QuestDef[] = [
   q('q_ash', 'Asche und Glut', 'Aschenwandler ziehen aus der Öde. Besiege 15.', 21, 'ash_walker', 15, 1.4, 1.5),
   q('q_king', 'Der Aschenkönig', 'Der Aschenkönig sitzt auf seinem Thron. Beende seine Herrschaft.', 28, 'ash_king', 1, 1.5, 2),
 ];
+
+QUESTS.push(
+  qv('q_chests1', 'Schatzsucher', 'Man munkelt von vergrabenen Truhen auf den Feldern. Öffne 3 Truhen.', 2, 'chest', 3, 2.5),
+  qv('q_unique1', 'Namenlose Jagd', 'Manche Bestien haben Namen und Gefolge. Erlege einen benannten Gegner (Orange auf der Karte).', 6, 'unique', 1, 6),
+  qv('q_champs1', 'Anführer brechen', 'Rudelführer mit besonderer Kraft leiten die Angriffe. Besiege 4 Champions.', 8, 'champion', 4, 2),
+  qv('q_chests2', 'Beutezug', 'Plündere 6 Truhen im Land, in Dungeons oder in der Wildnis.', 10, 'chest', 6, 2.5),
+  qv('q_unique2', 'Legenden der Wildnis', 'Jage 3 benannte Gegner.', 14, 'unique', 3, 5),
+  qv('q_champs2', 'Eiserne Anführer', 'Brich die Macht von 8 Champions.', 18, 'champion', 8, 2),
+);
 
 export function questById(id: string): QuestDef | undefined {
   return QUESTS.find((x) => x.id === id);

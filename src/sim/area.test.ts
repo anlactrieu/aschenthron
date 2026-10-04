@@ -79,7 +79,7 @@ describe('Gebiet „Aschental“: Inhalt und Größe', () => {
 
   it('Questkette deckt Level 1–28 ab, alle Ziele existieren auf der Karte', () => {
     const kinds = new Set(monsters.map((m) => m.kindId));
-    for (const q of QUESTS) expect(kinds.has(q.target), q.id).toBe(true);
+    for (const q of QUESTS) if (q.kind === 'kill') expect(kinds.has(q.target), q.id).toBe(true);
     expect(Math.min(...QUESTS.map((q) => q.minLevel))).toBe(1);
     expect(Math.max(...QUESTS.map((q) => q.minLevel))).toBeGreaterThanOrEqual(28);
     expect(MONSTERS.length).toBeGreaterThanOrEqual(20);
