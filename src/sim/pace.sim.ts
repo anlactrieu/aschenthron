@@ -1,7 +1,7 @@
 import { describe, it } from 'vitest';
 import mapJson from '../data/aschenthron.json';
 import { buildWorld, type TiledMap } from './tiled';
-import { MAX_LEVEL, SHOPS, monsterKind, totalXpFor } from './data';
+import { MAX_LEVEL, SHOPS, totalXpFor } from './data';
 import { templateById, type Item } from './items';
 import {
   applyCommand, buyPrice, carriedWeight, carryCapacity, drainEvents, getActor, inSafeZone, maxHpOf, tick, TICK_RATE,
@@ -102,6 +102,5 @@ describe('Level-Tempo (Messung)', () => {
     }
     const mins = (tk?: number) => (tk ? `${(tk / TICK_RATE / 60).toFixed(0)} min` : 'nicht erreicht');
     console.log(`PACE Level5 ${mins(reached[5])} | Level10 ${mins(reached[10])} | Level20 ${mins(reached[20])} | Level30 ${mins(reached[30])} | Tode ${deaths} | Stadtfahrten ${trips} | Endlevel ${p.level} | XP-Bedarf Cap ${totalXpFor(MAX_LEVEL)} | Spielzeit ${(w.tick / TICK_RATE / 3600).toFixed(1)} h | kleinster Stufenabstand ok`);
-    void monsterKind;
   }, 900000);
 });

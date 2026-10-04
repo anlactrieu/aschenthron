@@ -223,3 +223,55 @@ describe('Neue Fertigkeiten', () => {
     expect(damageRange(p)[0]).toBeGreaterThan(0);
   });
 });
+
+describe('Review-Fixes', () => {
+  it('Schmied lehnt unbekannte Operationen ab', () => {
+    const { w, p } = fresh();
+    addNpc(w, 'smith', 'S', 11, 10);
+    p.gold = 9999;
+    const it = generateItem(w.rng, w.nextId++, 'steel_sword', 'normal');
+    p.inventory.push(it);
+    applyCommand(w, p.id, { type: 'craft', itemId: it.id, op: 'x' as never });
+    expect(it.affixes).toHaveLength(0);
+    expect(p.gold).toBe(9999);
+  });
+
+  it('Heilende Hand wirkt auch in der Stadt', () => {
+    const w = createWorld(2, open(), [{ x: 0, y: 0, w: 30, h: 30 }]);
+    const p = spawnPlayer(w, 10, 10);
+    p.skills.push('healing_hand');
+    p.mana = 50;
+    p.hp = 10;
+    applyCommand(w, p.id, { type: 'useSkill', skillId: 'healing_hand' });
+    expect(p.hp).toBeGreaterThan(10);
+  });
+
+  it('Dornen-Rückwurf kritet nicht und stiehlt kein Leben', () => {
+    const { w, p } = fresh();
+    const plate = generateLegendary(w.rng, w.nextId++, 'colossus_heart');
+    const blade = generateLegendary(w.rng, w.nextId++, 'harkon_blade');
+    p.attrs.kraft = 40;
+    p.inventory.push(plate, blade);
+    applyCommand(w, p.id, { type: 'equip', itemId: plate.id });
+    applyCommand(w, p.id, { type: 'equip', itemId: blade.id });
+    p.hp = 200;
+    const m = spawnMonster(w, 11, 10, 'hill_troll');
+    m.targetId = p.id;
+    run(w, 40);
+    const ev = drainEvents(w);
+    const reflected = ev.filter((e) => e.type === 'hit' && e.attackerId === p.id && e.targetId === m.id);
+    for (const e of reflected) expect((e as { crit?: boolean }).crit).toBe(false);
+  });
+
+  it('Import klemmt LP/Mana und verwirft Items mit unbekanntem Set', async () => {
+    const { importPlayer } = await import('./save');
+    const { w, p } = fresh();
+    const good = generateItem(w.rng, w.nextId++, 'iron_ring', 'normal');
+    const bad = { ...generateItem(w.rng, w.nextId++, 'iron_ring', 'normal'), setId: 'gibt_es_nicht' };
+    const json = JSON.stringify({ v: 1, player: { level: 1, hp: 9999, mana: 9999, inventory: [good, bad] } });
+    expect(importPlayer(w, p, json)).toBe(true);
+    expect(p.hp).toBeLessThanOrEqual(maxHpOf(p));
+    expect(p.mana).toBeLessThanOrEqual(maxManaOf(p));
+    expect(p.inventory).toHaveLength(1);
+  });
+});

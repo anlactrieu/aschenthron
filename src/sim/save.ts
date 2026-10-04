@@ -1,7 +1,7 @@
 import { ATTR_KEYS, MAX_LEVEL, questById, skillById, totalXpFor } from './data';
 import { isWalkable } from './path';
-import type { Item } from './items';
-import type { Actor, World } from './world';
+import { LEGENDARIES, SETS, TEMPLATES, type Item } from './items';
+import { maxHpOf, maxManaOf, type Actor, type World } from './world';
 
 const KEYS = [
   'x', 'y', 'hp', 'mana', 'level', 'xp', 'statPoints', 'attrs', 'gold', 'skills', 'inventory', 'equipment', 'stash', 'maxHp', 'quests',
@@ -16,8 +16,15 @@ export function exportPlayer(p: Actor): string {
   return JSON.stringify({ v: 1, player: o });
 }
 
-const isItem = (i: unknown): i is Item =>
-  !!i && typeof i === 'object' && typeof (i as Item).id === 'number' && typeof (i as Item).slot === 'string' && Array.isArray((i as Item).affixes);
+const isItem = (i: unknown): i is Item => {
+  if (!i || typeof i !== 'object') return false;
+  const it = i as Item;
+  if (typeof it.id !== 'number' || typeof it.slot !== 'string' || !Array.isArray(it.affixes)) return false;
+  if (!TEMPLATES.some((t) => t.id === it.templateId)) return false;
+  if (it.setId !== undefined && !SETS.some((x) => x.id === it.setId)) return false;
+  if (it.unique !== undefined && !LEGENDARIES.some((x) => x.id === it.unique)) return false;
+  return true;
+};
 
 /**
  * Lädt einen Spielstand tolerant: unbekannte/kaputte Teile werden verworfen oder auf Standard gesetzt,
@@ -52,8 +59,8 @@ export function importPlayer(w: World, p: Actor, json: string): boolean {
       p.x = w.start.x;
       p.y = w.start.y;
     }
-    p.hp = Math.max(1, num(s.hp, 1));
-    p.mana = Math.max(0, num(s.mana, 0));
+    p.hp = Math.min(maxHpOf(p), Math.max(1, num(s.hp, 1)));
+    p.mana = Math.min(maxManaOf(p), Math.max(0, num(s.mana, 0)));
     p.quests = {};
     const qs = s.quests as Record<string, { state?: string; progress?: number }> | undefined;
     for (const [id, st] of Object.entries(qs ?? {})) {

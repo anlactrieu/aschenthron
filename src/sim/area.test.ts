@@ -84,20 +84,18 @@ describe('Performance auf der großen Karte', () => {
     expect(per).toBeLessThan(5);
   });
 
-  it('Klick auf unerreichbare, aber begehbare Insel-Kachel friert nicht ein', () => {
-    // Kachel hinter Wasser: begehbarer Fleck ohne Anbindung suchen
+  it('Klick auf unerreichbare, aber begehbare Kachel (abgeschnittene Insel) friert nicht ein', () => {
+    // Kopie der echten Karte mit einem begehbaren Fleck mitten im Wasser
+    const grid = { ...w.grid, walkable: [...w.grid.walkable] };
+    const spot = { x: 3, y: 3 };
+    grid.walkable[spot.y * grid.w + spot.x] = true;
     const from = { x: Math.round(player.x), y: Math.round(player.y) };
-    let target = { x: -1, y: -1 };
-    for (let y = 0; y < w.grid.h && target.x < 0; y++) {
-      for (let x = 0; x < w.grid.w; x++) {
-        if (isWalkable(w.grid, x, y) && findPath(w.grid, from, { x, y }).length === 0 && (x !== from.x || y !== from.y)) {
-          target = { x, y };
-          break;
-        }
-      }
-    }
     const t0 = performance.now();
-    applyCommand(w, playerId, { type: 'moveTo', x: Math.max(0, target.x), y: Math.max(0, target.y) });
+    const path = findPath(grid, from, spot);
+    expect(path).toEqual([]);
     expect(performance.now() - t0).toBeLessThan(250);
+    const t1 = performance.now();
+    applyCommand(w, playerId, { type: 'moveTo', x: from.x, y: from.y });
+    expect(performance.now() - t1).toBeLessThan(250);
   });
 });

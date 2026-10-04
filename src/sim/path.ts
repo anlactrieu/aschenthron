@@ -19,8 +19,23 @@ const DIRS: readonly [number, number][] = [
   [1, 1], [1, -1], [-1, 1], [-1, -1],
 ];
 
-/** Höchstzahl expandierter Knoten, damit unerreichbare Ziele nicht die ganze Karte fluten. */
-export const PATH_NODE_CAP = 25000;
+/** Wiederverwendete Arbeitspuffer (Generationszähler statt fill pro Aufruf). */
+let bufSize = 0;
+let gScore = new Float32Array(0);
+let came = new Int32Array(0);
+let stamp = new Uint32Array(0);
+let closedStamp = new Uint32Array(0);
+let gen = 0;
+
+function ensureBuffers(n: number): void {
+  if (bufSize === n) return;
+  bufSize = n;
+  gScore = new Float32Array(n);
+  came = new Int32Array(n);
+  stamp = new Uint32Array(n);
+  closedStamp = new Uint32Array(n);
+  gen = 0;
+}
 
 /** Binärer Min-Heap über (Knoten, Priorität). */
 class MinHeap {
@@ -66,17 +81,18 @@ class MinHeap {
   }
 }
 
-/** A* auf Tiles, 8 Richtungen, kein Eckenschneiden. Liefert Pfad ohne Startfeld, [] wenn keiner (oder Knotenlimit). */
+/** A* auf Tiles, 8 Richtungen, kein Eckenschneiden. Liefert Pfad ohne Startfeld, [] wenn keiner. */
 export function findPath(g: Grid, from: Pt, to: Pt): Pt[] {
   if (!isWalkable(g, to.x, to.y)) return [];
   if (from.x === to.x && from.y === to.y) return [];
-  const n = g.w * g.h;
-  const gScore = new Float32Array(n).fill(Infinity);
-  const came = new Int32Array(n).fill(-1);
-  const closed = new Uint8Array(n);
+  ensureBuffers(g.w * g.h);
+  gen++;
   const start = from.y * g.w + from.x;
   const goal = to.y * g.w + to.x;
+  const score = (k: number) => (stamp[k] === gen ? gScore[k]! : Infinity);
   gScore[start] = 0;
+  stamp[start] = gen;
+  came[start] = -1;
   const heap = new MinHeap();
   heap.push(start, 0);
   const heur = (x: number, y: number) => {
@@ -84,11 +100,10 @@ export function findPath(g: Grid, from: Pt, to: Pt): Pt[] {
     const dy = Math.abs(y - to.y);
     return Math.max(dx, dy) + 0.41 * Math.min(dx, dy);
   };
-  let expanded = 0;
   while (heap.size) {
     const cur = heap.pop();
-    if (closed[cur]) continue;
-    closed[cur] = 1;
+    if (closedStamp[cur] === gen) continue;
+    closedStamp[cur] = gen;
     if (cur === goal) {
       const out: Pt[] = [];
       let k = cur;
@@ -98,20 +113,20 @@ export function findPath(g: Grid, from: Pt, to: Pt): Pt[] {
       }
       return out.reverse();
     }
-    if (++expanded > PATH_NODE_CAP) return [];
     const cx = cur % g.w;
     const cy = Math.floor(cur / g.w);
-    const cg = gScore[cur]!;
+    const cg = score(cur);
     for (const [dx, dy] of DIRS) {
       const nx = cx + dx;
       const ny = cy + dy;
       if (!isWalkable(g, nx, ny)) continue;
       if (dx !== 0 && dy !== 0 && (!isWalkable(g, cx + dx, cy) || !isWalkable(g, cx, cy + dy))) continue;
       const nk = ny * g.w + nx;
-      if (closed[nk]) continue;
+      if (closedStamp[nk] === gen) continue;
       const ng = cg + (dx !== 0 && dy !== 0 ? 1.41 : 1);
-      if (ng < gScore[nk]!) {
+      if (ng < score(nk)) {
         gScore[nk] = ng;
+        stamp[nk] = gen;
         came[nk] = cur;
         heap.push(nk, ng + heur(nx, ny));
       }

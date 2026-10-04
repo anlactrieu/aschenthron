@@ -229,7 +229,6 @@ def spawn(kind, n, r, ground=None, pad=SPAWN_BUFFER, tries=4000):
         x, y = random.randint(x0, x1), random.randint(y0, y1)
         if not free(x, y) or (ground is not None and g[y][x] not in ground): continue
         if in_safe(x, y, pad) or any(abs(x - a) < SPACING and abs(y - b) < SPACING for a, b in taken): continue
-        if g[y][x] == 7 and r[0] != r[1]: pass
         taken.append((x, y)); obj(kind, "monster", x, y, kind=kind); placed += 1
     if placed < n: print("WARN nur", placed, "von", n, kind, r, file=sys.stderr)
 

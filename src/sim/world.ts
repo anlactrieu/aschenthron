@@ -437,6 +437,7 @@ export function applyCommand(w: World, actorId: number, cmd: Command): void {
     }
     case 'craft': {
       if (!nearNpc(w, a, 'smith')) return fail(w, 'Kein Schmied in der Nähe.');
+      if (cmd.op !== 'upgrade' && cmd.op !== 'reroll' && cmd.op !== 'extend') return fail(w, 'Unbekannte Schmiedearbeit.');
       const it = a.inventory.find((i) => i.id === cmd.itemId);
       if (!it || it.slot === 'potion') return;
       if (it.rarity === 'legendary' || it.rarity === 'set') return fail(w, 'Das lässt sich nicht verändern.');
@@ -488,7 +489,6 @@ function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void 
   if (!s || !a.skills.includes(s.id)) return fail(w, 'Fertigkeit nicht gelernt.');
   if ((a.skillCd[s.id] ?? 0) > 0) return;
   if (a.mana < s.mana) return fail(w, 'Nicht genug Mana.');
-  if (a.kind === 'player' && inSafeZone(w, a.x, a.y)) return fail(w, 'In der Stadt ist Kämpfen verboten.');
   const lvl = 1 + a.level * 0.1;
   if (s.heal !== undefined) {
     const scale = s.scales ? Math.max(0, a.attrs[s.scales] - 10) * 3 : 0;
@@ -500,6 +500,7 @@ function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void 
     w.events.push({ type: 'healed', amount: Math.round(a.hp - before) });
     return;
   }
+  if (a.kind === 'player' && inSafeZone(w, a.x, a.y)) return fail(w, 'In der Stadt ist Kämpfen verboten.');
   const first = getActor(w, targetId ?? a.targetId ?? -1);
   if (!s.aoeSelf && (!first || !first.alive || first.id === a.id)) return fail(w, 'Kein Ziel.');
   const range = s.range;
@@ -593,7 +594,7 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
   if (t.kind === 'player' && inSafeZone(w, t.x, t.y)) return;
   let raw = rawIn;
   let crit = false;
-  if (a.kind === 'player') {
+  if (a.kind === 'player' && !noReflect) {
     const chance = powerOf(a, 'crit');
     if (chance > 0 && w.rng.next() * 100 < chance) {
       raw *= 2;
@@ -609,7 +610,7 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
     t.autoAttack = true;
   }
   w.events.push({ type: 'hit', attackerId: a.id, targetId: t.id, amount, skill, crit });
-  if (a.kind === 'player' && a.alive) {
+  if (a.kind === 'player' && a.alive && !noReflect) {
     const steal = powerOf(a, 'lifesteal');
     if (steal > 0) a.hp = Math.min(maxHpOf(a), a.hp + Math.max(1, Math.round((amount * steal) / 100)));
   }

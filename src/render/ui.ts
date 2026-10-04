@@ -141,7 +141,7 @@ export class Ui {
     p.skills.forEach((id, i) => {
       const s = SKILLS.find((x) => x.id === id)!;
       const cd = p.skillCd[id] ?? 0;
-      const label = `${i + 1} ${s.name}${cd > 0 ? ` (${Math.ceil(cd / TICK_RATE)}s)` : ''}`;
+      const label = `${i < 9 ? `${i + 1} ` : ''}${s.name}${cd > 0 ? ` (${Math.ceil(cd / TICK_RATE)}s)` : ''}`;
       const b = this.hotButtons[i]!;
       if (b.textContent !== label) b.textContent = label;
     });
