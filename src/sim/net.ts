@@ -109,3 +109,8 @@ export function actorFromLite(l: ActorLite, tick: number): Actor {
     attackedBy: null, damagers: {},
   };
 }
+
+/** Aufwand eines Befehls für die Ratenbegrenzung: Wegsuchen sind teurer als einfache Aktionen. */
+export function commandCost(c: Command): number {
+  return c.type === 'moveTo' || c.type === 'attack' || c.type === 'pickup' ? 4 : 1;
+}

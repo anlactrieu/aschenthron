@@ -7,7 +7,13 @@ import type { TiledMap } from './sim/tiled';
 function showError(msg: string): void {
   const d = document.createElement('div');
   d.style.cssText = 'position:fixed;inset:0;display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center;color:#c9b79c;font:16px system-ui,sans-serif;background:#0b0a0d';
-  d.innerHTML = `<div>${msg}</div><a style="color:#e8c040" href="${location.pathname}">Einzelspieler starten</a>`;
+  const text = document.createElement('div');
+  text.textContent = msg;
+  const link = document.createElement('a');
+  link.style.color = '#e8c040';
+  link.href = location.pathname;
+  link.textContent = 'Einzelspieler starten';
+  d.append(text, link);
   document.body.appendChild(d);
 }
 

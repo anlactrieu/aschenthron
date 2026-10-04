@@ -1,9 +1,10 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { WebSocketServer, type WebSocket, type RawData } from 'ws';
 import { buildWorld, type TiledMap } from '../src/sim/tiled';
 import { addPlayer, applyCommand, drainEvents, getActor, removePlayer, tick, TICK_RATE, type Actor, type GameEvent, type World } from '../src/sim/world';
 import { exportPlayer, importPlayer } from '../src/sim/save';
-import { makeSnapshot, validateCommand } from '../src/sim/net';
+import { commandCost, makeSnapshot, validateCommand } from '../src/sim/net';
 
 export interface ServerOptions {
   /** 0 = freier Port (Tests) */
@@ -16,6 +17,8 @@ export interface ServerOptions {
   savePath?: string;
   mapPath?: string;
   maxPlayers?: number;
+  /** Sekunden, die ein getrennter Spieler nach einem Kampf noch in der Welt bleibt (gegen Combat-Logging) */
+  lingerSeconds?: number;
 }
 
 export interface RunningServer {
@@ -28,54 +31,86 @@ interface Client {
   ws: WebSocket;
   name: string;
   actorId: number;
-  /** einfache Ratenbegrenzung (Tokens pro Sekunde) */
+  /** einfache Ratenbegrenzung */
   tokens: number;
   lastRefill: number;
 }
 
 const NAME_RE = /^[A-Za-z0-9ÄÖÜäöüß _-]{2,16}$/;
-const MAX_MSG_PER_SEC = 40;
+const MAX_COST_PER_SEC = 40;
+const JOIN_TIMEOUT_MS = 10_000;
+const COMBAT_TICKS = TICK_RATE * 10;
 
 export async function startServer(opts: ServerOptions): Promise<RunningServer> {
-  const mapPath = opts.mapPath ?? new URL('../src/data/aschenthron.json', import.meta.url).pathname;
+  const mapPath = opts.mapPath ?? fileURLToPath(new URL('../src/data/aschenthron.json', import.meta.url));
   const map = JSON.parse(readFileSync(mapPath, 'utf8')) as TiledMap;
   const { world: w } = buildWorld(opts.seed ?? (Date.now() >>> 0), map, { player: false });
   w.pvp = opts.pvp ?? true;
-  const saves: Record<string, string> = opts.savePath && existsSync(opts.savePath) ? (JSON.parse(readFileSync(opts.savePath, 'utf8')) as Record<string, string>) : {};
+  const saves = new Map<string, string>(
+    opts.savePath && existsSync(opts.savePath) ? Object.entries(JSON.parse(readFileSync(opts.savePath, 'utf8')) as Record<string, string>) : [],
+  );
   const clients = new Map<WebSocket, Client>();
+  /** Getrennte Spieler, die nach einem Kampf noch kurz in der Welt bleiben: Name → Akteur und Ablauf-Tick */
+  const lingering = new Map<string, { actorId: number; until: number }>();
   let pending: GameEvent[] = [];
-
   let closed = false;
+
+  /** Spielstand inkl. verbleibender Mörder-Zeit (die Welt-Ticks sind nach einem Neustart nicht vergleichbar). */
+  const snapshotSave = (a: Actor): string => {
+    const d = JSON.parse(exportPlayer(a)) as { v: number; player: Record<string, unknown> };
+    d.player.pkLeft = Math.max(0, a.pkUntil - w.tick);
+    return JSON.stringify(d);
+  };
+
   const writeSaves = (): void => {
     if (!opts.savePath || closed) return;
     try {
-      writeFileSync(opts.savePath, JSON.stringify(saves));
+      writeFileSync(opts.savePath, JSON.stringify(Object.fromEntries(saves)));
     } catch (e) {
       console.error('Speichern fehlgeschlagen:', (e as Error).message);
     }
   };
 
   const persist = (): void => {
-    if (!opts.savePath) return;
     for (const c of clients.values()) {
       const a = getActor(w, c.actorId);
-      if (a) saves[c.name] = exportPlayer(a);
+      if (a) saves.set(c.name, snapshotSave(a));
     }
     writeSaves();
   };
 
   const wss = new WebSocketServer({ port: opts.port, host: opts.host ?? '127.0.0.1', maxPayload: 16 * 1024 });
-  await new Promise<void>((res) => wss.once('listening', () => res()));
+  await new Promise<void>((res, rej) => {
+    wss.once('listening', () => res());
+    wss.once('error', (e: Error) => rej(new Error(`Server konnte nicht starten: ${e.message}`)));
+  });
+  wss.on('error', (e: Error) => console.error('Serverfehler:', e.message));
   const port = (wss.address() as { port: number }).port;
+
+  /** Akteur endgültig aus der Welt nehmen und speichern. */
+  const finalize = (name: string, actorId: number): void => {
+    const a = getActor(w, actorId);
+    if (a) saves.set(name, snapshotSave(a));
+    removePlayer(w, actorId);
+    writeSaves();
+  };
 
   const leave = (ws: WebSocket): void => {
     const c = clients.get(ws);
     if (!c) return;
-    const a = getActor(w, c.actorId);
-    if (a && opts.savePath) saves[c.name] = exportPlayer(a);
-    removePlayer(w, c.actorId);
     clients.delete(ws);
-    writeSaves();
+    const a = getActor(w, c.actorId);
+    if (!a) return;
+    const inCombat = w.tick - a.lastHitAt < COMBAT_TICKS || (a.attackedBy !== null && w.tick - a.attackedBy.at < COMBAT_TICKS) || a.pkUntil > w.tick;
+    const linger = opts.lingerSeconds ?? 20;
+    if (inCombat && linger > 0 && !closed) {
+      // bleibt kurz schutzlos in der Welt; Speichern erst beim Entfernen
+      lingering.set(c.name.toLowerCase(), { actorId: c.actorId, until: w.tick + linger * TICK_RATE });
+      a.path = [];
+      a.targetId = null;
+      saves.set(c.name, snapshotSave(a));
+      writeSaves();
+    } else finalize(c.name, c.actorId);
   };
 
   const send = (ws: WebSocket, msg: unknown): void => {
@@ -83,6 +118,9 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   };
 
   wss.on('connection', (ws) => {
+    const joinTimer = setTimeout(() => {
+      if (!clients.has(ws)) ws.close(4001, 'Kein Join');
+    }, JOIN_TIMEOUT_MS);
     ws.on('message', (data: RawData) => {
       let msg: { t?: string; name?: unknown; c?: unknown };
       try {
@@ -95,34 +133,58 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
         if (msg.t !== 'join') return;
         const name = typeof msg.name === 'string' ? msg.name.trim() : '';
         if (!NAME_RE.test(name)) return send(ws, { t: 'error', reason: 'Ungültiger Name (2–16 Zeichen: Buchstaben, Ziffern, Leerzeichen, _ -).' });
-        if (clients.size >= (opts.maxPlayers ?? 32)) return send(ws, { t: 'error', reason: 'Server ist voll.' });
+        const key = name.toLowerCase();
+        const rejoin = [...clients.values()].some((x) => x.name.toLowerCase() === key);
+        if (!rejoin && clients.size >= (opts.maxPlayers ?? 32)) return send(ws, { t: 'error', reason: 'Server ist voll.' });
         // zweite Verbindung mit gleichem Namen ersetzt die erste
         for (const [other, oc] of clients) {
-          if (oc.name.toLowerCase() === name.toLowerCase()) {
-            leave(other);
+          if (oc.name.toLowerCase() === key) {
+            const keep = oc.actorId;
+            clients.delete(other);
+            // Akteur bleibt bestehen und wird an die neue Verbindung übergeben
+            lingering.set(key, { actorId: keep, until: Number.MAX_SAFE_INTEGER });
             other.close(4000, 'Angemeldet an anderer Stelle');
           }
         }
-        const actor: Actor = addPlayer(w, name);
-        const saved = saves[name];
-        if (saved) importPlayer(w, actor, saved);
-        clients.set(ws, { ws, name, actorId: actor.id, tokens: MAX_MSG_PER_SEC, lastRefill: Date.now() });
+        let actor: Actor | undefined;
+        const ghost = lingering.get(key);
+        if (ghost) {
+          lingering.delete(key);
+          actor = getActor(w, ghost.actorId);
+        }
+        if (!actor) {
+          actor = addPlayer(w, name);
+          const saved = saves.get(name);
+          if (saved && importPlayer(w, actor, saved)) {
+            const pkLeft = (JSON.parse(saved) as { player?: { pkLeft?: number } }).player?.pkLeft;
+            if (typeof pkLeft === 'number' && pkLeft > 0) actor.pkUntil = w.tick + pkLeft;
+          }
+        }
+        clearTimeout(joinTimer);
+        clients.set(ws, { ws, name, actorId: actor.id, tokens: MAX_COST_PER_SEC, lastRefill: Date.now() });
         send(ws, { t: 'welcome', id: actor.id, tickRate: TICK_RATE, pvp: w.pvp, seed: opts.seed ?? 0 });
         return;
       }
-      // Ratenbegrenzung
+      if (msg.t !== 'cmd') return;
+      const cmd = validateCommand(w, msg.c);
+      if (!cmd) return;
+      // Ratenbegrenzung nach Aufwand (Wegsuchen kosten mehr)
       const now = Date.now();
-      c.tokens = Math.min(MAX_MSG_PER_SEC, c.tokens + ((now - c.lastRefill) / 1000) * MAX_MSG_PER_SEC);
+      c.tokens = Math.min(MAX_COST_PER_SEC, c.tokens + ((now - c.lastRefill) / 1000) * MAX_COST_PER_SEC);
       c.lastRefill = now;
-      if (c.tokens < 1) return;
-      c.tokens -= 1;
-      if (msg.t === 'cmd') {
-        const cmd = validateCommand(w, msg.c);
-        if (cmd) applyCommand(w, c.actorId, cmd);
-      }
+      const cost = commandCost(cmd);
+      if (c.tokens < cost) return;
+      c.tokens -= cost;
+      applyCommand(w, c.actorId, cmd);
     });
-    ws.on('close', () => leave(ws));
-    ws.on('error', () => leave(ws));
+    ws.on('close', () => {
+      clearTimeout(joinTimer);
+      leave(ws);
+    });
+    ws.on('error', () => {
+      clearTimeout(joinTimer);
+      leave(ws);
+    });
   });
 
   let n = 0;
@@ -130,6 +192,13 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     tick(w);
     pending.push(...drainEvents(w));
     n++;
+    for (const [key, g] of lingering) {
+      if (w.tick >= g.until) {
+        lingering.delete(key);
+        const a = getActor(w, g.actorId);
+        finalize(a?.name ?? key, g.actorId);
+      }
+    }
     if (n % 2 === 0) {
       for (const c of clients.values()) {
         const you = getActor(w, c.actorId);
@@ -146,6 +215,12 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     async close(): Promise<void> {
       clearInterval(timer);
       persist();
+      for (const [key, g] of lingering) {
+        const a = getActor(w, g.actorId);
+        if (a) saves.set(a.name, snapshotSave(a));
+        lingering.delete(key);
+      }
+      writeSaves();
       closed = true;
       for (const ws of clients.keys()) ws.close();
       await new Promise<void>((res) => wss.close(() => res()));

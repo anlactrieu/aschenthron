@@ -157,3 +157,45 @@ describe('Mehrspieler-Server', () => {
     expect(snap.actors.length).toBeGreaterThan(0);
   });
 });
+
+describe('Mehrspieler: Combat-Logging und Robustheit', () => {
+  it('Spieler im Kampf bleibt nach dem Trennen kurz in der Welt; Mörder-Status bleibt erhalten', async () => {
+    const srv = await boot({ lingerSeconds: 5 });
+    const a = await connect(srv, 'Anna');
+    const b = await connect(srv, 'Ben');
+    const A = getActor(srv.world, a.id)!;
+    const B = getActor(srv.world, b.id)!;
+    for (const m of srv.world.actors) if (m.kind === 'monster') m.aggroRange = 0;
+    A.x = 60; A.y = 100; B.x = 61; B.y = 100;
+    B.damage = [3, 3];
+    b.send({ t: 'cmd', c: { type: 'attack', targetId: a.id } });
+    await a.waitFor((s) => s.you.hp < maxHpOf(A));
+    expect(isPk(srv.world, B)).toBe(true);
+    b.close();
+    await new Promise((r) => setTimeout(r, 300));
+    // Ben ist noch als Akteur in der Welt (Combat-Logging-Schutz)
+    expect(getActor(srv.world, b.id)).toBeDefined();
+    // Wiederverbinden übernimmt denselben Akteur samt Mörder-Status
+    const b2 = await connect(srv, 'Ben');
+    expect(b2.id).toBe(b.id);
+    expect(isPk(srv.world, getActor(srv.world, b2.id)!)).toBe(true);
+  });
+
+  it('Port-Konflikt liefert klare Fehlermeldung, Sockets ohne Join werden beendet', async () => {
+    const srv = await boot();
+    await expect(startServer({ port: srv.port, seed: 1 })).rejects.toThrow(/Server konnte nicht starten/);
+  });
+
+  it('Spielername __proto__ bekommt trotzdem einen Spielstand', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'asch-'));
+    dirs.push(dir);
+    const savePath = join(dir, 'saves.json');
+    const srv = await boot({ savePath, lingerSeconds: 0 });
+    const a = await connect(srv, '__proto__');
+    getActor(srv.world, a.id)!.gold = 55;
+    a.close();
+    await new Promise((r) => setTimeout(r, 200));
+    const a2 = await connect(srv, '__proto__');
+    expect(getActor(srv.world, a2.id)!.gold).toBe(55);
+  });
+});

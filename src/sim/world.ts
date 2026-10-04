@@ -821,7 +821,7 @@ export function tick(w: World): void {
     }
     for (const id of Object.keys(a.skillCd)) if ((a.skillCd[id] ?? 0) > 0) a.skillCd[id]!--;
     if (a.kind === 'player') regen(w, a);
-    else monsterAi(w, a);
+    else monsterAi(w, a, players);
     if (a.kind === 'monster' && a.targetId === null && a.path.length === 0 && w.tick - a.lastHitAt > TICK_RATE * 6) {
       // Monster regeneriert langsam zu Hause
       a.hp = Math.min(a.maxHp, a.hp + a.maxHp * 0.002);
@@ -872,13 +872,13 @@ function reviveMonster(m: Actor): void {
   }
 }
 
-function monsterAi(w: World, m: Actor): void {
+function monsterAi(w: World, m: Actor, players: Actor[]): void {
   const home = m.home!;
   if (m.targetId === null) {
     let best: Actor | undefined;
     let bd = m.aggroRange;
-    for (const x of w.actors) {
-      if (x.kind !== 'player' || !x.alive || (inSafeZone(w, x.x, x.y) && x.pkUntil <= w.tick)) continue;
+    for (const x of players) {
+      if ((inSafeZone(w, x.x, x.y) && x.pkUntil <= w.tick)) continue;
       const d = dist(m, x);
       if (d <= bd) {
         bd = d;
