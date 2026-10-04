@@ -67,6 +67,8 @@ export interface Actor {
   diedAt: number;
   boss: boolean;
   enraged: boolean;
+  /** true: verfolgt und schlägt das Ziel automatisch (Nahkampf-Befehl, Monster) */
+  autoAttack: boolean;
 }
 
 export interface GroundItem {
@@ -138,7 +140,7 @@ function baseActor(w: World, kind: Actor['kind'], name: string, x: number, y: nu
     cooldownLeft: 0, path: [], targetId: null, aggroRange: 0, alive: true, level: 1, xp: 0, statPoints: 0,
     attrs: { kraft: 10, gewandtheit: 10, ausdauer: 10, verstand: 10, willenskraft: 10 },
     mana: 20, gold: 0, skills: [], skillCd: {}, inventory: [], equipment: {}, stash: [], pickupId: null,
-    diedAt: -1, boss: false, enraged: false,
+    diedAt: -1, boss: false, enraged: false, autoAttack: true,
   };
   w.actors.push(a);
   return a;
@@ -258,6 +260,7 @@ export function applyCommand(w: World, actorId: number, cmd: Command): void {
       const t = getActor(w, cmd.targetId);
       if (!t || !t.alive || t.id === a.id) return;
       a.targetId = t.id;
+      a.autoAttack = true;
       a.pickupId = null;
       a.path = [];
       break;
@@ -386,6 +389,9 @@ function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void 
     const scale = s.scales ? Math.max(0, a.attrs[s.scales] - 10) : 0;
     amount = w.rng.int(lo, hi) + scale;
   }
+  // Fern-/Magie-Skills lösen keine Nahkampf-Verfolgung aus; Nahkampf-Skills schon
+  if (s.mult) a.autoAttack = true;
+  else if (a.targetId !== t.id) a.autoAttack = false;
   a.targetId = t.id;
   a.path = [];
   dealDamage(w, a, t, amount, s.ignoresArmor, s.id);
@@ -557,7 +563,7 @@ export function tick(w: World): void {
       a.targetId = null;
       a.path = [];
     }
-    if (t && t.alive) {
+    if (t && t.alive && a.autoAttack) {
       if (dist(a, t) <= MELEE_RANGE) {
         a.path = [];
         fight(w, a, t);

@@ -34,6 +34,7 @@ export class GameScene extends Phaser.Scene {
   private acc = 0;
   private autosave = 0;
   private ui!: Ui;
+  private resetting = false;
 
   constructor() {
     super('game');
@@ -45,15 +46,21 @@ export class GameScene extends Phaser.Scene {
     this.tiles = built.tiles;
     this.playerId = built.playerId;
     const store = safeStorage();
+    if (new URLSearchParams(location.search).has('neu')) {
+      store?.removeItem(SAVE_KEY);
+      history.replaceState(null, '', location.pathname);
+    }
     const saved = store?.getItem(SAVE_KEY);
     const p = this.player();
-    this.ui = new Ui((c) => this.send(c), (i) => this.useSkillSlot(i));
+    this.ui = new Ui((c) => this.send(c), (i) => this.useSkillSlot(i), () => this.newGame());
     if (saved && importPlayer(this.world, p, saved)) this.ui.say('Spielstand geladen.');
     else this.ui.say('Willkommen in Aschenthron. C: Charakter (Attributpunkte verteilen!) · Klick: laufen/angreifen/aufheben · Lehrer, Händlerin und Truhe in der Stadt.');
     this.gfx = this.add.graphics();
     this.cameras.main.setBackgroundColor('#0b0a0d');
     this.input.on('pointerdown', (ptr: Phaser.Input.Pointer) => this.onClick(ptr));
-    window.addEventListener('beforeunload', () => this.save());
+    window.addEventListener('beforeunload', () => {
+      if (!this.resetting) this.save();
+    });
   }
 
   private player(): Actor {
@@ -64,7 +71,14 @@ export class GameScene extends Phaser.Scene {
     applyCommand(this.world, this.playerId, c);
   }
 
+  private newGame(): void {
+    this.resetting = true;
+    safeStorage()?.removeItem(SAVE_KEY);
+    location.reload();
+  }
+
   private save(): void {
+    if (this.resetting) return;
     safeStorage()?.setItem(SAVE_KEY, exportPlayer(this.player()));
   }
 
@@ -157,11 +171,13 @@ export class GameScene extends Phaser.Scene {
     const cx = Math.round(p.x);
     const cy = Math.round(p.y);
     const { w: gw, h: gh } = w.grid;
+    const view = this.cameras.main.worldView;
     for (let y = Math.max(0, cy - VIEW); y < Math.min(gh, cy + VIEW); y++) {
       for (let x = Math.max(0, cx - VIEW); x < Math.min(gw, cx + VIEW); x++) {
         const gid = this.tiles[y * gw + x] ?? 0;
         if (!gid) continue;
         const { sx, sy } = toScreen(x, y);
+        if (sx < view.left - 64 || sx > view.right + 64 || sy < view.top - 64 || sy > view.bottom + 64) continue;
         if (gid === 2) this.drawBlock(g, sx, sy);
         else this.diamond(g, sx, sy, TILE_COLORS[gid]?.[(x + y) % 2] ?? 0x222222);
       }

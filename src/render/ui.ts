@@ -17,6 +17,12 @@ export function describeItem(i: Item): string {
   return [...base, ...aff, `Gewicht ${i.weight}`, i.reqKraft ? `Kraft ${i.reqKraft} nötig` : ''].filter(Boolean).join(' · ');
 }
 
+interface Bar {
+  box: HTMLElement;
+  fill: HTMLElement;
+  text: HTMLElement;
+}
+
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, css = '', text = ''): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
   if (css) e.style.cssText = css;
@@ -30,12 +36,13 @@ export class Ui {
   private bars = el('div', 'display:flex;gap:10px;align-items:center;background:rgba(14,12,18,.85);border:1px solid #4b3f3a;padding:6px 10px');
   private hotbar = el('div', 'display:flex;gap:6px;pointer-events:auto');
   private target = el('div', 'position:fixed;left:50%;top:10px;transform:translateX(-50%);background:rgba(14,12,18,.85);border:1px solid #4b3f3a;color:#c9b79c;font:13px system-ui,sans-serif;padding:4px 10px;display:none;text-align:center');
-  private toast = el('div', 'position:fixed;left:12px;bottom:12px;width:420px;color:#c9b79c;font:13px/1.35 system-ui,sans-serif;pointer-events:none;text-shadow:0 1px 2px #000');
+  private toast = el('div', 'position:fixed;left:12px;bottom:84px;width:420px;color:#c9b79c;font:13px/1.35 system-ui,sans-serif;pointer-events:none;text-shadow:0 1px 2px #000');
   private msgs: string[] = [];
   private key = '';
   private open = false;
 
-  constructor(private send: (c: Command) => void, private useSkillSlot: (i: number) => void) {
+  constructor(private send: (c: Command) => void, private useSkillSlot: (i: number) => void, private newGame: () => void) {
+    this.buildBars();
     this.hud.append(this.hotbar, this.bars);
     document.body.append(this.panel, this.hud, this.target, this.toast);
     window.addEventListener('keydown', (e) => {
@@ -61,39 +68,68 @@ export class Ui {
     this.updateHud(p, target);
     if (!this.open) return;
     const near = [nearNpc(w, p, 'trainer'), nearNpc(w, p, 'merchant'), nearNpc(w, p, 'stash')].map((n) => n?.id ?? 0);
-    const key = JSON.stringify([p.inventory, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.gold, p.level, near, Math.floor(p.hp / 5)]);
+    const key = JSON.stringify([p.inventory, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.gold, p.level, near]);
     if (key === this.key) return;
     this.key = key;
     this.renderPanel(w, p);
   }
 
+  private barParts: { lv: HTMLElement; hp: Bar; mp: Bar; xp: Bar; gold: HTMLElement; pts: HTMLElement } | null = null;
+  private hotKey = '';
+  private hotButtons: HTMLButtonElement[] = [];
+  private panelHp: HTMLElement | null = null;
+
+  private buildBars(): void {
+    const bar = (color: string): Bar => {
+      const box = el('div', 'width:120px;position:relative;height:16px;background:#241f2a');
+      const fill = el('div', `height:100%;background:${color}`);
+      const text = el('div', 'position:absolute;inset:0;text-align:center;font-size:11px;line-height:16px;color:#fff');
+      box.append(fill, text);
+      return { box, fill, text };
+    };
+    const parts = { lv: el('span'), hp: bar('#a4332b'), mp: bar('#3558a8'), xp: bar('#8a7a2a'), gold: el('span'), pts: el('span', 'opacity:.7') };
+    this.barParts = parts;
+    this.bars.append(parts.lv, parts.hp.box, parts.mp.box, parts.xp.box, parts.gold, parts.pts);
+  }
+
+  private setBar(b: Bar, label: string, v: number, max: number): void {
+    b.fill.style.width = `${Math.max(0, Math.min(1, v / max)) * 100}%`;
+    b.text.textContent = `${label} ${Math.ceil(v)}/${max}`;
+  }
+
   private updateHud(p: Actor, t?: Actor): void {
+    const bp = this.barParts!;
     const span = totalXpFor(Math.min(p.level + 1, MAX_LEVEL)) - totalXpFor(p.level);
     const into = Math.max(0, p.xp - totalXpFor(p.level));
-    const bar = (label: string, v: number, max: number, color: string) => {
-      const d = el('div', 'width:120px;position:relative;height:16px;background:#241f2a');
-      d.append(el('div', `width:${Math.max(0, Math.min(1, v / max)) * 100}%;height:100%;background:${color}`));
-      d.append(el('div', 'position:absolute;inset:0;text-align:center;font-size:11px;line-height:16px;color:#fff', `${label} ${Math.ceil(v)}/${max}`));
-      return d;
-    };
-    this.bars.replaceChildren(
-      el('span', '', `Lv ${p.level}`),
-      bar('LP', p.hp, maxHpOf(p), '#a4332b'),
-      bar('MP', p.mana, maxManaOf(p), '#3558a8'),
-      bar('XP', into, p.level >= MAX_LEVEL ? 1 : span, '#8a7a2a'),
-      el('span', '', `Gold ${p.gold}`),
-      el('span', 'opacity:.7', p.statPoints ? `${p.statPoints} Punkte (C)` : ''),
-    );
-    this.hotbar.replaceChildren(
-      ...p.skills.map((id, i) => {
+    bp.lv.textContent = `Lv ${p.level}`;
+    this.setBar(bp.hp, 'LP', p.hp, maxHpOf(p));
+    this.setBar(bp.mp, 'MP', p.mana, maxManaOf(p));
+    this.setBar(bp.xp, 'XP', into, p.level >= MAX_LEVEL ? 1 : span);
+    bp.gold.textContent = `Gold ${p.gold}`;
+    bp.pts.textContent = p.statPoints ? `${p.statPoints} Punkte (C)` : '';
+    if (this.panelHp) this.panelHp.textContent = `Leben ${Math.ceil(p.hp)}/${maxHpOf(p)} · Mana ${Math.floor(p.mana)}/${maxManaOf(p)}`;
+
+    // Hotbar: Buttons nur bei geänderter Skill-Liste neu bauen, sonst Text in place aktualisieren
+    const hk = p.skills.join(',');
+    if (hk !== this.hotKey) {
+      this.hotKey = hk;
+      this.hotButtons = p.skills.map((id, i) => {
         const s = SKILLS.find((x) => x.id === id)!;
-        const cd = p.skillCd[id] ?? 0;
-        const b = el('button', 'cursor:pointer;min-width:84px;padding:4px 6px;background:#241f2a;color:#c9b79c;border:1px solid #4b3f3a', `${i + 1} ${s.name}${cd > 0 ? ` (${Math.ceil(cd / 20)}s)` : ''}`);
+        const b = el('button', 'cursor:pointer;min-width:84px;padding:4px 6px;background:#241f2a;color:#c9b79c;border:1px solid #4b3f3a');
         b.title = s.desc;
         b.onclick = () => this.useSkillSlot(i);
         return b;
-      }),
-    );
+      });
+      this.hotbar.replaceChildren(...this.hotButtons);
+    }
+    p.skills.forEach((id, i) => {
+      const s = SKILLS.find((x) => x.id === id)!;
+      const cd = p.skillCd[id] ?? 0;
+      const label = `${i + 1} ${s.name}${cd > 0 ? ` (${Math.ceil(cd / 20)}s)` : ''}`;
+      const b = this.hotButtons[i]!;
+      if (b.textContent !== label) b.textContent = label;
+    });
+
     if (t && t.alive && t.kind === 'monster') {
       this.target.style.display = 'block';
       const k = monsterKind(t.kindId!);
@@ -106,7 +142,8 @@ export class Ui {
     const h = (t: string) => out.push(el('div', 'margin-top:10px;font-weight:bold;border-top:1px solid #4b3f3a;padding-top:6px', t));
     const [lo, hi] = damageRange(p);
     out.push(el('div', 'font-weight:bold', `Held · Level ${p.level} (I/C schließen)`));
-    out.push(el('div', '', `Leben ${Math.ceil(p.hp)}/${maxHpOf(p)} · Mana ${Math.floor(p.mana)}/${maxManaOf(p)}`));
+    this.panelHp = el('div');
+    out.push(this.panelHp);
     out.push(el('div', '', `Schaden ${lo}-${hi} · Rüstung ${armorOf(p)} · Gewicht ${carriedWeight(p).toFixed(1)}/${carryCapacity(p)}`));
 
     h(`Attribute (${p.statPoints} Punkte)`);
@@ -166,6 +203,7 @@ export class Ui {
       if (!p.stash.length) out.push(el('i', '', 'leer'));
       for (const it of p.stash) out.push(this.itemRow(it.name, it, [['Nehmen', () => this.send({ type: 'stashTake', itemId: it.id })]]));
     }
+    out.push(el('hr', 'border-color:#4b3f3a;margin-top:12px'), this.btn('Neues Spiel (löscht Spielstand)', () => { if (confirm('Spielstand wirklich löschen und neu beginnen?')) this.newGame(); }));
     this.panel.replaceChildren(...out);
   }
 

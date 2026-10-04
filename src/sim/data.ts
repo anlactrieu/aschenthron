@@ -10,7 +10,7 @@ export const START_STAT_POINTS = 10;
 
 /** Gesamt-XP, die für das Erreichen von `level` nötig sind. */
 export function totalXpFor(level: number): number {
-  return 50 * (level - 1) * level;
+  return 150 * (level - 1) * level;
 }
 
 export interface MonsterKind {

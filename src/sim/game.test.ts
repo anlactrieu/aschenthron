@@ -243,3 +243,32 @@ describe('Verfolgung', () => {
     expect(m.alive).toBe(false);
   });
 });
+
+describe('Fernkampf', () => {
+  it('Fernkampf-Skill zieht den Helden nicht in den Nahkampf', () => {
+    const { w, p } = fresh();
+    p.x = 10;
+    p.y = 10;
+    p.skills.push('quick_shot');
+    const m = spawnMonster(w, 14, 10, 'grave_rat');
+    m.aggroRange = 0;
+    applyCommand(w, p.id, { type: 'useSkill', skillId: 'quick_shot', targetId: m.id });
+    expect(m.hp).toBeLessThan(m.maxHp);
+    run(w, TICK_RATE * 3);
+    expect(p.x).toBe(10);
+    expect(p.y).toBe(10);
+    expect(p.targetId).toBe(m.id);
+  });
+
+  it('Nahkampf-Skill löst Verfolgung aus', () => {
+    const { w, p } = fresh();
+    p.x = 10;
+    p.y = 10;
+    p.skills.push('power_strike');
+    const m = spawnMonster(w, 11, 10, 'grave_rat');
+    m.aggroRange = 0;
+    applyCommand(w, p.id, { type: 'useSkill', skillId: 'power_strike', targetId: m.id });
+    run(w, TICK_RATE * 5);
+    expect(m.alive).toBe(false);
+  });
+});
