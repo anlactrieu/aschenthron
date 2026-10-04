@@ -14,7 +14,7 @@ import { Minimap } from './minimap';
 import { Fx } from './fx';
 import type { RemoteSession } from '../net/client';
 import {
-  ensureTexture, tileBase, lookOf, monsterCanvas, playerCanvas, registerStaticArt, tileCanvas, TILE_H, TILE_VARIANTS, TILE_W, WALL_VARIANTS,
+  ensureTexture, tileBase, FEET_ORIGIN_Y, lookOf, monsterCanvas, playerCanvas, registerStaticArt, tileCanvas, TILE_H, TILE_VARIANTS, TILE_W, WALL_VARIANTS,
 } from './art';
 
 const SAVE_KEY = 'aschenthron.save.v1';
@@ -22,6 +22,8 @@ const VIEW = 30;
 const CHUNK = 16;
 const PROP_GIDS = new Set([2, 10, 11, 13, 14]);
 const OVERLAY_DEPTH = 1e7;
+/** Dauer eines Hiebs/Wurfs in ms (Ausholen 40 %, Schlag 60 %) */
+const SWING_MS = 240;
 
 function safeStorage(): Storage | null {
   try {
@@ -40,7 +42,7 @@ interface ActorView {
   movingUntil: number;
   flip: boolean;
   swingUntil?: number;
-  swingDir?: number;
+  swingStart?: number;
 }
 
 export class GameScene extends Phaser.Scene {
@@ -72,6 +74,9 @@ export class GameScene extends Phaser.Scene {
   private ambientKind: 'embers' | 'mist' | null = null;
   private lastTime = 0;
   private now = 0;
+  private ts = 1;
+  private timers: { at: number; fn: () => void }[] = [];
+  private fireballs = new Map<number, { impacts: (() => void)[]; target: number }>();
   private regionName = '';
   private resetting = false;
   private ended = false;
@@ -114,7 +119,8 @@ export class GameScene extends Phaser.Scene {
     else this.ui.say('Willkommen in Aschenthron. C: Charakter (Attributpunkte verteilen!) · Q/E: Heil-/Manatrank · N: Karte · M: Ton · Klick: laufen/angreifen/aufheben · Lehrer, Händlerin, Schmiede, Truhe und Aufgaben in der Stadt.');
     this.gfx = this.add.graphics().setDepth(OVERLAY_DEPTH);
     this.gfxGround = this.add.graphics().setDepth(-9e5);
-    this.fx = new Fx(this);
+    this.ts = new URLSearchParams(location.search).has('slowfx') ? 6 : 1;
+    this.fx = new Fx(this, this.ts);
     this.vignette = document.createElement('div');
     this.vignette.style.cssText = 'position:fixed;inset:0;pointer-events:none;transition:opacity 1.2s,background 1.2s;opacity:1;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 58%,rgba(0,0,0,.45) 100%)';
     document.body.appendChild(this.vignette);
@@ -231,6 +237,11 @@ export class GameScene extends Phaser.Scene {
     }
     this.now = time;
     this.handleEvents();
+    if (this.timers.length) {
+      const due = this.timers.filter((t) => t.at <= time);
+      this.timers = this.timers.filter((t) => t.at > time);
+      for (const t of due) t.fn();
+    }
     this.autosave += dt;
     if (this.autosave > 5000) {
       this.autosave = 0;
@@ -253,6 +264,12 @@ export class GameScene extends Phaser.Scene {
     const pos = this.dispPos(a);
     const { sx, sy } = toScreen(pos.x, pos.y);
     return { x: sx, y: sy - (a.boss ? 34 : 18) };
+  }
+
+  /** Verzögert eine Darstellung (Ausholen vor dem Treffer). */
+  private later(ms: number, fn: () => void): void {
+    if (ms <= 0) fn();
+    else this.timers.push({ at: this.now + ms, fn });
   }
 
   private kick(id: number, dx: number, dy: number): void {
@@ -301,13 +318,13 @@ export class GameScene extends Phaser.Scene {
           const tg = getActor(w, e.targetId);
           const fromPlayer = e.attackerId === this.playerId;
           const toPlayer = e.targetId === this.playerId;
-          const projectile = e.skill && ['quick_shot', 'multishot', 'poison_shot', 'ember_bolt', 'fireball'].includes(e.skill);
-          const from = this.bodyPos(at);
-          const to = this.bodyPos(tg);
-          // Wirkung am Ziel: Zahl, Blitz, Rückstoß – bei Geschossen erst beim Einschlag
+          const arrowSkill = !!e.skill && ['quick_shot', 'multishot', 'poison_shot'].includes(e.skill);
+          const boltSkill = !!e.skill && ['ember_bolt', 'fireball'].includes(e.skill);
+          const projectile = arrowSkill || boltSkill;
+          // Wirkung am Ziel: Zahl, Blitz, Rückstoß, Ton – bei Geschossen erst beim Einschlag
           const impact = () => {
-            this.flash.set(e.targetId, this.now + 110);
-            const pos = this.bodyPos(tg) ?? to;
+            this.flash.set(e.targetId, this.now + 120 * this.ts);
+            const pos = this.bodyPos(tg);
             if (pos) {
               const poison = e.skill === 'poison_shot' && !e.crit && tg?.dot;
               const txt = e.crit ? `${e.amount}!` : String(e.amount);
@@ -322,7 +339,7 @@ export class GameScene extends Phaser.Scene {
               const sxv = (t.x - a.x - (t.y - a.y)) * 32;
               const syv = (t.x - a.x + (t.y - a.y)) * 16;
               const len = Math.hypot(sxv, syv) || 1;
-              this.kick(tg.id, (sxv / len) * 4, (syv / len) * 4);
+              this.kick(tg.id, (sxv / len) * 5, (syv / len) * 5);
             }
             if (e.crit || (tg?.boss && fromPlayer)) this.cameras.main.shake(70, e.crit ? 0.004 : 0.0025);
             if (toPlayer) this.cameras.main.shake(60, 0.002);
@@ -331,42 +348,68 @@ export class GameScene extends Phaser.Scene {
               else this.sfx.hit();
             } else if (toPlayer) this.sfx.hurt();
           };
-          // Der Angreifer holt sichtbar aus: Ausfallschritt, Neigung und Schlagbogen (Nahkampf)
+          // Der Angreifer holt sichtbar aus (Ausholen → Schlag/Wurf), erst dann trifft es
+          let delay = 0;
           if (at && tg && at.id !== tg.id) {
             const a = this.dispPos(at);
             const t = this.dispPos(tg);
             const sxv = (t.x - a.x - (t.y - a.y)) * 32;
             const syv = (t.x - a.x + (t.y - a.y)) * 16;
             const len = Math.hypot(sxv, syv) || 1;
-            this.kick(at.id, (sxv / len) * (projectile ? -2 : 9), (syv / len) * (projectile ? -1 : 9));
             const v = this.actorViews.get(at.id);
             if (v) {
-              v.swingUntil = this.now + 170;
-              v.swingDir = sxv >= 0 ? 1 : -1;
+              v.swingStart = this.now;
+              v.swingUntil = this.now + SWING_MS * this.ts;
+              v.flip = sxv < 0;
             }
+            delay = SWING_MS * 0.4 * this.ts;
+            this.later(delay, () => this.kick(at.id, (sxv / len) * (projectile ? -1 : 10), (syv / len) * (projectile ? -0.5 : 10)));
           }
-          if (!e.skill && from && to && at) {
-            // normaler Hieb: Schlagbogen an der Waffenseite; Monster mit Klauen-/Bissspur
-            const col = at.kind === 'player' ? 0xf0f0ff : 0xffb0a0;
-            this.fx.slash(to.x, to.y, col, (from.x <= to.x ? 0 : Math.PI) + (at.kind === 'player' ? 0 : 0.5));
-          }
-          if (projectile && from && to && e.skill) {
-            const col = { quick_shot: 0xe8d8a0, multishot: 0xe8d8a0, poison_shot: 0x7fe060, ember_bolt: 0xff8a2a, fireball: 0xff5a1a }[e.skill as 'quick_shot'];
-            const dur = e.skill === 'fireball' ? 240 : e.skill === 'ember_bolt' ? 200 : 170;
-            const done = () => {
+          const from = this.bodyPos(at);
+          if (!e.skill) {
+            this.later(delay, () => {
+              const to = this.bodyPos(tg);
+              const f = this.bodyPos(at);
+              if (to && f && at) this.fx.slash(to.x, to.y, at.kind === 'player' ? 0xf0f0ff : 0xffb0a0, (f.x <= to.x ? 0 : Math.PI) + (at.kind === 'player' ? 0 : 0.5));
               impact();
-              if (e.skill === 'fireball' && !fxSeen.has(`${e.attackerId}:fb:done`)) {
-                fxSeen.add(`${e.attackerId}:fb:done`);
-                this.fx.ring(to.x, to.y + 14, 130, 0xff6a2a, 420);
-                this.fx.burst(to.x, to.y, 0xffa040, 520);
-                this.cameras.main.shake(110, 0.004);
+            });
+          } else if (projectile && from) {
+            if (e.skill === 'fireball') {
+              // ein Feuerball pro Zauber: alle Treffer des Flächenschadens warten auf den Einschlag
+              let b = this.fireballs.get(e.attackerId);
+              if (!b) {
+                b = { impacts: [], target: at?.targetId ?? e.targetId };
+                this.fireballs.set(e.attackerId, b);
+                const batch = b;
+                this.later(delay, () => {
+                  this.fireballs.delete(e.attackerId);
+                  const primary = this.bodyPos(getActor(w, batch.target)) ?? this.bodyPos(tg);
+                  const f2 = this.bodyPos(at);
+                  if (!primary || !f2) return batch.impacts.forEach((fn) => fn());
+                  this.fx.projectile(f2.x, f2.y, primary.x, primary.y, 0xff5a1a, 240, () => {
+                    this.fx.ring(primary.x, primary.y + 14, 130, 0xff6a2a, 420);
+                    this.fx.burst(primary.x, primary.y, 0xffa040, 520);
+                    this.cameras.main.shake(110, 0.004);
+                    batch.impacts.forEach((fn) => fn());
+                  });
+                });
               }
-            };
-            if (e.skill === 'quick_shot' || e.skill === 'multishot' || e.skill === 'poison_shot') this.fx.arrow(from.x, from.y, to.x, to.y, col, dur, done);
-            else this.fx.projectile(from.x, from.y, to.x, to.y, col, dur, done);
+              b.impacts.push(impact);
+            } else {
+              this.later(delay, () => {
+                const f = this.bodyPos(at);
+                const to = this.bodyPos(tg);
+                if (!f || !to) return impact();
+                const col = { quick_shot: 0xe8d8a0, multishot: 0xe8d8a0, poison_shot: 0x7fe060, ember_bolt: 0xff8a2a }[e.skill as 'quick_shot'];
+                if (arrowSkill) this.fx.arrow(f.x, f.y, to.x, to.y, col, 170, impact);
+                else this.fx.projectile(f.x, f.y, to.x, to.y, col, 200, impact);
+              });
+            }
           } else {
-            impact();
-            if (sk && e.skill) this.skillFx({ attackerId: e.attackerId, targetId: e.targetId, skill: e.skill }, fxSeen);
+            this.later(delay, () => {
+              impact();
+              if (e.skill) this.skillFx({ attackerId: e.attackerId, targetId: e.targetId, skill: e.skill }, fxSeen);
+            });
           }
           break;
         }
@@ -729,9 +772,11 @@ export class GameScene extends Phaser.Scene {
       let img = this.npcViews.get(n.id);
       const { sx, sy } = toScreen(n.x, n.y);
       if (!img) {
-        img = this.add.image(sx, sy + 8, `npc_${n.kind}`).setOrigin(0.5, 0.93);
+        img = this.add.image(sx, sy + 8, `npc_${n.kind}`).setOrigin(0.5, FEET_ORIGIN_Y);
         this.npcViews.set(n.id, img);
       }
+      this.gfxGround.fillStyle(0x000000, 0.2);
+      this.gfxGround.fillEllipse(sx, sy + 9, n.kind === 'stash' ? 34 : 26, n.kind === 'stash' ? 13 : 10);
       img.setPosition(sx, sy + 8).setDepth(sy + 8);
       this.label(`n${n.id}`, n.name, sx, sy - 52, '#e8d9b0', seen);
       const mark = this.questMark(n, p);
@@ -771,8 +816,9 @@ export class GameScene extends Phaser.Scene {
       // Bogenflug aus dem Gegner
       const arc = -Math.sin(k * Math.PI) * 30;
       const slide = (1 - k) * born.dx;
-      const bob = k >= 1 ? Math.sin(time / 280 + gi.id) * 2 : 0;
-      img.setPosition(sx + slide, sy + 2 + bob + arc).setDepth(sy + 4);
+      this.gfxGround.fillStyle(0x000000, 0.28);
+      this.gfxGround.fillEllipse(sx + slide, sy + 6, 18 - Math.abs(arc) * 0.2, 6);
+      img.setPosition(sx + slide, sy + 2 + arc).setDepth(sy + 4);
       const r = gi.item.rarity;
       const col = { normal: 0xc9c4bd, magic: 0x6f8fff, rare: 0xf2c94c, set: 0x5fd070, legendary: 0xff8a2a }[r];
       if (r !== 'normal') {
@@ -827,7 +873,7 @@ export class GameScene extends Phaser.Scene {
       if (a.id === p.id) this.camPos = pos;
       const { sx, sy } = toScreen(pos.x, pos.y);
       if (!view) {
-        view = { img: this.add.image(sx, sy, 'pillar').setOrigin(0.5, 0.92), lastX: pos.x, lastY: pos.y, movingUntil: 0, flip: false };
+        view = { img: this.add.image(sx, sy, 'pillar').setOrigin(0.5, FEET_ORIGIN_Y), lastX: pos.x, lastY: pos.y, movingUntil: 0, flip: false };
         this.actorViews.set(a.id, view);
       }
       const dx = pos.x - view.lastX;
@@ -840,7 +886,9 @@ export class GameScene extends Phaser.Scene {
       }
       view.lastX = pos.x;
       view.lastY = pos.y;
-      const frame = time < view.movingUntil ? Math.floor(time / 140) % 2 : 0;
+      const swinging = !!view.swingUntil && view.swingUntil > time && a.alive;
+      const swingK = swinging ? (time - view.swingStart!) / (view.swingUntil! - view.swingStart!) : -1;
+      const frame = swinging ? (swingK < 0.4 ? 2 : 3) : time < view.movingUntil ? Math.floor(time / 140) % 2 : 0;
       const img = view.img;
       if (a.kind === 'player') {
         const look = lookOf(a);
@@ -862,7 +910,17 @@ export class GameScene extends Phaser.Scene {
         kk.y *= 0.78;
         if (Math.abs(kk.x) + Math.abs(kk.y) < 0.2) this.kicks.delete(a.id);
       }
-      img.setVisible(true).setPosition(sx + ox, sy + 8 + oy).setDepth(sy + 8).setFlipX(view.flip);
+      // Schritt-Wippen beim Gehen, Bodenschatten bleibt fest unter den Füßen
+      const walking = time < view.movingUntil && a.alive;
+      const bob = walking ? -Math.abs(Math.sin(time / 140 * Math.PI * 0.5)) * 2.4 : 0;
+      if (a.alive) {
+        const wide = a.boss ? 46 : a.kind === 'monster' && (monsterKind(a.kindId!).family === 'beast' || monsterKind(a.kindId!).family === 'spider') ? 30 : a.kind === 'monster' && monsterKind(a.kindId!).family === 'golem' ? 34 : 22;
+        this.gfxGround.fillStyle(0x000000, 0.18);
+        this.gfxGround.fillEllipse(sx + ox, sy + 9 + oy, wide * 1.25, wide * 0.5);
+        this.gfxGround.fillStyle(0x000000, 0.22);
+        this.gfxGround.fillEllipse(sx + ox, sy + 9 + oy, wide * 0.85, wide * 0.34);
+      }
+      img.setVisible(true).setPosition(sx + ox, sy + 8 + oy + bob).setDepth(sy + 8).setFlipX(view.flip);
       if (!a.alive) {
         const age = a.kind === 'monster' ? (this.world.tick - a.diedAt) / (TICK_RATE * 4) : 0;
         img.setAngle(view.flip ? -90 : 90).setAlpha(Math.max(0, 0.6 - age * 0.6)).setTint(0x664444).setScale(1);
@@ -870,9 +928,7 @@ export class GameScene extends Phaser.Scene {
         continue;
       }
       // leichtes Atmen, wenn sie stehen
-      const swing = view.swingUntil && view.swingUntil > time ? (1 - (view.swingUntil - time) / 170) : -1;
-      const tilt = swing >= 0 ? (view.swingDir ?? 1) * (swing < 0.4 ? -14 * (swing / 0.4) : -14 + 40 * ((swing - 0.4) / 0.6)) : 0;
-      img.setAngle(tilt).setAlpha(1).setScale(1, time < view.movingUntil ? 1 : 1 + 0.022 * Math.sin(time / 330 + a.id));
+      img.setAngle(0).setAlpha(1).setScale(1, 1);
       if ((this.flash.get(a.id) ?? 0) > time) img.setTint(0xffffff);
       else if (a.dot) img.setTint(0x9aff9a);
       else if (a.enraged) img.setTint(0xff9a8a);

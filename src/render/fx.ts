@@ -52,7 +52,7 @@ export class Fx {
   private now = 0;
   private seedCounter = 1;
 
-  constructor(private scene: Phaser.Scene) {}
+  constructor(private scene: Phaser.Scene, private timeScale = 1) {}
 
   private seed(): number {
     this.seedCounter = (this.seedCounter * 1664525 + 1013904223) >>> 0;
@@ -67,6 +67,7 @@ export class Fx {
   }
 
   floatText(x: number, y: number, text: string, color: string, size = 14, dur = 950): void {
+    dur *= this.timeScale;
     let f = this.floats.find((q) => !q.active);
     if (!f) {
       const t = this.scene.add.text(0, 0, '', { fontSize: '14px', fontStyle: 'bold', stroke: '#000', strokeThickness: 3 }).setOrigin(0.5).setDepth(DEPTH);
@@ -85,7 +86,7 @@ export class Fx {
   }
 
   private add(e: Omit<Effect, 'start' | 'seed'>): void {
-    this.effects.push({ ...e, start: this.now, seed: this.seed() });
+    this.effects.push({ ...e, dur: e.dur * this.timeScale, start: this.now, seed: this.seed() });
     if (this.effects.length > 160) this.effects.shift();
   }
 

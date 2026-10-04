@@ -80,6 +80,23 @@ function outline(src: HTMLCanvasElement, col = '#120e12'): HTMLCanvasElement {
   return out;
 }
 
+/** Legt einen weichen Kontaktschatten unter ein Sprite (Bodenhaftung statt Schweben). */
+function grounded(src: HTMLCanvasElement, widthFrac: number, baseYFrac: number): HTMLCanvasElement {
+  const out = mkCanvas(src.width, src.height);
+  const c = ctxOf(out);
+  const cx = src.width / 2;
+  const cy = src.height * baseYFrac;
+  const w = src.width * widthFrac;
+  for (let i = 3; i >= 0; i--) {
+    c.fillStyle = `rgba(0,0,0,${0.1 + (3 - i) * 0.07})`;
+    c.beginPath();
+    c.ellipse(cx, cy, (w / 2) * (0.55 + i * 0.15), (w / 2) * 0.22 * (0.55 + i * 0.15), 0, 0, Math.PI * 2);
+    c.fill();
+  }
+  c.drawImage(src, 0, 0);
+  return out;
+}
+
 function upscale(src: HTMLCanvasElement, k: number): HTMLCanvasElement {
   const out = mkCanvas(src.width * k, src.height * k);
   const c = ctxOf(out);
@@ -259,7 +276,7 @@ function treeCanvas(style: 'oak' | 'pine' | 'dead' | 'char', variant: number): H
     }
     if (style === 'dead' && r() < 0.6) rect(x, 3, 14, 2, 1, 0x5a6a3a);
   }
-  return upscale(outline(c), 3);
+  return grounded(upscale(outline(c), 3), 0.55, 0.93);
 }
 
 function rockCanvas(style: 'grey' | 'dark', variant: number): HTMLCanvasElement {
@@ -270,7 +287,7 @@ function rockCanvas(style: 'grey' | 'dark', variant: number): HTMLCanvasElement 
   rect(x, 3, 3, 8, 4, base);
   rect(x, 5, 2, 4, 2, shade(base, 1.2));
   rect(x, 4 + (variant % 3), 4, 2, 1, shade(base, 1.3));
-  return upscale(outline(c), 4);
+  return grounded(upscale(outline(c), 4), 0.9, 0.86);
 }
 
 function graveCanvas(variant: number): HTMLCanvasElement {
@@ -287,7 +304,7 @@ function graveCanvas(variant: number): HTMLCanvasElement {
     rect(x, 2, 4, 8, 2, base);
   }
   rect(x, 2, 12, 8, 2, 0x3a4a30);
-  return upscale(outline(c), 4);
+  return grounded(upscale(outline(c), 4), 0.8, 0.9);
 }
 
 function pillarCanvas(): HTMLCanvasElement {
@@ -297,7 +314,7 @@ function pillarCanvas(): HTMLCanvasElement {
   rect(x, 3, 4, 6, 15, 0x4a4652);
   rect(x, 3, 4, 2, 15, 0x5a5662);
   rect(x, 2, 2, 8, 3, 0x3a3640);
-  return upscale(outline(c), 4);
+  return grounded(upscale(outline(c), 4), 0.9, 0.93);
 }
 
 /* ------------------------------------------------------------- Akteure */
@@ -305,6 +322,23 @@ function pillarCanvas(): HTMLCanvasElement {
 type Painter = (x: Ctx, f: number, col: number, r: () => number) => void;
 
 const SKIN = 0xd8b088;
+
+type Pose = 'idle' | 'wind' | 'strike';
+let POSE: Pose = 'idle';
+
+/** Waffe je nach Haltung: Ruhe senkrecht, Ausholen über dem Kopf, Schlag waagerecht nach vorn. */
+function weapon(x: Ctx, blade: number, len: number, hilt = 0x6a4a2a): void {
+  if (POSE === 'wind') {
+    rect(x, 13, -4, 1, Math.round(len * 0.8), blade);
+    rect(x, 12, Math.round(len * 0.8) - 4, 3, 1, hilt);
+  } else if (POSE === 'strike') {
+    rect(x, 15, 8, Math.round(len * 0.5), 1, blade);
+    rect(x, 14, 7, 1, 3, hilt);
+  } else {
+    rect(x, 13, 4, 1, len, blade);
+    rect(x, 12, 4 + len - 2, 3, 1, hilt);
+  }
+}
 
 function humanoidBase(x: Ctx, f: number, o: { skin: number; body: number; legs: number; hair?: number; belt?: number; arms?: number }): void {
   const step = f % 2;
@@ -317,6 +351,16 @@ function humanoidBase(x: Ctx, f: number, o: { skin: number; body: number; legs: 
   rect(x, 12, 7, 2, 6, shade(arm, 0.9));
   rect(x, 2, 13, 2, 1, o.skin);
   rect(x, 12, 13, 2, 1, o.skin);
+  if (POSE === 'wind') {
+    x.clearRect(12, 7, 2, 7);
+    rect(x, 12, 3, 2, 6, shade(arm, 0.9));
+    rect(x, 12, 2, 2, 1, o.skin);
+  } else if (POSE === 'strike') {
+    x.clearRect(12, 7, 2, 7);
+    rect(x, 11, 8, 4, 2, shade(arm, 0.9));
+    rect(x, 15, 8, 1, 2, o.skin);
+    rect(x, 4, 7, 8, 8, shade(o.body, 1.08));
+  }
   rect(x, 5, 2, 6, 5, o.skin);
   rect(x, 6, 4, 1, 1, 0x1a1418);
   rect(x, 9, 4, 1, 1, 0x1a1418);
@@ -326,8 +370,7 @@ function humanoidBase(x: Ctx, f: number, o: { skin: number; body: number; legs: 
 const FAMILY: Record<MonsterFamily, Painter> = {
   humanoid: (x, f, col) => {
     humanoidBase(x, f, { skin: SKIN, body: col, legs: shade(col, 0.55), hair: shade(col, 0.5) });
-    rect(x, 13, 4, 1, 9, 0xb8b8c0);
-    rect(x, 12, 11, 3, 1, 0x6a4a2a);
+    weapon(x, 0xb8b8c0, 9);
   },
   undead: (x, f, col) => {
     humanoidBase(x, f, { skin: 0xe8e0c8, body: shade(col, 0.55), legs: 0x3a3438, arms: 0xe8e0c8 });
@@ -335,7 +378,7 @@ const FAMILY: Record<MonsterFamily, Painter> = {
     rect(x, 9, 4, 2, 2, 0x120e12);
     rect(x, 5, 9, 6, 1, 0xe8e0c8);
     rect(x, 5, 11, 6, 1, 0xe8e0c8);
-    rect(x, 13, 3, 1, 10, col);
+    weapon(x, col, 10, col);
   },
   ghoul: (x, f, col) => {
     humanoidBase(x, f, { skin: shade(col, 1.1), body: shade(col, 0.6), legs: shade(col, 0.45), arms: shade(col, 1.0) });
@@ -346,6 +389,9 @@ const FAMILY: Record<MonsterFamily, Painter> = {
   },
   beast: (x, f, col) => {
     const l = f % 2;
+    x.translate(0, 4);
+    if (POSE === 'wind') x.translate(-2, 1);
+    if (POSE === 'strike') x.translate(2, 0);
     rect(x, 3, 8, 10, 5, col);
     rect(x, 3, 8, 10, 1, shade(col, 1.2));
     rect(x, 11, 5, 4, 5, shade(col, 1.05));
@@ -353,6 +399,12 @@ const FAMILY: Record<MonsterFamily, Painter> = {
     rect(x, 14, 4, 1, 2, shade(col, 0.7));
     rect(x, 14, 7, 1, 1, 0x140808);
     rect(x, 13, 7, 1, 1, 0xd03030);
+    if (POSE === 'strike') {
+      rect(x, 12, 9, 4, 1, 0x1a0a0a);
+      rect(x, 13, 10, 1, 1, 0xe8e0d0);
+      rect(x, 15, 9, 1, 1, 0xe8e0d0);
+      rect(x, 2, 12, 3, 1, 0xe8e0d0);
+    }
     rect(x, 1, 7, 3, 2, shade(col, 0.8));
     rect(x, 4, 13, 2, 4 - (l ? 1 : 0), shade(col, 0.7));
     rect(x, 7, 13, 2, 3 + (l ? 1 : 0), shade(col, 0.7));
@@ -360,6 +412,9 @@ const FAMILY: Record<MonsterFamily, Painter> = {
   },
   spider: (x, f, col) => {
     const l = f % 2;
+    x.translate(0, 5);
+    if (POSE === 'wind') x.translate(0, 1);
+    if (POSE === 'strike') x.translate(1, -1);
     rect(x, 6, 7, 6, 6, col);
     rect(x, 7, 8, 3, 2, shade(col, 1.4));
     rect(x, 3, 8, 4, 4, shade(col, 0.9));
@@ -375,6 +430,14 @@ const FAMILY: Record<MonsterFamily, Painter> = {
   },
   golem: (x, f, col, r) => {
     const l = f % 2;
+    if (POSE === 'wind') {
+      rect(x, 0, 1, 3, 9, shade(col, 0.85));
+      rect(x, 14, 1, 3, 9, shade(col, 0.85));
+    }
+    if (POSE === 'strike') {
+      rect(x, 13, 9, 7, 4, shade(col, 0.95));
+      rect(x, 1, 9, 2, 5, shade(col, 0.85));
+    }
     rect(x, 4, 15, 4, 6 - (l ? 1 : 0), shade(col, 0.7));
     rect(x, 9, 15, 4, 5 + (l ? 1 : 0), shade(col, 0.7));
     rect(x, 3, 6, 11, 10, col);
@@ -396,6 +459,8 @@ const FAMILY: Record<MonsterFamily, Painter> = {
     rect(x, 7, 19, 2, 3, shade(col, 0.5));
   },
   worm: (x, f, col) => {
+    if (POSE === 'wind') x.translate(-1, 1);
+    if (POSE === 'strike') x.translate(2, 0);
     for (let i = 0; i < 6; i++) {
       const yy = 20 - i * 3;
       const off = Math.round(Math.sin(i * 1.1 + f * 1.4) * 2);
@@ -407,6 +472,8 @@ const FAMILY: Record<MonsterFamily, Painter> = {
     rect(x, 10, 2, 1, 1, 0xf0e040);
   },
   elemental: (x, f, col) => {
+    x.translate(0, 2);
+    if (POSE === 'strike') x.translate(2, 0);
     const w = f % 2;
     rect(x, 5, 12, 6, 7, shade(col, 0.8));
     rect(x, 4, 8, 8, 8, col);
@@ -419,18 +486,23 @@ const FAMILY: Record<MonsterFamily, Painter> = {
 };
 
 const actorCache = new Map<string, HTMLCanvasElement>();
-const FW = 16;
-const FH = 24;
+const FW = 20;
+const FH = 28;
+/** Rand um die Figur: Platz für erhobene Waffen und Sprünge nach vorn */
+const PAD_X = 2;
+const PAD_Y = 3;
+/** Fußposition relativ zur Bildhöhe (für setOrigin) */
+export const FEET_ORIGIN_Y = (PAD_Y + 22) / FH;
 
 function actorCanvas(key: string, build: (x: Ctx) => void, scale: number): HTMLCanvasElement {
   const hit = actorCache.get(key);
   if (hit) return hit;
   const c = mkCanvas(FW, FH);
   const x = ctxOf(c);
-  // weicher Bodenschatten
-  x.fillStyle = 'rgba(0,0,0,0.35)';
-  x.fillRect(3, 21, 10, 2);
+  x.save();
+  x.translate(PAD_X, PAD_Y);
   build(x);
+  x.restore();
   const out = upscale(outline(c), scale);
   actorCache.set(key, out);
   return out;
@@ -438,6 +510,7 @@ function actorCanvas(key: string, build: (x: Ctx) => void, scale: number): HTMLC
 
 export function monsterCanvas(id: string, family: MonsterFamily, color: number, boss: boolean, frame: number): HTMLCanvasElement {
   return actorCanvas(`mon_${id}_${frame}`, (x) => {
+    POSE = frame === 2 ? 'wind' : frame === 3 ? 'strike' : 'idle';
     const r = rng(id.length * 91 + id.charCodeAt(0));
     FAMILY[family](x, frame, color, r);
     if (boss) {
@@ -470,8 +543,9 @@ export function lookOf(a: Actor): Look {
 }
 
 export function playerCanvas(look: Look, frame: number): HTMLCanvasElement {
-  const key = `pl_${look.chest}_${look.head}_${look.weapon}_${look.hands}_${frame % 2}`;
+  const key = `pl_${look.chest}_${look.head}_${look.weapon}_${look.hands}_${frame}`;
   return actorCanvas(key, (x) => {
+    POSE = frame === 2 ? 'wind' : frame === 3 ? 'strike' : 'idle';
     const body = look.chest >= 0 ? TIER_COL[look.chest]! : 0x4a68a0;
     humanoidBase(x, frame, { skin: SKIN, body, legs: look.chest >= 0 ? shade(body, 0.6) : 0x3a3a52, hair: 0x4a3020, arms: look.hands >= 0 ? TIER_COL[look.hands]! : body });
     if (look.chest >= 2) {
@@ -487,10 +561,8 @@ export function playerCanvas(look: Look, frame: number): HTMLCanvasElement {
     }
     if (look.weapon >= 0) {
       const wc = TIER_COL[look.weapon]!;
-      rect(x, 13, 3 - (look.weapon >= 3 ? 1 : 0), 1, 10 + (look.weapon >= 3 ? 1 : 0), shade(wc, 1.25));
-      rect(x, 12, 11, 3, 1, 0x6a4a2a);
-      rect(x, 13, 12, 1, 2, 0x4a3020);
-    } else {
+      weapon(x, shade(wc, 1.25), 10 + (look.weapon >= 3 ? 2 : 0));
+    } else if (POSE === 'idle') {
       rect(x, 13, 9, 1, 4, 0x8a6a40);
     }
   }, 3);
@@ -498,6 +570,7 @@ export function playerCanvas(look: Look, frame: number): HTMLCanvasElement {
 
 export function npcCanvas(kind: string): HTMLCanvasElement {
   return actorCanvas(`npc_${kind}`, (x) => {
+    POSE = 'idle';
     if (kind === 'stash') {
       rect(x, 2, 12, 12, 9, 0x7a5a30);
       rect(x, 2, 12, 12, 2, 0x9a7a40);
