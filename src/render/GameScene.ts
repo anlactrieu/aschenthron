@@ -58,6 +58,7 @@ export class GameScene extends Phaser.Scene {
   private ui!: Ui;
   private sfx!: Sfx;
   private minimap!: Minimap;
+  private fpsText: Phaser.GameObjects.Text | null = null;
   private regionName = '';
   private resetting = false;
   private ended = false;
@@ -83,9 +84,12 @@ export class GameScene extends Phaser.Scene {
     }
     registerStaticArt(this);
     const store = this.remote ? null : safeStorage();
-    if (!this.remote && new URLSearchParams(location.search).has('neu')) {
+    const params = new URLSearchParams(location.search);
+    if (!this.remote && params.has('neu')) {
       store?.removeItem(SAVE_KEY);
-      history.replaceState(null, '', location.pathname);
+      params.delete('neu');
+      const rest = params.toString();
+      history.replaceState(null, '', location.pathname + (rest ? `?${rest}` : ''));
     }
     const saved = store?.getItem(SAVE_KEY);
     const p = this.player();
@@ -96,6 +100,9 @@ export class GameScene extends Phaser.Scene {
     else if (saved && importPlayer(this.world, p, saved)) this.ui.say('Spielstand geladen.');
     else this.ui.say('Willkommen in Aschenthron. C: Charakter (Attributpunkte verteilen!) · Q/E: Heil-/Manatrank · N: Karte · M: Ton · Klick: laufen/angreifen/aufheben · Lehrer, Händlerin, Schmiede, Truhe und Aufgaben in der Stadt.');
     this.gfx = this.add.graphics().setDepth(OVERLAY_DEPTH);
+    if (new URLSearchParams(location.search).has('fps')) {
+      this.fpsText = this.add.text(0, 0, '', { fontSize: '14px', color: '#9fff9f', backgroundColor: '#000a' }).setScrollFactor(0).setDepth(OVERLAY_DEPTH + 5);
+    }
     this.cameras.main.setBackgroundColor('#0b0a0d');
     this.input.on('pointerdown', (ptr: Phaser.Input.Pointer) => this.onClick(ptr));
     window.addEventListener('beforeunload', () => {
@@ -153,19 +160,38 @@ export class GameScene extends Phaser.Scene {
     else this.ui.say(kind === 'heal' ? 'Kein Heiltrank im Rucksack.' : 'Kein Manatrank im Rucksack.');
   }
 
+  /** Trefferprüfung im Bildraum gegen die sichtbaren Sprites (inkl. Namensschild/Aufgaben-Marker bei NPCs). */
+  private pick(wx: number, wy: number): { npc?: Npc; actor?: Actor } | null {
+    let best: { depth: number; npc?: Npc; actor?: Actor } | null = null;
+    for (const a of this.world.actors) {
+      if (a.id === this.playerId || !a.alive || (a.kind === 'player' && !this.remote)) continue;
+      const v = this.actorViews.get(a.id);
+      if (!v || !v.img.visible) continue;
+      if (v.img.getBounds().contains(wx, wy) && (!best || v.img.depth > best.depth)) best = { depth: v.img.depth, actor: a };
+    }
+    for (const n of this.world.npcs) {
+      const img = this.npcViews.get(n.id);
+      if (!img) continue;
+      const b = img.getBounds();
+      // Box nach oben und seitlich erweitern: Namensschild und Marker gehören zum Anklickbaren
+      const box = new Phaser.Geom.Rectangle(b.centerX - 55, b.top - 64, 110, b.height + 64);
+      if (box.contains(wx, wy) && (!best || img.depth > best.depth)) best = { depth: img.depth, npc: n };
+    }
+    return best;
+  }
+
   private onClick(ptr: Phaser.Input.Pointer): void {
     const t = toTile(ptr.worldX, ptr.worldY);
     const w = this.world;
-    const npc = w.npcs.find((n) => Math.hypot(n.x - t.x, n.y - (t.y + 0.5)) < 1);
-    if (npc) {
+    const hit = this.pick(ptr.worldX, ptr.worldY);
+    if (hit?.npc) {
       this.ui.toggle(true);
-      this.send({ type: 'moveTo', x: Math.round(npc.x), y: Math.round(npc.y + 1) });
+      this.send({ type: 'moveTo', x: Math.round(hit.npc.x), y: Math.round(hit.npc.y + 1) });
       return;
     }
+    if (hit?.actor) return this.send({ type: 'attack', targetId: hit.actor.id });
     const loot = w.ground.find((g) => Math.hypot(g.x - t.x, g.y - t.y) < 0.8);
     if (loot) return this.send({ type: 'pickup', groundId: loot.id });
-    const target = w.actors.find((a) => a.id !== this.playerId && a.alive && (a.kind === 'monster' || this.remote !== null) && Math.hypot(a.x - t.x, a.y - (t.y + 0.5)) < 1);
-    if (target) return this.send({ type: 'attack', targetId: target.id });
     const x = Math.floor(t.x + 0.5);
     const y = Math.floor(t.y + 0.5);
     if (isWalkable(w.grid, x, y)) this.send({ type: 'moveTo', x, y });
@@ -197,6 +223,7 @@ export class GameScene extends Phaser.Scene {
     this.ui.update(this.world, p, tgt);
     this.frame++;
     this.draw(time, p);
+    if (this.fpsText && this.frame % 20 === 0) this.fpsText.setText(`${Math.round(this.game.loop.actualFps)} FPS · Chunks ${this.chunks.size} · Props ${this.props.size}`);
   }
 
   /* ------------------------------------------------------------ Ereignisse */
@@ -313,7 +340,16 @@ export class GameScene extends Phaser.Scene {
     const cx1 = Math.min(Math.floor((w - 1) / CHUNK), Math.floor((px + VIEW) / CHUNK));
     const cy0 = Math.max(0, Math.floor((py - VIEW) / CHUNK));
     const cy1 = Math.min(Math.floor((h - 1) / CHUNK), Math.floor((py + VIEW) / CHUNK));
-    for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) if (!this.chunks.has(`${cx}_${cy}`)) this.makeChunk(cx, cy);
+    // Nur wenige Chunks pro Frame bauen (Ruckeln beim Überqueren von Chunk-Grenzen vermeiden); beim Start mehr
+    let budget = this.frame < 3 ? 40 : 2;
+    for (let cy = cy0; cy <= cy1 && budget > 0; cy++) {
+      for (let cx = cx0; cx <= cx1 && budget > 0; cx++) {
+        if (!this.chunks.has(`${cx}_${cy}`)) {
+          this.makeChunk(cx, cy);
+          budget--;
+        }
+      }
+    }
     if (this.frame % 30 === 0) {
       for (const [key, img] of this.chunks) {
         const [cx, cy] = key.split('_').map(Number) as [number, number];

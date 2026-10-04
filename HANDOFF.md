@@ -1,10 +1,17 @@
 # HANDOFF – Aschenthron
 
 ## Stand
-Nachtarbeit abgeschlossen (Auftrag: alles ausführen, Gebiet in T4C-Insel-Größe). Fertig und committet: A Gebiet „Aschental“ (160×120, 2 Städte, 4 Dungeons, 5 Bosse, 22 Monsterarten, 14 Quests, Level 1–30), B Balance per Bot (~5,8 h bis Cap), C prozedurale Pixel-Art + WebAudio + Minikarte, D Stufe 2 (12 Skills, Unikate, 3 Sets, Schmied), E Mehrspieler-Server mit PvP (`server/`, `src/net/`, `src/sim/net.ts`).
+Nachtarbeit abgeschlossen (letzter Feinschliff: Klick-Erkennung im Bildraum gegen die Sprites, Chunk-Budget, `?fps`-Overlay) (Auftrag: alles ausführen, Gebiet in T4C-Insel-Größe). Fertig und committet: A Gebiet „Aschental“ (160×120, 2 Städte, 4 Dungeons, 5 Bosse, 22 Monsterarten, 14 Quests, Level 1–30), B Balance per Bot (~5,8 h bis Cap), C prozedurale Pixel-Art + WebAudio + Minikarte, D Stufe 2 (12 Skills, Unikate, 3 Sets, Schmied), E Mehrspieler-Server mit PvP (`server/`, `src/net/`, `src/sim/net.ts`).
 Befehle: `npm run dev | server | test | lint | build | pace`. README.md erklärt Start und Mehrspieler. Karte: `python3 scripts/gen_map.py`.
 Annahmen für den User: `SPEC.md` Abschnitt „Annahmen ohne Rückfrage“. Neue Abhängigkeiten (`ws`, `tsx`, `@types/ws`): nach dem Pull `npm install`.
 `Browserspiele/` und `Spiele/` sind per `.gitignore` bewusst nicht im Repo.
+
+## Verifikation (Stand Nachtarbeit)
+- 69 Unit- und Server-Tests (echte WebSocket-Verbindungen, 2 lokale Clients), Lint, Build grün.
+- Bot-Messlauf (`npm run pace`): Level 30 nach ~5,8 h Spielzeit, 3 Tode.
+- Headless-Skripte gegen die laufende Szene: Klick-Matrix auf Boss, Normalmonster, NPCs (inkl. Namensschild/Marker) – alle Treffer; Bodenklick läuft.
+- Echte Mausklicks nur auf das DOM-UI (Panel, Hotbar); auf dem Canvas keine, weil das Browser-Pane nicht sichtbar war.
+- NICHT gemessen: Framerate auf dem Mac (`?fps` anhängen zeigt sie). Mehrspieler nur lokal geprüft.
 
 ## Letzte 3 Entscheidungen
 1. **Code-Review-Fixes:** Kämpfen in der Safe-Zone verboten, Händlersortiment in der Sim (`SHOP_ITEMS`), Drop-Pool deckt alle Slots ab. Grund: Safe-Zone ermöglichte risikoloses Farmen; Sim soll Autorität sein (online-fähig).
