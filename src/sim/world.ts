@@ -84,6 +84,12 @@ export interface Actor {
   dot: { perSec: number; until: number; srcId: number } | null;
   /** letzter erlittener Treffer (Monster regenerieren erst nach Ruhe) */
   lastHitAt: number;
+  /** Spieler: bis zu diesem Tick als Mörder markiert (überall angreifbar) */
+  pkUntil: number;
+  /** Spieler: zuletzt von diesem Spieler angegriffen (Notwehr-Erkennung) */
+  attackedBy: { id: number; at: number } | null;
+  /** Monster: Spieler, die Schaden verursacht haben (Tick des letzten Treffers) */
+  damagers: Record<number, number>;
 }
 
 export interface GroundItem {
@@ -114,7 +120,7 @@ export interface Npc {
   quests?: string[];
 }
 
-export type GameEvent =
+type GameEventBase =
   | { type: 'hit'; attackerId: number; targetId: number; amount: number; skill?: string; crit?: boolean }
   | { type: 'healed'; amount: number }
   | { type: 'crafted'; item: Item; op: string }
@@ -134,7 +140,11 @@ export type GameEvent =
   | { type: 'questDone'; questId: string }
   | { type: 'questTurned'; questId: string; xp: number; gold: number }
   | { type: 'enraged'; id: number }
-  | { type: 'fail'; reason: string };
+  | { type: 'fail'; reason: string }
+  | { type: 'pk'; id: number };
+
+/** `to`: nur für diesen Akteur bestimmt (sonst sichtbar für alle in der Nähe). */
+export type GameEvent = GameEventBase & { to?: number };
 
 export interface World {
   tick: number;
@@ -151,10 +161,14 @@ export interface World {
   towns: Pt[];
   /** Benannte Zonen (nur Anzeige) */
   regions: (Rect & { name: string; levels: string })[];
+  /** Spieler dürfen einander außerhalb von Städten angreifen (Server-Einstellung) */
+  pvp: boolean;
+  /** Akteur des gerade ausgeführten Befehls (für `fail`-Ereignisse) */
+  cmdActor: number | null;
 }
 
 export function createWorld(seed: number, grid: Grid, safe: Rect[] = []): World {
-  return { tick: 0, grid, rng: new Rng(seed), actors: [], nextId: 1, events: [], ground: [], safe, npcs: [], start: { x: 1, y: 1 }, towns: [], regions: [] };
+  return { tick: 0, grid, rng: new Rng(seed), actors: [], nextId: 1, events: [], ground: [], safe, npcs: [], start: { x: 1, y: 1 }, towns: [], regions: [], pvp: false, cmdActor: null };
 }
 
 export function addNpc(w: World, kind: NpcKind, name: string, x: number, y: number, extra: Partial<Npc> = {}): Npc {
@@ -169,19 +183,33 @@ function baseActor(w: World, kind: Actor['kind'], name: string, x: number, y: nu
     cooldownLeft: 0, path: [], targetId: null, aggroRange: 0, alive: true, level: 1, xp: 0, statPoints: 0,
     attrs: { kraft: 10, gewandtheit: 10, ausdauer: 10, verstand: 10, willenskraft: 10 },
     mana: 20, gold: 0, skills: [], skillCd: {}, potionCd: 0, quests: {}, inventory: [], equipment: {}, stash: [], pickupId: null,
-    diedAt: -1, boss: false, enraged: false, autoAttack: true, repathAt: 0, dot: null, lastHitAt: -9999,
+    diedAt: -1, boss: false, enraged: false, autoAttack: true, repathAt: 0, dot: null, lastHitAt: -9999, pkUntil: 0, attackedBy: null, damagers: {},
   };
   w.actors.push(a);
   return a;
 }
 
-export function spawnPlayer(w: World, x: number, y: number): Actor {
-  const a = baseActor(w, 'player', 'Held', x, y);
+export function spawnPlayer(w: World, x: number, y: number, name = 'Held'): Actor {
+  const a = baseActor(w, 'player', name, x, y);
   Object.assign(a, { damage: [4, 7] as [number, number], speed: 0.15, attackCooldown: 14, statPoints: START_STAT_POINTS, gold: 20 });
   a.hp = maxHpOf(a);
   a.mana = maxManaOf(a);
-  w.start = { x, y };
+  if (w.towns.length === 0) w.start = { x, y };
   return a;
+}
+
+/** Neuer Spieler am Startpunkt (erste Stadt); für Mehrspieler. */
+export function addPlayer(w: World, name: string): Actor {
+  const at = w.towns[0] ?? w.start;
+  return spawnPlayer(w, at.x, at.y, name);
+}
+
+export function removePlayer(w: World, id: number): void {
+  w.actors = w.actors.filter((a) => a.id !== id);
+  for (const m of w.actors) {
+    if (m.targetId === id) m.targetId = null;
+    delete m.damagers[id];
+  }
 }
 
 export function spawnMonster(w: World, x: number, y: number, kindId = 'field_rat'): Actor {
@@ -269,6 +297,17 @@ export function carriedWeight(a: Actor): number {
   return [...a.inventory, ...equippedItems(a)].reduce((s, i) => s + i.weight, 0);
 }
 
+/** Darf `a` den Spieler `t` angreifen? (Server-PvP, nicht in Städten, außer das Ziel ist als Mörder markiert) */
+export function canPvp(w: World, a: Actor, t: Actor): boolean {
+  if (!w.pvp || a.id === t.id || a.kind !== 'player' || t.kind !== 'player' || !a.alive || !t.alive) return false;
+  if (inSafeZone(w, a.x, a.y)) return false;
+  return !inSafeZone(w, t.x, t.y) || t.pkUntil > w.tick;
+}
+
+export function isPk(w: World, a: Actor): boolean {
+  return a.pkUntil > w.tick;
+}
+
 export function inSafeZone(w: World, x: number, y: number): boolean {
   return w.safe.some((r) => x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h);
 }
@@ -292,10 +331,19 @@ export function getActor(w: World, id: number): Actor | undefined {
 /* ---------- Befehle ---------- */
 
 function fail(w: World, reason: string): void {
-  w.events.push({ type: 'fail', reason });
+  w.events.push({ type: 'fail', reason, to: w.cmdActor ?? undefined });
 }
 
 export function applyCommand(w: World, actorId: number, cmd: Command): void {
+  w.cmdActor = actorId;
+  try {
+    execCommand(w, actorId, cmd);
+  } finally {
+    w.cmdActor = null;
+  }
+}
+
+function execCommand(w: World, actorId: number, cmd: Command): void {
   const a = getActor(w, actorId);
   if (!a || !a.alive) return;
   switch (cmd.type) {
@@ -307,6 +355,7 @@ export function applyCommand(w: World, actorId: number, cmd: Command): void {
     case 'attack': {
       const t = getActor(w, cmd.targetId);
       if (!t || !t.alive || t.id === a.id) return;
+      if (t.kind === 'player' && !canPvp(w, a, t)) return fail(w, 'Hier ist kein Kampf gegen Spieler erlaubt.');
       a.targetId = t.id;
       a.autoAttack = true;
       a.pickupId = null;
@@ -327,7 +376,7 @@ export function applyCommand(w: World, actorId: number, cmd: Command): void {
       const replaced = a.equipment[it.slot];
       const bonusLost = replaced ? replaced.affixes.filter((f) => f.stat === 'kraft').reduce((n, f) => n + f.value, 0) : 0;
       if (effectiveKraft(a) - bonusLost < it.reqKraft) {
-        w.events.push({ type: 'cannotEquip', item: it, reason: `Benötigt Kraft ${it.reqKraft}` });
+        w.events.push({ type: 'cannotEquip', item: it, reason: `Benötigt Kraft ${it.reqKraft}`, to: a.id });
         return;
       }
       const old = a.equipment[it.slot];
@@ -363,7 +412,7 @@ export function applyCommand(w: World, actorId: number, cmd: Command): void {
       if (it.mana) a.mana = Math.min(maxManaOf(a), a.mana + it.mana);
       a.inventory = a.inventory.filter((i) => i.id !== it.id);
       a.potionCd = POTION_COOLDOWN_TICKS;
-      w.events.push({ type: 'potion', item: it });
+      w.events.push({ type: 'potion', item: it, to: a.id });
       break;
     }
     case 'spendStat':
@@ -382,7 +431,7 @@ export function applyCommand(w: World, actorId: number, cmd: Command): void {
       if (a.gold < s.price) return fail(w, 'Nicht genug Gold.');
       a.gold -= s.price;
       a.skills.push(s.id);
-      w.events.push({ type: 'learned', skillId: s.id });
+      w.events.push({ type: 'learned', skillId: s.id, to: a.id });
       break;
     }
     case 'useSkill':
@@ -396,12 +445,12 @@ export function applyCommand(w: World, actorId: number, cmd: Command): void {
       if (a.gold < price) return fail(w, 'Nicht genug Gold.');
       const item = generateItem(w.rng, w.nextId++, cmd.templateId, 'normal');
       if (carriedWeight(a) + item.weight > carryCapacity(a)) {
-        w.events.push({ type: 'tooHeavy', item });
+        w.events.push({ type: 'tooHeavy', item, to: a.id });
         return;
       }
       a.gold -= price;
       a.inventory.push(item);
-      w.events.push({ type: 'pickedUp', item });
+      w.events.push({ type: 'pickedUp', item, to: a.id });
       break;
     }
     case 'sell': {
@@ -411,7 +460,7 @@ export function applyCommand(w: World, actorId: number, cmd: Command): void {
       a.inventory = a.inventory.filter((i) => i.id !== it.id);
       const price = sellPrice(it);
       a.gold += price;
-      w.events.push({ type: 'gold', amount: price });
+      w.events.push({ type: 'gold', amount: price, to: a.id });
       break;
     }
     case 'acceptQuest': {
@@ -431,7 +480,7 @@ export function applyCommand(w: World, actorId: number, cmd: Command): void {
       if (st.state !== 'done') return fail(w, 'Aufgabe noch nicht erfüllt.');
       st.state = 'turned';
       a.gold += def.gold;
-      w.events.push({ type: 'questTurned', questId: def.id, xp: def.xp, gold: def.gold });
+      w.events.push({ type: 'questTurned', questId: def.id, xp: def.xp, gold: def.gold, to: a.id });
       gainXp(w, a, def.xp);
       break;
     }
@@ -452,7 +501,7 @@ export function applyCommand(w: World, actorId: number, cmd: Command): void {
         else rerollAffixes(w.rng, it, 'rare', w.rng.int(3, 4));
       } else if (cmd.op === 'reroll') rerollAffixes(w.rng, it, it.rarity, it.affixes.length);
       else extendAffixes(w.rng, it);
-      w.events.push({ type: 'crafted', item: it, op: cmd.op });
+      w.events.push({ type: 'crafted', item: it, op: cmd.op, to: a.id });
       break;
     }
     case 'stashPut': {
@@ -468,7 +517,7 @@ export function applyCommand(w: World, actorId: number, cmd: Command): void {
       const it = a.stash.find((i) => i.id === cmd.itemId);
       if (!it) return;
       if (carriedWeight(a) + it.weight > carryCapacity(a)) {
-        w.events.push({ type: 'tooHeavy', item: it });
+        w.events.push({ type: 'tooHeavy', item: it, to: a.id });
         return;
       }
       a.stash = a.stash.filter((i) => i.id !== it.id);
@@ -497,7 +546,7 @@ function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void 
     a.skillCd[s.id] = s.cooldown;
     const before = a.hp;
     a.hp = Math.min(maxHpOf(a), a.hp + amount);
-    w.events.push({ type: 'healed', amount: Math.round(a.hp - before) });
+    w.events.push({ type: 'healed', amount: Math.round(a.hp - before), to: a.id });
     return;
   }
   if (a.kind === 'player' && inSafeZone(w, a.x, a.y)) return fail(w, 'In der Stadt ist Kämpfen verboten.');
@@ -505,7 +554,8 @@ function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void 
   if (!s.aoeSelf && (!first || !first.alive || first.id === a.id)) return fail(w, 'Kein Ziel.');
   const range = s.range;
   if (first && !s.aoeSelf && Math.hypot(a.x - first.x, a.y - first.y) > range) return fail(w, 'Ziel außer Reichweite.');
-  const enemy = (x: Actor) => x.alive && x.id !== a.id && x.kind !== a.kind;
+  if (first && first.kind === 'player' && !canPvp(w, a, first)) return fail(w, 'Hier ist kein Kampf gegen Spieler erlaubt.');
+  const enemy = (x: Actor) => x.alive && x.id !== a.id && (x.kind !== a.kind || canPvp(w, a, x));
   let victims: Actor[];
   if (s.aoeSelf) victims = w.actors.filter((x) => enemy(x) && Math.hypot(x.x - a.x, x.y - a.y) <= s.aoe!);
   else if (s.aoe) victims = w.actors.filter((x) => enemy(x) && Math.hypot(x.x - first!.x, x.y - first!.y) <= s.aoe!);
@@ -591,7 +641,7 @@ function fight(w: World, a: Actor, t: Actor): void {
 }
 
 function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: boolean, skill?: string, noReflect = false): void {
-  if (t.kind === 'player' && inSafeZone(w, t.x, t.y)) return;
+  if (t.kind === 'player' && inSafeZone(w, t.x, t.y) && t.pkUntil <= w.tick) return;
   let raw = rawIn;
   let crit = false;
   if (a.kind === 'player' && !noReflect) {
@@ -610,6 +660,16 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
     t.autoAttack = true;
   }
   w.events.push({ type: 'hit', attackerId: a.id, targetId: t.id, amount, skill, crit });
+  if (a.kind === 'player' && t.kind === 'monster') t.damagers[a.id] = w.tick;
+  if (a.kind === 'player' && t.kind === 'player') {
+    // Angriff auf einen Unbeteiligten macht zum Mörder; Notwehr (Gegenschlag auf den Angreifer) nicht
+    const selfDefense = a.attackedBy?.id === t.id && w.tick - a.attackedBy.at < TICK_RATE * 10;
+    if (!selfDefense && t.pkUntil <= w.tick && a.pkUntil <= w.tick) {
+      a.pkUntil = w.tick + TICK_RATE * 60 * 10;
+      w.events.push({ type: 'pk', id: a.id });
+    } else if (!selfDefense && a.pkUntil > w.tick) a.pkUntil = w.tick + TICK_RATE * 60 * 10;
+    t.attackedBy = { id: a.id, at: w.tick };
+  }
   if (a.kind === 'player' && a.alive && !noReflect) {
     const steal = powerOf(a, 'lifesteal');
     if (steal > 0) a.hp = Math.min(maxHpOf(a), a.hp + Math.max(1, Math.round((amount * steal) / 100)));
@@ -636,24 +696,31 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
 
 function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
   const k = monsterKind(m.kindId!);
-  if (killer.kind === 'player') {
+  // Alle Spieler, die zuletzt (30 s) Schaden gemacht haben und in der Nähe sind, bekommen XP, Gold und Questfortschritt
+  const credited = new Map<number, Actor>();
+  if (killer.kind === 'player') credited.set(killer.id, killer);
+  for (const [id, at] of Object.entries(m.damagers)) {
+    const pl = getActor(w, Number(id));
+    if (pl && pl.alive && w.tick - at <= TICK_RATE * 30 && Math.hypot(pl.x - m.x, pl.y - m.y) <= 25) credited.set(pl.id, pl);
+  }
+  for (const pl of credited.values()) {
     for (const q of QUESTS) {
-      const st = killer.quests[q.id];
+      const st = pl.quests[q.id];
       if (st?.state === 'active' && q.target === m.kindId) {
         st.progress++;
-        w.events.push({ type: 'questProgress', questId: q.id, progress: st.progress, count: q.count });
+        w.events.push({ type: 'questProgress', questId: q.id, progress: st.progress, count: q.count, to: pl.id });
         if (st.progress >= q.count) {
           st.state = 'done';
-          w.events.push({ type: 'questDone', questId: q.id });
+          w.events.push({ type: 'questDone', questId: q.id, to: pl.id });
         }
       }
     }
-    gainXp(w, killer, Math.round(k.xp * (1 + powerOf(killer, 'xpBonus') / 100)));
-    const mk = powerOf(killer, 'manaKill');
-    if (mk > 0) killer.mana = Math.min(maxManaOf(killer), killer.mana + mk);
-    const gold = Math.round(w.rng.int(k.gold[0], k.gold[1]) * (1 + powerOf(killer, 'goldBonus') / 100));
-    killer.gold += gold;
-    w.events.push({ type: 'gold', amount: gold });
+    gainXp(w, killer, Math.round(k.xp * (1 + powerOf(pl, 'xpBonus') / 100)));
+    const mk = powerOf(pl, 'manaKill');
+    if (mk > 0) pl.mana = Math.min(maxManaOf(killer), pl.mana + mk);
+    const gold = Math.round(w.rng.int(k.gold[0], k.gold[1]) * (1 + powerOf(pl, 'goldBonus') / 100));
+    pl.gold += gold;
+    w.events.push({ type: 'gold', amount: gold, to: pl.id });
   }
   const x = Math.round(m.x);
   const y = Math.round(m.y);
@@ -671,14 +738,14 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
 
 export function gainXp(w: World, a: Actor, amount: number): void {
   a.xp += amount;
-  w.events.push({ type: 'xp', amount });
+  w.events.push({ type: 'xp', amount, to: a.id });
   while (a.level < MAX_LEVEL && a.xp >= totalXpFor(a.level + 1)) {
     a.level++;
     a.statPoints += STAT_POINTS_PER_LEVEL;
     a.maxHp += 10;
     a.hp = maxHpOf(a);
     a.mana = maxManaOf(a);
-    w.events.push({ type: 'levelUp', level: a.level });
+    w.events.push({ type: 'levelUp', level: a.level, to: a.id });
   }
 }
 
@@ -703,7 +770,7 @@ function onPlayerDeath(w: World, p: Actor): void {
   const x = Math.round(p.x);
   const y = Math.round(p.y);
   for (const item of dropped) w.ground.push({ id: w.nextId++, x, y, item, expiresAt: w.tick + CORPSE_LOOT_TTL });
-  w.events.push({ type: 'deathPenalty', xpLost, dropped });
+  w.events.push({ type: 'deathPenalty', xpLost, dropped, to: p.id });
   // Respawn in der Stadt
   const town = w.towns.length
     ? w.towns.reduce((best, t) => (Math.hypot(t.x - p.x, t.y - p.y) < Math.hypot(best.x - p.x, best.y - p.y) ? t : best))
@@ -717,7 +784,7 @@ function onPlayerDeath(w: World, p: Actor): void {
   p.targetId = null;
   p.pickupId = null;
   for (const m of w.actors) if (m.kind === 'monster' && m.targetId === p.id) m.targetId = null;
-  w.events.push({ type: 'respawned' });
+  w.events.push({ type: 'respawned', to: p.id });
 }
 
 /* ---------- Tick ---------- */
@@ -761,11 +828,14 @@ export function tick(w: World): void {
     }
 
     const t = a.targetId === null ? undefined : getActor(w, a.targetId);
-    if (a.targetId !== null && (!t || !t.alive)) {
+    if (t && t.kind === 'player' && a.kind === 'player' && !canPvp(w, a, t)) {
+      a.targetId = null;
+      a.path = [];
+    } else if (a.targetId !== null && (!t || !t.alive)) {
       a.targetId = null;
       a.path = [];
     }
-    if (t && t.alive && a.autoAttack) {
+    if (t && t.alive && a.autoAttack && a.targetId !== null) {
       if (dist(a, t) <= MELEE_RANGE) {
         a.path = [];
         fight(w, a, t);
@@ -795,6 +865,7 @@ function reviveMonster(m: Actor): void {
   m.targetId = null;
   m.path = [];
   m.dot = null;
+  m.damagers = {};
   if (m.enraged) {
     m.enraged = false;
     m.damage = monsterKind(m.kindId!).damage;
@@ -804,14 +875,21 @@ function reviveMonster(m: Actor): void {
 function monsterAi(w: World, m: Actor): void {
   const home = m.home!;
   if (m.targetId === null) {
-    const p = w.actors.find(
-      (x) => x.kind === 'player' && x.alive && dist(m, x) <= m.aggroRange && !inSafeZone(w, x.x, x.y),
-    );
-    if (p) m.targetId = p.id;
+    let best: Actor | undefined;
+    let bd = m.aggroRange;
+    for (const x of w.actors) {
+      if (x.kind !== 'player' || !x.alive || (inSafeZone(w, x.x, x.y) && x.pkUntil <= w.tick)) continue;
+      const d = dist(m, x);
+      if (d <= bd) {
+        bd = d;
+        best = x;
+      }
+    }
+    if (best) m.targetId = best.id;
     return;
   }
   const t = getActor(w, m.targetId);
-  const lost = !t || !t.alive || inSafeZone(w, t.x, t.y) || Math.hypot(m.x - home.x, m.y - home.y) > LEASH;
+  const lost = !t || !t.alive || (inSafeZone(w, t.x, t.y) && t.pkUntil <= w.tick) || Math.hypot(m.x - home.x, m.y - home.y) > LEASH;
   if (lost) {
     m.targetId = null;
     m.path = findPath(w.grid, { x: Math.round(m.x), y: Math.round(m.y) }, home);
@@ -831,10 +909,10 @@ function tryPickup(w: World, a: Actor): void {
   a.pickupId = null;
   a.path = [];
   if (carriedWeight(a) + g.item.weight > carryCapacity(a)) {
-    w.events.push({ type: 'tooHeavy', item: g.item });
+    w.events.push({ type: 'tooHeavy', item: g.item, to: a.id });
     return;
   }
   w.ground = w.ground.filter((x) => x.id !== g.id);
   a.inventory.push(g.item);
-  w.events.push({ type: 'pickedUp', item: g.item });
+  w.events.push({ type: 'pickedUp', item: g.item, to: a.id });
 }

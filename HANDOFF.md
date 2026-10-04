@@ -1,10 +1,9 @@
 # HANDOFF – Aschenthron
 
 ## Stand
-Nachtarbeit läuft (Auftrag des Users: alles ausführen, morgen früh ein komplettes Gebiet in T4C-Insel-Größe spielbar). Reihenfolge laut Advisor: Pfadfindung → Save-Migration → Gebiet (A) → Balance (B) → Grafik/Sound (C) → Stufe-2-Loot (D) → Mehrspieler (E, nur auf eigenem Branch/Einstiegspunkt, Singleplayer bleibt Standard).
-Fertig + committet: A (Insel „Aschental“ 160×120, 2 Städte, 4 Dungeons, 5 Bosse, 22 Monsterarten, 14 Quests, Level 1–30, ~290 Monster), B (Bot-Messung ~6 h bis Cap), C (prozedurale Pixel-Art, WebAudio-Sound, Minikarte N, Zonenbanner).
-Befehle: `npm run dev | test | lint | build | pace`. Reset: `?neu`. Karte neu erzeugen: `python3 scripts/gen_map.py [--preview]` (schreibt `src/data/aschenthron.json`).
-Annahmen für den User: siehe `SPEC.md` Abschnitt „Annahmen ohne Rückfrage“.
+Nachtarbeit abgeschlossen (Auftrag: alles ausführen, Gebiet in T4C-Insel-Größe). Fertig und committet: A Gebiet „Aschental“ (160×120, 2 Städte, 4 Dungeons, 5 Bosse, 22 Monsterarten, 14 Quests, Level 1–30), B Balance per Bot (~5,8 h bis Cap), C prozedurale Pixel-Art + WebAudio + Minikarte, D Stufe 2 (12 Skills, Unikate, 3 Sets, Schmied), E Mehrspieler-Server mit PvP (`server/`, `src/net/`, `src/sim/net.ts`).
+Befehle: `npm run dev | server | test | lint | build | pace`. README.md erklärt Start und Mehrspieler. Karte: `python3 scripts/gen_map.py`.
+Annahmen für den User: `SPEC.md` Abschnitt „Annahmen ohne Rückfrage“. Neue Abhängigkeiten (`ws`, `tsx`, `@types/ws`): nach dem Pull `npm install`.
 `Browserspiele/` und `Spiele/` sind per `.gitignore` bewusst nicht im Repo.
 
 ## Letzte 3 Entscheidungen
@@ -13,6 +12,9 @@ Annahmen für den User: siehe `SPEC.md` Abschnitt „Annahmen ohne Rückfrage“
 3. **Pace-Messung als `npm run pace`** statt im Standard-Test. Grund: lange Laufzeit, keine Assertions.
 
 ## Offene TODOs
+- Mehrspieler im echten Netz/mit 3+ Spielern nur per Test und kurzem Live-Check geprüft; Chat, Gruppen, Gilden, Handel fehlen
+- Framerate im Browser-Pane nicht belastbar messbar (unsichtbar); auf dem Mac prüfen, ggf. `?fps`-Anzeige ergänzen
+- UI-Panel serialisiert pro Frame JSON (Dirty-Flag), `you` wird online mit jedem Schnappschuss komplett gesendet (Delta wäre besser)
 - User fragen: Level-Tempo auf ~3 h strecken und Monster härter machen? (Bot starb 0-mal)
 - Framerate auf dem Mac prüfen lassen (im Browser-Pane nicht belastbar messbar)
 - Aus Review offen: UI-Panel serialisiert pro Frame JSON (Dirty-Flag), A* in `chase` fast jeden Tick pro Monster (drosseln, Heap)

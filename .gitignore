@@ -4,3 +4,4 @@ dist/
 .env
 Browserspiele/
 Spiele/
+server-saves.json

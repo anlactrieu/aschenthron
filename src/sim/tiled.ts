@@ -45,7 +45,7 @@ export function loadMap(map: TiledMap): LoadedMap {
 }
 
 /** Baut eine spielbare Welt: Karte, Sicherheitszonen, NPCs, Monster und Spieler. */
-export function buildWorld(seed: number, map: TiledMap): { world: World; tiles: number[]; playerId: number } {
+export function buildWorld(seed: number, map: TiledMap, opts: { player?: boolean } = {}): { world: World; tiles: number[]; playerId: number } {
   const { grid, tiles } = loadMap(map);
   const ts = map.tilewidth;
   const objs = map.layers.find((l) => l.type === 'objectgroup')?.objects ?? [];
@@ -71,6 +71,8 @@ export function buildWorld(seed: number, map: TiledMap): { world: World; tiles: 
     if (o.type === 'townstart') world.towns.push({ x: o.x / ts, y: o.y / ts });
     if (o.type === 'monster') spawnMonster(world, o.x / ts, o.y / ts, prop(o, 'kind'));
   }
+  world.start = { x: start.x / ts, y: start.y / ts };
+  if (opts.player === false) return { world, tiles, playerId: -1 };
   const player = spawnPlayer(world, start.x / ts, start.y / ts);
   return { world, tiles, playerId: player.id };
 }

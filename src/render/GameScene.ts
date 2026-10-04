@@ -11,6 +11,7 @@ import { toScreen, toTile } from './iso';
 import { Ui, describeItem } from './ui';
 import { Sfx } from './audio';
 import { Minimap } from './minimap';
+import type { RemoteSession } from '../net/client';
 import {
   ensureTexture, lookOf, monsterCanvas, playerCanvas, registerStaticArt, tileCanvas, TILE_H, TILE_VARIANTS, TILE_W, WALL_VARIANTS,
 } from './art';
@@ -59,19 +60,30 @@ export class GameScene extends Phaser.Scene {
   private minimap!: Minimap;
   private regionName = '';
   private resetting = false;
+  private ended = false;
+  private camPos: { x: number; y: number } | null = null;
+  private remote: RemoteSession | null = null;
+  private disp = new Map<number, { x: number; y: number }>();
 
   constructor() {
     super('game');
   }
 
-  create(): void {
-    const built = buildWorld(Date.now() >>> 0, mapJson as unknown as TiledMap);
-    this.world = built.world;
-    this.tiles = built.tiles;
-    this.playerId = built.playerId;
+  create(data?: { session?: RemoteSession }): void {
+    this.remote = data?.session ?? null;
+    if (this.remote) {
+      this.world = this.remote.world;
+      this.tiles = this.remote.tiles;
+      this.playerId = this.remote.playerId;
+    } else {
+      const built = buildWorld(Date.now() >>> 0, mapJson as unknown as TiledMap);
+      this.world = built.world;
+      this.tiles = built.tiles;
+      this.playerId = built.playerId;
+    }
     registerStaticArt(this);
-    const store = safeStorage();
-    if (new URLSearchParams(location.search).has('neu')) {
+    const store = this.remote ? null : safeStorage();
+    if (!this.remote && new URLSearchParams(location.search).has('neu')) {
       store?.removeItem(SAVE_KEY);
       history.replaceState(null, '', location.pathname);
     }
@@ -80,7 +92,8 @@ export class GameScene extends Phaser.Scene {
     this.ui = new Ui((c) => this.send(c), (i) => this.useSkillSlot(i), (k) => this.usePotionKind(k), () => this.newGame());
     this.sfx = new Sfx();
     this.minimap = new Minimap(this.world, this.tiles);
-    if (saved && importPlayer(this.world, p, saved)) this.ui.say('Spielstand geladen.');
+    if (this.remote) this.ui.say(`Verbunden als ${p.name}${this.remote.pvp ? ' – PvP außerhalb der Städte aktiv, Angreifer werden zu Mördern' : ''}. Klick auf Spieler greift an.`);
+    else if (saved && importPlayer(this.world, p, saved)) this.ui.say('Spielstand geladen.');
     else this.ui.say('Willkommen in Aschenthron. C: Charakter (Attributpunkte verteilen!) · Q/E: Heil-/Manatrank · N: Karte · M: Ton · Klick: laufen/angreifen/aufheben · Lehrer, Händlerin, Schmiede, Truhe und Aufgaben in der Stadt.');
     this.gfx = this.add.graphics().setDepth(OVERLAY_DEPTH);
     this.cameras.main.setBackgroundColor('#0b0a0d');
@@ -95,7 +108,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private send(c: Command): void {
-    applyCommand(this.world, this.playerId, c);
+    if (this.remote) this.remote.send(c);
+    else applyCommand(this.world, this.playerId, c);
   }
 
   private newGame(): void {
@@ -105,7 +119,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private save(): void {
-    if (this.resetting) return;
+    if (this.resetting || this.remote) return;
     try {
       safeStorage()?.setItem(SAVE_KEY, exportPlayer(this.player()));
     } catch {
@@ -150,7 +164,7 @@ export class GameScene extends Phaser.Scene {
     }
     const loot = w.ground.find((g) => Math.hypot(g.x - t.x, g.y - t.y) < 0.8);
     if (loot) return this.send({ type: 'pickup', groundId: loot.id });
-    const target = w.actors.find((a) => a.kind === 'monster' && a.alive && Math.hypot(a.x - t.x, a.y - (t.y + 0.5)) < 1);
+    const target = w.actors.find((a) => a.id !== this.playerId && a.alive && (a.kind === 'monster' || this.remote !== null) && Math.hypot(a.x - t.x, a.y - (t.y + 0.5)) < 1);
     if (target) return this.send({ type: 'attack', targetId: target.id });
     const x = Math.floor(t.x + 0.5);
     const y = Math.floor(t.y + 0.5);
@@ -158,11 +172,18 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(time: number, dt: number): void {
-    this.acc += Math.min(dt, 250);
-    const step = 1000 / TICK_RATE;
-    while (this.acc >= step) {
-      this.acc -= step;
-      tick(this.world);
+    if (this.remote) {
+      if (this.remote.closed && !this.ended) {
+        this.ended = true;
+        this.ui.say('Verbindung zum Server verloren. Seite neu laden.');
+      }
+    } else {
+      this.acc += Math.min(dt, 250);
+      const step = 1000 / TICK_RATE;
+      while (this.acc >= step) {
+        this.acc -= step;
+        tick(this.world);
+      }
     }
     this.handleEvents(time);
     this.autosave += dt;
@@ -171,6 +192,7 @@ export class GameScene extends Phaser.Scene {
       this.save();
     }
     const p = this.player();
+    if (!p) return;
     const tgt = p.targetId !== null ? getActor(this.world, p.targetId) : undefined;
     this.ui.update(this.world, p, tgt);
     this.frame++;
@@ -182,7 +204,7 @@ export class GameScene extends Phaser.Scene {
   private handleEvents(time: number): void {
     const say = (m: string) => this.ui.say(m);
     const w = this.world;
-    for (const e of drainEvents(w)) {
+    for (const e of this.remote ? this.remote.drainEvents() : drainEvents(w)) {
       switch (e.type) {
         case 'hit': {
           this.flash.set(e.targetId, time + 110);
@@ -266,7 +288,8 @@ export class GameScene extends Phaser.Scene {
     this.updateLoot(time, g);
     this.updateActors(time, p, g);
     for (const r of this.world.safe) this.outline(g, r.x, r.y, r.w, r.h);
-    const { sx, sy } = toScreen(p.x, p.y);
+    const cp = this.camPos ?? p;
+    const { sx, sy } = toScreen(cp.x, cp.y);
     this.cameras.main.centerOn(Math.round(sx), Math.round(sy - 14));
     if (this.frame % 6 === 0) this.minimap.draw(p.x, p.y);
     this.updateRegion(p);
@@ -447,6 +470,7 @@ export class GameScene extends Phaser.Scene {
 
   private updateActors(time: number, p: Actor, g: Phaser.GameObjects.Graphics): void {
     const seen = new Set<string>();
+    const active = new Set<number>();
     for (const a of this.world.actors) {
       let view = this.actorViews.get(a.id);
       const near = Math.abs(a.x - p.x) <= VIEW && Math.abs(a.y - p.y) <= VIEW;
@@ -454,21 +478,24 @@ export class GameScene extends Phaser.Scene {
         view?.img.setVisible(false);
         continue;
       }
-      const { sx, sy } = toScreen(a.x, a.y);
+      active.add(a.id);
+      const pos = this.dispPos(a);
+      if (a.id === p.id) this.camPos = pos;
+      const { sx, sy } = toScreen(pos.x, pos.y);
       if (!view) {
-        view = { img: this.add.image(sx, sy, 'pillar').setOrigin(0.5, 0.92), lastX: a.x, lastY: a.y, movingUntil: 0, flip: false };
+        view = { img: this.add.image(sx, sy, 'pillar').setOrigin(0.5, 0.92), lastX: pos.x, lastY: pos.y, movingUntil: 0, flip: false };
         this.actorViews.set(a.id, view);
       }
-      const dx = a.x - view.lastX;
-      const dy = a.y - view.lastY;
+      const dx = pos.x - view.lastX;
+      const dy = pos.y - view.lastY;
       if (Math.abs(dx) + Math.abs(dy) > 0.001) {
         view.movingUntil = time + 160;
         // Bildschirm-Richtung: iso x-y
         const screenDx = dx - dy;
         if (Math.abs(screenDx) > 0.0005) view.flip = screenDx < 0;
       }
-      view.lastX = a.x;
-      view.lastY = a.y;
+      view.lastX = pos.x;
+      view.lastY = pos.y;
       const frame = time < view.movingUntil ? Math.floor(time / 140) % 2 : 0;
       const img = view.img;
       if (a.kind === 'player') {
@@ -499,6 +526,7 @@ export class GameScene extends Phaser.Scene {
         g.fillRect(sx - big / 2, top, big * Math.max(0, a.hp / a.maxHp), 5);
         if (a.boss || a.id === p.targetId) this.label(`a${a.id}`, a.name, sx, top - 10, a.boss ? '#ff9a4a' : '#e6cfcf', seen);
       } else {
+        if (a.id !== p.id) this.label(`a${a.id}`, `${a.name} (Lv ${a.level})${a.pkUntil > this.world.tick ? ' ☠' : ''}`, sx, sy + 8 - 66, a.pkUntil > this.world.tick ? '#ff5a4a' : '#9fd0ff', seen);
         // Spielerring in der Stadt = sicher
         if (this.world.safe.some((r) => a.x >= r.x && a.y >= r.y && a.x < r.x + r.w && a.y < r.y + r.h)) {
           g.lineStyle(1, 0xd8a24a, 0.7);
@@ -510,7 +538,28 @@ export class GameScene extends Phaser.Scene {
         g.strokeEllipse(sx, sy + 6, a.boss ? 64 : 38, a.boss ? 28 : 17);
       }
     }
+    for (const [id, v] of this.actorViews) if (!active.has(id)) v.img.setVisible(false);
     this.cleanLabels(seen, ['a']);
+  }
+
+  /** Anzeigeposition: lokal exakt, online geglättet zwischen den 10-Hz-Schnappschüssen. */
+  private dispPos(a: Actor): { x: number; y: number } {
+    if (!this.remote) return a;
+    let d = this.disp.get(a.id);
+    if (!d) {
+      d = { x: a.x, y: a.y };
+      this.disp.set(a.id, d);
+    }
+    const dx = a.x - d.x;
+    const dy = a.y - d.y;
+    if (Math.abs(dx) + Math.abs(dy) > 6) {
+      d.x = a.x;
+      d.y = a.y;
+    } else {
+      d.x += dx * 0.35;
+      d.y += dy * 0.35;
+    }
+    return d;
   }
 
   private label(id: string, text: string, x: number, y: number, color: string, seen: Set<string>, size = 12): void {

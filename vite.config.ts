@@ -1,3 +1,3 @@
 import { defineConfig } from 'vite';
 
-export default defineConfig({ test: { include: ['src/**/*.test.ts'] } });
+export default defineConfig({ test: { include: ['src/**/*.test.ts', 'server/**/*.test.ts'] } });
