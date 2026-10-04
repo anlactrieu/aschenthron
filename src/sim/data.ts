@@ -119,6 +119,15 @@ export interface SkillDef {
   base?: [number, number];
   scales?: AttrKey;
   ignoresArmor: boolean;
+  /** Flächenschaden: Radius (um den Zaubernden bei aoeSelf, sonst um das Ziel) */
+  aoe?: number;
+  aoeSelf?: boolean;
+  /** Mehrfachziel: so viele nächste Gegner in Reichweite */
+  targets?: number;
+  /** Selbstheilung: Basiswert, skaliert mit Verstand */
+  heal?: number;
+  /** Gift: Zusatzschaden über `seconds` Sekunden (Faktor auf den Direktschaden) */
+  dot?: { seconds: number; factor: number };
   /** Lehrer-Stufe: 1 = Aschenhafen, 2 = Felsenwacht */
   tier: number;
   desc: string;
@@ -128,6 +137,14 @@ export const SKILLS: SkillDef[] = [
   { id: 'power_strike', name: 'Wuchtschlag', area: 'Nahkampf', levelReq: 2, price: 50, mana: 8, cooldown: 60, range: 1.5, mult: 2, ignoresArmor: false, tier: 1, desc: 'Doppelter Waffenschaden im Nahkampf.' },
   { id: 'quick_shot', name: 'Schnellschuss', area: 'Fernkampf', levelReq: 2, price: 60, mana: 4, cooldown: 20, range: 6, base: [6, 12], scales: 'gewandtheit', ignoresArmor: false, tier: 1, desc: 'Schneller Schuss auf Distanz, skaliert mit Gewandtheit.' },
   { id: 'ember_bolt', name: 'Glutblitz', area: 'Magie', levelReq: 3, price: 80, mana: 10, cooldown: 30, range: 7, base: [10, 18], scales: 'verstand', ignoresArmor: true, tier: 1, desc: 'Magischer Schaden, ignoriert Rüstung, skaliert mit Verstand.' },
+  { id: 'healing_hand', name: 'Heilende Hand', area: 'Magie', levelReq: 4, price: 120, mana: 14, cooldown: 200, range: 0, heal: 40, scales: 'verstand', ignoresArmor: true, tier: 1, desc: 'Heilt dich selbst, stärker mit Verstand und Level.' },
+  { id: 'poison_shot', name: 'Giftpfeil', area: 'Fernkampf', levelReq: 6, price: 220, mana: 9, cooldown: 60, range: 6, base: [5, 9], scales: 'gewandtheit', ignoresArmor: false, dot: { seconds: 8, factor: 1.6 }, tier: 2, desc: 'Schuss, der das Ziel zusätzlich 8 Sekunden vergiftet.' },
+  { id: 'whirlwind', name: 'Wirbelhieb', area: 'Nahkampf', levelReq: 10, price: 500, mana: 16, cooldown: 100, range: 1.6, mult: 1.2, aoe: 2.2, aoeSelf: true, ignoresArmor: false, tier: 2, desc: 'Trifft alle Gegner um dich herum.' },
+  { id: 'frost_nova', name: 'Frostnova', area: 'Magie', levelReq: 11, price: 650, mana: 18, cooldown: 140, range: 1.6, base: [14, 22], scales: 'verstand', aoe: 3, aoeSelf: true, ignoresArmor: true, tier: 2, desc: 'Magische Druckwelle um dich herum.' },
+  { id: 'multishot', name: 'Salve', area: 'Fernkampf', levelReq: 13, price: 800, mana: 14, cooldown: 70, range: 6, base: [9, 15], scales: 'gewandtheit', targets: 3, ignoresArmor: false, tier: 2, desc: 'Schießt auf bis zu drei Gegner gleichzeitig.' },
+  { id: 'fireball', name: 'Feuerball', area: 'Magie', levelReq: 16, price: 1200, mana: 24, cooldown: 90, range: 7, base: [28, 42], scales: 'verstand', aoe: 2, ignoresArmor: true, tier: 2, desc: 'Explodiert am Ziel und trifft Gegner in der Nähe.' },
+  { id: 'skull_split', name: 'Schädelspalter', area: 'Nahkampf', levelReq: 18, price: 1500, mana: 22, cooldown: 160, range: 1.5, mult: 3.2, ignoresArmor: false, tier: 2, desc: 'Gewaltiger Hieb mit mehr als dreifachem Waffenschaden.' },
+  { id: 'lightning', name: 'Blitzschlag', area: 'Magie', levelReq: 22, price: 2400, mana: 30, cooldown: 120, range: 8, base: [60, 90], scales: 'verstand', ignoresArmor: true, tier: 2, desc: 'Zerschmetternder Blitz auf ein Ziel.' },
 ];
 
 export function skillById(id: string): SkillDef | undefined {

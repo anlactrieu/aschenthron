@@ -1,13 +1,13 @@
 import { ATTR_KEYS, ATTR_NAME, SKILLS, SHOPS, QUESTS, questById, totalXpFor, MAX_LEVEL, monsterKind } from '../sim/data';
-import { templateById, type Item, type Slot } from '../sim/items';
+import { POWER_TEXT, setById, templateById, type Item, type Slot } from '../sim/items';
 import {
-  NPC_RANGE, TICK_RATE, armorOf, buyPrice, carriedWeight, carryCapacity, damageRange, maxHpOf, maxManaOf, nearNpc, sellPrice,
+  NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, buyPrice, carriedWeight, carryCapacity, damageRange, maxHpOf, maxManaOf, nearNpc, sellPrice,
   type Actor, type Command, type World,
 } from '../sim/world';
 
-const RARITY_COLOR: Record<Item['rarity'], string> = { normal: '#c9c4bd', magic: '#7f9fff', rare: '#f2c94c' };
+const RARITY_COLOR: Record<Item['rarity'], string> = { normal: '#c9c4bd', magic: '#7f9fff', rare: '#f2c94c', set: '#5fd070', legendary: '#ff8a2a' };
 const SLOT_NAME: Record<Slot, string> = { weapon: 'Waffe', head: 'Kopf', chest: 'Brust', hands: 'Hände', feet: 'Füße', ring: 'Ring' };
-const STAT_NAME = { damage: 'Schaden', armor: 'Rüstung', maxHp: 'Leben', kraft: 'Kraft' } as const;
+const STAT_NAME = { damage: 'Schaden', armor: 'Rüstung', maxHp: 'Leben', kraft: 'Kraft', maxMana: 'Mana' } as const;
 
 export function describeItem(i: Item): string {
   const base: string[] = [];
@@ -16,6 +16,8 @@ export function describeItem(i: Item): string {
   if (i.damage) base.push(`Schaden ${i.damage[0]}-${i.damage[1]}`);
   if (i.armor) base.push(`Rüstung ${i.armor}`);
   const aff = i.affixes.map((a) => `+${a.value} ${STAT_NAME[a.stat]}`);
+  if (i.power) aff.push(POWER_TEXT[i.power.id](i.power.value));
+  if (i.setId) aff.push(`Set: ${setById(i.setId).name}`);
   return [...base, ...aff, `Gewicht ${i.weight}`, i.reqKraft ? `Kraft ${i.reqKraft} nötig` : ''].filter(Boolean).join(' · ');
 }
 
@@ -169,6 +171,18 @@ export class Ui {
     }
     out.push(el('div', 'font-size:11px;opacity:.65', 'Kraft: Schaden & Tragkraft · Gewandtheit: Angriffstempo & Fernkampf · Ausdauer: Leben · Verstand: Mana & Magie · Willenskraft: Mana-Regeneration'));
 
+    const sets = activeSetBonuses(p);
+    if (sets.length) {
+      h('Set-Boni');
+      for (const st of sets) {
+        out.push(el('div', 'color:#5fd070', `${st.name} (${st.pieces} Teile)`));
+        for (const [n, b] of st.bonuses) {
+          const txt = [...(b.affixes ?? []).map((a) => `+${a.value} ${STAT_NAME[a.stat]}`), ...(b.power ? [POWER_TEXT[b.power.id](b.power.value)] : [])].join(', ');
+          out.push(el('div', 'font-size:11px;opacity:.8', `${n} Teile: ${txt}`));
+        }
+      }
+    }
+
     if (p.skills.length) {
       h('Fertigkeiten');
       p.skills.forEach((id, i) => {
@@ -235,6 +249,20 @@ export class Ui {
         else if (st.state === 'done') row.append(this.btn('Abgeben', () => this.send({ type: 'turnInQuest', questId: id })));
         else row.append(el('i', '', 'erledigt'));
         out.push(row);
+      }
+    }
+    const smith = nearNpc(w, p, 'smith');
+    if (smith) {
+      h(`${smith.name} – Schmiede`);
+      out.push(el('div', 'font-size:11px;opacity:.75', 'Aufwerten (normal → magisch → selten), Affixe neu würfeln, Affix hinzufügen (selten). Nur Gegenstände im Rucksack.'));
+      const gear = p.inventory.filter((i) => i.slot !== 'potion' && i.rarity !== 'legendary' && i.rarity !== 'set');
+      if (!gear.length) out.push(el('i', '', 'Nichts zu verbessern.'));
+      for (const it of gear) {
+        const acts: [string, () => void][] = [];
+        if (it.rarity !== 'rare') acts.push([`Aufwerten (${craftCost(it, 'upgrade')}g)`, () => this.send({ type: 'craft', itemId: it.id, op: 'upgrade' })]);
+        if (it.rarity !== 'normal') acts.push([`Neu würfeln (${craftCost(it, 'reroll')}g)`, () => this.send({ type: 'craft', itemId: it.id, op: 'reroll' })]);
+        if (it.rarity === 'rare' && it.affixes.length < 5) acts.push([`Affix + (${craftCost(it, 'extend')}g)`, () => this.send({ type: 'craft', itemId: it.id, op: 'extend' })]);
+        out.push(this.itemRow(it.name, it, acts));
       }
     }
     if (stash) {

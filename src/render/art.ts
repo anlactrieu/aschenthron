@@ -523,11 +523,11 @@ export function npcCanvas(kind: string): HTMLCanvasElement {
   }, 3);
 }
 
-export function lootCanvas(rarity: 'normal' | 'magic' | 'rare'): HTMLCanvasElement {
+export function lootCanvas(rarity: 'normal' | 'magic' | 'rare' | 'set' | 'legendary'): HTMLCanvasElement {
   const key = `loot_${rarity}`;
   const hit = actorCache.get(key);
   if (hit) return hit;
-  const col = { normal: 0xc9c4bd, magic: 0x6f8fff, rare: 0xf2c94c }[rarity];
+  const col = { normal: 0xc9c4bd, magic: 0x6f8fff, rare: 0xf2c94c, set: 0x5fd070, legendary: 0xff8a2a }[rarity];
   const c = mkCanvas(12, 12);
   const x = ctxOf(c);
   x.fillStyle = css(col) + '44';
@@ -555,7 +555,7 @@ export function registerStaticArt(scene: Phaser.Scene): void {
   for (const style of ['grey', 'dark'] as const) for (let v = 0; v < 3; v++) add(`rock_${style}_${v}`, rockCanvas(style, v));
   for (let v = 0; v < 2; v++) add(`grave_${v}`, graveCanvas(v));
   add('pillar', pillarCanvas());
-  for (const r of ['normal', 'magic', 'rare'] as const) add(`loot_${r}`, lootCanvas(r));
+  for (const r of ['normal', 'magic', 'rare', 'set', 'legendary'] as const) add(`loot_${r}`, lootCanvas(r));
   for (const k of ['trainer', 'merchant', 'stash', 'quest', 'smith']) add(`npc_${k}`, npcCanvas(k));
 }
 

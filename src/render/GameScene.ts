@@ -188,7 +188,7 @@ export class GameScene extends Phaser.Scene {
           this.flash.set(e.targetId, time + 110);
           const sk = e.skill ? SKILLS.find((s) => s.id === e.skill) : undefined;
           if (e.attackerId === this.playerId) {
-            say(`Du triffst für ${e.amount}${sk ? ` (${sk.name})` : ''}`);
+            say(`Du triffst für ${e.amount}${e.crit ? ' (KRITISCH!)' : ''}${sk ? ` (${sk.name})` : ''}`);
             if (sk) this.sfx.cast(sk.area);
             else this.sfx.hit();
           } else if (e.targetId === this.playerId) {
@@ -212,6 +212,8 @@ export class GameScene extends Phaser.Scene {
         case 'levelUp': say(`LEVEL ${e.level}! +5 Attributpunkte (C)`); this.sfx.levelUp(); break;
         case 'learned': say(`Gelernt: ${SKILLS.find((s) => s.id === e.skillId)?.name}`); this.sfx.quest(); break;
         case 'enraged': say(`${getActor(w, e.id)?.name} wird wütend!`); this.sfx.boss(); break;
+        case 'healed': say(`Du heilst dich um ${e.amount}.`); this.sfx.potion(); break;
+        case 'crafted': say(`Geschmiedet: ${e.item.name}`); this.sfx.pickup(); break;
         case 'potion': say(`Benutzt: ${e.item.name}`); this.sfx.potion(); break;
         case 'questProgress': say(`Aufgabe: ${e.progress}/${e.count}`); break;
         case 'questDone': say(`Aufgabe erfüllt: ${questById(e.questId)?.name} – beim Auftraggeber abgeben!`); this.sfx.quest(); break;
@@ -428,7 +430,7 @@ export class GameScene extends Phaser.Scene {
       const bob = Math.sin(time / 280 + gi.id) * 2;
       img.setPosition(sx, sy + 2 + bob).setDepth(sy + 4);
       if (gi.item.rarity !== 'normal') {
-        const col = gi.item.rarity === 'rare' ? 0xf2c94c : 0x6f8fff;
+        const col = { magic: 0x6f8fff, rare: 0xf2c94c, set: 0x5fd070, legendary: 0xff8a2a }[gi.item.rarity as 'magic'];
         g.fillStyle(col, 0.18);
         g.fillRect(sx - 6, sy - 56, 12, 56);
         g.fillStyle(col, 0.28);

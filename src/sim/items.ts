@@ -3,8 +3,22 @@ import type { Rng } from './rng';
 export type Slot = 'weapon' | 'head' | 'chest' | 'hands' | 'feet' | 'ring';
 /** Verbrauchsgegenstände belegen keinen Ausrüstungsslot */
 export type ItemSlot = Slot | 'potion';
-export type Rarity = 'normal' | 'magic' | 'rare';
-export type Stat = 'damage' | 'armor' | 'maxHp' | 'kraft';
+export type Rarity = 'normal' | 'magic' | 'rare' | 'set' | 'legendary';
+export type Stat = 'damage' | 'armor' | 'maxHp' | 'kraft' | 'maxMana';
+/** Besondere Effekte legendärer Gegenstände und Set-Boni */
+export type PowerId = 'lifesteal' | 'crit' | 'thorns' | 'manaKill' | 'xpBonus' | 'goldBonus';
+export interface Power {
+  id: PowerId;
+  value: number;
+}
+export const POWER_TEXT: Record<PowerId, (v: number) => string> = {
+  lifesteal: (v) => `${v} % des Schadens als Leben`,
+  crit: (v) => `${v} % Chance auf doppelten Schaden`,
+  thorns: (v) => `${v} % des erlittenen Schadens zurückgeworfen`,
+  manaKill: (v) => `+${v} Mana pro Kill`,
+  xpBonus: (v) => `+${v} % Erfahrung`,
+  goldBonus: (v) => `+${v} % Gold`,
+};
 
 export interface ItemTemplate {
   id: string;
@@ -40,6 +54,10 @@ export interface Item {
   reqKraft: number;
   value: number;
   affixes: Affix[];
+  power?: Power;
+  setId?: string;
+  /** Legendär: Vorlagen-ID des Unikats */
+  unique?: string;
 }
 
 export const TEMPLATES: ItemTemplate[] = [
@@ -103,15 +121,22 @@ const AFFIXES: AffixDef[] = [
   { stat: 'armor', name: 'der Härte', min: 1, max: 3 },
   { stat: 'maxHp', name: 'der Zähigkeit', min: 5, max: 20 },
   { stat: 'kraft', name: 'der Stärke', min: 1, max: 3 },
+  { stat: 'maxMana', name: 'der Weisheit', min: 3, max: 10 },
 ];
 
-const RARITY_VALUE: Record<Rarity, number> = { normal: 1, magic: 3, rare: 8 };
-const RARITY_AFFIXES: Record<Rarity, [number, number]> = { normal: [0, 0], magic: [1, 2], rare: [3, 4] };
+const RARITY_VALUE: Record<Rarity, number> = { normal: 1, magic: 3, rare: 8, set: 14, legendary: 25 };
+const RARITY_AFFIXES: Record<Rarity, [number, number]> = { normal: [0, 0], magic: [1, 2], rare: [3, 4], set: [0, 0], legendary: [0, 0] };
 
 export function templateById(id: string): ItemTemplate {
   const t = TEMPLATES.find((x) => x.id === id);
   if (!t) throw new Error(`Unbekannte Item-Vorlage: ${id}`);
   return t;
+}
+
+function rollAffix(rng: Rng, pool: AffixDef[], minLevel: number): Affix {
+  const def = pool.splice(rng.int(0, pool.length - 1), 1)[0]!;
+  const scale = 1 + minLevel / 8;
+  return { stat: def.stat, value: Math.max(1, Math.round(rng.int(def.min, def.max) * (def.stat === 'kraft' ? 1 + minLevel / 20 : scale))) };
 }
 
 export function rollRarity(rng: Rng): Rarity {
@@ -126,11 +151,7 @@ export function generateItem(rng: Rng, id: number, templateId: string, rarityIn:
   const count = rng.int(lo, hi);
   const pool = [...AFFIXES];
   const affixes: Affix[] = [];
-  for (let i = 0; i < count && pool.length; i++) {
-    const def = pool.splice(rng.int(0, pool.length - 1), 1)[0]!;
-    const scale = 1 + t.minLevel / 8;
-    affixes.push({ stat: def.stat, value: Math.max(1, Math.round(rng.int(def.min, def.max) * (def.stat === 'kraft' ? 1 + t.minLevel / 20 : scale))) });
-  }
+  for (let i = 0; i < count && pool.length; i++) affixes.push(rollAffix(rng, pool, t.minLevel));
   const name = affixes.length
     ? `${t.name} ${AFFIXES.find((a) => a.stat === affixes[0]!.stat)!.name}`
     : t.name;
@@ -163,4 +184,171 @@ export function rollPotion(rng: Rng, nextId: () => number, monsterLevel: number)
   const tier = TEMPLATES.filter((t) => t.slot === 'potion' && t[kind] !== undefined && t.minLevel <= monsterLevel);
   const best = tier.filter((t) => t.minLevel === Math.max(...tier.map((x) => x.minLevel)));
   return generateItem(rng, nextId(), best[rng.int(0, best.length - 1)]!.id, 'normal');
+}
+
+/* ------------------------------------------------ Legendäre und Set-Gegenstände */
+
+interface AffixRange {
+  stat: Stat;
+  min: number;
+  max: number;
+}
+
+export interface LegendaryDef {
+  id: string;
+  name: string;
+  base: string;
+  minLevel: number;
+  affixes: AffixRange[];
+  power: Power;
+  /** Fällt gezielt von diesem Monster (Boss) */
+  source?: string;
+}
+
+export const LEGENDARIES: LegendaryDef[] = [
+  { id: 'rat_king_ring', name: 'Ring des Rattenkönigs', base: 'iron_ring', minLevel: 1, affixes: [{ stat: 'maxHp', min: 15, max: 25 }], power: { id: 'goldBonus', value: 25 } },
+  { id: 'bog_walkers', name: 'Moorwandler', base: 'cloth_boots', minLevel: 5, affixes: [{ stat: 'maxHp', min: 20, max: 30 }, { stat: 'armor', min: 2, max: 3 }], power: { id: 'xpBonus', value: 8 } },
+  { id: 'harkon_blade', name: 'Harkons Klinge', base: 'steel_sword', minLevel: 12, affixes: [{ stat: 'damage', min: 6, max: 9 }, { stat: 'kraft', min: 2, max: 3 }], power: { id: 'crit', value: 15 }, source: 'bandit_lord' },
+  { id: 'bone_cleaver', name: 'Knochenspalter', base: 'cinder_axe', minLevel: 11, affixes: [{ stat: 'damage', min: 8, max: 12 }], power: { id: 'crit', value: 12 } },
+  { id: 'ember_band', name: 'Glutband', base: 'ember_ring', minLevel: 11, affixes: [{ stat: 'maxMana', min: 15, max: 25 }, { stat: 'damage', min: 3, max: 5 }], power: { id: 'lifesteal', value: 4 } },
+  { id: 'morrik_plate', name: 'Morriks Knochenpanzer', base: 'bone_plate', minLevel: 14, affixes: [{ stat: 'armor', min: 6, max: 8 }, { stat: 'maxHp', min: 40, max: 60 }], power: { id: 'thorns', value: 15 }, source: 'bone_lord' },
+  { id: 'veshra_seal', name: 'Veshras Siegel', base: 'silver_ring', minLevel: 16, affixes: [{ stat: 'maxMana', min: 20, max: 30 }, { stat: 'damage', min: 4, max: 6 }], power: { id: 'manaKill', value: 6 }, source: 'bog_queen' },
+  { id: 'wolf_fang', name: 'Wolfsfang', base: 'war_blade', minLevel: 17, affixes: [{ stat: 'damage', min: 8, max: 12 }, { stat: 'kraft', min: 2, max: 4 }], power: { id: 'lifesteal', value: 5 } },
+  { id: 'colossus_heart', name: 'Kolossherz', base: 'dread_mail', minLevel: 20, affixes: [{ stat: 'armor', min: 10, max: 14 }, { stat: 'maxHp', min: 80, max: 120 }], power: { id: 'thorns', value: 25 }, source: 'stone_colossus' },
+  { id: 'death_grip', name: 'Griff des Todes', base: 'dread_fists', minLevel: 21, affixes: [{ stat: 'damage', min: 8, max: 12 }, { stat: 'armor', min: 4, max: 6 }], power: { id: 'lifesteal', value: 6 } },
+  { id: 'ash_bringer', name: 'Aschenbringer', base: 'ash_greatsword', minLevel: 26, affixes: [{ stat: 'damage', min: 15, max: 20 }, { stat: 'kraft', min: 4, max: 6 }], power: { id: 'lifesteal', value: 8 }, source: 'ash_king' },
+  { id: 'ash_crown', name: 'Aschenkrone', base: 'ash_visor', minLevel: 26, affixes: [{ stat: 'armor', min: 8, max: 12 }, { stat: 'maxHp', min: 100, max: 150 }], power: { id: 'xpBonus', value: 15 }, source: 'ash_king' },
+];
+
+export function legendaryById(id: string): LegendaryDef {
+  const d = LEGENDARIES.find((x) => x.id === id);
+  if (!d) throw new Error(`Unbekanntes Unikat: ${id}`);
+  return d;
+}
+
+export function generateLegendary(rng: Rng, id: number, defId: string): Item {
+  const d = legendaryById(defId);
+  const t = templateById(d.base);
+  const affixes = d.affixes.map((a) => ({ stat: a.stat, value: rng.int(a.min, a.max) }));
+  return {
+    id, templateId: d.base, name: d.name, slot: t.slot, rarity: 'legendary', weight: t.weight,
+    damage: t.damage ? [...t.damage] : undefined, armor: t.armor, reqKraft: t.reqKraft,
+    value: t.value * RARITY_VALUE.legendary + 100, affixes, power: { ...d.power }, unique: d.id,
+  };
+}
+
+export interface SetBonus {
+  affixes?: Affix[];
+  power?: Power;
+}
+
+export interface SetDef {
+  id: string;
+  name: string;
+  minLevel: number;
+  /** Teile: Vorlage, Name, feste Zusatzwerte */
+  pieces: { base: string; name: string; affixes: Affix[] }[];
+  bonuses: Record<number, SetBonus>;
+}
+
+export const SETS: SetDef[] = [
+  {
+    id: 'warden', name: 'Wächter von Aschental', minLevel: 9,
+    pieces: [
+      { base: 'iron_helm', name: 'Wächterhaube', affixes: [{ stat: 'armor', value: 3 }] },
+      { base: 'plate_cuirass', name: 'Wächterharnisch', affixes: [{ stat: 'maxHp', value: 25 }] },
+      { base: 'iron_gauntlets', name: 'Wächterfäuste', affixes: [{ stat: 'damage', value: 3 }] },
+      { base: 'iron_greaves', name: 'Wächterschienen', affixes: [{ stat: 'armor', value: 3 }] },
+    ],
+    bonuses: {
+      2: { affixes: [{ stat: 'maxHp', value: 40 }] },
+      3: { affixes: [{ stat: 'armor', value: 8 }] },
+      4: { affixes: [{ stat: 'damage', value: 8 }], power: { id: 'thorns', value: 10 } },
+    },
+  },
+  {
+    id: 'bonebinder', name: 'Knochenbinder', minLevel: 15,
+    pieces: [
+      { base: 'crown_helm', name: 'Knochenbinder-Krone', affixes: [{ stat: 'maxMana', value: 15 }] },
+      { base: 'bone_plate', name: 'Knochenbinder-Panzer', affixes: [{ stat: 'maxHp', value: 50 }] },
+      { base: 'bone_gloves', name: 'Knochenbinder-Griffe', affixes: [{ stat: 'damage', value: 5 }] },
+      { base: 'bone_boots', name: 'Knochenbinder-Tritte', affixes: [{ stat: 'armor', value: 5 }] },
+    ],
+    bonuses: {
+      2: { affixes: [{ stat: 'maxMana', value: 40 }] },
+      3: { affixes: [{ stat: 'damage', value: 12 }] },
+      4: { affixes: [{ stat: 'kraft', value: 6 }], power: { id: 'lifesteal', value: 6 } },
+    },
+  },
+  {
+    id: 'ashen', name: 'Aschenerbe', minLevel: 26,
+    pieces: [
+      { base: 'ash_visor', name: 'Aschenerbe-Visier', affixes: [{ stat: 'maxHp', value: 80 }] },
+      { base: 'ash_cuirass', name: 'Aschenerbe-Harnisch', affixes: [{ stat: 'armor', value: 10 }] },
+      { base: 'ash_gauntlets', name: 'Aschenerbe-Stulpen', affixes: [{ stat: 'damage', value: 12 }] },
+      { base: 'ash_boots', name: 'Aschenerbe-Stiefel', affixes: [{ stat: 'maxHp', value: 60 }] },
+    ],
+    bonuses: {
+      2: { affixes: [{ stat: 'kraft', value: 8 }, { stat: 'maxHp', value: 120 }] },
+      3: { affixes: [{ stat: 'damage', value: 25 }] },
+      4: { affixes: [{ stat: 'armor', value: 25 }], power: { id: 'crit', value: 15 } },
+    },
+  },
+];
+
+export function setById(id: string): SetDef {
+  const d = SETS.find((x) => x.id === id);
+  if (!d) throw new Error(`Unbekanntes Set: ${id}`);
+  return d;
+}
+
+export function generateSetPiece(rng: Rng, id: number, setId: string, index: number): Item {
+  const set = setById(setId);
+  const piece = set.pieces[index]!;
+  const t = templateById(piece.base);
+  void rng;
+  return {
+    id, templateId: piece.base, name: piece.name, slot: t.slot, rarity: 'set', weight: t.weight,
+    damage: t.damage ? [...t.damage] : undefined, armor: t.armor, reqKraft: t.reqKraft,
+    value: t.value * RARITY_VALUE.set, affixes: piece.affixes.map((a) => ({ ...a })), setId,
+  };
+}
+
+/** Seltene Sonderdrops: Unikate (Bosse gezielt, sonst sehr selten) und Set-Teile. */
+export function rollSpecial(rng: Rng, nextId: () => number, monsterLevel: number, monsterId: string, boss: boolean): Item | null {
+  const sourced = LEGENDARIES.filter((d) => d.source === monsterId);
+  if (sourced.length && rng.next() < 0.55) return generateLegendary(rng, nextId(), sourced[rng.int(0, sourced.length - 1)]!.id);
+  if (boss) return null;
+  if (rng.next() < 0.004) {
+    const pool = LEGENDARIES.filter((d) => !d.source && d.minLevel <= monsterLevel + 1 && d.minLevel >= monsterLevel - 9);
+    if (pool.length) return generateLegendary(rng, nextId(), pool[rng.int(0, pool.length - 1)]!.id);
+  }
+  if (rng.next() < 0.006) {
+    const sets = SETS.filter((d) => d.minLevel <= monsterLevel + 1 && d.minLevel >= monsterLevel - 9);
+    if (sets.length) {
+      const set = sets[rng.int(0, sets.length - 1)]!;
+      return generateSetPiece(rng, nextId(), set.id, rng.int(0, set.pieces.length - 1));
+    }
+  }
+  return null;
+}
+
+/** Würfelt die Affixe eines normalen/magischen/seltenen Gegenstands neu (Schmied). */
+export function rerollAffixes(rng: Rng, item: Item, rarity: Rarity, count: number): void {
+  const t = templateById(item.templateId);
+  const pool = [...AFFIXES];
+  item.affixes = [];
+  for (let i = 0; i < count && pool.length; i++) item.affixes.push(rollAffix(rng, pool, t.minLevel));
+  item.rarity = rarity;
+  item.name = item.affixes.length ? `${t.name} ${AFFIXES.find((a) => a.stat === item.affixes[0]!.stat)!.name}` : t.name;
+  item.value = t.value * RARITY_VALUE[rarity] + item.affixes.length * 8;
+}
+
+/** Fügt einem seltenen Gegenstand ein weiteres Affix hinzu (Schmied). */
+export function extendAffixes(rng: Rng, item: Item): void {
+  const t = templateById(item.templateId);
+  const pool = AFFIXES.filter((a) => !item.affixes.some((x) => x.stat === a.stat));
+  if (!pool.length) return;
+  item.affixes.push(rollAffix(rng, pool, t.minLevel));
+  item.value += 8;
 }

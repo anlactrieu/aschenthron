@@ -98,3 +98,10 @@ Die Zielgröße „wie die erste Insel von T4C“ ist als messbare Ziele umgeset
 - Rüstung wirkt prozentual (Schaden × 30 / (30 + Rüstung)) statt als fester Abzug.
 - Respawn nach dem Tod in der nächstgelegenen Stadt.
 - Quests sind Töte-Aufgaben (keine Liefer-/Dialogquests).
+
+## Stufe 2 (umgesetzt in der Nachtarbeit)
+- 12 Fertigkeiten in 3 Bereichen (Nahkampf, Fernkampf, Magie): Flächenschaden, Mehrfachziel, Gift (Schaden über Zeit), Selbstheilung; Lehrer-Stufe 1 (Aschenhafen) und 2 (Felsenwacht).
+- Legendäre Gegenstände mit Effekten (Lebensraub, Kritisch, Dornen, Mana pro Kill, Erfahrungs-/Goldbonus): 12 Unikate, Bosse lassen ihr Unikat gezielt fallen.
+- 3 Sets (Wächter von Aschental, Knochenbinder, Aschenerbe) mit Boni bei 2/3/4 Teilen.
+- Schmied: Aufwerten (normal → magisch → selten), Affixe neu würfeln, Affix hinzufügen (Goldkosten).
+- Haltbarkeit/Reparatur und Dunkle Künste bleiben bewusst draußen.

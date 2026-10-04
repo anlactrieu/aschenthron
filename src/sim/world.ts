@@ -1,6 +1,6 @@
 import { Rng } from './rng';
 import { findPath, isWalkable, type Grid, type Pt } from './path';
-import { rollDrop, rollPotion, templateById, generateItem, type Item, type Slot } from './items';
+import { rollDrop, rollPotion, rollSpecial, templateById, generateItem, rerollAffixes, extendAffixes, SETS, type Item, type PowerId, type SetBonus, type Slot, type Stat } from './items';
 import {
   ATTR_KEYS, MAX_LEVEL, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
   monsterKind, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
@@ -33,7 +33,8 @@ export type Command =
   | { type: 'stashPut'; itemId: number }
   | { type: 'stashTake'; itemId: number }
   | { type: 'acceptQuest'; questId: string }
-  | { type: 'turnInQuest'; questId: string };
+  | { type: 'turnInQuest'; questId: string }
+  | { type: 'craft'; itemId: number; op: 'upgrade' | 'reroll' | 'extend' };
 
 export type Attrs = Record<AttrKey, number>;
 
@@ -79,6 +80,10 @@ export interface Actor {
   autoAttack: boolean;
   /** frühester Tick für die nächste Wegneuberechnung beim Verfolgen */
   repathAt: number;
+  /** Gift: Schaden pro Sekunde bis Tick `until` */
+  dot: { perSec: number; until: number; srcId: number } | null;
+  /** letzter erlittener Treffer (Monster regenerieren erst nach Ruhe) */
+  lastHitAt: number;
 }
 
 export interface GroundItem {
@@ -110,7 +115,9 @@ export interface Npc {
 }
 
 export type GameEvent =
-  | { type: 'hit'; attackerId: number; targetId: number; amount: number; skill?: string }
+  | { type: 'hit'; attackerId: number; targetId: number; amount: number; skill?: string; crit?: boolean }
+  | { type: 'healed'; amount: number }
+  | { type: 'crafted'; item: Item; op: string }
   | { type: 'died'; id: number }
   | { type: 'loot'; item: Item; x: number; y: number }
   | { type: 'pickedUp'; item: Item }
@@ -162,7 +169,7 @@ function baseActor(w: World, kind: Actor['kind'], name: string, x: number, y: nu
     cooldownLeft: 0, path: [], targetId: null, aggroRange: 0, alive: true, level: 1, xp: 0, statPoints: 0,
     attrs: { kraft: 10, gewandtheit: 10, ausdauer: 10, verstand: 10, willenskraft: 10 },
     mana: 20, gold: 0, skills: [], skillCd: {}, potionCd: 0, quests: {}, inventory: [], equipment: {}, stash: [], pickupId: null,
-    diedAt: -1, boss: false, enraged: false, autoAttack: true, repathAt: 0,
+    diedAt: -1, boss: false, enraged: false, autoAttack: true, repathAt: 0, dot: null, lastHitAt: -9999,
   };
   w.actors.push(a);
   return a;
@@ -196,9 +203,28 @@ export function equippedItems(a: Actor): Item[] {
   return Object.values(a.equipment).filter((i): i is Item => !!i);
 }
 
-function affixSum(a: Actor, stat: 'damage' | 'maxHp' | 'kraft' | 'armor'): number {
+/** Aktive Set-Boni: pro Set zählen alle Bonusstufen bis zur Zahl angelegter Teile. */
+export function activeSetBonuses(a: Actor): { name: string; pieces: number; bonuses: [number, SetBonus][] }[] {
+  const out: { name: string; pieces: number; bonuses: [number, SetBonus][] }[] = [];
+  for (const set of SETS) {
+    const n = equippedItems(a).filter((i) => i.setId === set.id).length;
+    if (n >= 2) out.push({ name: set.name, pieces: n, bonuses: Object.entries(set.bonuses).filter(([k]) => Number(k) <= n).map(([k, v]) => [Number(k), v] as [number, SetBonus]) });
+  }
+  return out;
+}
+
+function affixSum(a: Actor, stat: Stat): number {
   let sum = 0;
   for (const it of equippedItems(a)) for (const f of it.affixes) if (f.stat === stat) sum += f.value;
+  for (const set of activeSetBonuses(a)) for (const [, b] of set.bonuses) for (const f of b.affixes ?? []) if (f.stat === stat) sum += f.value;
+  return sum;
+}
+
+/** Summe eines besonderen Effekts aus Gegenständen und Set-Boni. */
+export function powerOf(a: Actor, id: PowerId): number {
+  let sum = 0;
+  for (const it of equippedItems(a)) if (it.power?.id === id) sum += it.power.value;
+  for (const set of activeSetBonuses(a)) for (const [, b] of set.bonuses) if (b.power?.id === id) sum += b.power.value;
   return sum;
 }
 
@@ -228,7 +254,7 @@ export function maxHpOf(a: Actor): number {
 }
 
 export function maxManaOf(a: Actor): number {
-  return 20 + (a.attrs.verstand - 10) * 5;
+  return 20 + (a.attrs.verstand - 10) * 5 + affixSum(a, 'maxMana');
 }
 
 export function attackCooldownOf(a: Actor): number {
@@ -409,6 +435,25 @@ export function applyCommand(w: World, actorId: number, cmd: Command): void {
       gainXp(w, a, def.xp);
       break;
     }
+    case 'craft': {
+      if (!nearNpc(w, a, 'smith')) return fail(w, 'Kein Schmied in der Nähe.');
+      const it = a.inventory.find((i) => i.id === cmd.itemId);
+      if (!it || it.slot === 'potion') return;
+      if (it.rarity === 'legendary' || it.rarity === 'set') return fail(w, 'Das lässt sich nicht verändern.');
+      const cost = craftCost(it, cmd.op);
+      if (cmd.op === 'upgrade' && it.rarity === 'rare') return fail(w, 'Bereits selten.');
+      if (cmd.op === 'reroll' && it.rarity === 'normal') return fail(w, 'Normale Gegenstände haben keine Affixe.');
+      if (cmd.op === 'extend' && (it.rarity !== 'rare' || it.affixes.length >= 5)) return fail(w, 'Nur seltene Gegenstände mit weniger als 5 Affixen.');
+      if (a.gold < cost) return fail(w, 'Nicht genug Gold.');
+      a.gold -= cost;
+      if (cmd.op === 'upgrade') {
+        if (it.rarity === 'normal') rerollAffixes(w.rng, it, 'magic', w.rng.int(1, 2));
+        else rerollAffixes(w.rng, it, 'rare', w.rng.int(3, 4));
+      } else if (cmd.op === 'reroll') rerollAffixes(w.rng, it, it.rarity, it.affixes.length);
+      else extendAffixes(w.rng, it);
+      w.events.push({ type: 'crafted', item: it, op: cmd.op });
+      break;
+    }
     case 'stashPut': {
       if (!nearNpc(w, a, 'stash')) return fail(w, 'Keine Truhe in der Nähe.');
       const it = a.inventory.find((i) => i.id === cmd.itemId);
@@ -432,32 +477,63 @@ export function applyCommand(w: World, actorId: number, cmd: Command): void {
   }
 }
 
+export function craftCost(item: Item, op: 'upgrade' | 'reroll' | 'extend'): number {
+  if (op === 'upgrade') return Math.round(item.rarity === 'normal' ? 30 + item.value : 80 + item.value * 1.5);
+  if (op === 'reroll') return Math.round(20 + item.value * 0.4);
+  return Math.round(120 + item.value * 1.2);
+}
+
 function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void {
   const s = skillById(skillId);
   if (!s || !a.skills.includes(s.id)) return fail(w, 'Fertigkeit nicht gelernt.');
   if ((a.skillCd[s.id] ?? 0) > 0) return;
   if (a.mana < s.mana) return fail(w, 'Nicht genug Mana.');
-  const t = getActor(w, targetId ?? a.targetId ?? -1);
-  if (!t || !t.alive || t.id === a.id) return fail(w, 'Kein Ziel.');
-  if (Math.hypot(a.x - t.x, a.y - t.y) > s.range) return fail(w, 'Ziel außer Reichweite.');
   if (a.kind === 'player' && inSafeZone(w, a.x, a.y)) return fail(w, 'In der Stadt ist Kämpfen verboten.');
+  const lvl = 1 + a.level * 0.1;
+  if (s.heal !== undefined) {
+    const scale = s.scales ? Math.max(0, a.attrs[s.scales] - 10) * 3 : 0;
+    const amount = Math.round((s.heal + scale) * lvl);
+    a.mana -= s.mana;
+    a.skillCd[s.id] = s.cooldown;
+    const before = a.hp;
+    a.hp = Math.min(maxHpOf(a), a.hp + amount);
+    w.events.push({ type: 'healed', amount: Math.round(a.hp - before) });
+    return;
+  }
+  const first = getActor(w, targetId ?? a.targetId ?? -1);
+  if (!s.aoeSelf && (!first || !first.alive || first.id === a.id)) return fail(w, 'Kein Ziel.');
+  const range = s.range;
+  if (first && !s.aoeSelf && Math.hypot(a.x - first.x, a.y - first.y) > range) return fail(w, 'Ziel außer Reichweite.');
+  const enemy = (x: Actor) => x.alive && x.id !== a.id && x.kind !== a.kind;
+  let victims: Actor[];
+  if (s.aoeSelf) victims = w.actors.filter((x) => enemy(x) && Math.hypot(x.x - a.x, x.y - a.y) <= s.aoe!);
+  else if (s.aoe) victims = w.actors.filter((x) => enemy(x) && Math.hypot(x.x - first!.x, x.y - first!.y) <= s.aoe!);
+  else if (s.targets) {
+    victims = [first!, ...w.actors.filter((x) => enemy(x) && x.id !== first!.id && Math.hypot(x.x - a.x, x.y - a.y) <= range).sort((p, q) => Math.hypot(p.x - a.x, p.y - a.y) - Math.hypot(q.x - a.x, q.y - a.y))].slice(0, s.targets);
+  } else victims = [first!];
+  if (!victims.length) return fail(w, 'Kein Ziel.');
   a.mana -= s.mana;
   a.skillCd[s.id] = s.cooldown;
-  let amount: number;
-  if (s.mult) {
-    const [lo, hi] = damageRange(a);
-    amount = Math.round(w.rng.int(lo, hi) * s.mult);
-  } else {
-    const [lo, hi] = s.base!;
-    const scale = s.scales ? Math.max(0, a.attrs[s.scales] - 10) : 0;
-    amount = w.rng.int(lo, hi) + scale;
-  }
   // Fern-/Magie-Skills lösen keine Nahkampf-Verfolgung aus; Nahkampf-Skills schon
-  if (s.mult) a.autoAttack = true;
-  else if (a.targetId !== t.id) a.autoAttack = false;
-  a.targetId = t.id;
+  if (first) {
+    if (s.mult) a.autoAttack = true;
+    else if (a.targetId !== first.id) a.autoAttack = false;
+    a.targetId = first.id;
+  }
   a.path = [];
-  dealDamage(w, a, t, amount, s.ignoresArmor, s.id);
+  for (const v of victims) {
+    let amount: number;
+    if (s.mult) {
+      const [lo, hi] = damageRange(a);
+      amount = Math.round(w.rng.int(lo, hi) * s.mult);
+    } else {
+      const [lo, hi] = s.base!;
+      const scale = s.scales ? Math.max(0, a.attrs[s.scales] - 10) * (1 + a.level * 0.08) : 0;
+      amount = Math.round(w.rng.int(lo, hi) * lvl + scale);
+    }
+    dealDamage(w, a, v, amount, s.ignoresArmor, s.id);
+    if (s.dot && v.alive) v.dot = { perSec: Math.max(1, Math.round((amount * s.dot.factor) / s.dot.seconds)), until: w.tick + s.dot.seconds * TICK_RATE, srcId: a.id };
+  }
 }
 
 /* ---------- Kampf ---------- */
@@ -513,11 +589,34 @@ function fight(w: World, a: Actor, t: Actor): void {
   dealDamage(w, a, t, w.rng.int(lo, hi), false);
 }
 
-function dealDamage(w: World, a: Actor, t: Actor, raw: number, ignoreArmor: boolean, skill?: string): void {
+function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: boolean, skill?: string, noReflect = false): void {
   if (t.kind === 'player' && inSafeZone(w, t.x, t.y)) return;
+  let raw = rawIn;
+  let crit = false;
+  if (a.kind === 'player') {
+    const chance = powerOf(a, 'crit');
+    if (chance > 0 && w.rng.next() * 100 < chance) {
+      raw *= 2;
+      crit = true;
+    }
+  }
   const amount = Math.max(1, Math.round(ignoreArmor ? raw : (raw * ARMOR_K) / (ARMOR_K + armorOf(t))));
   t.hp = Math.max(0, t.hp - amount);
-  w.events.push({ type: 'hit', attackerId: a.id, targetId: t.id, amount, skill });
+  t.lastHitAt = w.tick;
+  // Wer angegriffen wird, wehrt sich (auch gegen Fernkämpfer außerhalb der Aggro-Reichweite)
+  if (t.kind === 'monster' && a.kind === 'player' && t.alive && t.targetId === null) {
+    t.targetId = a.id;
+    t.autoAttack = true;
+  }
+  w.events.push({ type: 'hit', attackerId: a.id, targetId: t.id, amount, skill, crit });
+  if (a.kind === 'player' && a.alive) {
+    const steal = powerOf(a, 'lifesteal');
+    if (steal > 0) a.hp = Math.min(maxHpOf(a), a.hp + Math.max(1, Math.round((amount * steal) / 100)));
+  }
+  if (t.kind === 'player' && !noReflect && a.alive && a.kind === 'monster') {
+    const th = powerOf(t, 'thorns');
+    if (th > 0) dealDamage(w, t, a, Math.max(1, Math.round((amount * th) / 100)), true, undefined, true);
+  }
   if (t.boss && !t.enraged && t.hp > 0 && t.hp < t.maxHp * 0.3) {
     t.enraged = true;
     t.damage = [Math.round(t.damage[0] * 1.5), Math.round(t.damage[1] * 1.5)];
@@ -527,6 +626,7 @@ function dealDamage(w: World, a: Actor, t: Actor, raw: number, ignoreArmor: bool
   t.alive = false;
   t.path = [];
   t.targetId = null;
+  t.dot = null;
   t.diedAt = w.tick;
   w.events.push({ type: 'died', id: t.id });
   if (t.kind === 'monster') onMonsterDeath(w, a, t);
@@ -547,8 +647,10 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
         }
       }
     }
-    gainXp(w, killer, k.xp);
-    const gold = w.rng.int(k.gold[0], k.gold[1]);
+    gainXp(w, killer, Math.round(k.xp * (1 + powerOf(killer, 'xpBonus') / 100)));
+    const mk = powerOf(killer, 'manaKill');
+    if (mk > 0) killer.mana = Math.min(maxManaOf(killer), killer.mana + mk);
+    const gold = Math.round(w.rng.int(k.gold[0], k.gold[1]) * (1 + powerOf(killer, 'goldBonus') / 100));
     killer.gold += gold;
     w.events.push({ type: 'gold', amount: gold });
   }
@@ -562,6 +664,8 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
     drop(rollDrop(w.rng, () => w.nextId++, k.level, k.boss ? 'rare' : undefined));
   }
   if (w.rng.next() <= POTION_DROP_CHANCE) drop(rollPotion(w.rng, () => w.nextId++, k.level));
+  const special = rollSpecial(w.rng, () => w.nextId++, k.level, k.id, !!k.boss);
+  if (special) drop(special);
 }
 
 export function gainXp(w: World, a: Actor, amount: number): void {
@@ -638,10 +742,19 @@ export function tick(w: World): void {
     }
     if (a.cooldownLeft > 0) a.cooldownLeft--;
     if (a.potionCd > 0) a.potionCd--;
+    if (a.dot) {
+      if (w.tick % TICK_RATE === 0) {
+        const src = getActor(w, a.dot.srcId) ?? a;
+        const d = a.dot;
+        if (w.tick >= d.until) a.dot = null;
+        dealDamage(w, src, a, d.perSec, true, 'poison_shot');
+        if (!a.alive) continue;
+      } else if (w.tick >= a.dot.until) a.dot = null;
+    }
     for (const id of Object.keys(a.skillCd)) if ((a.skillCd[id] ?? 0) > 0) a.skillCd[id]!--;
     if (a.kind === 'player') regen(w, a);
     else monsterAi(w, a);
-    if (a.kind === 'monster' && a.targetId === null && a.path.length === 0) {
+    if (a.kind === 'monster' && a.targetId === null && a.path.length === 0 && w.tick - a.lastHitAt > TICK_RATE * 6) {
       // Monster regeneriert langsam zu Hause
       a.hp = Math.min(a.maxHp, a.hp + a.maxHp * 0.002);
     }
@@ -680,6 +793,7 @@ function reviveMonster(m: Actor): void {
   m.y = m.home!.y;
   m.targetId = null;
   m.path = [];
+  m.dot = null;
   if (m.enraged) {
     m.enraged = false;
     m.damage = monsterKind(m.kindId!).damage;
