@@ -13,6 +13,9 @@ const MONSTER_RESPAWN_TICKS = 20 * 45;
 const MONSTER_LOOT_TTL = 20 * 180;
 const CORPSE_LOOT_TTL = 20 * 300;
 const LEASH = 14;
+/** Monster schlafen (kein Tick), wenn kein Spieler näher ist als dies */
+const SLEEP_DIST = 32;
+const REPATH_TICKS = 8;
 
 export type Command =
   | { type: 'moveTo'; x: number; y: number }
@@ -71,6 +74,8 @@ export interface Actor {
   enraged: boolean;
   /** true: verfolgt und schlägt das Ziel automatisch (Nahkampf-Befehl, Monster) */
   autoAttack: boolean;
+  /** frühester Tick für die nächste Wegneuberechnung beim Verfolgen */
+  repathAt: number;
 }
 
 export interface GroundItem {
@@ -143,7 +148,7 @@ function baseActor(w: World, kind: Actor['kind'], name: string, x: number, y: nu
     cooldownLeft: 0, path: [], targetId: null, aggroRange: 0, alive: true, level: 1, xp: 0, statPoints: 0,
     attrs: { kraft: 10, gewandtheit: 10, ausdauer: 10, verstand: 10, willenskraft: 10 },
     mana: 20, gold: 0, skills: [], skillCd: {}, potionCd: 0, inventory: [], equipment: {}, stash: [], pickupId: null,
-    diedAt: -1, boss: false, enraged: false, autoAttack: true,
+    diedAt: -1, boss: false, enraged: false, autoAttack: true, repathAt: 0,
   };
   w.actors.push(a);
   return a;
@@ -442,7 +447,9 @@ function stepAlong(a: Actor): void {
 function chase(w: World, a: Actor, t: Actor): void {
   const goal = { x: Math.round(t.x), y: Math.round(t.y) };
   const last = a.path[a.path.length - 1];
-  if (!last || Math.abs(last.x - goal.x) + Math.abs(last.y - goal.y) > 1) {
+  const stale = !last || Math.abs(last.x - goal.x) + Math.abs(last.y - goal.y) > 1;
+  if (stale && (w.tick >= a.repathAt || a.path.length === 0)) {
+    a.repathAt = w.tick + REPATH_TICKS;
     a.path = findPath(w.grid, { x: Math.round(a.x), y: Math.round(a.y) }, goal);
     if (a.path.length) a.path.pop();
   }
@@ -568,7 +575,11 @@ export function drainEvents(w: World): GameEvent[] {
 export function tick(w: World): void {
   w.tick++;
   w.ground = w.ground.filter((g) => g.expiresAt === null || g.expiresAt > w.tick);
+  const players = w.actors.filter((x) => x.kind === 'player' && x.alive);
   for (const a of w.actors) {
+    if (a.kind === 'monster' && a.alive && a.targetId === null && a.path.length === 0 && a.hp >= a.maxHp) {
+      if (!players.some((pl) => Math.abs(pl.x - a.x) < SLEEP_DIST && Math.abs(pl.y - a.y) < SLEEP_DIST)) continue;
+    }
     if (!a.alive) {
       if (a.kind === 'monster' && w.tick - a.diedAt >= MONSTER_RESPAWN_TICKS && a.home) reviveMonster(a);
       continue;

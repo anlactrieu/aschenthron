@@ -374,3 +374,32 @@ describe('Tränke', () => {
     expect(p.inventory[0]?.heal).toBe(50);
   });
 });
+
+describe('Speichern: Migration', () => {
+  it('Position in Wand/außerhalb → Startpunkt, kaputte Teile verworfen, XP an Level angepasst', async () => {
+    const { importPlayer } = await import('./save');
+    const w = createWorld(1, open());
+    w.grid.walkable[5 * 20 + 5] = false;
+    const p = spawnPlayer(w, 2, 2);
+    const old = JSON.stringify({
+      v: 1,
+      player: {
+        x: 5, y: 5, hp: 50, mana: 5, level: 4, xp: 3, statPoints: 2, gold: 12, maxHp: 130,
+        attrs: { kraft: 14 }, skills: ['power_strike', 'gibt_es_nicht'],
+        inventory: [{ nope: true }, null], equipment: { weapon: { broken: 1 } }, stash: 'kaputt',
+      },
+    });
+    expect(importPlayer(w, p, old)).toBe(true);
+    expect([p.x, p.y]).toEqual([2, 2]);
+    expect(p.skills).toEqual(['power_strike']);
+    expect(p.inventory).toEqual([]);
+    expect(p.stash).toEqual([]);
+    expect(p.attrs.kraft).toBe(14);
+    expect(p.attrs.verstand).toBe(10);
+    expect(p.xp).toBe(totalXpFor(4));
+    p.hp = 1;
+    const off = JSON.stringify({ v: 1, player: { x: 999, y: -4, level: 1 } });
+    expect(importPlayer(w, p, off)).toBe(true);
+    expect([p.x, p.y]).toEqual([2, 2]);
+  });
+});
