@@ -97,7 +97,7 @@ Die Zielgröße „wie die erste Insel von T4C“ ist als messbare Ziele umgeset
 - Grafik und Sound werden prozedural im Code erzeugt (keine heruntergeladenen Assets), weil Downloads deine Freigabe brauchen.
 - Rüstung wirkt prozentual (Schaden × 30 / (30 + Rüstung)) statt als fester Abzug.
 - Respawn nach dem Tod in der nächstgelegenen Stadt.
-- Quests sind Töte-Aufgaben (keine Liefer-/Dialogquests).
+- Aufgaben: Töten, Truhen öffnen, Champions und benannte Mini-Bosse besiegen (keine Liefer-/Dialogquests).
 
 ## Stufe 2 (umgesetzt in der Nachtarbeit)
 - 12 Fertigkeiten in 3 Bereichen (Nahkampf, Fernkampf, Magie): Flächenschaden, Mehrfachziel, Gift (Schaden über Zeit), Selbstheilung; Lehrer-Stufe 1 (Aschenhafen) und 2 (Felsenwacht).
@@ -125,3 +125,14 @@ Es gibt kein fertiges, düsteres, einheitliches, lizenzsauberes Pixel-Iso-Paket 
 2. Dungeon Crawl 32x32 Tiles (CC0, >3000 Einzelbilder: Items, Monster, Effekte) – https://opengameart.org/content/dungeon-crawl-32x32-tiles
 3. Clint Bellanger Figuren (CC-BY 3.0, Namensnennung nötig; gerenderte 3D-Sprites in 8 Richtungen mit Lauf-/Angriffsframes): Isometric Hero and Heroine, Isometric Hero and Creatures, Skeleton Warrior, Zombie, Goblin – Links auf opengameart.org (siehe Titel).
 Grassland Tileset (CC-BY-SA) wird wegen ShareAlike nicht empfohlen. Bäume, Felsen, Wasser, Lava, Wölfe, Ratten, Spinnen, Golems, Dämonen und Effekte bleiben prozedural. Mischstil-Warnung: gerenderte Figuren + Pixel-Tiles brauchen einheitliche Palette/Skalierung. Lizenzdateien in den ZIPs vor dem Einbau prüfen; Credits-Seite im Spiel nötig.
+
+## Nachtarbeit 2: neue Annahmen und Regeln (bitte prüfen)
+- Insel v3: 240×180 Tiles, ~650 Monster in ~250 Rudeln (1–5 Tiere, Anführer eine Stufe höher), Monsterfamilien in Stufen (z. B. Goblin → Kundschafter → Krieger → Schamane → Häuptling), je weiter vom Zoneneingang desto stärker. Spielstände anderer Kartenversion starten in der Stadt.
+- Champions (~10 % der Rudel mit ≥2 Tieren): Modifikator (flink, gepanzert, feurig, blutsaugend, dornig), dreifache Belohnung, garantierte magische/seltene Beute. 13 benannte Mini-Bosse mit Fähigkeiten und 15–25 Min. Wartezeit, garantiert seltene Beute, oft Unikat/Set-Teil.
+- Boss-Mechaniken: Bodenschlag mit Warnring (1,3 s), Beschwörung bei halbem Leben (Helfer verschwinden beim Wiedererscheinen), Ansturm.
+- 76 Truhen (Holz/Eisen/Gold), 12 Min. Wiederauffüllung, Beute nach Zonenstufe.
+- Gegenstände haben Anforderungen (Stufe + Attribute); schwere Rüstung braucht Ausdauer, Waffen ab Stufe 11 Gewandtheit, Bögen Gewandtheit, Stäbe/Roben Verstand/Willenskraft. Fernkampf-Skills brauchen Bogen + Köcher mit Pfeilen (1 Pfeil pro Schuss; Pfeilbündel auf den Köcher ziehen), Magie-Skills profitieren von Stäben. Bögen/Stäbe machen im Nahkampf nur ein Viertel Schaden.
+- Skillpunkte: 2 am Start, 1 pro Level; Rang 1–5 je Skill (Stufenanforderung steigt, Gold, +18 % Wirkung je Rang). Neuverteilen beim Lehrer gegen Gold (100 + 8·Stufe²), setzt Attribute und Skills zurück.
+- Trefferchance: ATK/(ATK + 0,2·DEF), 35–97 %; Fehlschläge werden als „Verfehlt/Ausgewichen“ angezeigt. Zauber treffen immer.
+- Neue Affixe: Angriffstempo, Kritisch, Regeneration, Treffsicherheit, Ausweichen. Rasten mit R (5× Erholung außerhalb der Stadt, endet bei Aktion/Treffer).
+- Grafik: weiterhin prozedural; Recherche zu Fremd-Assets steht oben, nichts heruntergeladen (Freigabe nötig).

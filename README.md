@@ -7,7 +7,7 @@ Dark-Fantasy-ARPG im Browser (Mac). Feste offene Insel „Aschental“, klassenl
 npm install     # nur beim ersten Mal / nach Updates
 npm run dev     # dann http://localhost:5173 öffnen
 ```
-Steuerung: Klick = laufen/angreifen/aufheben · C/I = Charakter & Inventar · 1–9 = Fertigkeiten · Q/E = Heil-/Manatrank · N = Karte · M = Ton. Neustart: `?neu` an die URL.
+Steuerung: Klick = laufen/angreifen/aufheben/Truhe öffnen · I Inventar (Gegenstände per Drag-and-drop anlegen, in den Köcher füllen, verkaufen) · C Charakter · K Fertigkeiten · J Aufgaben · 1–9 Fertigkeiten · Q/E Heil-/Manatrank · R Rasten · N Karte · M Ton · Esc Fenster schließen. Neustart: `?neu`, Bildrate: `?fps`, Zeitlupe der Effekte: `?slowfx`.
 
 ## Mehrspieler (Server + PvP, experimentell)
 ```bash
