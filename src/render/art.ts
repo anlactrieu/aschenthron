@@ -532,6 +532,11 @@ export interface Look {
   head: number;
   weapon: number;
   hands: number;
+  /** 0 Schwert/Axt/Hammer, 1 Bogen, 2 Stab */
+  weaponKind: number;
+  /** Robe statt Rüstung: langer Rock */
+  robe: boolean;
+  quiver: boolean;
 }
 
 export function lookOf(a: Actor): Look {
@@ -539,11 +544,17 @@ export function lookOf(a: Actor): Look {
     const it = a.equipment[slot];
     return it ? tierOf(templateById(it.templateId).minLevel) : -1;
   };
-  return { chest: t('chest'), head: t('head'), weapon: t('weapon'), hands: t('hands') };
+  const kind = a.equipment.weapon ? templateById(a.equipment.weapon.templateId).kind : undefined;
+  return {
+    chest: t('chest'), head: t('head'), weapon: t('weapon'), hands: t('hands'),
+    weaponKind: kind === 'bow' ? 1 : kind === 'staff' ? 2 : 0,
+    robe: !!a.equipment.chest && a.equipment.chest.templateId.includes('robe'),
+    quiver: !!a.equipment.quiver,
+  };
 }
 
 export function playerCanvas(look: Look, frame: number): HTMLCanvasElement {
-  const key = `pl_${look.chest}_${look.head}_${look.weapon}_${look.hands}_${frame}`;
+  const key = `pl_${look.chest}_${look.head}_${look.weapon}_${look.hands}_${look.weaponKind}_${look.robe ? 1 : 0}_${look.quiver ? 1 : 0}_${frame}`;
   return actorCanvas(key, (x) => {
     POSE = frame === 2 ? 'wind' : frame === 3 ? 'strike' : 'idle';
     const body = look.chest >= 0 ? TIER_COL[look.chest]! : 0x4a68a0;
@@ -559,7 +570,40 @@ export function playerCanvas(look: Look, frame: number): HTMLCanvasElement {
       rect(x, 11, 4, 1, 2, hc);
       if (look.head >= 3) rect(x, 7, 0, 2, 2, shade(hc, 1.3));
     }
-    if (look.weapon >= 0) {
+    if (look.quiver) {
+      rect(x, 1, 6, 3, 9, 0x6a4a28);
+      rect(x, 1, 5, 1, 2, 0xe8e0d0);
+      rect(x, 2, 4, 1, 3, 0xd8c890);
+    }
+    if (look.robe) {
+      // langer Rock bis zu den Füßen
+      rect(x, 4, 14, 8, 6, shade(body, 0.95));
+      rect(x, 3, 18, 10, 2, shade(body, 0.7));
+      rect(x, 7, 14, 2, 6, shade(body, 1.25));
+    }
+    if (look.weapon >= 0 && look.weaponKind === 1) {
+      // Bogen in der Hand: Bogenbogen mit Sehne, im Schuss angelegt
+      const wc = shade(TIER_COL[look.weapon]!, 1.15);
+      const bx = POSE === 'strike' ? 15 : 13;
+      for (let i = 0; i < 12; i++) rect(x, bx + Math.round(Math.sin((i / 11) * Math.PI) * 2), 3 + i, 1, 1, wc);
+      rect(x, bx, 3, 1, 1, 0xe8e0d0);
+      rect(x, bx, 14, 1, 1, 0xe8e0d0);
+      rect(x, POSE === 'wind' ? bx - 3 : bx, 4, 1, 10, 0xe8e0d0);
+      if (POSE === 'strike') rect(x, 9, 8, 6, 1, 0xd8c890);
+    } else if (look.weapon >= 0 && look.weaponKind === 2) {
+      // Stab mit leuchtender Spitze
+      const orb = [0x90c0ff, 0x80d0ff, 0xb090ff, 0x70e0e0, 0xff9a40, 0xc060ff][look.weapon]!;
+      if (POSE === 'strike') {
+        rect(x, 12, 8, 7, 1, 0x6a4a2a);
+        rect(x, 18, 6, 3, 4, orb);
+        rect(x, 19, 7, 1, 1, 0xffffff);
+      } else {
+        const top = POSE === 'wind' ? -4 : 0;
+        rect(x, 13, top + 4, 1, 14, 0x6a4a2a);
+        rect(x, 12, top + 1, 3, 4, orb);
+        rect(x, 13, top + 2, 1, 1, 0xffffff);
+      }
+    } else if (look.weapon >= 0) {
       const wc = TIER_COL[look.weapon]!;
       weapon(x, shade(wc, 1.25), 10 + (look.weapon >= 3 ? 2 : 0));
     } else if (POSE === 'idle') {
@@ -619,6 +663,36 @@ export function lootCanvas(rarity: 'normal' | 'magic' | 'rare' | 'set' | 'legend
   return out;
 }
 
+export function chestCanvas(tier: 'wood' | 'iron' | 'gold', open: boolean): HTMLCanvasElement {
+  const body = { wood: 0x7a5230, iron: 0x5a6070, gold: 0x8a6a28 }[tier];
+  const trim = { wood: 0x4a3018, iron: 0x9aa4b4, gold: 0xf0cc50 }[tier];
+  const c = mkCanvas(16, 14);
+  const x = ctxOf(c);
+  rect(x, 2, 7, 12, 6, body);
+  rect(x, 2, 7, 12, 1, shade(body, 1.3));
+  rect(x, 2, 11, 12, 2, shade(body, 0.75));
+  rect(x, 2, 7, 1, 6, trim);
+  rect(x, 13, 7, 1, 6, trim);
+  rect(x, 7, 8, 2, 3, trim);
+  if (open) {
+    rect(x, 3, 7, 10, 2, 0xffe890);
+    rect(x, 4, 6, 8, 1, 0xfff4c0);
+    rect(x, 2, 2, 12, 4, shade(body, 0.9));
+    rect(x, 2, 2, 12, 1, trim);
+    rect(x, 2, 2, 1, 4, trim);
+    rect(x, 13, 2, 1, 4, trim);
+  } else {
+    rect(x, 2, 3, 12, 4, shade(body, 1.1));
+    rect(x, 3, 2, 10, 1, shade(body, 1.1));
+    rect(x, 2, 3, 12, 1, shade(body, 1.35));
+    rect(x, 2, 3, 1, 4, trim);
+    rect(x, 13, 3, 1, 4, trim);
+    rect(x, 7, 6, 2, 2, trim);
+    rect(x, 8, 7, 1, 1, 0x000000);
+  }
+  return grounded(upscale(outline(c), 4), 0.85, 0.9);
+}
+
 /* ------------------------------------------------------------ Registrierung */
 
 export const WALL_VARIANTS = 3;
@@ -636,6 +710,7 @@ export function registerStaticArt(scene: Phaser.Scene): void {
   add('pillar', pillarCanvas());
   for (const r of ['normal', 'magic', 'rare', 'set', 'legendary'] as const) add(`loot_${r}`, lootCanvas(r));
   for (const k of ['trainer', 'merchant', 'stash', 'quest', 'smith']) add(`npc_${k}`, npcCanvas(k));
+  for (const t of ['wood', 'iron', 'gold'] as const) for (const o of [false, true]) add(`chest_${t}_${o ? 1 : 0}`, chestCanvas(t, o));
 }
 
 export function ensureTexture(scene: Phaser.Scene, key: string, make: () => HTMLCanvasElement): string {

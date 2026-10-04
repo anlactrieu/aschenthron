@@ -68,8 +68,14 @@ export function buildWorld(seed: number, map: TiledMap, opts: { player?: boolean
         quests: prop(o, 'quests')?.split(','),
       });
     }
+    if (o.type === 'chest') {
+      world.chests.push({ id: world.nextId++, x: o.x / ts, y: o.y / ts, level: Number(prop(o, 'level') ?? 1), tier: (prop(o, 'tier') ?? 'wood') as 'wood', opened: false, respawnAt: 0 });
+    }
     if (o.type === 'townstart') world.towns.push({ x: o.x / ts, y: o.y / ts });
-    if (o.type === 'monster') spawnMonster(world, o.x / ts, o.y / ts, prop(o, 'kind'));
+    if (o.type === 'monster') {
+      const m = spawnMonster(world, o.x / ts, o.y / ts, prop(o, 'kind'));
+      m.packId = Number(prop(o, 'pack') ?? 0);
+    }
   }
   world.start = { x: start.x / ts, y: start.y / ts };
   if (opts.player === false) return { world, tiles, playerId: -1 };

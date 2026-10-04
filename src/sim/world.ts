@@ -1,6 +1,6 @@
 import { Rng } from './rng';
 import { findPath, isWalkable, type Grid, type Pt } from './path';
-import { rollDrop, rollPotion, rollSpecial, templateById, generateItem, rerollAffixes, extendAffixes, SETS, type Item, type PowerId, type SetBonus, type Slot, type Stat } from './items';
+import { itemReq, rollArrows, rollDrop, rollPotion, rollSpecial, templateById, generateItem, rerollAffixes, extendAffixes, SETS, type Item, type PowerId, type SetBonus, type Slot, type Stat } from './items';
 import {
   ATTR_KEYS, MAX_LEVEL, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
   monsterKind, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
@@ -32,6 +32,8 @@ export type Command =
   | { type: 'sell'; itemId: number }
   | { type: 'stashPut'; itemId: number }
   | { type: 'stashTake'; itemId: number }
+  | { type: 'openChest'; chestId: number }
+  | { type: 'refillQuiver'; itemId: number }
   | { type: 'acceptQuest'; questId: string }
   | { type: 'turnInQuest'; questId: string }
   | { type: 'craft'; itemId: number; op: 'upgrade' | 'reroll' | 'extend' };
@@ -72,6 +74,7 @@ export interface Actor {
   equipment: Partial<Record<Slot, Item>>;
   stash: Item[];
   pickupId: number | null;
+  chestId: number | null;
   home?: Pt;
   diedAt: number;
   boss: boolean;
@@ -84,6 +87,8 @@ export interface Actor {
   dot: { perSec: number; until: number; srcId: number } | null;
   /** letzter erlittener Treffer (Monster regenerieren erst nach Ruhe) */
   lastHitAt: number;
+  /** Rudel-Kennung (0 = Einzelgänger): Rudelmitglieder greifen gemeinsam an */
+  packId: number;
   /** Spieler: bis zu diesem Tick als Mörder markiert (überall angreifbar) */
   pkUntil: number;
   /** Spieler: zuletzt von diesem Spieler angegriffen (Notwehr-Erkennung) */
@@ -105,6 +110,17 @@ export interface Rect {
   y: number;
   w: number;
   h: number;
+}
+
+export interface Chest {
+  id: number;
+  x: number;
+  y: number;
+  /** Stufe der Gegend: bestimmt Beute */
+  level: number;
+  tier: 'wood' | 'iron' | 'gold';
+  opened: boolean;
+  respawnAt: number;
 }
 
 export type NpcKind = 'trainer' | 'merchant' | 'stash' | 'quest' | 'smith';
@@ -141,7 +157,9 @@ type GameEventBase =
   | { type: 'questTurned'; questId: string; xp: number; gold: number }
   | { type: 'enraged'; id: number }
   | { type: 'fail'; reason: string }
-  | { type: 'pk'; id: number };
+  | { type: 'pk'; id: number }
+  | { type: 'chestOpened'; chestId: number }
+  | { type: 'refilled'; arrows: number };
 
 /** `to`: nur für diesen Akteur bestimmt (sonst sichtbar für alle in der Nähe). */
 export type GameEvent = GameEventBase & { to?: number };
@@ -163,12 +181,13 @@ export interface World {
   regions: (Rect & { name: string; levels: string })[];
   /** Spieler dürfen einander außerhalb von Städten angreifen (Server-Einstellung) */
   pvp: boolean;
+  chests: Chest[];
   /** Akteur des gerade ausgeführten Befehls (für `fail`-Ereignisse) */
   cmdActor: number | null;
 }
 
 export function createWorld(seed: number, grid: Grid, safe: Rect[] = []): World {
-  return { tick: 0, grid, rng: new Rng(seed), actors: [], nextId: 1, events: [], ground: [], safe, npcs: [], start: { x: 1, y: 1 }, towns: [], regions: [], pvp: false, cmdActor: null };
+  return { tick: 0, grid, rng: new Rng(seed), actors: [], nextId: 1, events: [], ground: [], safe, npcs: [], start: { x: 1, y: 1 }, towns: [], regions: [], pvp: false, chests: [], cmdActor: null };
 }
 
 export function addNpc(w: World, kind: NpcKind, name: string, x: number, y: number, extra: Partial<Npc> = {}): Npc {
@@ -182,8 +201,8 @@ function baseActor(w: World, kind: Actor['kind'], name: string, x: number, y: nu
     id: w.nextId++, kind, name, x, y, hp: 100, maxHp: 100, damage: [1, 2], speed: 0.1, attackCooldown: 20,
     cooldownLeft: 0, path: [], targetId: null, aggroRange: 0, alive: true, level: 1, xp: 0, statPoints: 0,
     attrs: { kraft: 10, gewandtheit: 10, ausdauer: 10, verstand: 10, willenskraft: 10 },
-    mana: 20, gold: 0, skills: [], skillCd: {}, potionCd: 0, quests: {}, inventory: [], equipment: {}, stash: [], pickupId: null,
-    diedAt: -1, boss: false, enraged: false, autoAttack: true, repathAt: 0, dot: null, lastHitAt: -9999, pkUntil: 0, attackedBy: null, damagers: {},
+    mana: 20, gold: 0, skills: [], skillCd: {}, potionCd: 0, quests: {}, inventory: [], equipment: {}, stash: [], pickupId: null, chestId: null,
+    diedAt: -1, boss: false, enraged: false, autoAttack: true, repathAt: 0, dot: null, lastHitAt: -9999, packId: 0, pkUntil: 0, attackedBy: null, damagers: {},
   };
   w.actors.push(a);
   return a;
@@ -270,8 +289,10 @@ export function damageRange(a: Actor): [number, number] {
   let [lo, hi] = a.damage;
   const wpn = a.equipment.weapon;
   if (wpn?.damage) {
-    lo += wpn.damage[0];
-    hi += wpn.damage[1];
+    // Bögen und Stäbe taugen im Nahkampf kaum (ein Viertel); ihre Stärke liegt bei Fernkampf bzw. Magie
+    const f = wpn.kind === 'bow' || wpn.kind === 'staff' ? 0.25 : 1;
+    lo += Math.round(wpn.damage[0] * f);
+    hi += Math.round(wpn.damage[1] * f);
   }
   const bonus = affixSum(a, 'damage') + Math.floor((effectiveKraft(a) - 10) / 2);
   return [Math.max(1, lo + bonus), Math.max(1, hi + bonus)];
@@ -287,6 +308,19 @@ export function maxManaOf(a: Actor): number {
 
 export function attackCooldownOf(a: Actor): number {
   return Math.max(6, a.attackCooldown - Math.floor((a.attrs.gewandtheit - 10) / 2));
+}
+
+/** Fehlende Anforderungen für einen Gegenstand (leer = anlegbar). `replaced`: ersetztes Stück, dessen Kraft-Bonus nicht zählt. */
+export function missingReq(a: Actor, it: Item, replaced?: Item): string[] {
+  const r = itemReq(it);
+  const out: string[] = [];
+  if ((r.level ?? 1) > a.level) out.push(`Stufe ${r.level}`);
+  const bonusLost = replaced ? replaced.affixes.filter((f) => f.stat === 'kraft').reduce((n, f) => n + f.value, 0) : 0;
+  if ((r.kraft ?? 0) > effectiveKraft(a) - bonusLost) out.push(`Kraft ${r.kraft}`);
+  for (const [k, label] of [['gewandtheit', 'Gewandtheit'], ['ausdauer', 'Ausdauer'], ['verstand', 'Verstand'], ['willenskraft', 'Willenskraft']] as const) {
+    if ((r[k] ?? 0) > a.attrs[k]) out.push(`${label} ${r[k]}`);
+  }
+  return out;
 }
 
 export function carryCapacity(a: Actor): number {
@@ -350,6 +384,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
     case 'moveTo':
       a.targetId = null;
       a.pickupId = null;
+      a.chestId = null;
       a.path = findPath(w.grid, { x: Math.round(a.x), y: Math.round(a.y) }, { x: cmd.x, y: cmd.y });
       break;
     case 'attack': {
@@ -372,11 +407,11 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
     }
     case 'equip': {
       const it = a.inventory.find((i) => i.id === cmd.itemId);
-      if (!it || it.slot === 'potion') return;
+      if (!it || it.slot === 'potion' || it.slot === 'ammo') return;
       const replaced = a.equipment[it.slot];
-      const bonusLost = replaced ? replaced.affixes.filter((f) => f.stat === 'kraft').reduce((n, f) => n + f.value, 0) : 0;
-      if (effectiveKraft(a) - bonusLost < it.reqKraft) {
-        w.events.push({ type: 'cannotEquip', item: it, reason: `Benötigt Kraft ${it.reqKraft}`, to: a.id });
+      const missing = missingReq(a, it, replaced);
+      if (missing.length) {
+        w.events.push({ type: 'cannotEquip', item: it, reason: `Benötigt ${missing.join(', ')}`, to: a.id });
         return;
       }
       const old = a.equipment[it.slot];
@@ -461,6 +496,35 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       const price = sellPrice(it);
       a.gold += price;
       w.events.push({ type: 'gold', amount: price, to: a.id });
+      break;
+    }
+    case 'refillQuiver': {
+      const bundle = a.inventory.find((i) => i.id === cmd.itemId);
+      const q = a.equipment.quiver;
+      if (!bundle || bundle.slot !== 'ammo') return;
+      if (!q) return fail(w, 'Du trägst keinen Köcher.');
+      const cap = q.capacity ?? 40;
+      const have = q.ammo ?? 0;
+      if (have >= cap) return fail(w, 'Der Köcher ist voll.');
+      if (have > 0 && (q.arrowBonus ?? 0) !== (bundle.arrowBonus ?? 0)) return fail(w, 'Im Köcher stecken andere Pfeile.');
+      const add = Math.min(bundle.ammo ?? 0, cap - have);
+      q.ammo = have + add;
+      q.arrowBonus = bundle.arrowBonus ?? 0;
+      bundle.ammo = (bundle.ammo ?? 0) - add;
+      if ((bundle.ammo ?? 0) <= 0) a.inventory = a.inventory.filter((i) => i.id !== bundle.id);
+      w.events.push({ type: 'refilled', arrows: add, to: a.id });
+      break;
+    }
+    case 'openChest': {
+      const c = w.chests.find((x) => x.id === cmd.chestId);
+      if (!c) return;
+      if (c.opened) return fail(w, 'Die Truhe ist leer.');
+      a.targetId = null;
+      a.pickupId = null;
+      if (Math.hypot(a.x - c.x, a.y - c.y) <= CHEST_RANGE) return openChest(w, a, c);
+      a.chestId = c.id;
+      a.path = findPath(w.grid, { x: Math.round(a.x), y: Math.round(a.y) }, { x: c.x, y: c.y + 1 }).concat([]);
+      if (!a.path.length) a.path = findPath(w.grid, { x: Math.round(a.x), y: Math.round(a.y) }, { x: c.x, y: c.y });
       break;
     }
     case 'acceptQuest': {
@@ -550,6 +614,11 @@ function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void 
     return;
   }
   if (a.kind === 'player' && inSafeZone(w, a.x, a.y)) return fail(w, 'In der Stadt ist Kämpfen verboten.');
+  const bowShot = s.area === 'Fernkampf' && a.kind === 'player';
+  if (bowShot) {
+    if (a.equipment.weapon?.kind !== 'bow') return fail(w, 'Dafür brauchst du einen Bogen.');
+    if ((a.equipment.quiver?.ammo ?? 0) <= 0) return fail(w, a.equipment.quiver ? 'Der Köcher ist leer.' : 'Dafür brauchst du einen Köcher mit Pfeilen.');
+  }
   const first = getActor(w, targetId ?? a.targetId ?? -1);
   if (!s.aoeSelf && (!first || !first.alive || first.id === a.id)) return fail(w, 'Kein Ziel.');
   const range = s.range;
@@ -565,6 +634,8 @@ function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void 
   if (!victims.length) return fail(w, 'Kein Ziel.');
   a.mana -= s.mana;
   a.skillCd[s.id] = s.cooldown;
+  const quiver = bowShot ? a.equipment.quiver : undefined;
+  if (quiver) quiver.ammo = (quiver.ammo ?? 1) - 1;
   // Fern-/Magie-Skills lösen keine Nahkampf-Verfolgung aus; Nahkampf-Skills schon
   if (first) {
     if (s.mult) a.autoAttack = true;
@@ -580,7 +651,10 @@ function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void 
     } else {
       const [lo, hi] = s.base!;
       const scale = s.scales ? Math.max(0, a.attrs[s.scales] - 10) * (1 + a.level * 0.08) : 0;
-      amount = Math.round(w.rng.int(lo, hi) * lvl + scale);
+      const wp = a.equipment.weapon;
+      const matches = wp?.damage && ((s.area === 'Fernkampf' && wp.kind === 'bow') || (s.area === 'Magie' && wp.kind === 'staff'));
+      const weaponBonus = matches ? ((wp!.damage![0] + wp!.damage![1]) / 2) * 0.9 : 0;
+      amount = Math.round(w.rng.int(lo, hi) * lvl + scale + weaponBonus + (quiver?.arrowBonus ?? 0));
     }
     dealDamage(w, a, v, amount, s.ignoresArmor, s.id);
     if (s.dot && v.alive) v.dot = { perSec: Math.max(1, Math.round((amount * s.dot.factor) / s.dot.seconds)), until: w.tick + s.dot.seconds * TICK_RATE, srcId: a.id };
@@ -658,6 +732,7 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
   if (t.kind === 'monster' && a.kind === 'player' && t.alive && t.targetId === null) {
     t.targetId = a.id;
     t.autoAttack = true;
+    alertPack(w, t, a.id);
   }
   w.events.push({ type: 'hit', attackerId: a.id, targetId: t.id, amount, skill, crit });
   if (a.kind === 'player' && t.kind === 'monster') t.damagers[a.id] = w.tick;
@@ -732,6 +807,7 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
     drop(rollDrop(w.rng, () => w.nextId++, k.level, k.boss ? 'rare' : undefined));
   }
   if (w.rng.next() <= POTION_DROP_CHANCE) drop(rollPotion(w.rng, () => w.nextId++, k.level));
+  if (w.rng.next() <= 0.05) drop(rollArrows(w.rng, () => w.nextId++, k.level));
   const special = rollSpecial(w.rng, () => w.nextId++, k.level, k.id, !!k.boss);
   if (special) drop(special);
 }
@@ -798,6 +874,7 @@ export function drainEvents(w: World): GameEvent[] {
 
 export function tick(w: World): void {
   w.tick++;
+  for (const c of w.chests) if (c.opened && w.tick >= c.respawnAt) c.opened = false;
   w.ground = w.ground.filter((g) => g.expiresAt === null || g.expiresAt > w.tick);
   const players = w.actors.filter((x) => x.kind === 'player' && x.alive);
   for (const a of w.actors) {
@@ -845,6 +922,7 @@ export function tick(w: World): void {
     } else {
       stepAlong(a);
       if (a.pickupId !== null) tryPickup(w, a);
+      if (a.chestId !== null) tryOpenChest(w, a);
     }
   }
 }
@@ -872,6 +950,17 @@ function reviveMonster(m: Actor): void {
   }
 }
 
+/** Rudelmitglieder in der Nähe greifen dasselbe Ziel an. */
+function alertPack(w: World, m: Actor, targetId: number): void {
+  if (!m.packId) return;
+  for (const o of w.actors) {
+    if (o.kind === 'monster' && o.alive && o.packId === m.packId && o.targetId === null && o.id !== m.id && Math.hypot(o.x - m.x, o.y - m.y) <= 14) {
+      o.targetId = targetId;
+      o.autoAttack = true;
+    }
+  }
+}
+
 function monsterAi(w: World, m: Actor, players: Actor[]): void {
   const home = m.home!;
   if (m.targetId === null) {
@@ -885,7 +974,10 @@ function monsterAi(w: World, m: Actor, players: Actor[]): void {
         best = x;
       }
     }
-    if (best) m.targetId = best.id;
+    if (best) {
+      m.targetId = best.id;
+      alertPack(w, m, best.id);
+    }
     return;
   }
   const t = getActor(w, m.targetId);
@@ -893,6 +985,53 @@ function monsterAi(w: World, m: Actor, players: Actor[]): void {
   if (lost) {
     m.targetId = null;
     m.path = findPath(w.grid, { x: Math.round(m.x), y: Math.round(m.y) }, home);
+  }
+}
+
+const CHEST_RANGE = 2;
+const CHEST_RESPAWN_TICKS = TICK_RATE * 60 * 12;
+
+function tryOpenChest(w: World, a: Actor): void {
+  const c = w.chests.find((x) => x.id === a.chestId);
+  if (!c || c.opened) {
+    a.chestId = null;
+    return;
+  }
+  if (Math.hypot(a.x - c.x, a.y - c.y) <= CHEST_RANGE) {
+    a.chestId = null;
+    a.path = [];
+    openChest(w, a, c);
+  } else if (a.path.length === 0) a.chestId = null;
+}
+
+/** Öffnet eine Truhe: Gold, Tränke, Ausrüstung (bessere Truhen: bessere Seltenheit, selten Unikate/Set-Teile). */
+function openChest(w: World, a: Actor, c: Chest): void {
+  c.opened = true;
+  c.respawnAt = w.tick + CHEST_RESPAWN_TICKS;
+  const mult = { wood: 1, iron: 1.8, gold: 3 }[c.tier];
+  const gold = Math.round(w.rng.int(c.level * 6, c.level * 14 + 10) * mult);
+  a.gold += gold;
+  w.events.push({ type: 'gold', amount: gold, to: a.id });
+  w.events.push({ type: 'chestOpened', chestId: c.id });
+  const spots: [number, number][] = [[0, 1], [1, 0], [-1, 0], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]];
+  let n = 0;
+  const drop = (item: Item) => {
+    const [dx, dy] = spots[n++ % spots.length]!;
+    const x = isWalkable(w.grid, Math.round(c.x) + dx, Math.round(c.y) + dy) ? Math.round(c.x) + dx : Math.round(c.x);
+    const y = isWalkable(w.grid, Math.round(c.x) + dx, Math.round(c.y) + dy) ? Math.round(c.y) + dy : Math.round(c.y);
+    w.ground.push({ id: w.nextId++, x, y, item, expiresAt: w.tick + MONSTER_LOOT_TTL });
+    w.events.push({ type: 'loot', item, x, y });
+  };
+  const gear = c.tier === 'wood' ? 1 : c.tier === 'iron' ? 2 : 3;
+  for (let i = 0; i < gear; i++) {
+    const r = w.rng.next();
+    const rarity = c.tier === 'gold' ? (r < 0.35 ? 'rare' : 'magic') : c.tier === 'iron' ? (r < 0.15 ? 'rare' : r < 0.7 ? 'magic' : 'normal') : r < 0.05 ? 'rare' : r < 0.35 ? 'magic' : 'normal';
+    drop(rollDrop(w.rng, () => w.nextId++, c.level, rarity));
+  }
+  for (let i = 0; i < (c.tier === 'wood' ? 1 : 2); i++) drop(rollPotion(w.rng, () => w.nextId++, c.level));
+  if (c.tier !== 'wood') {
+    const special = rollSpecial(w.rng, () => w.nextId++, c.level, '', false);
+    if (special && w.rng.next() < (c.tier === 'gold' ? 1 : 0.4)) drop(special);
   }
 }
 

@@ -70,9 +70,11 @@ describe('Mehrspieler-Server', () => {
     expect(b.id).not.toBe(a.id);
     await a.waitFor((s) => s.actors.some((x) => x.id === b.id && x.name === 'Ben'));
     const start = getActor(srv.world, a.id)!;
-    const tx = Math.round(start.x) + 4;
-    a.send({ t: 'cmd', c: { type: 'moveTo', x: tx, y: Math.round(start.y) } });
-    const snap = await a.waitFor((s) => Math.abs(s.you.x - tx) < 0.2);
+    const row = Math.round(start.y);
+    let tx = Math.round(start.x) + 4;
+    while (!srv.world.grid.walkable[row * srv.world.grid.w + tx] && tx > 0) tx--;
+    a.send({ t: 'cmd', c: { type: 'moveTo', x: tx, y: row } });
+    const snap = await a.waitFor((s) => Math.abs(s.you.x - tx) < 0.2 && Math.abs(s.you.y - row) < 0.2);
     expect(snap.you.name).toBe('Anna');
     // Ben sieht Annas neue Position
     const seen = await b.waitFor((s) => s.actors.some((x) => x.id === a.id && Math.abs(x.x - tx) < 0.3));

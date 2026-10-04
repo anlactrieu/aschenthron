@@ -234,6 +234,11 @@ describe('Fernkampf', () => {
     p.x = 10;
     p.y = 10;
     p.skills.push('quick_shot');
+    for (const id of ['hunt_bow', 'leather_quiver']) {
+      const it = generateItem(w.rng, w.nextId++, id, 'normal');
+      p.inventory.push(it);
+      applyCommand(w, p.id, { type: 'equip', itemId: it.id });
+    }
     const m = spawnMonster(w, 14, 10, 'field_rat');
     m.aggroRange = 0;
     applyCommand(w, p.id, { type: 'useSkill', skillId: 'quick_shot', targetId: m.id });

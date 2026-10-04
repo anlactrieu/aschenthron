@@ -11,15 +11,16 @@ const monsters = w.actors.filter((a) => a.kind === 'monster');
 
 describe('Gebiet „Aschental“: Inhalt und Größe', () => {
   it('ist inselgroß: Karte, Monsterzahl, Städte, Bosse', () => {
-    expect(w.grid.w).toBeGreaterThanOrEqual(150);
-    expect(w.grid.h).toBeGreaterThanOrEqual(110);
-    expect(monsters.length).toBeGreaterThanOrEqual(250);
+    expect(w.grid.w).toBeGreaterThanOrEqual(230);
+    expect(w.grid.h).toBeGreaterThanOrEqual(170);
+    expect(monsters.length).toBeGreaterThanOrEqual(350);
+    expect(w.chests.length).toBeGreaterThanOrEqual(45);
     expect(w.safe.length).toBeGreaterThanOrEqual(2);
     expect(w.towns.length).toBeGreaterThanOrEqual(2);
     const bosses = new Set(monsters.filter((m) => m.boss).map((m) => m.kindId));
-    expect([...bosses].sort()).toEqual(['ash_king', 'bandit_lord', 'bog_queen', 'bone_lord', 'stone_colossus']);
+    expect([...bosses].sort()).toEqual(['ash_king', 'bandit_lord', 'bog_queen', 'bone_lord', 'goblin_king', 'stone_colossus', 'web_mother']);
     const kinds = new Set(monsters.map((m) => m.kindId));
-    expect(kinds.size).toBeGreaterThanOrEqual(18);
+    expect(kinds.size).toBeGreaterThanOrEqual(40);
   });
 
   it('NPCs: je Stadt Lehrer, Händler, Truhe, Schmied und Questgeber', () => {

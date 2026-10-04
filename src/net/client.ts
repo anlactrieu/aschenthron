@@ -61,6 +61,10 @@ export class RemoteSession {
     w.tick = s.tick;
     w.actors = [s.you, ...s.actors.map((l) => actorFromLite(l, s.tick))];
     w.ground = s.ground;
+    for (const c of s.chests) {
+      const ch = w.chests.find((x) => x.id === c.id);
+      if (ch) ch.opened = c.opened;
+    }
     this.events.push(...s.events);
   }
 

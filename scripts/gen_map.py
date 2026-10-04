@@ -1,20 +1,25 @@
 #!/usr/bin/env python3
-"""Erzeugt src/data/aschenthron.json (Tiled-JSON, orthogonal, 32px) – die Insel „Aschental“.
+"""Erzeugt src/data/aschenthron.json (Tiled-JSON, orthogonal, 32px) – die Insel „Aschental“ (Version 3).
 Gids: 1 Stadtstein, 2 Wand, 3 Sumpf, 4 Gras, 5 Dungeonboden, 6 Wasser, 7 Weg, 8 Hochland, 9 Asche,
-10 Baum, 11 Fels, 12 Lava, 13 Grabstein, 14 Säule (alle blockiert).
+10 Baum, 11 Fels, 12 Lava, 13 Grabstein, 14 Säule (alle blockiert außer 1,3,4,5,7,8,9).
+Monster stehen in Rudeln (1–5, mit Anführer einer höheren Stufe). Je weiter vom Zoneneingang, desto stärker.
 Alles hier ist eigener Entwurf. Danach in Tiled editierbar; das Spiel liest nur die JSON-Datei."""
 import json, random, collections, sys
 
-W, H, TS = 160, 120, 32
-random.seed(20261004)
+S = 1.5                                  # Skalierung gegenüber dem ersten Entwurf (160x120)
+W, H, TS = 240, 180, 32
+random.seed(20261005)
 g = [[6] * W for _ in range(H)]
 BLOCK = {2, 6, 10, 11, 12, 13, 14}
 objs, oid = [], [1]
+pack_counter = [0]
+
+def sc(v): return int(round(v * S))
 
 def fill(r, gid):
     x0, y0, x1, y1 = r
-    for y in range(y0, y1 + 1):
-        for x in range(x0, x1 + 1):
+    for y in range(max(0, y0), min(H - 1, y1) + 1):
+        for x in range(max(0, x0), min(W - 1, x1) + 1):
             g[y][x] = gid
 
 def obj(name, typ, x, y, w=0, h=0, **props):
@@ -26,7 +31,6 @@ def obj(name, typ, x, y, w=0, h=0, **props):
 def free(x, y): return 0 <= x < W and 0 <= y < H and g[y][x] not in BLOCK
 
 def road(pts, width=3, gid=7):
-    """Weg entlang eines Linienzugs; überschreibt alles (auch Wasser = Brücke, Fels = Durchgang)."""
     for (ax, ay), (bx, by) in zip(pts, pts[1:]):
         x, y = ax, ay
         while True:
@@ -38,8 +42,7 @@ def road(pts, width=3, gid=7):
             if x != bx: x += 1 if bx > x else -1
             elif y != by: y += 1 if by > y else -1
 
-def ragged(r, gid, depth=3, p=0.35):
-    """Unregelmäßiger Rand: Randzone zufällig zu Wasser machen (nur für Landregionen)."""
+def ragged(r, gid, depth=4, p=0.4):
     x0, y0, x1, y1 = r
     for y in range(y0, y1 + 1):
         for x in range(x0, x1 + 1):
@@ -64,63 +67,70 @@ def blobs(r, gid_ground, gid_blob, n, size):
                 if x0 <= x <= x1 and y0 <= y <= y1 and g[y][x] == gid_ground and (x - cx) ** 2 + (y - cy) ** 2 <= rad * rad:
                     g[y][x] = gid_blob
 
-# ---------- Oberfläche ----------
-R = dict(
-    town1=(14, 88, 33, 106), farm=(34, 80, 66, 112), forest=(14, 46, 62, 80), camp=(14, 24, 46, 44),
-    swamp=(68, 62, 112, 96), town2=(68, 40, 88, 58), grave=(70, 98, 112, 114), hills=(92, 26, 130, 58),
-    ash=(114, 60, 152, 92),
+# ---------------------------------------------------------------- Oberfläche
+def R(a, b, c, d): return (sc(a), sc(b), sc(c), sc(d))
+ZONES = dict(
+    farm=R(34, 80, 66, 112), forest=R(14, 46, 62, 80), camp=R(14, 24, 46, 44), swamp=R(68, 62, 112, 96),
+    grave=R(70, 98, 112, 114), hills=R(92, 26, 130, 58), ash=R(114, 60, 152, 92),
 )
-GROUND = dict(town1=1, farm=4, forest=4, camp=7, swamp=3, town2=1, grave=4, hills=8, ash=9)
-for k, r in R.items():
-    fill(r, GROUND[k])
-    if k not in ('town1', 'town2'):
-        ragged(r, GROUND[k])
+GROUND = dict(farm=4, forest=4, camp=7, swamp=3, grave=4, hills=8, ash=9)
+TOWN1 = (21, 132, 41, 151)      # Aschenhafen (20x20)
+TOWN2 = (103, 60, 124, 80)      # Felsenwacht (22x21)
+for k, r in ZONES.items():
+    fill(r, GROUND[k]); ragged(r, GROUND[k])
+fill(TOWN1, 1); fill(TOWN2, 1)
 
-scatter(R['farm'], 4, 10, 0.03); scatter(R['farm'], 4, 11, 0.01)
-scatter(R['forest'], 4, 10, 0.20)
-scatter(R['camp'], 7, 11, 0.04); scatter(R['camp'], 7, 10, 0.03)
-blobs(R['swamp'], 3, 6, 14, 3); scatter(R['swamp'], 3, 10, 0.04)
-scatter(R['grave'], 4, 13, 0.09); scatter(R['grave'], 4, 10, 0.02)
-scatter(R['hills'], 8, 11, 0.12); scatter(R['hills'], 8, 10, 0.02)
-blobs(R['ash'], 9, 12, 12, 3); scatter(R['ash'], 9, 11, 0.10)
+def area(r): return (r[2] - r[0]) * (r[3] - r[1])
+scatter(ZONES['farm'], 4, 10, 0.03); scatter(ZONES['farm'], 4, 11, 0.01)
+scatter(ZONES['forest'], 4, 10, 0.20)
+scatter(ZONES['camp'], 7, 11, 0.04); scatter(ZONES['camp'], 7, 10, 0.03)
+blobs(ZONES['swamp'], 3, 6, 30, 4); scatter(ZONES['swamp'], 3, 10, 0.04)
+scatter(ZONES['grave'], 4, 13, 0.09); scatter(ZONES['grave'], 4, 10, 0.02)
+scatter(ZONES['hills'], 8, 11, 0.12); scatter(ZONES['hills'], 8, 10, 0.02)
+blobs(ZONES['ash'], 9, 12, 26, 4); scatter(ZONES['ash'], 9, 11, 0.10)
 
-# Städte: Mauern mit Toren, Häuser als Blöcke
 def town(r, gates):
     x0, y0, x1, y1 = r
-    for x in range(x0, x1 + 1):
-        g[y0][x] = g[y1][x] = 2
-    for y in range(y0, y1 + 1):
-        g[y][x0] = g[y][x1] = 2
+    for x in range(x0, x1 + 1): g[y0][x] = g[y1][x] = 2
+    for y in range(y0, y1 + 1): g[y][x0] = g[y][x1] = 2
     for gx, gy in gates:
         for d in range(-1, 2):
             if gx in (x0, x1): g[gy + d][gx] = 1
             else: g[gy][gx + d] = 1
-town(R['town1'], [(33, 97), (23, 88)])
-town(R['town2'], [(68, 49), (78, 58), (88, 49), (78, 40)])
-for hx, hy, hw, hh in [(16, 90, 4, 3), (25, 90, 5, 3), (16, 100, 5, 3), (27, 100, 4, 3),
-                       (70, 42, 4, 3), (82, 42, 4, 3), (70, 52, 4, 3), (82, 52, 4, 3)]:
-    fill((hx, hy, hx + hw - 1, hy + hh - 1), 2)
+t1x, t1y = TOWN1[0], TOWN1[1]
+t2x, t2y = TOWN2[0], TOWN2[1]
+T1_E = (TOWN1[2], (TOWN1[1] + TOWN1[3]) // 2)      # Osttor
+T1_N = ((TOWN1[0] + TOWN1[2]) // 2, TOWN1[1])      # Nordtor
+T2_W = (TOWN2[0], (TOWN2[1] + TOWN2[3]) // 2)
+T2_S = ((TOWN2[0] + TOWN2[2]) // 2, TOWN2[3])
+T2_E = (TOWN2[2], (TOWN2[1] + TOWN2[3]) // 2)
+T2_N = ((TOWN2[0] + TOWN2[2]) // 2, TOWN2[1])
+town(TOWN1, [T1_E, T1_N]); town(TOWN2, [T2_W, T2_S, T2_E, T2_N])
+for ox, oy, hw, hh in [(2, 2, 4, 3), (11, 2, 5, 3), (2, 12, 5, 3), (13, 12, 4, 3)]:
+    fill((t1x + ox, t1y + oy, t1x + ox + hw - 1, t1y + oy + hh - 1), 2)
+for ox, oy, hw, hh in [(2, 2, 4, 3), (14, 2, 4, 3), (2, 15, 4, 3), (14, 15, 4, 3)]:
+    fill((t2x + ox, t2y + oy, t2x + ox + hw - 1, t2y + oy + hh - 1), 2)
 
-# Wege (Verbindungen zwischen allen Gebieten)
-road([(33, 97), (50, 97), (50, 64)])
-road([(50, 64), (50, 48), (30, 48), (30, 40)])
-road([(23, 88), (23, 84), (50, 84)])
-road([(62, 70), (68, 70)])
-road([(78, 63), (78, 58)])
-road([(66, 106), (74, 106)])
-road([(90, 95), (90, 99)])
-road([(88, 49), (96, 49)])
-road([(112, 76), (116, 76)])
-road([(122, 58), (122, 62)])
-road([(112, 106), (116, 106)])
-road([(78, 40), (78, 31)])
-road([(130, 42), (134, 42)])
-road([(110, 26), (110, 21)])
-road([(46, 34), (70, 34), (78, 34)])  # Räuberlager → Gruftweg
-road([(60, 70), (68, 70)])
+def P(x, y): return (sc(x), sc(y))
+# Wege
+road([T1_E, (sc(50), T1_E[1]), P(50, 64)])
+road([P(50, 64), P(50, 48), P(30, 48), P(30, 40)])
+road([T1_N, (T1_N[0], sc(84)), P(50, 84)])
+road([P(62, 70), P(68, 70)])
+road([P(60, 70), P(68, 70)])
+road([(T2_S[0], sc(63)), T2_S])
+road([P(66, 106), P(74, 106)])
+road([P(90, 95), P(90, 99)])
+road([T2_E, P(96, T2_E[1] / S)])
+road([P(112, 76), P(116, 76)])
+road([P(122, 58), P(122, 62)])
+road([P(112, 106), P(116, 106)])
+road([P(130, 42), P(134, 42)])
+road([P(110, 26), P(110, 21)])
+road([P(46, 34), P(70, 34), (T2_N[0], P(70, 34)[1])])
 
-# ---------- Dungeons ----------
-def dungeon(box, entrance, cell=(11, 9), room=(8, 6), pillars=0.05, loops=3):
+# --------------------------------------------------------------- Dungeons
+def dungeon(box, entrance, cell=(11, 9), room=(8, 6), pillars=0.05, loops=4):
     x0, y0, x1, y1 = box
     fill(box, 2)
     cols, rows = (x1 - x0 - 2) // cell[0], (y1 - y0 - 2) // cell[1]
@@ -152,12 +162,10 @@ def dungeon(box, entrance, cell=(11, 9), room=(8, 6), pillars=0.05, loops=3):
             for x in range(rx0 + 1, rx1):
                 if g[y][x] == 5 and random.random() < pillars and abs(x - (rx0 + rx1) // 2) > 1 and abs(y - (ry0 + ry1) // 2) > 1:
                     g[y][x] = 14
-    # Eingang: nächster Raum zum Eintrittspunkt
     ex, ey = entrance
     ent = min(rooms, key=lambda k: abs((rooms[k][0] + rooms[k][2]) // 2 - ex) + abs((rooms[k][1] + rooms[k][3]) // 2 - ey))
     ecx, ecy = (rooms[ent][0] + rooms[ent][2]) // 2, (rooms[ent][1] + rooms[ent][3]) // 2
     road([(ex, ey), (ex, ecy), (ecx, ecy)], width=3, gid=5)
-    # Bossraum = weitester Raum (Pfadlänge im Raumgraphen)
     adj = collections.defaultdict(list)
     for a, b in edges: adj[a].append(b); adj[b].append(a)
     dist = {ent: 0}; q = collections.deque([ent])
@@ -166,125 +174,233 @@ def dungeon(box, entrance, cell=(11, 9), room=(8, 6), pillars=0.05, loops=3):
         for n in adj[c]:
             if n not in dist: dist[n] = dist[c] + 1; q.append(n)
     boss = max(dist, key=dist.get)
-    return rooms, ent, boss
+    return rooms, ent, boss, dist
 
 def room_center(r): return (r[0] + r[2]) // 2, (r[1] + r[3]) // 2
 
 DUNGEONS = {
-    'sumpf': dict(box=(48, 4, 92, 30), entrance=(78, 31)),
-    'kata': dict(box=(114, 94, 152, 114), entrance=(114, 106)),
-    'mine': dict(box=(134, 26, 156, 58), entrance=(134, 42)),
-    'thron': dict(box=(96, 4, 154, 22), entrance=(110, 22)),
+    'sumpf': dict(box=(sc(48), 4, sc(92), sc(30)), entrance=(T2_N[0], sc(31))),
+    'kata': dict(box=(sc(114), sc(94), sc(152), sc(114)), entrance=P(114, 106)),
+    'mine': dict(box=(sc(134), sc(26), sc(156), sc(58)), entrance=P(134, 42)),
+    'thron': dict(box=(sc(96), 4, sc(154), sc(22)), entrance=P(110, 22)),
 }
 dg = {}
 for name, d in DUNGEONS.items():
     dg[name] = dungeon(d['box'], d['entrance'])
-    # Eingangsweg bis zur Oberfläche offen lassen
-road([(78, 40), (78, 29)], width=3, gid=7)
+road([T2_N, (T2_N[0], sc(29))], width=3, gid=7)
 
-# ---------- Objekte ----------
-obj("Start", "start", 22, 99)
-obj("Aschenhafen", "townstart", 22, 99)
-obj("Felsenwacht", "townstart", 78, 50)
-obj("Aschenhafen", "safezone", 13, 87, 22, 21)
-obj("Felsenwacht", "safezone", 67, 39, 23, 21)
-# Zonen (für Namensanzeige und Minikarte): Name, Rechteck, Level-Spanne
-for nm, r, lv in [("Aschenhafen", (13, 87, 34, 108), "Stadt"), ("Roggenfelder", (35, 80, 66, 112), "1-3"),
-                  ("Düsterwald", (14, 46, 62, 79), "3-7"), ("Räuberlager", (14, 24, 46, 44), "8-12"),
-                  ("Moorlande", (68, 62, 112, 96), "6-11"), ("Felsenwacht", (67, 39, 90, 60), "Stadt"),
-                  ("Totenacker", (70, 98, 112, 114), "9-13"), ("Hochland", (92, 26, 130, 58), "13-19"),
-                  ("Aschenöde", (114, 60, 152, 92), "21-29"),
-                  ("Gruft der Moorhexe", DUNGEONS['sumpf']['box'], "10-16"), ("Katakomben", DUNGEONS['kata']['box'], "13-18"),
-                  ("Tiefenmine", DUNGEONS['mine']['box'], "17-22"), ("Thron der Asche", DUNGEONS['thron']['box'], "26-30")]:
+# ------------------------------------------------------------------ Objekte
+START = (t1x + 10, t1y + 12)
+obj("Start", "start", *START)
+obj("Aschenhafen", "townstart", *START)
+obj("Felsenwacht", "townstart", t2x + 11, t2y + 10)
+obj("Aschenhafen", "safezone", TOWN1[0] - 1, TOWN1[1] - 1, TOWN1[2] - TOWN1[0] + 3, TOWN1[3] - TOWN1[1] + 3)
+obj("Felsenwacht", "safezone", TOWN2[0] - 1, TOWN2[1] - 1, TOWN2[2] - TOWN2[0] + 3, TOWN2[3] - TOWN2[1] + 3)
+
+ZONE_INFO = [("Aschenhafen", (TOWN1[0] - 1, TOWN1[1] - 1, TOWN1[2] + 1, TOWN1[3] + 1), "Stadt"),
+             ("Roggenfelder", ZONES['farm'], "1-5"), ("Düsterwald", ZONES['forest'], "3-10"),
+             ("Räuberlager", ZONES['camp'], "7-13"), ("Moorlande", ZONES['swamp'], "6-15"),
+             ("Felsenwacht", (TOWN2[0] - 1, TOWN2[1] - 1, TOWN2[2] + 1, TOWN2[3] + 1), "Stadt"),
+             ("Totenacker", ZONES['grave'], "8-18"), ("Hochland", ZONES['hills'], "11-22"), ("Aschenöde", ZONES['ash'], "21-29"),
+             ("Gruft der Moorhexe", DUNGEONS['sumpf']['box'], "10-16"), ("Katakomben", DUNGEONS['kata']['box'], "13-18"),
+             ("Tiefenmine", DUNGEONS['mine']['box'], "17-23"), ("Thron der Asche", DUNGEONS['thron']['box'], "26-30")]
+for nm, r, lv in ZONE_INFO:
     obj(nm, "region", r[0], r[1], r[2] - r[0] + 1, r[3] - r[1] + 1, levels=lv)
-# NPCs Aschenhafen
-obj("Lehrer Varn", "npc", 20, 94, kind="trainer", tier=1)
-obj("Händlerin Mirel", "npc", 24, 94, kind="merchant", shop="basic")
-obj("Truhe", "npc", 20, 98, kind="stash")
-obj("Schmiedin Ilse", "npc", 28, 96, kind="smith")
-obj("Hauptmann Brandt", "npc", 30, 94, kind="quest", quests="q_rats,q_hounds,q_bandits,q_spiders")
-obj("Kräuterfrau Odda", "npc", 17, 96, kind="quest", quests="q_herbs,q_ghouls")
-# NPCs Felsenwacht
-obj("Meisterin Kjorra", "npc", 74, 46, kind="trainer", tier=2)
-obj("Händler Dorn", "npc", 80, 46, kind="merchant", shop="advanced")
-obj("Truhe", "npc", 78, 52, kind="stash")
-obj("Schmied Torgal", "npc", 72, 50, kind="smith")
-obj("Wachführerin Tessa", "npc", 84, 50, kind="quest", quests="q_harkon,q_wraiths,q_veshra,q_trolls")
-obj("Späher Ruven", "npc", 78, 44, kind="quest", quests="q_mine,q_ash,q_katacombs,q_king")
 
-# Monster
-SPAWN_BUFFER = 8
-SPACING = 4   # Mindestabstand zwischen Monstern (vermeidet Massen-Aggro)
-DENSITY = 1.0  # Anteil der Monster pro Patch
-safe_rects = [(13, 87, 34, 108), (67, 39, 90, 60)]
+def npc(name, dx, dy, tx, ty, **props): obj(name, "npc", tx + dx, ty + dy, **props)
+npc("Lehrer Varn", 7, 6, t1x, t1y, kind="trainer", tier=1)
+npc("Händlerin Mirel", 11, 6, t1x, t1y, kind="merchant", shop="basic")
+npc("Truhe", 9, 10, t1x, t1y, kind="stash")
+npc("Schmiedin Ilse", 14, 9, t1x, t1y, kind="smith")
+npc("Hauptmann Brandt", 16, 6, t1x, t1y, kind="quest", quests="q_rats,q_hounds,q_goblins,q_bandits,q_spiders,q_goblin_scouts")
+npc("Kräuterfrau Odda", 4, 9, t1x, t1y, kind="quest", quests="q_herbs,q_ghouls")
+npc("Meisterin Kjorra", 5, 7, t2x, t2y, kind="trainer", tier=2)
+npc("Händler Dorn", 12, 7, t2x, t2y, kind="merchant", shop="advanced")
+npc("Truhe", 11, 12, t2x, t2y, kind="stash")
+npc("Schmied Torgal", 3, 11, t2x, t2y, kind="smith")
+npc("Wachführerin Tessa", 16, 11, t2x, t2y, kind="quest", quests="q_harkon,q_goblin_king,q_wraiths,q_veshra,q_trolls")
+npc("Späher Ruven", 11, 5, t2x, t2y, kind="quest", quests="q_mine,q_ash,q_katacombs,q_king")
+
+safe_rects = [(TOWN1[0] - 1, TOWN1[1] - 1, TOWN1[2] + 1, TOWN1[3] + 1), (TOWN2[0] - 1, TOWN2[1] - 1, TOWN2[2] + 1, TOWN2[3] + 1)]
 def in_safe(x, y, pad=0):
     return any(a - pad <= x <= b + pad and c - pad <= y <= d + pad for a, c, b, d in safe_rects)
+
+SPAWN_BUFFER = 12
 taken = []
-def spawn(kind, n, r, ground=None, pad=SPAWN_BUFFER, tries=4000):
-    x0, y0, x1, y1 = r
-    n = max(1, round(n * DENSITY))
-    placed, t = 0, 0
-    while placed < n and t < tries:
-        t += 1
+def place_ok(x, y, ground, pad, gap):
+    if not free(x, y) or (ground is not None and g[y][x] not in ground): return False
+    if in_safe(x, y, pad): return False
+    return not any(abs(x - a) < gap and abs(y - b) < gap for a, b in taken)
+
+def spawn_pack(kinds, x, y, ground, size, leader=None, gap=3):
+    """Ein Rudel um (x,y): Anführer (falls angegeben) und size-1 Mitglieder in 3 Tiles Umkreis."""
+    pack_counter[0] += 1
+    pid = pack_counter[0]
+    members = []
+    cx, cy = x, y
+    members.append((leader or random.choice(kinds), cx, cy))
+    tries = 0
+    while len(members) < size and tries < 60:
+        tries += 1
+        mx, my = cx + random.randint(-3, 3), cy + random.randint(-3, 3)
+        if free(mx, my) and (ground is None or g[my][mx] in ground) and not in_safe(mx, my) and not any(abs(mx - a) < 2 and abs(my - b) < 2 for _, a, b in members):
+            members.append((random.choice(kinds), mx, my))
+    for kind, mx, my in members:
+        obj(kind, "monster", mx, my, kind=kind, pack=pid)
+        taken.append((mx, my))
+    return len(members)
+
+def zone_packs(zone, entry, bands, n_packs, ground):
+    """bands: [(f_max, [(kind, gewicht)...], leader_kind|None)] nach Entfernung vom Eingang (0..1)."""
+    x0, y0, x1, y1 = zone
+    far = max(abs(entry[0] - x0), abs(entry[0] - x1)) + max(abs(entry[1] - y0), abs(entry[1] - y1))
+    placed, tries, total = 0, 0, 0
+    while placed < n_packs and tries < n_packs * 60:
+        tries += 1
         x, y = random.randint(x0, x1), random.randint(y0, y1)
-        if not free(x, y) or (ground is not None and g[y][x] not in ground): continue
-        if in_safe(x, y, pad) or any(abs(x - a) < SPACING and abs(y - b) < SPACING for a, b in taken): continue
-        taken.append((x, y)); obj(kind, "monster", x, y, kind=kind); placed += 1
-    if placed < n: print("WARN nur", placed, "von", n, kind, r, file=sys.stderr)
+        if not place_ok(x, y, ground, SPAWN_BUFFER, 6): continue
+        f = (abs(x - entry[0]) + abs(y - entry[1])) / far
+        band = next((b for b in bands if f <= b[0]), bands[-1])
+        kinds = [k for k, w in band[1] for _ in range(w)]
+        size = random.choices([1, 2, 3, 4, 5], weights=[3, 4, 4, 3, 2] if f < 0.7 else [3, 4, 3, 2, 1])[0]
+        leader = band[2] if band[2] and size >= 3 and random.random() < 0.5 else None
+        total += spawn_pack(kinds, x, y, ground, size, leader)
+        placed += 1
+    if placed < n_packs: print("WARN nur", placed, "von", n_packs, "Rudeln in", zone, file=sys.stderr)
+    return total
 
-# Roggenfelder L1-3 (nahe der Stadt nur Stufe 1)
-spawn('field_rat', 14, (36, 92, 66, 110), (4,))
-spawn('field_rat', 10, (36, 82, 66, 92), (4,))
-spawn('wild_hound', 12, (44, 82, 66, 106), (4,))
-spawn('bandit_novice', 6, (50, 80, 66, 90), (4,))
-# Düsterwald L3-7
-spawn('wild_hound', 10, (16, 62, 62, 80), (4,))
-spawn('bandit_novice', 10, (16, 62, 62, 80), (4,))
-spawn('forest_spider', 18, (16, 46, 62, 66), (4,))
-spawn('highwayman', 8, (16, 46, 62, 62), (4,))
-# Räuberlager L8-12
-spawn('highwayman', 16, (16, 26, 44, 43), (7, 4))
-spawn('bandit_novice', 6, (16, 26, 44, 43), (7, 4))
-obj("Räuberfürst Harkon", "monster", 30, 28, kind="bandit_lord"); taken.append((30, 28))
-fill((28, 26, 32, 30), 7)
-# Moorlande L6-11
-spawn('bog_ghoul', 26, (70, 64, 110, 94), (3,))
-spawn('bog_witch', 10, (84, 64, 110, 94), (3,))
-spawn('wraith', 6, (70, 64, 90, 94), (3,))
-# Totenacker L9-13
-spawn('wraith', 20, (72, 100, 110, 112), (4,))
-spawn('bone_knight', 12, (86, 100, 110, 112), (4,))
-# Hochland L13-19
-spawn('hill_troll', 20, (94, 28, 128, 56), (8,))
-spawn('stone_golem', 14, (104, 28, 128, 56), (8,))
-spawn('shadow_wolf', 16, (94, 28, 128, 56), (8,))
+E = lambda x, y: P(x, y)
+# Roggenfelder L1-5: Ratten und Hunde am Eingang, Goblins weiter hinten
+zone_packs(ZONES['farm'], T1_E, [
+    (0.30, [('field_rat', 5), ('wild_hound', 2)], 'wild_hound'),
+    (0.60, [('wild_hound', 3), ('burrow_rat', 3), ('goblin', 2)], 'goblin_scout'),
+    (1.00, [('goblin', 3), ('feral_hound', 2), ('giant_rat', 2), ('goblin_scout', 3)], 'goblin_scout')], 26, (4,))
+# Düsterwald L3-10: Goblins in Stufen, Spinnen, Banditen-Späher
+zone_packs(ZONES['forest'], P(50, 80), [
+    (0.25, [('goblin', 4), ('feral_hound', 2), ('forest_spider', 2)], 'goblin_scout'),
+    (0.55, [('goblin_scout', 4), ('forest_spider', 3), ('bandit_novice', 2)], 'goblin_warrior'),
+    (0.80, [('goblin_warrior', 3), ('wolf', 2), ('venom_spider', 2), ('highwayman', 2)], 'goblin_shaman'),
+    (1.00, [('goblin_warrior', 3), ('goblin_shaman', 2), ('venom_spider', 2), ('wolf', 2)], 'goblin_chief')], 30, (4,))
+# Goblinkönig im Düsterwald (tief im Wald)
+gk = (sc(22), sc(50))
+for _ in range(200):
+    gx, gy = random.randint(sc(16), sc(30)), random.randint(sc(50), sc(60))
+    if place_ok(gx, gy, (4,), 0, 2):
+        fill((gx - 2, gy - 2, gx + 2, gy + 2), 4); obj("Goblinkönig Grix", "monster", gx, gy, kind="goblin_king", pack=0); taken.append((gx, gy)); break
+# Räuberlager L7-13
+zone_packs(ZONES['camp'], P(30, 44), [
+    (0.45, [('highwayman', 3), ('bandit', 3), ('bandit_novice', 1)], 'bandit'),
+    (1.00, [('bandit', 4), ('highwayman', 2), ('goblin_shaman', 1)], 'bandit_captain')], 12, (7, 4))
+bl = (sc(30), sc(28))
+fill((bl[0] - 3, bl[1] - 3, bl[0] + 3, bl[1] + 3), 7); obj("Räuberfürst Harkon", "monster", bl[0], bl[1], kind="bandit_lord", pack=0); taken.append(bl)
+# Moorlande L6-15
+zone_packs(ZONES['swamp'], P(78, 62), [
+    (0.30, [('bog_ghoul', 5), ('giant_rat', 1)], 'marsh_corpse'),
+    (0.65, [('bog_ghoul', 3), ('marsh_corpse', 3), ('bog_witch', 1)], 'bog_witch'),
+    (1.00, [('marsh_corpse', 3), ('bog_witch', 2), ('ghoul_alpha', 2), ('wraith', 1)], 'ghoul_alpha')], 28, (3,))
+# Totenacker L8-18
+zone_packs(ZONES['grave'], P(90, 98), [
+    (0.30, [('skeleton', 4), ('wraith', 2)], 'zombie'),
+    (0.60, [('skeleton', 3), ('zombie', 3), ('wraith', 2)], 'bone_knight'),
+    (1.00, [('zombie', 3), ('bone_knight', 3), ('crypt_guard', 1)], 'crypt_guard')], 22, (4,))
+# Hochland L11-22
+zone_packs(ZONES['hills'], P(92, 49), [
+    (0.30, [('wolf', 3), ('dire_wolf', 3), ('hill_troll', 1)], 'dire_wolf'),
+    (0.65, [('dire_wolf', 3), ('hill_troll', 3), ('stone_golem', 2)], 'hill_troll'),
+    (1.00, [('rock_troll', 3), ('stone_golem', 3), ('shadow_wolf', 2)], 'rock_troll')], 28, (8,))
 # Aschenöde L21-29
-spawn('ash_walker', 18, (116, 62, 150, 90), (9,))
-spawn('cinder_wisp', 16, (126, 62, 150, 90), (9,))
-spawn('death_knight', 10, (132, 66, 150, 90), (9,))
-spawn('hell_spawn', 8, (140, 70, 150, 90), (9,))
+zone_packs(ZONES['ash'], P(114, 76), [
+    (0.30, [('ash_walker', 4), ('shadow_wolf', 2), ('imp', 1)], 'ash_walker'),
+    (0.60, [('ash_walker', 3), ('cinder_wisp', 3), ('night_stalker', 2), ('imp', 2)], 'cinder_wisp'),
+    (1.00, [('cinder_wisp', 3), ('death_knight', 2), ('ember_elemental', 3), ('hell_spawn', 2), ('imp', 2)], 'hell_spawn')], 26, (9,))
 
-def dungeon_spawns(name, kinds, per_room, boss_kind, guards=None):
-    rooms, ent, boss = dg[name]
+def dungeon_spawns(name, bands, boss_kind, guards=None, per_room=(1, 2)):
+    rooms, ent, boss, dist = dg[name]
+    maxd = max(dist.values()) or 1
     for k, r in rooms.items():
         if k == ent: continue
         if k == boss:
             cx, cy = room_center(r)
-            obj(boss_kind, "monster", cx, cy, kind=boss_kind); taken.append((cx, cy))
+            obj(boss_kind, "monster", cx, cy, kind=boss_kind, pack=0); taken.append((cx, cy))
             for gk in (guards or []):
-                spawn(gk, 2, r, (5,), pad=0)
+                for _ in range(2):
+                    for _t in range(30):
+                        x, y = random.randint(r[0], r[2]), random.randint(r[1], r[3])
+                        if place_ok(x, y, (5,), 0, 2):
+                            obj(gk, "monster", x, y, kind=gk, pack=0); taken.append((x, y)); break
             continue
-        for kind in random.sample(kinds, k=min(len(kinds), per_room)):
-            spawn(kind, random.randint(2, 4), r, (5,), pad=0)
+        f = dist.get(k, maxd) / maxd
+        band = next((b for b in bands if f <= b[0]), bands[-1])
+        kinds = [kk for kk, w in band[1] for _ in range(w)]
+        for _ in range(random.randint(*per_room)):
+            for _t in range(40):
+                x, y = random.randint(r[0] + 1, r[2] - 1), random.randint(r[1] + 1, r[3] - 1)
+                if place_ok(x, y, (5,), 0, 3):
+                    spawn_pack(kinds, x, y, (5,), random.randint(1, 4), band[2]); break
     return room_center(rooms[boss])
 
-dungeon_spawns('sumpf', ['bog_ghoul', 'wraith', 'bog_witch'], 2, 'bog_queen', ['bog_witch'])
-dungeon_spawns('kata', ['bone_knight', 'wraith', 'hill_troll'], 2, 'bone_lord', ['bone_knight'])
-dungeon_spawns('mine', ['pit_worm', 'stone_golem', 'hill_troll'], 2, 'stone_colossus')
-dungeon_spawns('thron', ['death_knight', 'hell_spawn', 'cinder_wisp'], 2, 'ash_king', ['hell_spawn'])
+dungeon_spawns('sumpf', [(0.4, [('marsh_corpse', 3), ('bog_witch', 1), ('wraith', 1)], 'bog_witch'), (1.0, [('bog_witch', 2), ('ghoul_alpha', 3), ('wraith', 2)], 'ghoul_alpha')], 'bog_queen', ['bog_witch'])
+dungeon_spawns('kata', [(0.4, [('skeleton', 3), ('zombie', 2), ('wraith', 1)], 'bone_knight'), (1.0, [('bone_knight', 3), ('crypt_guard', 3), ('zombie', 1)], 'crypt_guard')], 'bone_lord', ['bone_knight'])
+dungeon_spawns('mine', [(0.35, [('cave_spider', 3), ('pit_worm', 2), ('stone_golem', 1)], 'pit_worm'), (0.7, [('pit_worm', 3), ('rock_troll', 2), ('iron_golem', 2), ('cave_spider', 2)], 'iron_golem'), (1.0, [('iron_golem', 3), ('acid_worm', 3), ('rock_troll', 2)], 'acid_worm')], 'stone_colossus', ['iron_golem'])
+dungeon_spawns('thron', [(0.4, [('imp', 3), ('death_knight', 2), ('ember_elemental', 1)], 'death_knight'), (1.0, [('death_knight', 3), ('ember_elemental', 2), ('hell_spawn', 3), ('imp', 2)], 'hell_spawn')], 'ash_king', ['hell_spawn'])
 
-# ---------- Prüfung ----------
-sx, sy = 22, 99
+# Webmutter in der Tiefenmine (eigener Raum nahe dem Ende)
+rooms, ent, boss, dist = dg['mine']
+cand = sorted((k for k in rooms if k not in (ent, boss)), key=lambda k: -dist.get(k, 0))
+if cand:
+    r = rooms[cand[0]]; cx, cy = room_center(r)
+    obj("Webmutter Skarra", "monster", cx, cy, kind="web_mother", pack=0); taken.append((cx, cy))
+
+# -------------------------------------------------------------------- Truhen
+CHEST_COUNT = {}
+ctaken = []
+def chest(x, y, level, tier):
+    obj("Truhe", "chest", x, y, level=level, tier=tier)
+    ctaken.append((x, y))
+    CHEST_COUNT[tier] = CHEST_COUNT.get(tier, 0) + 1
+
+def zone_chests(zone, ground, n, levels, tiers, entry):
+    """Truhen abseits der Wege: Standort mit mindestens 5 freien Nachbarn, nie in Stadtnähe."""
+    x0, y0, x1, y1 = zone
+    far = max(abs(entry[0] - x0), abs(entry[0] - x1)) + max(abs(entry[1] - y0), abs(entry[1] - y1))
+    placed, tries = 0, 0
+    while placed < n and tries < 4000:
+        tries += 1
+        x, y = random.randint(x0, x1), random.randint(y0, y1)
+        if not free(x, y) or (ground and g[y][x] not in ground) or in_safe(x, y, 10) or g[y][x] == 7: continue
+        if sum(1 for dx in (-1, 0, 1) for dy in (-1, 0, 1) if free(x + dx, y + dy)) < 6: continue
+        if any(abs(x - a) < 3 and abs(y - b) < 3 for a, b in taken) or any(abs(x - a) < 14 and abs(y - b) < 14 for a, b in ctaken): continue
+        f = min(1.0, (abs(x - entry[0]) + abs(y - entry[1])) / far)
+        lv = levels[0] + int((levels[1] - levels[0]) * f)
+        tier = tiers[0] if f < 0.45 else tiers[1] if f < 0.8 else tiers[2]
+        chest(x, y, lv, tier); placed += 1
+
+zone_chests(ZONES['farm'], (4,), 8, (1, 5), ('wood', 'wood', 'iron'), T1_E)
+zone_chests(ZONES['forest'], (4,), 10, (3, 10), ('wood', 'iron', 'iron'), P(50, 80))
+zone_chests(ZONES['camp'], (7, 4), 4, (8, 13), ('iron', 'iron', 'gold'), P(30, 44))
+zone_chests(ZONES['swamp'], (3,), 10, (6, 15), ('wood', 'iron', 'gold'), P(78, 62))
+zone_chests(ZONES['grave'], (4,), 8, (8, 18), ('iron', 'iron', 'gold'), P(90, 98))
+zone_chests(ZONES['hills'], (8,), 10, (11, 22), ('iron', 'iron', 'gold'), P(92, 49))
+zone_chests(ZONES['ash'], (9,), 10, (21, 29), ('iron', 'gold', 'gold'), P(114, 76))
+DLV = {'sumpf': (10, 16), 'kata': (13, 18), 'mine': (17, 23), 'thron': (26, 30)}
+for name, (rooms, ent, boss, dist) in dg.items():
+    maxd = max(dist.values()) or 1
+    for k, r in rooms.items():
+        if k == ent: continue
+        f = dist.get(k, maxd) / maxd
+        lv = DLV[name][0] + int((DLV[name][1] - DLV[name][0]) * f)
+        if k == boss:
+            for dx in (-2, 2):
+                x, y = room_center(r); x += dx; y += 2
+                if free(x, y): chest(x, y, DLV[name][1], 'gold')
+        elif random.random() < 0.45:
+            for _t in range(30):
+                x, y = random.randint(r[0] + 1, r[2] - 1), random.randint(r[1] + 1, r[3] - 1)
+                if free(x, y) and not any(abs(x - a) < 3 and abs(y - b) < 3 for a, b in taken + ctaken):
+                    chest(x, y, lv, 'gold' if f > 0.6 else 'iron'); break
+
+# ------------------------------------------------------------------ Prüfung
+sx, sy = START
 seen = {(sx, sy)}; q = collections.deque([(sx, sy)])
 while q:
     x, y = q.popleft()
@@ -292,24 +408,23 @@ while q:
         nx, ny = x + dx, y + dy
         if free(nx, ny) and (nx, ny) not in seen:
             seen.add((nx, ny)); q.append((nx, ny))
-bad = [o for o in objs if o["type"] in ("monster", "npc") and (o["x"] // TS, o["y"] // TS) not in seen]
+bad = [o for o in objs if o["type"] in ("monster", "npc", "chest") and (o["x"] // TS, o["y"] // TS) not in seen]
 if bad:
+    crit = [o for o in bad if o["type"] == "npc" or "boss" in o["name"].lower() or o["name"] in ("Räuberfürst Harkon", "Moorhexe Veshra", "Aschenkönig", "Steinkoloss", "Knochenfürst Morrik", "Goblinkönig Grix", "Webmutter Skarra")]
     for o in bad[:20]: print("UNERREICHBAR", o["name"], o["x"] // TS, o["y"] // TS, file=sys.stderr)
-    # Unerreichbare Monster entfernen, Bosse/NPCs nicht -> Abbruch
-    crit = [o for o in bad if o["type"] == "npc" or o["name"] in ("Räuberfürst Harkon", "Moorhexe Veshra", "Aschenkönig", "Steinkoloss", "Knochenfürst Morrik")]
     if crit: sys.exit("kritische Objekte unerreichbar: " + ", ".join(o["name"] for o in crit))
     ids = {o["id"] for o in bad}; objs[:] = [o for o in objs if o["id"] not in ids]
-    print("entfernt:", len(bad), "unerreichbare Monster", file=sys.stderr)
+    print("entfernt:", len(bad), "unerreichbare Objekte", file=sys.stderr)
 
+data = [g[y][x] for y in range(H) for x in range(W)]
 tmj = {"compressionlevel": -1, "height": H, "width": W, "infinite": False, "orientation": "orthogonal", "renderorder": "right-down",
        "tilewidth": TS, "tileheight": TS, "type": "map", "version": "1.10", "nextlayerid": 3, "nextobjectid": oid[0], "tilesets": [],
-       "layers": [{"id": 1, "name": "ground", "type": "tilelayer", "width": W, "height": H, "x": 0, "y": 0, "visible": True, "opacity": 1,
-                   "data": [g[y][x] for y in range(H) for x in range(W)]},
+       "layers": [{"id": 1, "name": "ground", "type": "tilelayer", "width": W, "height": H, "x": 0, "y": 0, "visible": True, "opacity": 1, "data": data},
                   {"id": 2, "name": "objects", "type": "objectgroup", "x": 0, "y": 0, "visible": True, "opacity": 1, "draworder": "topdown", "objects": objs}]}
 json.dump(tmj, open("src/data/aschenthron.json", "w"), ensure_ascii=False)
 mons = [o for o in objs if o["type"] == "monster"]
-print("ok:", len(mons), "Monster,", sum(1 for o in objs if o["type"] == "npc"), "NPCs, erreichbare Tiles:", len(seen))
+print("ok:", len(mons), "Monster in", pack_counter[0], "Rudeln,", sum(1 for o in objs if o["type"] == "npc"), "NPCs,", sum(CHEST_COUNT.values()), "Truhen", CHEST_COUNT, ", begehbar:", len(seen))
 if "--preview" in sys.argv:
     ch = {1: 'T', 2: '#', 3: '~', 4: '.', 5: '_', 6: ' ', 7: '=', 8: ',', 9: ':', 10: 'f', 11: 'o', 12: '!', 13: 't', 14: 'i'}
-    for y in range(0, H, 2):
+    for y in range(0, H, 3):
         print(''.join(ch[g[y][x]] for x in range(0, W, 2)))

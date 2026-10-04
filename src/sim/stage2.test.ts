@@ -52,6 +52,9 @@ describe('Legendäre Gegenstände und Set-Boni', () => {
   it('Set-Boni stufen sich nach angelegten Teilen und wirken auf Werte', () => {
     const { w, p } = fresh();
     p.attrs.kraft = 30;
+    p.attrs.ausdauer = 30;
+    p.attrs.gewandtheit = 30;
+    p.level = 30;
     const set = SETS[0]!;
     const hp0 = maxHpOf(p);
     for (let i = 0; i < set.pieces.length; i++) {
@@ -70,6 +73,8 @@ describe('Legendäre Gegenstände und Set-Boni', () => {
     const { w, p } = fresh();
     const blade = generateLegendary(w.rng, w.nextId++, 'wolf_fang'); // Lebensraub
     p.attrs.kraft = 40;
+    p.level = 30;
+    p.attrs.gewandtheit = 40;
     p.inventory.push(blade);
     applyCommand(w, p.id, { type: 'equip', itemId: blade.id });
     expect(powerOf(p, 'lifesteal')).toBe(5);
@@ -84,6 +89,8 @@ describe('Legendäre Gegenstände und Set-Boni', () => {
     const p2 = spawnPlayer(w2, 10, 10);
     const plate = generateLegendary(w2.rng, w2.nextId++, 'colossus_heart'); // Dornen 25 %
     p2.attrs.kraft = 40;
+    p2.attrs.ausdauer = 40;
+    p2.level = 30;
     p2.inventory.push(plate);
     applyCommand(w2, p2.id, { type: 'equip', itemId: plate.id });
     const m2 = spawnMonster(w2, 11, 10, 'hill_troll');
@@ -147,6 +154,14 @@ describe('Schmied', () => {
   });
 });
 
+function armBow(w: World, p: ReturnType<typeof fresh>['p']): void {
+  for (const id of ['hunt_bow', 'leather_quiver']) {
+    const it = generateItem(w.rng, w.nextId++, id, 'normal');
+    p.inventory.push(it);
+    applyCommand(w, p.id, { type: 'equip', itemId: it.id });
+  }
+}
+
 describe('Neue Fertigkeiten', () => {
   const learn = (p: ReturnType<typeof fresh>['p'], id: string) => p.skills.push(id);
 
@@ -167,6 +182,7 @@ describe('Neue Fertigkeiten', () => {
 
   it('Salve schießt auf bis zu drei, Feuerball auf Gruppen, Heilung füllt LP', () => {
     const { w, p } = fresh();
+    armBow(w, p);
     learn(p, 'multishot');
     learn(p, 'fireball');
     learn(p, 'healing_hand');
@@ -185,6 +201,7 @@ describe('Neue Fertigkeiten', () => {
 
   it('Giftpfeil verursacht Schaden über Zeit', () => {
     const { w, p } = fresh();
+    armBow(w, p);
     learn(p, 'poison_shot');
     p.mana = 100;
     const m = spawnMonster(w, 14, 10, 'bog_ghoul');
@@ -273,5 +290,189 @@ describe('Review-Fixes', () => {
     expect(p.hp).toBeLessThanOrEqual(maxHpOf(p));
     expect(p.mana).toBeLessThanOrEqual(maxManaOf(p));
     expect(p.inventory).toHaveLength(1);
+  });
+});
+
+describe('Anforderungen und Waffenarten', () => {
+  it('Stufe und Attribute müssen stimmen, Fehlendes wird gemeldet', async () => {
+    const { missingReq } = await import('./world');
+    const { w, p } = fresh();
+    const bow = generateItem(w.rng, w.nextId++, 'yew_bow', 'normal'); // Stufe 5, Gewandtheit 16
+    expect(missingReq(p, bow)).toEqual(['Stufe 5', 'Gewandtheit 16']);
+    applyCommand(w, p.id, { type: 'equip', itemId: bow.id }); // nicht im Rucksack: ignoriert
+    p.inventory.push(bow);
+    applyCommand(w, p.id, { type: 'equip', itemId: bow.id });
+    expect(p.equipment.weapon).toBeUndefined();
+    const ev = drainEvents(w).find((e) => e.type === 'cannotEquip');
+    expect(ev && 'reason' in ev ? ev.reason : '').toContain('Gewandtheit 16');
+    p.level = 5;
+    p.attrs.gewandtheit = 16;
+    expect(missingReq(p, bow)).toEqual([]);
+    applyCommand(w, p.id, { type: 'equip', itemId: bow.id });
+    expect(p.equipment.weapon).toBe(bow);
+  });
+
+  it('schwere Rüstung verlangt auch Ausdauer, Roben Verstand und Willenskraft', async () => {
+    const { missingReq } = await import('./world');
+    const { w, p } = fresh();
+    p.level = 30;
+    p.attrs.kraft = 40;
+    const plate = generateItem(w.rng, w.nextId++, 'ash_cuirass', 'normal');
+    expect(missingReq(p, plate).some((m) => m.startsWith('Ausdauer'))).toBe(true);
+    const robe = generateItem(w.rng, w.nextId++, 'acolyte_robe', 'normal');
+    expect(missingReq(p, robe)).toEqual(['Verstand 18', 'Willenskraft 12']);
+    expect(robe.affixes[0]).toEqual({ stat: 'maxMana', value: 25 });
+  });
+
+  it('Bogen stärkt Fernkampf-Skills, Stab Magie; Nahkampf damit bleibt schwach', () => {
+    const { w, p } = fresh();
+    p.level = 6;
+    p.mana = 200;
+    p.skills.push('quick_shot', 'ember_bolt');
+    const dmg = () => {
+      const m = spawnMonster(w, 14, 10, 'wild_hound');
+      m.aggroRange = 0;
+      m.maxHp = 99999;
+      m.hp = 99999;
+      p.skillCd = {};
+      p.mana = 500;
+      applyCommand(w, p.id, { type: 'useSkill', skillId: 'quick_shot', targetId: m.id });
+      applyCommand(w, p.id, { type: 'useSkill', skillId: 'ember_bolt', targetId: m.id });
+      return 99999 - m.hp;
+    };
+    let base = 0;
+    for (let i = 0; i < 20; i++) base += dmg();
+    const bow = generateItem(w.rng, w.nextId++, 'yew_bow', 'normal');
+    const staff = generateItem(w.rng, w.nextId++, 'oak_staff', 'normal');
+    p.attrs.gewandtheit = 16;
+    p.attrs.verstand = 16;
+    p.inventory.push(bow, staff);
+    const qv = generateItem(w.rng, w.nextId++, 'leather_quiver', 'normal');
+    p.inventory.push(qv);
+    applyCommand(w, p.id, { type: 'equip', itemId: qv.id });
+    applyCommand(w, p.id, { type: 'equip', itemId: bow.id });
+    let withBow = 0;
+    for (let i = 0; i < 20; i++) withBow += dmg();
+    expect(withBow).toBeGreaterThan(base * 1.2);
+    const [lo] = damageRange(p);
+    const melee = lo;
+    expect(melee).toBeLessThanOrEqual(6); // Bogen im Nahkampf: nur ein Viertel
+    p.attrs.verstand = 16;
+  });
+});
+
+describe('Schatztruhen', () => {
+  const setup = (tier: 'wood' | 'iron' | 'gold' = 'wood') => {
+    const { w, p } = fresh();
+    w.chests.push({ id: w.nextId++, x: 12, y: 10, level: 10, tier, opened: false, respawnAt: 0 });
+    return { w, p, c: w.chests[0]! };
+  };
+
+  it('Truhe öffnen gibt Gold und Beute; leere Truhe wieder auffüllen nach Wartezeit', () => {
+    const { w, p, c } = setup('iron');
+    const g0 = p.gold;
+    applyCommand(w, p.id, { type: 'openChest', chestId: c.id });
+    run(w, TICK_RATE * 4); // hinlaufen
+    expect(c.opened).toBe(true);
+    expect(p.gold).toBeGreaterThan(g0);
+    expect(w.ground.length).toBeGreaterThanOrEqual(3);
+    applyCommand(w, p.id, { type: 'openChest', chestId: c.id });
+    expect(drainEvents(w).some((e) => e.type === 'fail')).toBe(true);
+    run(w, TICK_RATE * 60 * 12 + 5);
+    expect(c.opened).toBe(false);
+  });
+
+  it('bessere Truhen liefern mehr; Beute passt zur Stufe', () => {
+    let wood = 0;
+    let gold = 0;
+    for (let seed = 1; seed <= 30; seed++) {
+      for (const tier of ['wood', 'gold'] as const) {
+        const w = createWorld(seed, open());
+        const p = spawnPlayer(w, 10, 10);
+        w.chests.push({ id: w.nextId++, x: 11, y: 10, level: 12, tier, opened: false, respawnAt: 0 });
+        applyCommand(w, p.id, { type: 'openChest', chestId: w.chests[0]!.id });
+        run(w, 30);
+        if (tier === 'wood') wood += p.gold + w.ground.length * 10;
+        else gold += p.gold + w.ground.length * 10;
+        for (const g of w.ground) if (g.item.slot !== 'potion') expect(itemReqLevel(g.item)).toBeLessThanOrEqual(13);
+      }
+    }
+    expect(gold).toBeGreaterThan(wood * 1.5);
+  });
+});
+
+function itemReqLevel(i: { req?: { level?: number } }): number {
+  return i.req?.level ?? 1;
+}
+
+describe('Bogen braucht Köcher mit Pfeilen', () => {
+  const shoot = (w: World, p: ReturnType<typeof fresh>['p'], bonusCheck = false) => {
+    const m = spawnMonster(w, 14, 10, 'wild_hound');
+    m.aggroRange = 0;
+    m.maxHp = 99999;
+    m.hp = 99999;
+    p.skillCd = {};
+    p.mana = 500;
+    applyCommand(w, p.id, { type: 'useSkill', skillId: 'quick_shot', targetId: m.id });
+    return bonusCheck ? 99999 - m.hp : m.hp < m.maxHp;
+  };
+
+  it('ohne Bogen, ohne Köcher oder mit leerem Köcher gibt es keinen Schuss', () => {
+    const { w, p } = fresh();
+    p.skills.push('quick_shot');
+    expect(shoot(w, p)).toBe(false);
+    expect(drainEvents(w).some((e) => e.type === 'fail' && e.reason.includes('Bogen'))).toBe(true);
+    const bow = generateItem(w.rng, w.nextId++, 'hunt_bow', 'normal');
+    p.inventory.push(bow);
+    applyCommand(w, p.id, { type: 'equip', itemId: bow.id });
+    expect(shoot(w, p)).toBe(false);
+    expect(drainEvents(w).some((e) => e.type === 'fail' && e.reason.includes('Köcher'))).toBe(true);
+    const q = generateItem(w.rng, w.nextId++, 'leather_quiver', 'normal');
+    q.ammo = 0;
+    p.inventory.push(q);
+    applyCommand(w, p.id, { type: 'equip', itemId: q.id });
+    expect(shoot(w, p)).toBe(false);
+    expect(drainEvents(w).some((e) => e.type === 'fail' && e.reason.includes('leer'))).toBe(true);
+  });
+
+  it('jeder Schuss verbraucht einen Pfeil; Bündel füllen den Köcher auf (nur gleiche Pfeile)', () => {
+    const { w, p } = fresh();
+    p.skills.push('quick_shot');
+    armBow(w, p);
+    const q = p.equipment.quiver!;
+    expect(q.ammo).toBe(40);
+    expect(shoot(w, p)).toBe(true);
+    expect(q.ammo).toBe(39);
+    q.ammo = 30;
+    const wood = generateItem(w.rng, w.nextId++, 'wood_arrows', 'normal');
+    p.inventory.push(wood);
+    applyCommand(w, p.id, { type: 'refillQuiver', itemId: wood.id });
+    expect(q.ammo).toBe(40); // nur 10 passen rein
+    expect(wood.ammo).toBe(10);
+    q.ammo = 5;
+    const iron = generateItem(w.rng, w.nextId++, 'iron_arrows', 'normal');
+    p.inventory.push(iron);
+    applyCommand(w, p.id, { type: 'refillQuiver', itemId: iron.id });
+    expect(q.ammo).toBe(5); // andere Pfeile im Köcher: abgelehnt
+    q.ammo = 0;
+    applyCommand(w, p.id, { type: 'refillQuiver', itemId: iron.id });
+    expect(q.ammo).toBe(20);
+    expect(q.arrowBonus).toBe(4);
+    expect(p.inventory.includes(iron)).toBe(false);
+  });
+
+  it('bessere Pfeile erhöhen den Schaden', () => {
+    const a = fresh();
+    a.p.skills.push('quick_shot');
+    armBow(a.w, a.p);
+    let base = 0;
+    for (let i = 0; i < 30; i++) base += shoot(a.w, a.p, true) as number;
+    const b = fresh();
+    b.p.skills.push('quick_shot');
+    armBow(b.w, b.p);
+    b.p.equipment.quiver!.arrowBonus = 30;
+    let strong = 0;
+    for (let i = 0; i < 30; i++) strong += shoot(b.w, b.p, true) as number;
+    expect(strong).toBeGreaterThan(base + 30 * 25);
   });
 });

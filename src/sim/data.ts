@@ -74,27 +74,66 @@ function mk(
 }
 
 export const MONSTERS: MonsterKind[] = [
+  // Ratten
   mk('field_rat', 'Feldratte', 1, 'beast', 0x9a7b5a, { hp: 0.8, dmg: 0.8, speed: 0.11 }),
+  mk('burrow_rat', 'Wühlratte', 3, 'beast', 0x7a6048, { hp: 0.9, speed: 0.11 }),
+  mk('giant_rat', 'Riesenratte', 5, 'beast', 0x6a5238, { hp: 1.2, dmg: 1.05 }),
+  // Hunde und Wölfe
   mk('wild_hound', 'Wildhund', 2, 'beast', 0x8a6a4a, { speed: 0.12, cd: 17 }),
+  mk('feral_hound', 'Streuner', 4, 'beast', 0x7a5a3a, { speed: 0.12, cd: 17, hp: 1.1 }),
+  mk('wolf', 'Wolf', 7, 'beast', 0x8a8a8e, { speed: 0.125, cd: 16, hp: 1.15 }),
+  mk('dire_wolf', 'Schreckenswolf', 11, 'beast', 0x5a5a62, { speed: 0.125, cd: 16, hp: 1.3, dmg: 1.1 }),
+  mk('shadow_wolf', 'Schattenwolf', 19, 'beast', 0x4a4a62, { speed: 0.125, hp: 0.9, cd: 16 }),
+  mk('night_stalker', 'Nachtjäger', 24, 'beast', 0x3a3a52, { speed: 0.13, hp: 1.1, cd: 15, dmg: 1.15 }),
+  // Goblins
+  mk('goblin', 'Goblin', 2, 'humanoid', 0x6a9a4a, { hp: 0.9 }),
+  mk('goblin_scout', 'Goblinkundschafter', 4, 'humanoid', 0x7ab05a, { speed: 0.115, hp: 0.9 }),
+  mk('goblin_warrior', 'Goblinkrieger', 8, 'humanoid', 0x5a8a3a, { hp: 1.25, dmg: 1.1 }),
+  mk('goblin_shaman', 'Goblinschamane', 10, 'humanoid', 0x8ac06a, { hp: 0.85, dmg: 1.25 }),
+  mk('goblin_chief', 'Goblinhäuptling', 13, 'humanoid', 0x4a7a2a, { hp: 1.8, dmg: 1.2, cd: 22 }),
+  // Banditen
   mk('bandit_novice', 'Räuberlehrling', 3, 'humanoid', 0xb06a4a),
-  mk('forest_spider', 'Waldspinne', 4, 'spider', 0x3a3a48, { speed: 0.115, hp: 0.9 }),
-  mk('bog_ghoul', 'Sumpfghul', 6, 'ghoul', 0x5a8a5a, { speed: 0.085, hp: 1.15 }),
   mk('highwayman', 'Wegelagerer', 7, 'humanoid', 0xa05a3a, { dmg: 1.1 }),
-  mk('wraith', 'Friedhofsgeist', 9, 'undead', 0x8a9ad8, { speed: 0.095, hp: 0.9, dmg: 1.15 }),
+  mk('bandit', 'Räuber', 10, 'humanoid', 0x905030, { hp: 1.15, dmg: 1.15 }),
+  mk('bandit_captain', 'Räuberhauptmann', 13, 'humanoid', 0x7a3a2a, { hp: 1.7, dmg: 1.25 }),
+  // Spinnen
+  mk('forest_spider', 'Waldspinne', 4, 'spider', 0x3a3a48, { speed: 0.115, hp: 0.9 }),
+  mk('venom_spider', 'Giftspinne', 9, 'spider', 0x3a5a3a, { speed: 0.115, hp: 0.95, dmg: 1.15 }),
+  mk('giant_spider', 'Riesenspinne', 14, 'spider', 0x4a3a58, { speed: 0.11, hp: 1.4, dmg: 1.15 }),
+  mk('cave_spider', 'Höhlenspinne', 20, 'spider', 0x5a4a38, { speed: 0.115, hp: 1.3, dmg: 1.2 }),
+  // Sumpf
+  mk('bog_ghoul', 'Sumpfghul', 6, 'ghoul', 0x5a8a5a, { speed: 0.085, hp: 1.15 }),
+  mk('marsh_corpse', 'Moorleiche', 9, 'ghoul', 0x6a7a52, { speed: 0.08, hp: 1.35 }),
   mk('bog_witch', 'Sumpfhexe', 11, 'humanoid', 0x7a4a8a, { hp: 0.85, dmg: 1.3 }),
+  mk('ghoul_alpha', 'Ghulalpha', 15, 'ghoul', 0x4a6a3a, { speed: 0.09, hp: 1.6, dmg: 1.2 }),
+  // Untote
+  mk('skeleton', 'Skelett', 8, 'undead', 0xdcd4bc, { hp: 0.9, dmg: 1.05 }),
+  mk('wraith', 'Friedhofsgeist', 9, 'undead', 0x8a9ad8, { speed: 0.095, hp: 0.9, dmg: 1.15 }),
+  mk('zombie', 'Zombie', 10, 'undead', 0x7a8a62, { speed: 0.075, hp: 1.5 }),
   mk('bone_knight', 'Knochenritter', 13, 'undead', 0xd8d0b8, { speed: 0.085, hp: 1.3 }),
+  mk('crypt_guard', 'Gruftwächter', 18, 'undead', 0xb8b0c8, { speed: 0.08, hp: 1.55, dmg: 1.15 }),
+  mk('death_knight', 'Todesritter', 27, 'undead', 0x5a5a7a, { hp: 1.4, dmg: 1.2 }),
+  // Trolle und Golems
   mk('hill_troll', 'Bergtroll', 15, 'golem', 0x7a8a6a, { speed: 0.08, hp: 1.5, cd: 24 }),
   mk('stone_golem', 'Steingolem', 17, 'golem', 0x8a8a92, { speed: 0.07, hp: 1.8, dmg: 1.2, cd: 26 }),
-  mk('shadow_wolf', 'Schattenwolf', 19, 'beast', 0x4a4a62, { speed: 0.125, hp: 0.9, cd: 16 }),
+  mk('rock_troll', 'Felstroll', 18, 'golem', 0x6a7a62, { speed: 0.08, hp: 1.7, dmg: 1.15, cd: 24 }),
+  mk('iron_golem', 'Eisengolem', 22, 'golem', 0x9a9aa8, { speed: 0.07, hp: 2.0, dmg: 1.25, cd: 26 }),
+  // Würmer
   mk('pit_worm', 'Grubenwurm', 21, 'worm', 0x9a7a5a, { speed: 0.09, hp: 1.3 }),
+  mk('acid_worm', 'Säurewurm', 25, 'worm', 0x8aa04a, { speed: 0.09, hp: 1.35, dmg: 1.2 }),
+  // Asche und Feuer
   mk('ash_walker', 'Aschenwandler', 23, 'humanoid', 0x6a5a52, { hp: 1.1 }),
   mk('cinder_wisp', 'Lavageist', 25, 'elemental', 0xe0702a, { speed: 0.105, hp: 0.9, dmg: 1.35 }),
-  mk('death_knight', 'Todesritter', 27, 'undead', 0x5a5a7a, { hp: 1.4, dmg: 1.2 }),
+  mk('ember_elemental', 'Glutelementar', 27, 'elemental', 0xff5a1a, { speed: 0.1, hp: 1.5, dmg: 1.3 }),
+  mk('imp', 'Imp', 24, 'demon', 0xd05a3a, { speed: 0.125, hp: 0.8, dmg: 1.3, cd: 16 }),
   mk('hell_spawn', 'Höllenbrut', 29, 'demon', 0xc0402a, { speed: 0.1, hp: 1.3, dmg: 1.25 }),
-  mk('stone_colossus', 'Steinkoloss', 20, 'golem', 0xa09a8a, { boss: true, speed: 0.07 }),
+  // Bosse
+  mk('goblin_king', 'Goblinkönig Grix', 10, 'humanoid', 0x3a6a1a, { boss: true, speed: 0.1 }),
   mk('bandit_lord', 'Räuberfürst Harkon', 12, 'humanoid', 0xc07a3a, { boss: true, speed: 0.1 }),
   mk('bone_lord', 'Knochenfürst Morrik', 14, 'undead', 0xe8e0c0, { boss: true, speed: 0.09 }),
   mk('bog_queen', 'Moorhexe Veshra', 16, 'humanoid', 0x9a4a9a, { boss: true, speed: 0.095 }),
+  mk('stone_colossus', 'Steinkoloss', 20, 'golem', 0xa09a8a, { boss: true, speed: 0.07 }),
+  mk('web_mother', 'Webmutter Skarra', 23, 'spider', 0x6a3a6a, { boss: true, speed: 0.1 }),
   mk('ash_king', 'Aschenkönig', 30, 'demon', 0xd86a2a, { boss: true, speed: 0.085 }),
 ];
 
@@ -135,13 +174,13 @@ export interface SkillDef {
 
 export const SKILLS: SkillDef[] = [
   { id: 'power_strike', name: 'Wuchtschlag', area: 'Nahkampf', levelReq: 2, price: 50, mana: 8, cooldown: 60, range: 1.5, mult: 2, ignoresArmor: false, tier: 1, desc: 'Doppelter Waffenschaden im Nahkampf.' },
-  { id: 'quick_shot', name: 'Schnellschuss', area: 'Fernkampf', levelReq: 2, price: 60, mana: 4, cooldown: 20, range: 6, base: [6, 12], scales: 'gewandtheit', ignoresArmor: false, tier: 1, desc: 'Schneller Schuss auf Distanz, skaliert mit Gewandtheit.' },
+  { id: 'quick_shot', name: 'Schnellschuss', area: 'Fernkampf', levelReq: 2, price: 60, mana: 4, cooldown: 20, range: 6, base: [6, 12], scales: 'gewandtheit', ignoresArmor: false, tier: 1, desc: 'Schneller Schuss auf Distanz (Bogen und Köcher nötig), skaliert mit Gewandtheit.' },
   { id: 'ember_bolt', name: 'Glutblitz', area: 'Magie', levelReq: 3, price: 80, mana: 10, cooldown: 30, range: 7, base: [10, 18], scales: 'verstand', ignoresArmor: true, tier: 1, desc: 'Magischer Schaden, ignoriert Rüstung, skaliert mit Verstand.' },
   { id: 'healing_hand', name: 'Heilende Hand', area: 'Magie', levelReq: 4, price: 120, mana: 14, cooldown: 200, range: 0, heal: 40, scales: 'verstand', ignoresArmor: true, tier: 1, desc: 'Heilt dich selbst, stärker mit Verstand und Level.' },
-  { id: 'poison_shot', name: 'Giftpfeil', area: 'Fernkampf', levelReq: 6, price: 220, mana: 9, cooldown: 60, range: 6, base: [5, 9], scales: 'gewandtheit', ignoresArmor: false, dot: { seconds: 8, factor: 1.6 }, tier: 2, desc: 'Schuss, der das Ziel zusätzlich 8 Sekunden vergiftet.' },
+  { id: 'poison_shot', name: 'Giftpfeil', area: 'Fernkampf', levelReq: 6, price: 220, mana: 9, cooldown: 60, range: 6, base: [5, 9], scales: 'gewandtheit', ignoresArmor: false, dot: { seconds: 8, factor: 1.6 }, tier: 2, desc: 'Schuss (Bogen und Köcher nötig), der das Ziel zusätzlich 8 Sekunden vergiftet.' },
   { id: 'whirlwind', name: 'Wirbelhieb', area: 'Nahkampf', levelReq: 10, price: 500, mana: 16, cooldown: 100, range: 1.6, mult: 1.2, aoe: 2.2, aoeSelf: true, ignoresArmor: false, tier: 2, desc: 'Trifft alle Gegner um dich herum.' },
   { id: 'frost_nova', name: 'Frostnova', area: 'Magie', levelReq: 11, price: 650, mana: 18, cooldown: 140, range: 1.6, base: [14, 22], scales: 'verstand', aoe: 3, aoeSelf: true, ignoresArmor: true, tier: 2, desc: 'Magische Druckwelle um dich herum.' },
-  { id: 'multishot', name: 'Salve', area: 'Fernkampf', levelReq: 13, price: 800, mana: 14, cooldown: 70, range: 6, base: [9, 15], scales: 'gewandtheit', targets: 3, ignoresArmor: false, tier: 2, desc: 'Schießt auf bis zu drei Gegner gleichzeitig.' },
+  { id: 'multishot', name: 'Salve', area: 'Fernkampf', levelReq: 13, price: 800, mana: 14, cooldown: 70, range: 6, base: [9, 15], scales: 'gewandtheit', targets: 3, ignoresArmor: false, tier: 2, desc: 'Schießt (Bogen und Köcher nötig) auf bis zu drei Gegner gleichzeitig; verbraucht einen Pfeil.' },
   { id: 'fireball', name: 'Feuerball', area: 'Magie', levelReq: 16, price: 1200, mana: 24, cooldown: 90, range: 7, base: [28, 42], scales: 'verstand', aoe: 2, ignoresArmor: true, tier: 2, desc: 'Explodiert am Ziel und trifft Gegner in der Nähe.' },
   { id: 'skull_split', name: 'Schädelspalter', area: 'Nahkampf', levelReq: 18, price: 1500, mana: 22, cooldown: 160, range: 1.5, mult: 3.2, ignoresArmor: false, tier: 2, desc: 'Gewaltiger Hieb mit mehr als dreifachem Waffenschaden.' },
   { id: 'lightning', name: 'Blitzschlag', area: 'Magie', levelReq: 22, price: 2400, mana: 30, cooldown: 120, range: 8, base: [60, 90], scales: 'verstand', ignoresArmor: true, tier: 2, desc: 'Zerschmetternder Blitz auf ein Ziel.' },
@@ -155,8 +194,8 @@ export const SAFE_REGEN = 0.5;
 export const FIELD_REGEN = 0.02;
 
 export const SHOPS: Record<string, string[]> = {
-  basic: ['rusty_sword', 'bone_club', 'steel_sword', 'leather_cap', 'iron_helm', 'ash_mail', 'worn_gloves', 'cloth_boots', 'iron_greaves', 'iron_ring', 'heal_small', 'heal_mid', 'mana_small', 'mana_mid'],
-  advanced: ['steel_sword', 'cinder_axe', 'war_blade', 'iron_helm', 'warden_helm', 'plate_cuirass', 'bone_plate', 'iron_gauntlets', 'ember_gauntlets', 'iron_greaves', 'steel_boots', 'silver_ring', 'heal_mid', 'heal_big', 'mana_mid', 'mana_big'],
+  basic: ['rusty_sword', 'bone_club', 'steel_sword', 'leather_cap', 'iron_helm', 'ash_mail', 'worn_gloves', 'cloth_boots', 'iron_greaves', 'iron_ring', 'heal_small', 'heal_mid', 'mana_small', 'mana_mid', 'hunt_bow', 'twig_staff', 'cloth_robe', 'leather_vest', 'leather_quiver', 'wood_arrows', 'iron_arrows'],
+  advanced: ['steel_sword', 'cinder_axe', 'war_blade', 'iron_helm', 'warden_helm', 'plate_cuirass', 'bone_plate', 'iron_gauntlets', 'ember_gauntlets', 'iron_greaves', 'steel_boots', 'silver_ring', 'heal_mid', 'heal_big', 'mana_mid', 'mana_big', 'yew_bow', 'horn_bow', 'oak_staff', 'bone_staff', 'acolyte_robe', 'hunter_vest', 'bone_leather', 'hunter_quiver', 'ranger_quiver', 'iron_arrows', 'steel_arrows', 'ember_arrows'],
 };
 
 /** Gegenstands-Drops: Ausrüstung seltener, Tränke häufiger. Faktor auf die Monster-dropChance. */
@@ -187,6 +226,9 @@ const q = (id: string, name: string, text: string, minLevel: number, target: str
 export const QUESTS: QuestDef[] = [
   q('q_rats', 'Rattenplage', 'Die Felder sind voller Ratten. Erlege 8 Feldratten.', 1, 'field_rat', 8, 1.5, 1.5),
   q('q_hounds', 'Wilde Hunde', 'Wildhunde reißen unser Vieh. Erlege 8 davon.', 2, 'wild_hound', 8, 1.5, 1.5),
+  q('q_goblins', 'Goblinplage', 'Goblins plündern die Höfe am Waldrand. Vertreibe 10 Goblins.', 3, 'goblin', 10, 1.5, 1.5),
+  q('q_goblin_scouts', 'Späher im Unterholz', 'Goblinkundschafter spähen unsere Wege aus. Töte 8.', 5, 'goblin_scout', 8, 1.5, 1.5),
+  q('q_goblin_king', 'Der Goblinkönig', 'Grix sammelt ein Heer im Düsterwald. Erschlage ihn.', 10, 'goblin_king', 1, 1.5, 2),
   q('q_bandits', 'Lehrlinge des Bösen', 'Räuberlehrlinge lauern an den Wegen. Besiege 8.', 3, 'bandit_novice', 8, 1.5, 1.5),
   q('q_spiders', 'Netze im Wald', 'Der Düsterwald ist voller Waldspinnen. Töte 10.', 4, 'forest_spider', 10, 1.5, 1.5),
   q('q_herbs', 'Sumpfkraut', 'Ohne Ghule im Moor kann ich Kräuter sammeln. Besiege 6 Sumpfghule.', 5, 'bog_ghoul', 6, 1.5, 1.5),

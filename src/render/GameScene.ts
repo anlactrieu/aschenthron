@@ -4,7 +4,7 @@ import { buildWorld, type TiledMap } from '../sim/tiled';
 import { monsterKind, questById, SKILLS } from '../sim/data';
 import { exportPlayer, importPlayer } from '../sim/save';
 import {
-  applyCommand, drainEvents, getActor, maxHpOf, maxManaOf, tick, TICK_RATE, type Actor, type Command, type Npc, type World,
+  applyCommand, drainEvents, getActor, maxHpOf, maxManaOf, tick, TICK_RATE, type Actor, type Chest, type Command, type Npc, type World,
 } from '../sim/world';
 import { isWalkable } from '../sim/path';
 import { toScreen, toTile } from './iso';
@@ -56,6 +56,7 @@ export class GameScene extends Phaser.Scene {
   private actorViews = new Map<number, ActorView>();
   private lootViews = new Map<number, Phaser.GameObjects.Image>();
   private npcViews = new Map<number, Phaser.GameObjects.Image>();
+  private chestViews = new Map<number, Phaser.GameObjects.Image>();
   private flash = new Map<number, number>();
   private acc = 0;
   private autosave = 0;
@@ -185,8 +186,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Trefferprüfung im Bildraum gegen die sichtbaren Sprites (inkl. Namensschild/Aufgaben-Marker bei NPCs). */
-  private pick(wx: number, wy: number): { npc?: Npc; actor?: Actor } | null {
-    let best: { depth: number; npc?: Npc; actor?: Actor } | null = null;
+  private pick(wx: number, wy: number): { npc?: Npc; actor?: Actor; chest?: Chest } | null {
+    let best: { depth: number; npc?: Npc; actor?: Actor; chest?: Chest } | null = null;
+    for (const c of this.world.chests) {
+      const img = this.chestViews.get(c.id);
+      if (img?.visible && !c.opened && img.getBounds().contains(wx, wy) && (!best || img.depth > best.depth)) best = { depth: img.depth, chest: c };
+    }
     for (const a of this.world.actors) {
       if (a.id === this.playerId || !a.alive || (a.kind === 'player' && !this.remote)) continue;
       const v = this.actorViews.get(a.id);
@@ -213,6 +218,7 @@ export class GameScene extends Phaser.Scene {
       this.send({ type: 'moveTo', x: Math.round(hit.npc.x), y: Math.round(hit.npc.y + 1) });
       return;
     }
+    if (hit?.chest) return this.send({ type: 'openChest', chestId: hit.chest.id });
     if (hit?.actor) return this.send({ type: 'attack', targetId: hit.actor.id });
     const loot = w.ground.find((g) => Math.hypot(g.x - t.x, g.y - t.y) < 0.8);
     if (loot) return this.send({ type: 'pickup', groundId: loot.id });
@@ -440,6 +446,17 @@ export class GameScene extends Phaser.Scene {
           } else if (r === 'rare') say(`Beute: ${e.item.name}`);
           break;
         }
+        case 'refilled': say(`Köcher aufgefüllt: +${e.arrows} Pfeile`); this.sfx.pickup(); break;
+        case 'chestOpened': {
+          this.sfx.chest();
+          const ch = w.chests.find((c) => c.id === e.chestId);
+          if (ch) {
+            const { sx, sy } = toScreen(ch.x, ch.y);
+            this.fx.burst(sx, sy - 8, 0xffe890, 600);
+            this.fx.sparkle(sx, sy - 6, 0xffe890, 900);
+          }
+          break;
+        }
         case 'pickedUp': say(`Erhalten: ${e.item.name} (${describeItem(e.item)})`); this.sfx.pickup(); break;
         case 'tooHeavy': say(`Zu schwer: ${e.item.name}`); break;
         case 'cannotEquip': say(`${e.item.name}: ${e.reason}`); break;
@@ -544,6 +561,7 @@ export class GameScene extends Phaser.Scene {
     this.updateChunks(px, py);
     this.updateProps(px, py);
     this.updateNpcs(time);
+    this.updateChests(time, px, py);
     this.updateLoot(time, g);
     this.updateActors(time, p, g);
     for (const r of this.world.safe) this.outline(g, r.x, r.y, r.w, r.h);
@@ -594,7 +612,7 @@ export class GameScene extends Phaser.Scene {
     this.hover = hit;
     let cursor = '';
     if (hit?.actor) cursor = 'crosshair';
-    else if (hit?.npc) cursor = 'pointer';
+    else if (hit?.npc || hit?.chest) cursor = 'pointer';
     else {
       const t = toTile(wp.x, wp.y);
       if (this.world.ground.some((gi) => Math.hypot(gi.x - t.x, gi.y - t.y) < 0.8)) cursor = 'pointer';
@@ -785,6 +803,34 @@ export class GameScene extends Phaser.Scene {
     this.cleanLabels(seen, ['n', 'm']);
   }
 
+  private updateChests(time: number, px: number, py: number): void {
+    const seen = new Set<string>();
+    for (const c of this.world.chests) {
+      let img = this.chestViews.get(c.id);
+      const near = Math.abs(c.x - px) <= VIEW && Math.abs(c.y - py) <= VIEW;
+      if (!near) {
+        img?.setVisible(false);
+        continue;
+      }
+      const { sx, sy } = toScreen(c.x, c.y);
+      const key = `chest_${c.tier}_${c.opened ? 1 : 0}`;
+      if (!img) {
+        img = this.add.image(sx, sy + 8, key).setOrigin(0.5, 0.9);
+        this.chestViews.set(c.id, img);
+      }
+      img.setTexture(key).setVisible(true).setPosition(sx, sy + 8).setDepth(sy + 8);
+      this.gfxGround.fillStyle(0x000000, 0.22);
+      this.gfxGround.fillEllipse(sx, sy + 9, 36, 13);
+      if (!c.opened) {
+        const col = { wood: 0xc89860, iron: 0x9fb4d8, gold: 0xffd84a }[c.tier];
+        if (c.tier !== 'wood' && (this.frame + c.id * 7) % 45 === 0) this.fx.sparkle(sx, sy - 6, col, 800);
+        if (Math.hypot(c.x - this.player().x, c.y - this.player().y) < 9) this.label(`c${c.id}`, c.tier === 'gold' ? 'Goldene Truhe' : c.tier === 'iron' ? 'Eisentruhe' : 'Truhe', sx, sy - 22 + Math.sin(time / 300) * 1.5, '#' + col.toString(16).padStart(6, '0'), seen, 11);
+      } else img.setAlpha(0.85);
+      if (!c.opened) img.setAlpha(1);
+    }
+    this.cleanLabels(seen, ['c']);
+  }
+
   private questMark(n: Npc, p: Actor): string {
     if (n.kind !== 'quest') return '';
     let avail = false;
@@ -892,7 +938,7 @@ export class GameScene extends Phaser.Scene {
       const img = view.img;
       if (a.kind === 'player') {
         const look = lookOf(a);
-        const key = `pl_${look.chest}_${look.head}_${look.weapon}_${look.hands}_${frame}`;
+        const key = `pl_${look.chest}_${look.head}_${look.weapon}_${look.hands}_${look.weaponKind}_${look.robe ? 1 : 0}_${look.quiver ? 1 : 0}_${frame}`;
         img.setTexture(ensureTexture(this, key, () => playerCanvas(look, frame)));
       } else {
         const k = monsterKind(a.kindId!);

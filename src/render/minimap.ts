@@ -50,6 +50,11 @@ export class Minimap {
       c.fillStyle = '#e8c040';
       c.fillRect(t.x * k - 2, t.y * k - 2, 5, 5);
     }
+    for (const ch of this.w.chests) {
+      if (ch.opened) continue;
+      c.fillStyle = ch.tier === 'gold' ? '#ffd84a' : ch.tier === 'iron' ? '#9fb4d8' : '#b88a50';
+      c.fillRect(ch.x * k - 1, ch.y * k - 1, 3, 3);
+    }
     for (const a of this.w.actors) {
       if (a.kind === 'monster' && a.boss && a.alive) {
         c.fillStyle = '#e04030';

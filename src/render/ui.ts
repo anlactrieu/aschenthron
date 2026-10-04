@@ -1,16 +1,26 @@
-import { ATTR_KEYS, ATTR_NAME, SKILLS, SHOPS, QUESTS, questById, totalXpFor, MAX_LEVEL, monsterKind } from '../sim/data';
-import { POWER_TEXT, setById, templateById, type Item, type Slot } from '../sim/items';
+import { ATTR_KEYS, ATTR_NAME, SKILLS, SHOPS, QUESTS, questById, totalXpFor, MAX_LEVEL, monsterKind, type SkillDef } from '../sim/data';
+import { POWER_TEXT, itemReq, setById, templateById, type Item, type Slot } from '../sim/items';
 import {
-  NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, buyPrice, carriedWeight, carryCapacity, damageRange, maxHpOf, maxManaOf, nearNpc, sellPrice,
-  type Actor, type Command, type World,
+  NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
+  maxHpOf, maxManaOf, missingReq, nearNpc, powerOf, type Actor, type Command, type Npc, type World,
 } from '../sim/world';
+import { arrowIcon, itemIcon, potionIcon, skillIcon } from './icons';
+import { lookOf, playerCanvas } from './art';
 
 const RARITY_COLOR: Record<Item['rarity'], string> = { normal: '#c9c4bd', magic: '#7f9fff', rare: '#f2c94c', set: '#5fd070', legendary: '#ff8a2a' };
-const SLOT_NAME: Record<Slot, string> = { weapon: 'Waffe', head: 'Kopf', chest: 'Brust', hands: 'Hände', feet: 'Füße', ring: 'Ring' };
+const SLOT_NAME: Record<Slot, string> = { weapon: 'Waffe', head: 'Kopf', chest: 'Brust', hands: 'Hände', feet: 'Füße', ring: 'Ring', quiver: 'Köcher' };
+
+/** Das angelegte Stück im selben Slot (Tränke und Pfeilbündel haben keins). */
+function equippedFor(p: Actor, it: Item): Item | undefined {
+  return it.slot === 'potion' || it.slot === 'ammo' ? undefined : p.equipment[it.slot];
+}
 const STAT_NAME = { damage: 'Schaden', armor: 'Rüstung', maxHp: 'Leben', kraft: 'Kraft', maxMana: 'Mana' } as const;
+const BAG_COLS = 8;
 
 export function describeItem(i: Item): string {
   const base: string[] = [];
+  if (i.slot === 'quiver') base.push(`${i.ammo ?? 0} / ${i.capacity ?? 0} Pfeile${i.arrowBonus ? ` (+${i.arrowBonus} Schaden)` : ''}`);
+  if (i.slot === 'ammo') base.push(`${i.ammo ?? 0} Pfeile${i.arrowBonus ? ` (+${i.arrowBonus} Schaden)` : ''} – auf den Köcher ziehen`);
   if (i.heal) base.push(`Heilt ${i.heal} LP`);
   if (i.mana) base.push(`Stellt ${i.mana} MP wieder her`);
   if (i.damage) base.push(`Schaden ${i.damage[0]}-${i.damage[1]}`);
@@ -18,53 +28,173 @@ export function describeItem(i: Item): string {
   const aff = i.affixes.map((a) => `+${a.value} ${STAT_NAME[a.stat]}`);
   if (i.power) aff.push(POWER_TEXT[i.power.id](i.power.value));
   if (i.setId) aff.push(`Set: ${setById(i.setId).name}`);
-  return [...base, ...aff, `Gewicht ${i.weight}`, i.reqKraft ? `Kraft ${i.reqKraft} nötig` : ''].filter(Boolean).join(' · ');
+  const need = reqLabels(i);
+  return [...base, ...aff, `Gewicht ${i.weight}`, need.length ? `Benötigt ${need.join(', ')}` : ''].filter(Boolean).join(' · ');
 }
 
-interface Bar {
-  box: HTMLElement;
-  fill: HTMLElement;
-  text: HTMLElement;
+/** Anforderungen als Textliste (nur Werte über dem Grundwert). */
+export function reqLabels(i: Item): string[] {
+  const r = itemReq(i);
+  const out: string[] = [];
+  if ((r.level ?? 1) > 1) out.push(`Stufe ${r.level}`);
+  if (r.kraft) out.push(`Kraft ${r.kraft}`);
+  if (r.gewandtheit) out.push(`Gewandtheit ${r.gewandtheit}`);
+  if (r.ausdauer) out.push(`Ausdauer ${r.ausdauer}`);
+  if (r.verstand) out.push(`Verstand ${r.verstand}`);
+  if (r.willenskraft) out.push(`Willenskraft ${r.willenskraft}`);
+  return out;
 }
 
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, css = '', text = ''): HTMLElementTagNameMap[K] {
+function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
-  if (css) e.style.cssText = css;
+  if (cls) e.className = cls;
   if (text) e.textContent = text;
   return e;
 }
 
+const CSS = `
+.a-win{position:fixed;background:linear-gradient(180deg,#1b1620 0%,#120f16 100%);border:2px solid #6b5a48;box-shadow:0 0 0 1px #14100c,0 0 0 3px #3a2f26,0 8px 30px rgba(0,0,0,.7);color:#d4c4a8;font:13px/1.4 Georgia,'Times New Roman',serif;display:none;z-index:10;user-select:none}
+.a-win h3{margin:0;padding:6px 10px;font:bold 14px Georgia,serif;letter-spacing:.5px;color:#e8d4a8;background:linear-gradient(180deg,#3a2f26,#241d18);border-bottom:1px solid #6b5a48}
+.a-tabs{display:flex;background:#241d18;border-bottom:1px solid #6b5a48}
+.a-tab{flex:1;padding:6px 4px;text-align:center;cursor:pointer;color:#9a8a70;border-right:1px solid #3a2f26;font-size:12px}
+.a-tab:hover{color:#e8d4a8;background:#2e251e}
+.a-tab.on{color:#ffe8b0;background:#3a2f26;box-shadow:inset 0 -2px 0 #d8a24a}
+.a-body{padding:10px;overflow-y:auto;max-height:calc(100vh - 140px)}
+.a-sec{margin:12px 0 6px;padding-bottom:3px;border-bottom:1px solid #4b3f3a;font-weight:bold;color:#e8c888;letter-spacing:.5px}
+.a-grid{display:grid;gap:3px;grid-template-columns:repeat(${BAG_COLS},46px)}
+.a-slot{position:relative;width:46px;height:46px;background:#0d0a10;border:1px solid #3a3040;box-shadow:inset 0 0 6px #000;box-sizing:border-box}
+.a-slot.item{cursor:grab;border-width:2px}
+.a-slot img{width:38px;height:38px;image-rendering:pixelated;position:absolute;left:3px;top:3px;pointer-events:none}
+.a-slot .n{position:absolute;right:2px;bottom:0;font:bold 11px system-ui;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000;pointer-events:none}
+.a-slot .l{position:absolute;left:2px;top:1px;font:10px system-ui;color:#7a6a58;pointer-events:none}
+.a-slot.ok{box-shadow:inset 0 0 0 2px #5fd070,0 0 8px #5fd070}
+.a-slot.bad{box-shadow:inset 0 0 0 2px #d04a3a}
+.a-drop.ok{outline:2px dashed #5fd070;outline-offset:-3px;background:rgba(95,208,112,.08)}
+.a-btn{background:linear-gradient(180deg,#4a3c2e,#2e251e);color:#f0e0c0;border:1px solid #8a7258;padding:3px 9px;cursor:pointer;font:12px Georgia,serif;border-radius:2px}
+.a-btn:hover{background:linear-gradient(180deg,#6a5640,#3e3226);color:#fff}
+.a-btn:disabled,.a-btn.off{opacity:.45;cursor:default}
+.a-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:3px 0}
+.a-note{font-size:11px;opacity:.65}
+.a-card{border:1px solid #3a3040;background:#0f0c13;padding:6px 8px;margin:5px 0;display:flex;gap:8px;align-items:center}
+.a-card img{width:36px;height:36px;image-rendering:pixelated;flex:none}
+.a-bar{height:8px;background:#241f2a;border:1px solid #3a3040;position:relative}
+.a-bar>div{height:100%}
+.a-doll{position:relative;width:236px;height:268px;margin:0 auto;background:radial-gradient(ellipse at 50% 60%,#2a2230 0%,#120f16 70%);border:1px solid #3a3040}
+.a-doll .a-slot{position:absolute}
+.a-doll img.me{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:120px;image-rendering:pixelated;opacity:.95;pointer-events:none}
+.orb{position:relative;width:92px;height:92px;border-radius:50%;border:3px solid #6b5a48;background:#0b080d;overflow:hidden;box-shadow:0 0 0 2px #14100c,0 4px 14px rgba(0,0,0,.7),inset 0 0 14px #000}
+.orb .liq{position:absolute;left:0;right:0;bottom:0}
+.orb .shine{position:absolute;left:14%;top:10%;width:38%;height:26%;border-radius:50%;background:rgba(255,255,255,.18);filter:blur(2px)}
+.orb .t{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:bold 13px system-ui;color:#fff;text-shadow:0 1px 3px #000,0 0 4px #000}
+.hb{position:relative;width:52px;height:52px;background:#0d0a10;border:2px solid #6b5a48;box-shadow:inset 0 0 6px #000,0 2px 6px rgba(0,0,0,.6);cursor:pointer}
+.hb img{width:42px;height:42px;image-rendering:pixelated;position:absolute;left:3px;top:3px;pointer-events:none}
+.hb .k{position:absolute;left:2px;top:0;font:bold 11px system-ui;color:#ffe8b0;text-shadow:0 0 3px #000,0 0 3px #000}
+.hb .cd{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.62)}
+.hb .c{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:bold 15px system-ui;color:#fff;text-shadow:0 0 4px #000}
+.hb.nomana img{filter:grayscale(.8) brightness(.6)}
+.hb .cnt{position:absolute;right:3px;bottom:0;font:bold 12px system-ui;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000}
+`;
+
+type Tab = 'inv' | 'char' | 'skills' | 'quests';
+
+interface Drag {
+  item: Item;
+  from: 'bag' | 'equip' | 'stash' | 'shop';
+  slot?: Slot;
+  templateId?: string;
+}
+
 export class Ui {
-  private panel = el('div', 'position:fixed;right:12px;top:12px;width:360px;max-height:92vh;overflow-y:auto;background:rgba(14,12,18,.93);border:1px solid #4b3f3a;color:#c9b79c;font:13px/1.4 system-ui,sans-serif;padding:10px;display:none');
-  private hud = el('div', 'position:fixed;left:50%;bottom:10px;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;align-items:center;font:13px system-ui,sans-serif;color:#c9b79c;pointer-events:none');
-  private bars = el('div', 'display:flex;gap:10px;align-items:center;background:rgba(14,12,18,.85);border:1px solid #4b3f3a;padding:6px 10px');
-  private hotbar = el('div', 'display:flex;gap:6px;pointer-events:auto');
-  private target = el('div', 'position:fixed;left:50%;top:10px;transform:translateX(-50%);background:rgba(14,12,18,.85);border:1px solid #4b3f3a;color:#c9b79c;font:13px system-ui,sans-serif;padding:4px 10px;display:none;text-align:center');
-  private toast = el('div', 'position:fixed;left:12px;bottom:84px;width:420px;color:#c9b79c;font:13px/1.35 system-ui,sans-serif;pointer-events:none;text-shadow:0 1px 2px #000');
-  private bannerEl = el('div', 'position:fixed;left:50%;top:70px;transform:translateX(-50%);color:#e8d9b0;font:bold 22px system-ui,sans-serif;text-shadow:0 2px 6px #000;letter-spacing:1px;opacity:0;transition:opacity .6s;pointer-events:none');
+  open = false;
+  private tab: Tab = 'inv';
+  private main = el('div', 'a-win');
+  private side = el('div', 'a-win');
+  private hud = el('div');
+  private orbHp = el('div', 'orb');
+  private orbMp = el('div', 'orb');
+  private orbParts: { hp: { liq: HTMLElement; t: HTMLElement }; mp: { liq: HTMLElement; t: HTMLElement } } | null = null;
+  private hotbar = el('div');
+  private xpBar = el('div', 'a-bar');
+  private xpFill = el('div');
+  private xpText = el('div');
+  private target = el('div');
+  private toast = el('div');
+  private bannerEl = el('div');
   private bannerTimer = 0;
-  private tip = el('div', 'position:fixed;z-index:50;max-width:260px;background:rgba(10,8,14,.97);border:1px solid #6b5a48;color:#c9b79c;font:12px/1.45 system-ui,sans-serif;padding:8px 10px;pointer-events:none;display:none');
+  private tip = el('div');
   private msgs: string[] = [];
   private key = '';
-  private open = false;
+  private hotKey = '';
+  private hotButtons: { el: HTMLElement; cd: HTMLElement; txt: HTMLElement }[] = [];
+  private potionBtns: { heal: HTMLElement; mana: HTMLElement } | null = null;
+  private arrows: HTMLElement | null = null;
+  private dragging: Drag | null = null;
+  private ghost: HTMLImageElement | null = null;
+  private lastP: Actor | null = null;
+  private lastW: World | null = null;
+  private dollKey = '';
+  private dollUrl = '';
 
-  constructor(private send: (c: Command) => void, private useSkillSlot: (i: number) => void, private usePotionKind: (kind: 'heal' | 'mana') => void, private newGame: () => void) {
-    this.buildBars();
-    this.hud.append(this.hotbar, this.bars);
-    document.body.append(this.panel, this.hud, this.target, this.toast, this.bannerEl, this.tip);
+  constructor(
+    private send: (c: Command) => void,
+    private useSkillSlot: (i: number) => void,
+    private usePotionKind: (kind: 'heal' | 'mana') => void,
+    private newGame: () => void,
+    private onDropToWorld?: (item: Item) => void,
+  ) {
+    const style = document.createElement('style');
+    style.textContent = CSS;
+    document.head.appendChild(style);
+
+    Object.assign(this.main.style, { right: '12px', top: '12px', width: '420px' });
+    Object.assign(this.side.style, { left: '12px', top: '190px', width: '380px' });
+
+    this.hud.style.cssText = 'position:fixed;left:50%;bottom:8px;transform:translateX(-50%);display:flex;align-items:flex-end;gap:10px;pointer-events:none;z-index:5';
+    const mid = el('div');
+    mid.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none';
+    this.hotbar.style.cssText = 'display:flex;gap:4px;pointer-events:auto;min-height:56px;align-items:flex-end';
+    this.xpBar.style.cssText = 'width:100%;min-width:300px;position:relative';
+    this.xpFill.style.cssText = 'background:linear-gradient(180deg,#d8b84a,#8a7220)';
+    this.xpText.style.cssText = 'position:absolute;inset:-3px 0 0;text-align:center;font:10px system-ui;color:#fff;text-shadow:0 0 3px #000;line-height:14px';
+    this.xpBar.append(this.xpFill, this.xpText);
+    mid.append(this.hotbar, this.xpBar);
+    this.buildOrbs();
+    this.hud.append(this.orbHp, mid, this.orbMp);
+
+    this.target.style.cssText = 'position:fixed;left:50%;top:10px;transform:translateX(-50%);background:rgba(14,12,18,.88);border:1px solid #6b5a48;color:#d4c4a8;font:13px Georgia,serif;padding:4px 12px;display:none;text-align:center;min-width:160px';
+    this.toast.style.cssText = 'position:fixed;left:12px;bottom:112px;width:420px;color:#d4c4a8;font:13px/1.35 Georgia,serif;pointer-events:none;text-shadow:0 1px 2px #000,0 0 4px #000';
+    this.bannerEl.style.cssText = 'position:fixed;left:50%;top:70px;transform:translateX(-50%);color:#e8d9b0;font:bold 24px Georgia,serif;text-shadow:0 2px 8px #000,0 0 2px #000;letter-spacing:1.5px;opacity:0;transition:opacity .6s;pointer-events:none;z-index:6;text-align:center';
+    this.tip.style.cssText = 'position:fixed;z-index:50;max-width:270px;background:rgba(10,8,14,.97);border:1px solid #8a7258;color:#d4c4a8;font:12px/1.45 Georgia,serif;padding:8px 10px;pointer-events:none;display:none;box-shadow:0 4px 16px #000';
+    document.body.append(this.main, this.side, this.hud, this.target, this.toast, this.bannerEl, this.tip);
+
     window.addEventListener('keydown', (e) => {
       const k = e.key.toLowerCase();
-      if (k === 'i' || k === 'c') this.toggle();
+      if (k === 'i') this.toggleTab('inv');
+      if (k === 'c') this.toggleTab('char');
+      if (k === 'k') this.toggleTab('skills');
+      if (k === 'j') this.toggleTab('quests');
+      if (k === 'escape') this.toggle(false);
       if (k >= '1' && k <= '9') this.useSkillSlot(Number(k) - 1);
       if (k === 'q') this.usePotionKind('heal');
       if (k === 'e') this.usePotionKind('mana');
     });
   }
 
+  /* ----------------------------------------------------------- Fenster */
+
+  private toggleTab(t: Tab): void {
+    if (this.open && this.tab === t) this.toggle(false);
+    else {
+      this.tab = t;
+      this.toggle(true);
+    }
+  }
+
   toggle(force?: boolean): void {
     this.open = force ?? !this.open;
-    this.panel.style.display = this.open ? 'block' : 'none';
+    this.main.style.display = this.open ? 'block' : 'none';
     this.key = '';
+    if (!this.open) this.tip.style.display = 'none';
   }
 
   banner(text: string, color = '#e8d9b0'): void {
@@ -77,243 +207,170 @@ export class Ui {
 
   say(m: string): void {
     this.msgs.push(m);
-    this.msgs = this.msgs.slice(-7);
+    this.msgs = this.msgs.slice(-6);
     this.toast.replaceChildren(...this.msgs.map((t) => el('div', '', t)));
   }
 
-  update(w: World, p: Actor, target?: Actor): void {
-    this.updateHud(p, target);
-    if (!this.open) return;
-    const near = w.npcs.filter((n) => Math.hypot(n.x - p.x, n.y - p.y) <= NPC_RANGE).map((n) => n.id);
-    const key = JSON.stringify([p.inventory, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.gold, p.level, near, p.quests]);
-    if (key === this.key) return;
-    this.key = key;
-    this.renderPanel(w, p);
-  }
+  /* -------------------------------------------------------------- HUD */
 
-  private barParts: { lv: HTMLElement; hp: Bar; mp: Bar; xp: Bar; gold: HTMLElement; pts: HTMLElement } | null = null;
-  private hotKey = '';
-  private hotButtons: HTMLButtonElement[] = [];
-  private panelHp: HTMLElement | null = null;
-
-  private buildBars(): void {
-    const bar = (color: string): Bar => {
-      const box = el('div', 'width:120px;position:relative;height:16px;background:#241f2a');
-      const fill = el('div', `height:100%;background:${color}`);
-      const text = el('div', 'position:absolute;inset:0;text-align:center;font-size:11px;line-height:16px;color:#fff');
-      box.append(fill, text);
-      return { box, fill, text };
+  private buildOrbs(): void {
+    const mk = (orb: HTMLElement, color: string) => {
+      const liq = el('div', 'liq');
+      liq.style.background = `linear-gradient(180deg,${color} 0%,#000 160%)`;
+      const t = el('div', 't');
+      orb.append(liq, el('div', 'shine'), t);
+      return { liq, t };
     };
-    const parts = { lv: el('span'), hp: bar('#a4332b'), mp: bar('#3558a8'), xp: bar('#8a7a2a'), gold: el('span'), pts: el('span', 'opacity:.7') };
-    this.barParts = parts;
-    this.bars.append(parts.lv, parts.hp.box, parts.mp.box, parts.xp.box, parts.gold, parts.pts);
+    this.orbParts = { hp: mk(this.orbHp, '#d83a3a'), mp: mk(this.orbMp, '#3a6ae0') };
   }
 
-  private setBar(b: Bar, label: string, v: number, max: number): void {
-    b.fill.style.width = `${Math.max(0, Math.min(1, v / max)) * 100}%`;
-    b.text.textContent = `${label} ${Math.ceil(v)}/${max}`;
+  update(w: World, p: Actor, target?: Actor): void {
+    this.lastP = p;
+    this.lastW = w;
+    this.updateHud(p, target);
+    const near = w.npcs.filter((n) => Math.hypot(n.x - p.x, n.y - p.y) <= NPC_RANGE);
+    const key = JSON.stringify([this.open, this.tab, p.inventory, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.gold, p.level, near.map((n) => n.id), p.quests, p.xp > 0]);
+    if (key === this.key || this.dragging) return;
+    this.key = key;
+    if (this.open) this.renderMain(w, p);
+    this.renderSide(w, p, this.open ? near : []);
   }
 
   private updateHud(p: Actor, t?: Actor): void {
-    const bp = this.barParts!;
+    const o = this.orbParts!;
+    const hpMax = maxHpOf(p);
+    const mpMax = maxManaOf(p);
+    o.hp.liq.style.height = `${Math.max(0, Math.min(1, p.hp / hpMax)) * 100}%`;
+    o.mp.liq.style.height = `${Math.max(0, Math.min(1, p.mana / mpMax)) * 100}%`;
+    o.hp.t.textContent = `${Math.ceil(p.hp)}`;
+    o.mp.t.textContent = `${Math.floor(p.mana)}`;
+    this.orbHp.title = `Leben ${Math.ceil(p.hp)}/${hpMax}`;
+    this.orbMp.title = `Mana ${Math.floor(p.mana)}/${mpMax}`;
+
     const span = totalXpFor(Math.min(p.level + 1, MAX_LEVEL)) - totalXpFor(p.level);
     const into = Math.max(0, p.xp - totalXpFor(p.level));
-    bp.lv.textContent = `Lv ${p.level}`;
-    this.setBar(bp.hp, 'LP', p.hp, maxHpOf(p));
-    this.setBar(bp.mp, 'MP', p.mana, maxManaOf(p));
-    this.setBar(bp.xp, 'XP', into, p.level >= MAX_LEVEL ? 1 : span);
-    bp.gold.textContent = `Gold ${p.gold}`;
-    const n = (k: 'heal' | 'mana') => p.inventory.filter((i) => i.slot === 'potion' && i[k] !== undefined).length;
-    bp.pts.textContent = `Q Heil ${n('heal')} · E Mana ${n('mana')}${p.statPoints ? ` · ${p.statPoints} Punkte (C)` : ''}`;
-    if (this.panelHp) this.panelHp.textContent = `Leben ${Math.ceil(p.hp)}/${maxHpOf(p)} · Mana ${Math.floor(p.mana)}/${maxManaOf(p)}`;
+    const frac = p.level >= MAX_LEVEL ? 1 : Math.min(1, into / Math.max(1, span));
+    this.xpFill.style.width = `${frac * 100}%`;
+    this.xpText.textContent = `Stufe ${p.level} · ${p.level >= MAX_LEVEL ? 'Maximum' : `${into} / ${span} XP`} · ${p.gold} Gold${p.statPoints ? ` · ${p.statPoints} Attributpunkte (C)` : ''}`;
 
-    // Hotbar: Buttons nur bei geänderter Skill-Liste neu bauen, sonst Text in place aktualisieren
+    // Schnellleiste: Tränke (Q/E) und Skills (1–9); Elemente bleiben bestehen, nur Zustand wird aktualisiert
     const hk = p.skills.join(',');
-    if (hk !== this.hotKey) {
+    if (hk !== this.hotKey || !this.potionBtns) {
       this.hotKey = hk;
+      this.hotbar.replaceChildren();
+      const mkPotion = (kind: 'heal' | 'mana', key: string) => {
+        const b = el('div', 'hb');
+        b.title = kind === 'heal' ? 'Heiltrank (Q)' : 'Manatrank (E)';
+        b.append(Object.assign(el('img'), { src: potionIcon(kind) }), el('div', 'k', key), el('div', 'cnt'));
+        b.onclick = () => this.usePotionKind(kind);
+        return b;
+      };
+      this.potionBtns = { heal: mkPotion('heal', 'Q'), mana: mkPotion('mana', 'E') };
+      this.hotbar.append(this.potionBtns.heal);
       this.hotButtons = p.skills.map((id, i) => {
         const s = SKILLS.find((x) => x.id === id)!;
-        const b = el('button', 'cursor:pointer;min-width:84px;padding:4px 6px;background:#241f2a;color:#c9b79c;border:1px solid #4b3f3a');
-        b.title = s.desc;
+        const b = el('div', 'hb');
+        b.title = `${s.name} – ${s.desc}`;
+        const cd = el('div', 'cd');
+        const txt = el('div', 'c');
+        b.append(Object.assign(el('img'), { src: skillIcon(s) }), cd, txt, el('div', 'k', i < 9 ? String(i + 1) : ''));
         b.onclick = () => this.useSkillSlot(i);
-        return b;
+        this.hotbar.append(b);
+        return { el: b, cd, txt };
       });
-      this.hotbar.replaceChildren(...this.hotButtons);
+      this.hotbar.append(this.potionBtns.mana);
+      this.arrows = el('div', 'hb');
+      this.arrows.title = 'Pfeile im Köcher';
+      this.arrows.append(Object.assign(el('img'), { src: arrowIcon() }), el('div', 'cnt'));
+      this.hotbar.append(this.arrows);
+    }
+    const q = p.equipment.quiver;
+    this.arrows!.style.display = q || p.equipment.weapon?.kind === 'bow' ? 'block' : 'none';
+    const ac = this.arrows!.querySelector('.cnt') as HTMLElement;
+    const at = q ? String(q.ammo ?? 0) : '0';
+    if (ac.textContent !== at) ac.textContent = at;
+    this.arrows!.style.opacity = (q?.ammo ?? 0) > 0 ? '1' : '.45';
+    const count = (k: 'heal' | 'mana') => p.inventory.filter((i) => i.slot === 'potion' && i[k] !== undefined).length;
+    for (const k of ['heal', 'mana'] as const) {
+      const cnt = this.potionBtns![k].querySelector('.cnt') as HTMLElement;
+      const n = count(k);
+      if (cnt.textContent !== String(n)) cnt.textContent = String(n);
+      this.potionBtns![k].style.opacity = n ? '1' : '.45';
     }
     p.skills.forEach((id, i) => {
       const s = SKILLS.find((x) => x.id === id)!;
       const cd = p.skillCd[id] ?? 0;
-      const label = `${i < 9 ? `${i + 1} ` : ''}${s.name}${cd > 0 ? ` (${Math.ceil(cd / TICK_RATE)}s)` : ''}`;
-      const b = this.hotButtons[i]!;
-      if (b.textContent !== label) b.textContent = label;
+      const hb = this.hotButtons[i]!;
+      hb.cd.style.height = cd > 0 ? `${Math.min(100, (cd / s.cooldown) * 100)}%` : '0';
+      const txt = cd > 0 ? String(Math.ceil(cd / TICK_RATE)) : '';
+      if (hb.txt.textContent !== txt) hb.txt.textContent = txt;
+      hb.el.classList.toggle('nomana', p.mana < s.mana);
     });
 
     if (t && t.alive && t.kind === 'monster') {
       this.target.style.display = 'block';
       const k = monsterKind(t.kindId!);
-      this.target.textContent = `${t.name} (Lv ${k.level}) ${Math.ceil(t.hp)}/${t.maxHp}`;
+      this.target.textContent = `${t.name} (Stufe ${k.level}) ${Math.ceil(t.hp)}/${t.maxHp}`;
     } else this.target.style.display = 'none';
   }
 
-  private renderPanel(w: World, p: Actor): void {
-    this.tip.style.display = 'none';
-    const out: HTMLElement[] = [];
-    const h = (t: string) => out.push(el('div', 'margin-top:10px;font-weight:bold;border-top:1px solid #4b3f3a;padding-top:6px', t));
-    const [lo, hi] = damageRange(p);
-    out.push(el('div', 'font-weight:bold', `Held · Level ${p.level} (I/C schließen)`));
-    this.panelHp = el('div');
-    out.push(this.panelHp);
-    out.push(el('div', '', `Schaden ${lo}-${hi} · Rüstung ${armorOf(p)} · Gewicht ${carriedWeight(p).toFixed(1)}/${carryCapacity(p)}`));
+  /* -------------------------------------------------- Tooltip & Drag */
 
-    h(`Attribute (${p.statPoints} Punkte)`);
-    for (const k of ATTR_KEYS) {
-      const row = el('div', 'display:flex;justify-content:space-between;align-items:center');
-      row.append(el('span', '', `${ATTR_NAME[k]}: ${p.attrs[k]}`));
-      if (p.statPoints > 0) row.append(this.btn('+', () => this.send({ type: 'spendStat', attr: k })));
-      out.push(row);
-    }
-    out.push(el('div', 'font-size:11px;opacity:.65', 'Kraft: Schaden & Tragkraft · Gewandtheit: Angriffstempo & Fernkampf · Ausdauer: Leben · Verstand: Mana & Magie · Willenskraft: Mana-Regeneration'));
-
-    const sets = activeSetBonuses(p);
-    if (sets.length) {
-      h('Set-Boni');
-      for (const st of sets) {
-        out.push(el('div', 'color:#5fd070', `${st.name} (${st.pieces} Teile)`));
-        for (const [n, b] of st.bonuses) {
-          const txt = [...(b.affixes ?? []).map((a) => `+${a.value} ${STAT_NAME[a.stat]}`), ...(b.power ? [POWER_TEXT[b.power.id](b.power.value)] : [])].join(', ');
-          out.push(el('div', 'font-size:11px;opacity:.8', `${n} Teile: ${txt}`));
-        }
-      }
-    }
-
-    if (p.skills.length) {
-      h('Fertigkeiten');
-      p.skills.forEach((id, i) => {
-        const s = SKILLS.find((x) => x.id === id)!;
-        out.push(el('div', '', `${i + 1}: ${s.name} (${s.mana} Mana) – ${s.desc}`));
-      });
-    }
-
-    const active = QUESTS.filter((q) => p.quests[q.id] && p.quests[q.id]!.state !== 'turned');
-    if (active.length) {
-      h('Aufgaben');
-      for (const q of active) out.push(el('div', '', `${q.name}: ${p.quests[q.id]!.state === 'done' ? 'fertig – abgeben!' : `${p.quests[q.id]!.progress}/${q.count}`}`));
-    }
-
-    h('Ausgerüstet');
-    for (const slot of Object.keys(SLOT_NAME) as Slot[]) {
-      const it = p.equipment[slot];
-      out.push(this.itemRow(`${SLOT_NAME[slot]}: ${it ? it.name : '–'}`, it, it ? [['Ablegen', () => this.send({ type: 'unequip', slot })]] : []));
-    }
-
-    const merchant = nearNpc(w, p, 'merchant');
-    const stash = nearNpc(w, p, 'stash');
-    h('Rucksack');
-    if (!p.inventory.length) out.push(el('i', '', 'leer'));
-    for (const it of p.inventory) {
-      const acts: [string, () => void][] = [];
-      if (it.slot === 'potion') acts.push(['Benutzen', () => this.send({ type: 'usePotion', itemId: it.id })]);
-      else acts.push(['Anlegen', () => this.send({ type: 'equip', itemId: it.id })]);
-      acts.push(['Fallen', () => this.send({ type: 'drop', itemId: it.id })]);
-      if (merchant) acts.push([`Verkaufen (${sellPrice(it)}g)`, () => this.send({ type: 'sell', itemId: it.id })]);
-      if (stash) acts.push(['In Truhe', () => this.send({ type: 'stashPut', itemId: it.id })]);
-      out.push(this.itemRow(it.name, it, acts, it.slot === 'potion' ? undefined : p.equipment[it.slot]));
-    }
-
-    const trainer = nearNpc(w, p, 'trainer');
-    if (trainer) {
-      h(trainer.name);
-      for (const s of SKILLS.filter((x) => x.tier <= (trainer.tier ?? 1))) {
-        const learned = p.skills.includes(s.id);
-        const row = el('div', 'margin:4px 0');
-        row.append(el('div', '', `${s.name} [${s.area}] · Lv ${s.levelReq} · ${s.price}g`), el('div', 'font-size:11px;opacity:.7', s.desc));
-        row.append(learned ? el('i', '', 'gelernt') : this.btn('Lernen', () => this.send({ type: 'learnSkill', skillId: s.id })));
-        out.push(row);
-      }
-    }
-    for (const m of w.npcs.filter((n) => n.kind === 'merchant' && Math.hypot(n.x - p.x, n.y - p.y) <= NPC_RANGE)) {
-      h(m.name);
-      for (const t of (SHOPS[m.shop ?? 'basic'] ?? []).map(templateById)) {
-        const row = el('div', 'display:flex;justify-content:space-between;align-items:center;margin:2px 0');
-        row.append(el('span', '', `${t.name} (${t.weight})`), this.btn(`${buyPrice(t.id)}g`, () => this.send({ type: 'buy', templateId: t.id })));
-        out.push(row);
-      }
-    }
-    for (const g of w.npcs.filter((n) => n.kind === 'quest' && Math.hypot(n.x - p.x, n.y - p.y) <= NPC_RANGE)) {
-      h(`${g.name} – Aufgaben`);
-      for (const id of g.quests ?? []) {
-        const def = questById(id);
-        if (!def) continue;
-        const st = p.quests[id];
-        const row = el('div', 'margin:6px 0');
-        row.append(el('div', 'font-weight:bold', `${def.name} (ab Lv ${def.minLevel})`), el('div', 'font-size:11px;opacity:.75', def.text), el('div', 'font-size:11px', `Belohnung: ${def.xp} XP, ${def.gold} Gold`));
-        if (!st) row.append(this.btn('Annehmen', () => this.send({ type: 'acceptQuest', questId: id })));
-        else if (st.state === 'active') row.append(el('i', '', `Fortschritt ${st.progress}/${def.count}`));
-        else if (st.state === 'done') row.append(this.btn('Abgeben', () => this.send({ type: 'turnInQuest', questId: id })));
-        else row.append(el('i', '', 'erledigt'));
-        out.push(row);
-      }
-    }
-    const smith = nearNpc(w, p, 'smith');
-    if (smith) {
-      h(`${smith.name} – Schmiede`);
-      out.push(el('div', 'font-size:11px;opacity:.75', 'Aufwerten (normal → magisch → selten), Affixe neu würfeln, Affix hinzufügen (selten). Nur Gegenstände im Rucksack.'));
-      const gear = p.inventory.filter((i) => i.slot !== 'potion' && i.rarity !== 'legendary' && i.rarity !== 'set');
-      if (!gear.length) out.push(el('i', '', 'Nichts zu verbessern.'));
-      for (const it of gear) {
-        const acts: [string, () => void][] = [];
-        if (it.rarity !== 'rare') acts.push([`Aufwerten (${craftCost(it, 'upgrade')}g)`, () => this.send({ type: 'craft', itemId: it.id, op: 'upgrade' })]);
-        if (it.rarity !== 'normal') acts.push([`Neu würfeln (${craftCost(it, 'reroll')}g)`, () => this.send({ type: 'craft', itemId: it.id, op: 'reroll' })]);
-        if (it.rarity === 'rare' && it.affixes.length < 5) acts.push([`Affix + (${craftCost(it, 'extend')}g)`, () => this.send({ type: 'craft', itemId: it.id, op: 'extend' })]);
-        out.push(this.itemRow(it.name, it, acts, it.slot === 'potion' ? undefined : p.equipment[it.slot]));
-      }
-    }
-    if (stash) {
-      h('Truhe (sicher, auch beim Tod)');
-      if (!p.stash.length) out.push(el('i', '', 'leer'));
-      for (const it of p.stash) out.push(this.itemRow(it.name, it, [['Nehmen', () => this.send({ type: 'stashTake', itemId: it.id })]]));
-    }
-    out.push(el('hr', 'border-color:#4b3f3a;margin-top:12px'), this.btn('Neues Spiel (löscht Spielstand)', () => { if (confirm('Spielstand wirklich löschen und neu beginnen?')) this.newGame(); }));
-    this.panel.replaceChildren(...out);
-  }
-
-  private btn(label: string, fn: () => void): HTMLButtonElement {
-    const b = el('button', 'margin:2px 4px 0 0;cursor:pointer', label);
-    b.onclick = fn;
-    return b;
-  }
-
-  /** Werte eines Gegenstands als Zahlen (für den Vergleich mit dem angelegten Stück). */
   private statsOf(i: Item): Record<string, number> {
     const o: Record<string, number> = {};
     if (i.damage) o['Schaden'] = (i.damage[0] + i.damage[1]) / 2;
     if (i.armor) o['Rüstung'] = i.armor;
-    if (i.heal) o['Heilung'] = i.heal;
-    if (i.mana) o['Mana (Trank)'] = i.mana;
-    for (const a of i.affixes) {
-      const n = STAT_NAME[a.stat];
-      o[n === 'Schaden' ? 'Schaden' : n] = (o[n === 'Schaden' ? 'Schaden' : n] ?? 0) + a.value;
-    }
+    for (const a of i.affixes) o[STAT_NAME[a.stat]] = (o[STAT_NAME[a.stat]] ?? 0) + a.value;
     return o;
   }
 
   private showTip(it: Item, equipped: Item | undefined, ev: MouseEvent): void {
+    if (this.dragging) return;
     const box = this.tip;
     box.replaceChildren();
-    box.append(el('div', `font-weight:bold;color:${RARITY_COLOR[it.rarity]}`, it.name));
+    const head = el('div', '', it.name);
+    head.style.cssText = `font-weight:bold;color:${RARITY_COLOR[it.rarity]}`;
+    box.append(head);
     const rar = { normal: 'Normal', magic: 'Magisch', rare: 'Selten', set: 'Set', legendary: 'Legendär' }[it.rarity];
-    box.append(el('div', 'opacity:.6', `${rar}${it.slot !== 'potion' ? ' · ' + ({ weapon: 'Waffe', head: 'Kopf', chest: 'Brust', hands: 'Hände', feet: 'Füße', ring: 'Ring' } as Record<string, string>)[it.slot] : ' · Trank'}`));
-    for (const part of describeItem(it).split(' · ')) box.append(el('div', '', part));
+    const sub = el('div', '', `${rar} · ${it.slot === 'potion' ? 'Trank' : it.slot === 'ammo' ? 'Pfeile' : SLOT_NAME[it.slot]}`);
+    sub.style.opacity = '.6';
+    box.append(sub);
+    for (const part of describeItem(it).split(' · ')) {
+      if (part.startsWith('Benötigt ')) continue;
+      box.append(el('div', '', part));
+    }
+    const labels = reqLabels(it);
+    if (labels.length && it.slot !== 'potion') {
+      const missing = this.lastP ? missingReq(this.lastP, it, equipped) : [];
+      const line = el('div');
+      line.append('Benötigt: ');
+      labels.forEach((l, idx) => {
+        const sp = el('span', '', l);
+        sp.style.color = missing.includes(l) ? '#ff6a5a' : '#8fd890';
+        line.append(sp);
+        if (idx < labels.length - 1) line.append(', ');
+      });
+      line.style.marginTop = '3px';
+      box.append(line);
+    }
     if (equipped && equipped.id !== it.id && it.slot !== 'potion') {
       const a = this.statsOf(it);
       const b = this.statsOf(equipped);
-      box.append(el('div', 'margin-top:6px;border-top:1px solid #4b3f3a;padding-top:4px;opacity:.7', `Verglichen mit: ${equipped.name}`));
+      const h = el('div', '', `Verglichen mit: ${equipped.name}`);
+      h.style.cssText = 'margin-top:6px;border-top:1px solid #4b3f3a;padding-top:4px;opacity:.7';
+      box.append(h);
       for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
         const d = Math.round(((a[k] ?? 0) - (b[k] ?? 0)) * 10) / 10;
         if (d === 0) continue;
-        box.append(el('div', `color:${d > 0 ? '#6fe08a' : '#ff7a6a'}`, `${d > 0 ? '▲ +' : '▼ '}${d} ${k}`));
+        const line = el('div', '', `${d > 0 ? '▲ +' : '▼ '}${d} ${k}`);
+        line.style.color = d > 0 ? '#6fe08a' : '#ff7a6a';
+        box.append(line);
       }
-    } else if (!equipped && it.slot !== 'potion') box.append(el('div', 'margin-top:6px;color:#6fe08a', 'Slot ist frei'));
+    } else if (!equipped && it.slot !== 'potion') {
+      const free = el('div', '', 'Slot ist frei');
+      free.style.cssText = 'margin-top:6px;color:#6fe08a';
+      box.append(free);
+    }
     box.style.display = 'block';
     this.moveTip(ev);
   }
@@ -326,16 +383,422 @@ export class Ui {
     this.tip.style.top = `${Math.min(window.innerHeight - h - 8, Math.max(8, ev.clientY - 20))}px`;
   }
 
-  private itemRow(label: string, it: Item | undefined, actions: [string, () => void][], equipped?: Item): HTMLElement {
-    const d = el('div', 'margin:4px 0');
-    if (it) {
-      d.onmouseenter = (ev) => this.showTip(it, equipped ?? undefined, ev);
-      d.onmousemove = (ev) => this.moveTip(ev);
-      d.onmouseleave = () => (this.tip.style.display = 'none');
+  private canDrop(d: Drag, zone: string): boolean {
+    if (zone === 'equip:quiver' && d.item.slot === 'ammo') return d.from === 'bag';
+    if (zone.startsWith('equip:')) return d.from === 'bag' && d.item.slot === zone.slice(6);
+    if (zone === 'bag') return d.from === 'equip' || d.from === 'stash' || d.from === 'shop';
+    if (zone === 'stash') return d.from === 'bag' && !!this.lastW && !!this.lastP && !!nearNpc(this.lastW, this.lastP, 'stash');
+    if (zone === 'sell') return d.from === 'bag' && !!this.lastW && !!this.lastP && !!nearNpc(this.lastW, this.lastP, 'merchant');
+    return false;
+  }
+
+  private perform(d: Drag, zone: string | null): void {
+    if (!zone) {
+      if (d.from === 'bag') this.send({ type: 'drop', itemId: d.item.id });
+      this.onDropToWorld?.(d.item);
+      return;
     }
-    d.append(el('div', it ? `color:${RARITY_COLOR[it.rarity]}` : '', label));
-    if (it) d.append(el('div', 'font-size:11px;opacity:.7', describeItem(it)));
-    for (const [n, f] of actions) d.append(this.btn(n, f));
-    return d;
+    if (!this.canDrop(d, zone)) {
+      this.say(zone.startsWith('equip:') ? `${d.item.name} passt nicht in diesen Slot.` : 'Das geht hier nicht.');
+      return;
+    }
+    if (zone === 'equip:quiver' && d.item.slot === 'ammo') this.send({ type: 'refillQuiver', itemId: d.item.id });
+    else if (zone.startsWith('equip:')) this.send({ type: 'equip', itemId: d.item.id });
+    else if (zone === 'bag') {
+      if (d.from === 'equip') this.send({ type: 'unequip', slot: d.slot! });
+      else if (d.from === 'stash') this.send({ type: 'stashTake', itemId: d.item.id });
+      else if (d.from === 'shop') this.send({ type: 'buy', templateId: d.templateId! });
+    } else if (zone === 'stash') this.send({ type: 'stashPut', itemId: d.item.id });
+    else if (zone === 'sell') this.send({ type: 'sell', itemId: d.item.id });
+  }
+
+  /** Macht ein Element ziehbar (Zeiger-Ereignisse) und bindet Tooltip und Doppelklick. */
+  private makeDraggable(e: HTMLElement, d: Drag, equipped: Item | undefined, onDouble: () => void): void {
+    e.onmouseenter = (ev) => this.showTip(d.item, equipped, ev);
+    e.onmousemove = (ev) => this.moveTip(ev);
+    e.onmouseleave = () => (this.tip.style.display = 'none');
+    e.ondblclick = () => {
+      this.tip.style.display = 'none';
+      onDouble();
+    };
+    e.onpointerdown = (down) => {
+      if (down.button !== 0) return;
+      const sx = down.clientX;
+      const sy = down.clientY;
+      let started = false;
+      const move = (m: PointerEvent) => {
+        if (!started && Math.hypot(m.clientX - sx, m.clientY - sy) > 5) {
+          started = true;
+          this.beginDrag(d);
+        }
+        if (started && this.ghost) {
+          this.ghost.style.left = `${m.clientX - 22}px`;
+          this.ghost.style.top = `${m.clientY - 22}px`;
+          this.markZones(m.clientX, m.clientY);
+        }
+      };
+      const up = (u: PointerEvent) => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        if (!started) return;
+        const under = document.elementFromPoint(u.clientX, u.clientY);
+        const zone = (under?.closest('[data-drop]') as HTMLElement | null)?.dataset.drop ?? null;
+        const overUi = !!under?.closest('.a-win, .hb, .orb');
+        this.endDrag();
+        if (zone) this.perform(d, zone);
+        else if (!overUi) this.perform(d, null);
+        this.key = '';
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+    };
+  }
+
+  private beginDrag(d: Drag): void {
+    this.dragging = d;
+    this.tip.style.display = 'none';
+    const g = el('img');
+    g.src = itemIcon(d.item);
+    g.style.cssText = 'position:fixed;width:44px;height:44px;image-rendering:pixelated;pointer-events:none;z-index:100;opacity:.9;filter:drop-shadow(0 4px 6px #000)';
+    document.body.appendChild(g);
+    this.ghost = g;
+    for (const z of document.querySelectorAll<HTMLElement>('[data-drop]')) {
+      if (this.canDrop(d, z.dataset.drop!)) z.classList.add('ok');
+    }
+  }
+
+  private markZones(x: number, y: number): void {
+    const under = document.elementFromPoint(x, y)?.closest('[data-drop]') as HTMLElement | null;
+    for (const z of document.querySelectorAll<HTMLElement>('[data-drop]')) {
+      z.classList.toggle('bad', z === under && !!this.dragging && !this.canDrop(this.dragging, z.dataset.drop!));
+    }
+  }
+
+  private endDrag(): void {
+    this.dragging = null;
+    this.ghost?.remove();
+    this.ghost = null;
+    for (const z of document.querySelectorAll<HTMLElement>('[data-drop]')) z.classList.remove('ok', 'bad');
+  }
+
+  /* -------------------------------------------------------- Hauptfenster */
+
+  private slotEl(item: Item | null, label = ''): HTMLElement {
+    const s = el('div', item ? 'a-slot item' : 'a-slot');
+    if (label) s.append(el('div', 'l', label));
+    if (item) {
+      s.style.borderColor = RARITY_COLOR[item.rarity];
+      if (item.rarity !== 'normal') s.style.boxShadow = `inset 0 0 8px ${RARITY_COLOR[item.rarity]}55`;
+      s.append(Object.assign(el('img'), { src: itemIcon(item) }));
+    }
+    return s;
+  }
+
+  private renderMain(w: World, p: Actor): void {
+    const tabs = el('div', 'a-tabs');
+    for (const [id, label] of [['inv', 'Inventar (I)'], ['char', 'Charakter (C)'], ['skills', 'Fertigkeiten (K)'], ['quests', 'Aufgaben (J)']] as [Tab, string][]) {
+      const t = el('div', `a-tab${this.tab === id ? ' on' : ''}`, label);
+      t.onclick = () => {
+        this.tab = id;
+        this.key = '';
+      };
+      tabs.append(t);
+    }
+    const body = el('div', 'a-body');
+    if (this.tab === 'inv') this.renderInventory(body, p);
+    else if (this.tab === 'char') this.renderChar(body, p);
+    else if (this.tab === 'skills') this.renderSkills(body, p);
+    else this.renderQuests(body, p);
+    const title = el('h3', '', `${p.name} · Stufe ${p.level}`);
+    this.main.replaceChildren(title, tabs, body);
+    void w;
+  }
+
+  private dollImage(p: Actor): string {
+    const look = lookOf(p);
+    const key = `${look.chest}_${look.head}_${look.weapon}_${look.hands}_${look.weaponKind}_${look.robe}_${look.quiver}`;
+    if (key !== this.dollKey) {
+      this.dollKey = key;
+      this.dollUrl = playerCanvas(look, 0).toDataURL();
+    }
+    return this.dollUrl;
+  }
+
+  private renderInventory(body: HTMLElement, p: Actor): void {
+    // Figur mit Ausrüstungsfeldern
+    const doll = el('div', 'a-doll');
+    doll.dataset.drop = 'bag';
+    doll.append(Object.assign(el('img', 'me'), { src: this.dollImage(p) }));
+    const pos: Record<Slot, [number, number]> = { head: [95, 6], chest: [95, 100], weapon: [10, 100], hands: [180, 100], feet: [95, 214], ring: [10, 214], quiver: [180, 214] };
+    for (const slot of Object.keys(pos) as Slot[]) {
+      const it = p.equipment[slot] ?? null;
+      const s = this.slotEl(it, it ? '' : SLOT_NAME[slot]);
+      s.dataset.drop = `equip:${slot}`;
+      s.style.left = `${pos[slot][0]}px`;
+      s.style.top = `${pos[slot][1]}px`;
+      if (it?.ammo !== undefined && slot === 'quiver') s.append(el('div', 'n', String(it.ammo)));
+      if (it) this.makeDraggable(s, { item: it, from: 'equip', slot }, undefined, () => this.send({ type: 'unequip', slot }));
+      doll.append(s);
+    }
+    body.append(doll);
+
+    // Werte-Kurzfassung
+    const [lo, hi] = damageRange(p);
+    const sum = el('div', 'a-row');
+    sum.style.justifyContent = 'center';
+    sum.style.gap = '16px';
+    sum.append(el('span', '', `Schaden ${lo}–${hi}`), el('span', '', `Rüstung ${armorOf(p)}`), el('span', '', `Leben ${maxHpOf(p)}`));
+    body.append(sum);
+
+    // Rucksack
+    body.append(el('div', 'a-sec', 'Rucksack'));
+    const grid = el('div', 'a-grid a-drop');
+    grid.dataset.drop = 'bag';
+    // Tränke gleicher Art stapeln (ein Slot, Anzahl als Zahl)
+    const stacks: { item: Item; n: number }[] = [];
+    for (const it of p.inventory) {
+      const st = it.slot === 'potion' ? stacks.find((s) => s.item.templateId === it.templateId) : undefined;
+      if (st) st.n++;
+      else stacks.push({ item: it, n: 1 });
+    }
+    const cells = Math.max(BAG_COLS * 5, Math.ceil((stacks.length + 1) / BAG_COLS) * BAG_COLS);
+    for (let i = 0; i < cells; i++) {
+      const st = stacks[i];
+      const s = this.slotEl(st?.item ?? null);
+      if (st) {
+        if (st.n > 1) s.append(el('div', 'n', String(st.n)));
+        const it = st.item;
+        this.makeDraggable(s, { item: it, from: 'bag' }, equippedFor(p, it), () =>
+          this.send(it.slot === 'potion' ? { type: 'usePotion', itemId: it.id } : it.slot === 'ammo' ? { type: 'refillQuiver', itemId: it.id } : { type: 'equip', itemId: it.id }),
+        );
+      }
+      grid.append(s);
+    }
+    body.append(grid);
+    const wgt = carriedWeight(p);
+    const cap = carryCapacity(p);
+    const bar = el('div', 'a-bar');
+    bar.style.marginTop = '6px';
+    const fill = el('div');
+    fill.style.cssText = `width:${Math.min(100, (wgt / cap) * 100)}%;background:${wgt / cap > 0.85 ? '#c04a3a' : '#7a9a4a'}`;
+    bar.append(fill);
+    body.append(bar, el('div', 'a-note', `Gewicht ${wgt.toFixed(1)} / ${cap} · ${p.gold} Gold · Ziehen: anlegen, ablegen, in die Welt werfen · Doppelklick: anlegen/benutzen`));
+  }
+
+  private renderChar(body: HTMLElement, p: Actor): void {
+    const [lo, hi] = damageRange(p);
+    body.append(el('div', 'a-sec', `Attribute${p.statPoints ? ` – ${p.statPoints} Punkte zu verteilen` : ''}`));
+    const help: Record<string, string> = {
+      kraft: 'mehr Schaden, mehr Tragkraft', gewandtheit: 'schnellere Hiebe, Fernkampf', ausdauer: 'mehr Leben und Regeneration',
+      verstand: 'mehr Mana, stärkere Magie', willenskraft: 'schnellere Mana-Regeneration',
+    };
+    for (const k of ATTR_KEYS) {
+      const row = el('div', 'a-row');
+      const left = el('div');
+      left.append(el('div', '', `${ATTR_NAME[k]}: ${p.attrs[k]}`), el('div', 'a-note', help[k]));
+      row.append(left);
+      const b = el('button', `a-btn${p.statPoints ? '' : ' off'}`, '+');
+      b.onclick = () => p.statPoints > 0 && this.send({ type: 'spendStat', attr: k });
+      row.append(b);
+      body.append(row);
+    }
+    body.append(el('div', 'a-sec', 'Werte'));
+    const rows: [string, string][] = [
+      ['Leben', `${Math.ceil(p.hp)} / ${maxHpOf(p)}`], ['Mana', `${Math.floor(p.mana)} / ${maxManaOf(p)}`], ['Schaden pro Hieb', `${lo}–${hi}`],
+      ['Rüstung', String(armorOf(p))], ['Angriffstempo', `${(TICK_RATE / attackCooldownOf(p)).toFixed(2)} Hiebe/s`],
+      ['Tragkraft', `${carriedWeight(p).toFixed(1)} / ${carryCapacity(p)}`],
+      ['Kritisch', `${powerOf(p, 'crit')} %`], ['Lebensraub', `${powerOf(p, 'lifesteal')} %`], ['Dornen', `${powerOf(p, 'thorns')} %`],
+    ];
+    for (const [a, b] of rows) {
+      const r = el('div', 'a-row');
+      r.append(el('span', '', a), el('span', '', b));
+      body.append(r);
+    }
+    const sets = activeSetBonuses(p);
+    if (sets.length) {
+      body.append(el('div', 'a-sec', 'Set-Boni'));
+      for (const st of sets) {
+        const h = el('div', '', `${st.name} (${st.pieces} Teile)`);
+        h.style.color = '#5fd070';
+        body.append(h);
+        for (const [n, b] of st.bonuses) {
+          const txt = [...(b.affixes ?? []).map((a) => `+${a.value} ${STAT_NAME[a.stat]}`), ...(b.power ? [POWER_TEXT[b.power.id](b.power.value)] : [])].join(', ');
+          body.append(el('div', 'a-note', `${n} Teile: ${txt}`));
+        }
+      }
+    }
+    const nb = el('button', 'a-btn', 'Neues Spiel (löscht Spielstand)');
+    nb.style.marginTop = '14px';
+    nb.onclick = () => {
+      if (confirm('Spielstand wirklich löschen und neu beginnen?')) this.newGame();
+    };
+    body.append(nb);
+  }
+
+  private renderSkills(body: HTMLElement, p: Actor): void {
+    body.append(el('div', 'a-sec', 'Gelernte Fertigkeiten'));
+    if (!p.skills.length) body.append(el('div', 'a-note', 'Noch keine – Lehrer in den Städten bringen dir Fertigkeiten bei.'));
+    p.skills.forEach((id, i) => {
+      const s = SKILLS.find((x) => x.id === id)!;
+      const c = el('div', 'a-card');
+      c.append(Object.assign(el('img'), { src: skillIcon(s) }));
+      const t = el('div');
+      t.append(el('div', '', `${s.name}${i < 9 ? ` [${i + 1}]` : ''} · ${s.area}`), el('div', 'a-note', `${s.mana} Mana · ${Math.round(s.cooldown / TICK_RATE)} s Abklingzeit`), el('div', 'a-note', s.desc));
+      c.append(t);
+      body.append(c);
+    });
+  }
+
+  private renderQuests(body: HTMLElement, p: Actor): void {
+    const active = QUESTS.filter((q) => p.quests[q.id] && p.quests[q.id]!.state !== 'turned');
+    body.append(el('div', 'a-sec', 'Aktive Aufgaben'));
+    if (!active.length) body.append(el('div', 'a-note', 'Keine. Questgeber (gelbes ! über dem Kopf) stehen in den Städten.'));
+    for (const q of active) {
+      const st = p.quests[q.id]!;
+      const c = el('div', 'a-card');
+      c.style.display = 'block';
+      c.append(el('div', '', q.name), el('div', 'a-note', q.text));
+      const bar = el('div', 'a-bar');
+      const f = el('div');
+      f.style.cssText = `width:${Math.min(100, (st.progress / q.count) * 100)}%;background:${st.state === 'done' ? '#6fe08a' : '#d8a24a'}`;
+      bar.append(f);
+      c.append(bar, el('div', 'a-note', st.state === 'done' ? 'Fertig – beim Auftraggeber abgeben!' : `${st.progress}/${q.count} · Belohnung ${q.xp} XP, ${q.gold} Gold`));
+      body.append(c);
+    }
+  }
+
+  /* -------------------------------------------------- Händler-Fenster */
+
+  private renderSide(w: World, p: Actor, near: Npc[]): void {
+    if (!near.length) {
+      this.side.style.display = 'none';
+      return;
+    }
+    const body = el('div', 'a-body');
+    const trainer = near.find((n) => n.kind === 'trainer');
+    const merchants = near.filter((n) => n.kind === 'merchant');
+    const stash = near.find((n) => n.kind === 'stash');
+    const smith = near.find((n) => n.kind === 'smith');
+    const givers = near.filter((n) => n.kind === 'quest');
+    for (const m of merchants) {
+      body.append(el('div', 'a-sec', `${m.name} – Waren`));
+      const grid = el('div', 'a-grid');
+      for (const id of SHOPS[m.shop ?? 'basic'] ?? []) {
+        const t = templateById(id);
+        const fake: Item = {
+          id: -1, templateId: id, name: t.name, slot: t.slot, rarity: 'normal', weight: t.weight, damage: t.damage, armor: t.armor,
+          heal: t.heal, mana: t.mana, reqKraft: t.reqKraft, value: t.value, affixes: [],
+        };
+        const s = this.slotEl(fake);
+        const price = el('div', 'n', `${buyPrice(id)}g`);
+        price.style.color = p.gold >= buyPrice(id) ? '#ffd84a' : '#ff7a6a';
+        s.append(price);
+        this.makeDraggable(s, { item: fake, from: 'shop', templateId: id }, equippedFor(p, fake), () => this.send({ type: 'buy', templateId: id }));
+        grid.append(s);
+      }
+      body.append(grid);
+      body.append(el('div', 'a-note', 'Ziehen in den Rucksack oder Doppelklick: kaufen.'));
+    }
+    if (merchants.length) {
+      const sell = el('div', 'a-card a-drop');
+      sell.dataset.drop = 'sell';
+      sell.style.cssText += ';justify-content:center;height:46px;border-style:dashed;color:#ffd84a';
+      sell.textContent = 'Zum Verkaufen Gegenstand hierher ziehen';
+      body.append(sell);
+    }
+    if (stash) {
+      body.append(el('div', 'a-sec', 'Truhe (sicher, auch beim Tod)'));
+      const grid = el('div', 'a-grid a-drop');
+      grid.dataset.drop = 'stash';
+      const cells = Math.max(BAG_COLS * 3, Math.ceil((p.stash.length + 1) / BAG_COLS) * BAG_COLS);
+      for (let i = 0; i < cells; i++) {
+        const it = p.stash[i] ?? null;
+        const s = this.slotEl(it);
+        if (it) this.makeDraggable(s, { item: it, from: 'stash' }, equippedFor(p, it), () => this.send({ type: 'stashTake', itemId: it.id }));
+        grid.append(s);
+      }
+      body.append(grid, el('div', 'a-note', 'Gegenstände aus dem Rucksack hierher ziehen (und zurück).'));
+    }
+    if (trainer) {
+      body.append(el('div', 'a-sec', `${trainer.name} – Lehrer`));
+      for (const s of SKILLS.filter((x) => x.tier <= (trainer.tier ?? 1))) body.append(this.skillCard(s, p));
+    }
+    if (smith) {
+      body.append(el('div', 'a-sec', `${smith.name} – Schmiede`));
+      body.append(el('div', 'a-note', 'Aufwerten (normal → magisch → selten), Affixe neu würfeln, Affix hinzufügen (selten).'));
+      const gear = p.inventory.filter((i) => i.slot !== 'potion' && i.rarity !== 'legendary' && i.rarity !== 'set');
+      if (!gear.length) body.append(el('i', 'a-note', 'Nichts zu verbessern.'));
+      for (const it of gear) {
+        const c = el('div', 'a-card');
+        c.append(Object.assign(el('img'), { src: itemIcon(it) }));
+        const t = el('div');
+        const nm = el('div', '', it.name);
+        nm.style.color = RARITY_COLOR[it.rarity];
+        t.append(nm, el('div', 'a-note', describeItem(it)));
+        const row = el('div');
+        row.style.marginTop = '3px';
+        const add = (label: string, op: 'upgrade' | 'reroll' | 'extend') => {
+          const b = el('button', 'a-btn', label);
+          b.style.marginRight = '4px';
+          b.onclick = () => this.send({ type: 'craft', itemId: it.id, op });
+          row.append(b);
+        };
+        if (it.rarity !== 'rare') add(`Aufwerten ${craftCost(it, 'upgrade')}g`, 'upgrade');
+        if (it.rarity !== 'normal') add(`Neu würfeln ${craftCost(it, 'reroll')}g`, 'reroll');
+        if (it.rarity === 'rare' && it.affixes.length < 5) add(`Affix + ${craftCost(it, 'extend')}g`, 'extend');
+        t.append(row);
+        c.append(t);
+        c.onmouseenter = (ev) => this.showTip(it, p.equipment[it.slot as Slot], ev);
+        c.onmousemove = (ev) => this.moveTip(ev);
+        c.onmouseleave = () => (this.tip.style.display = 'none');
+        body.append(c);
+      }
+    }
+    for (const g of givers) {
+      body.append(el('div', 'a-sec', `${g.name} – Aufgaben`));
+      for (const id of g.quests ?? []) {
+        const def = questById(id);
+        if (!def) continue;
+        const st = p.quests[id];
+        const c = el('div', 'a-card');
+        c.style.display = 'block';
+        const t = el('div', '', `${def.name} (ab Stufe ${def.minLevel})`);
+        t.style.fontWeight = 'bold';
+        c.append(t, el('div', 'a-note', def.text), el('div', 'a-note', `Belohnung: ${def.xp} XP, ${def.gold} Gold`));
+        if (!st) {
+          const b = el('button', `a-btn${p.level < def.minLevel ? ' off' : ''}`, 'Annehmen');
+          b.onclick = () => this.send({ type: 'acceptQuest', questId: id });
+          c.append(b);
+        } else if (st.state === 'active') c.append(el('i', 'a-note', `Fortschritt ${st.progress}/${def.count}`));
+        else if (st.state === 'done') {
+          const b = el('button', 'a-btn', 'Abgeben');
+          b.onclick = () => this.send({ type: 'turnInQuest', questId: id });
+          c.append(b);
+        } else c.append(el('i', 'a-note', 'erledigt'));
+        body.append(c);
+      }
+    }
+    const title = el('h3', '', near.map((n) => n.name).join(' · '));
+    this.side.replaceChildren(title, body);
+    this.side.style.display = 'block';
+    void w;
+  }
+
+  private skillCard(s: SkillDef, p: Actor): HTMLElement {
+    const learned = p.skills.includes(s.id);
+    const c = el('div', 'a-card');
+    c.append(Object.assign(el('img'), { src: skillIcon(s) }));
+    const t = el('div');
+    t.style.flex = '1';
+    t.append(el('div', '', `${s.name} · ${s.area}`), el('div', 'a-note', `${s.desc} Ab Stufe ${s.levelReq}.`));
+    c.append(t);
+    if (learned) c.append(el('i', 'a-note', 'gelernt'));
+    else {
+      const can = p.level >= s.levelReq && p.gold >= s.price;
+      const b = el('button', `a-btn${can ? '' : ' off'}`, `Lernen ${s.price}g`);
+      b.onclick = () => this.send({ type: 'learnSkill', skillId: s.id });
+      c.append(b);
+    }
+    return c;
   }
 }

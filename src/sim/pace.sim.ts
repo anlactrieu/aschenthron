@@ -4,7 +4,7 @@ import { buildWorld, type TiledMap } from './tiled';
 import { MAX_LEVEL, SHOPS, totalXpFor } from './data';
 import { templateById, type Item } from './items';
 import {
-  applyCommand, buyPrice, carriedWeight, carryCapacity, drainEvents, getActor, inSafeZone, maxHpOf, tick, TICK_RATE,
+  missingReq, applyCommand, buyPrice, carryCapacity, drainEvents, getActor, inSafeZone, maxHpOf, tick, TICK_RATE,
   type Actor, type World,
 } from './world';
 
@@ -22,6 +22,15 @@ function townTrip(w: World, p: Actor): boolean {
     return false;
   }
   for (const it of [...p.inventory]) if (it.slot !== 'potion') applyCommand(w, p.id, { type: 'sell', itemId: it.id });
+  // überzählige Tränke verkaufen (Bot hortet sonst Mana-Tränke und gilt für immer als überladen)
+  const keep = new Map<string, number>();
+  for (const it of [...p.inventory]) {
+    if (it.slot !== 'potion') continue;
+    const kind = it.heal ? 'heal' : 'mana';
+    const n = (keep.get(kind) ?? 0) + 1;
+    keep.set(kind, n);
+    if (n > (kind === 'heal' ? 12 : 3)) applyCommand(w, p.id, { type: 'sell', itemId: it.id });
+  }
   const shop = (SHOPS[merchant.shop ?? 'basic'] ?? []).map(templateById);
   // beste bezahlbare Tränke
   for (let n = p.inventory.filter((i) => i.heal).length; n < 6; n++) {
@@ -30,10 +39,10 @@ function townTrip(w: World, p: Actor): boolean {
     applyCommand(w, p.id, { type: 'buy', templateId: heals[0].id });
   }
   // Ausrüstung: besseres Stück je Slot, solange bezahlbar und anlegbar
-  for (const t of shop.filter((x) => x.slot !== 'potion')) {
+  for (const t of shop.filter((x) => x.slot !== 'potion' && x.slot !== 'ammo' && x.slot !== 'quiver' && x.kind === undefined && !x.req)) {
     const cur = p.equipment[t.slot as keyof typeof p.equipment];
     const val = (t.damage?.[1] ?? 0) * 1.5 + (t.armor ?? 0) * 2;
-    if ((!cur || val > score(cur)) && buyPrice(t.id) + 40 <= p.gold && p.attrs.kraft + 0 >= t.reqKraft) {
+    if ((!cur || val > score(cur)) && buyPrice(t.id) + 40 <= p.gold && p.attrs.kraft >= t.reqKraft && p.level >= Math.max(1, t.minLevel - 1) && !t.req && t.kind === undefined) {
       applyCommand(w, p.id, { type: 'buy', templateId: t.id });
       const bought = p.inventory[p.inventory.length - 1];
       if (bought && bought.id) applyCommand(w, p.id, { type: 'equip', itemId: bought.id });
@@ -59,11 +68,11 @@ describe('Level-Tempo (Messung)', () => {
       }
       if (p.level >= MAX_LEVEL) break;
       if (t % 10 !== 0) continue;
-      if (p.statPoints > 0) applyCommand(w, p.id, { type: 'spendStat', attr: p.statPoints % 3 === 0 ? 'ausdauer' : 'kraft' });
+      if (p.statPoints > 0) applyCommand(w, p.id, { type: 'spendStat', attr: (['kraft', 'ausdauer', 'kraft', 'gewandtheit', 'ausdauer'] as const)[p.statPoints % 5]! });
       for (const it of [...p.inventory]) {
-        if (it.slot === 'potion') continue;
+        if (it.slot === 'potion' || it.slot === 'ammo') continue;
         const cur = p.equipment[it.slot];
-        if ((!cur || score(it) > score(cur)) && p.attrs.kraft >= it.reqKraft) applyCommand(w, p.id, { type: 'equip', itemId: it.id });
+        if ((!cur || score(it) > score(cur)) && missingReq(p, it).length === 0) applyCommand(w, p.id, { type: 'equip', itemId: it.id });
       }
       const heals = p.inventory.filter((i) => i.heal);
       if (p.hp < maxHpOf(p) * 0.45 && heals.length && !inSafeZone(w, p.x, p.y)) {
@@ -71,7 +80,7 @@ describe('Level-Tempo (Messung)', () => {
         const pick = [...heals].sort((a, b) => a.heal! - b.heal!).find((i) => i.heal! >= need) ?? heals[heals.length - 1]!;
         applyCommand(w, p.id, { type: 'usePotion', itemId: pick.id });
       }
-      const heavy = carriedWeight(p) > carryCapacity(p) * 0.85;
+      const heavy = p.inventory.reduce((n, i) => n + i.weight, 0) > carryCapacity(p) * 0.45;
       const lowSupplies = heals.length === 0 && p.hp < maxHpOf(p) * 0.5;
       if (mode === 'hunt' && (heavy || lowSupplies)) {
         mode = 'town';

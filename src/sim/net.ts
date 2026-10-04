@@ -16,12 +16,16 @@ export function validateCommand(w: World, c: unknown): Command | null {
       return int(o.x) && int(o.y) && isWalkable(w.grid, o.x, o.y) ? { type: 'moveTo', x: o.x, y: o.y } : null;
     case 'attack':
       return int(o.targetId) ? { type: 'attack', targetId: o.targetId } : null;
+    case 'refillQuiver':
+      return int(o.itemId) ? { type: 'refillQuiver', itemId: o.itemId } : null;
+    case 'openChest':
+      return int(o.chestId) ? { type: 'openChest', chestId: o.chestId } : null;
     case 'pickup':
       return int(o.groundId) ? { type: 'pickup', groundId: o.groundId } : null;
     case 'equip': case 'drop': case 'usePotion': case 'sell': case 'stashPut': case 'stashTake':
       return int(o.itemId) ? ({ type: o.type, itemId: o.itemId } as Command) : null;
     case 'unequip':
-      return ['weapon', 'head', 'chest', 'hands', 'feet', 'ring'].includes(o.slot as string) ? { type: 'unequip', slot: o.slot as 'weapon' } : null;
+      return ['weapon', 'head', 'chest', 'hands', 'feet', 'ring', 'quiver'].includes(o.slot as string) ? { type: 'unequip', slot: o.slot as 'weapon' } : null;
     case 'spendStat':
       return ATTR_KEYS.includes(o.attr as never) ? { type: 'spendStat', attr: o.attr as never } : null;
     case 'learnSkill':
@@ -68,6 +72,8 @@ export interface Snapshot {
   actors: ActorLite[];
   ground: GroundItem[];
   events: GameEvent[];
+  /** Zustand aller Truhen (geöffnet?) */
+  chests: { id: number; opened: boolean }[];
 }
 
 const near = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.abs(a.x - b.x) <= NET_RADIUS && Math.abs(a.y - b.y) <= NET_RADIUS;
@@ -95,7 +101,7 @@ export function makeSnapshot(w: World, you: Actor, events: GameEvent[]): Snapsho
       default: return false;
     }
   });
-  return { t: 'snap', tick: w.tick, you, actors, ground: w.ground.filter((g) => near(g, you)), events: evs };
+  return { t: 'snap', tick: w.tick, you, actors, ground: w.ground.filter((g) => near(g, you)), events: evs, chests: w.chests.map((c) => ({ id: c.id, opened: c.opened })) };
 }
 
 /** Baut aus der reduzierten Sicht einen vollständigen Akteur (für Renderer und Zielanzeige auf dem Client). */
@@ -104,13 +110,13 @@ export function actorFromLite(l: ActorLite, tick: number): Actor {
     id: l.id, kind: l.kind, kindId: l.kindId, name: l.name, x: l.x, y: l.y, hp: l.hp, maxHp: l.maxHp, damage: [1, 1], speed: 0.1,
     attackCooldown: 20, cooldownLeft: 0, path: [], targetId: l.targetId, aggroRange: 0, alive: l.alive, level: l.level, xp: 0,
     statPoints: 0, attrs: { kraft: 10, gewandtheit: 10, ausdauer: 10, verstand: 10, willenskraft: 10 }, mana: 0, gold: 0, skills: [],
-    skillCd: {}, potionCd: 0, quests: {}, inventory: [], equipment: l.equipment ?? {}, stash: [], pickupId: null, diedAt: l.diedAt,
-    boss: l.boss, enraged: l.enraged, autoAttack: true, repathAt: 0, dot: null, lastHitAt: -9999, pkUntil: l.pk ? tick + 1e6 : 0,
+    skillCd: {}, potionCd: 0, quests: {}, inventory: [], equipment: l.equipment ?? {}, stash: [], pickupId: null, chestId: null, diedAt: l.diedAt,
+    boss: l.boss, enraged: l.enraged, autoAttack: true, repathAt: 0, dot: null, lastHitAt: -9999, packId: 0, pkUntil: l.pk ? tick + 1e6 : 0,
     attackedBy: null, damagers: {},
   };
 }
 
 /** Aufwand eines Befehls für die Ratenbegrenzung: Wegsuchen sind teurer als einfache Aktionen. */
 export function commandCost(c: Command): number {
-  return c.type === 'moveTo' || c.type === 'attack' || c.type === 'pickup' ? 4 : 1;
+  return c.type === 'moveTo' || c.type === 'attack' || c.type === 'pickup' || c.type === 'openChest' ? 4 : 1;
 }
