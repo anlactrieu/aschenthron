@@ -61,6 +61,28 @@ export const TEMPLATES: ItemTemplate[] = [
   { id: 'silver_ring', name: 'Silberring', slot: 'ring', weight: 0.5, reqKraft: 0, value: 60, minLevel: 6 },
   { id: 'ember_ring', name: 'Glutring', slot: 'ring', weight: 0.5, reqKraft: 0, value: 140, minLevel: 11 },
   { id: 'iron_ring', name: 'Eisenring', slot: 'ring', weight: 0.5, reqKraft: 0, value: 12, minLevel: 1 },
+  { id: 'war_blade', name: 'Kriegsklinge', slot: 'weapon', weight: 10, damage: [16, 28], reqKraft: 24, value: 300, minLevel: 16 },
+  { id: 'doom_hammer', name: 'Schädelbrecher', slot: 'weapon', weight: 14, damage: [22, 38], reqKraft: 30, value: 600, minLevel: 21 },
+  { id: 'ash_greatsword', name: 'Aschenrichter', slot: 'weapon', weight: 16, damage: [30, 50], reqKraft: 36, value: 1100, minLevel: 26 },
+  { id: 'bone_plate', name: 'Knochenpanzer', slot: 'chest', weight: 20, armor: 14, reqKraft: 24, value: 280, minLevel: 15 },
+  { id: 'dread_mail', name: 'Schreckenspanzer', slot: 'chest', weight: 22, armor: 20, reqKraft: 30, value: 560, minLevel: 21 },
+  { id: 'ash_cuirass', name: 'Aschenharnisch', slot: 'chest', weight: 24, armor: 28, reqKraft: 36, value: 1000, minLevel: 27 },
+  { id: 'crown_helm', name: 'Kronenhelm', slot: 'head', weight: 8, armor: 9, reqKraft: 22, value: 250, minLevel: 16 },
+  { id: 'dread_helm', name: 'Schreckenshelm', slot: 'head', weight: 9, armor: 12, reqKraft: 28, value: 520, minLevel: 21 },
+  { id: 'ash_visor', name: 'Aschenvisier', slot: 'head', weight: 10, armor: 16, reqKraft: 34, value: 950, minLevel: 27 },
+  { id: 'bone_gloves', name: 'Knochenhandschuhe', slot: 'hands', weight: 4, armor: 7, reqKraft: 22, value: 230, minLevel: 16 },
+  { id: 'dread_fists', name: 'Schreckensfäuste', slot: 'hands', weight: 5, armor: 10, reqKraft: 28, value: 480, minLevel: 21 },
+  { id: 'ash_gauntlets', name: 'Aschenstulpen', slot: 'hands', weight: 6, armor: 13, reqKraft: 34, value: 900, minLevel: 27 },
+  { id: 'bone_boots', name: 'Knochenstiefel', slot: 'feet', weight: 9, armor: 7, reqKraft: 22, value: 230, minLevel: 16 },
+  { id: 'dread_treads', name: 'Schreckensschreiter', slot: 'feet', weight: 10, armor: 10, reqKraft: 28, value: 480, minLevel: 21 },
+  { id: 'ash_boots', name: 'Aschenstiefel', slot: 'feet', weight: 11, armor: 13, reqKraft: 34, value: 900, minLevel: 27 },
+  { id: 'moon_ring', name: 'Mondsteinring', slot: 'ring', weight: 0.5, reqKraft: 0, value: 300, minLevel: 16 },
+  { id: 'blood_ring', name: 'Blutring', slot: 'ring', weight: 0.5, reqKraft: 0, value: 600, minLevel: 21 },
+  { id: 'ash_band', name: 'Aschenreif', slot: 'ring', weight: 0.5, reqKraft: 0, value: 1100, minLevel: 27 },
+  { id: 'heal_huge', name: 'Riesiger Heiltrank', slot: 'potion', weight: 0.6, heal: 600, reqKraft: 0, value: 160, minLevel: 21 },
+  { id: 'mana_huge', name: 'Riesiger Manatrank', slot: 'potion', weight: 0.6, mana: 300, reqKraft: 0, value: 160, minLevel: 21 },
+  { id: 'heal_max', name: 'Elixier des Lebens', slot: 'potion', weight: 0.7, heal: 1100, reqKraft: 0, value: 320, minLevel: 27 },
+  { id: 'mana_max', name: 'Elixier der Weisheit', slot: 'potion', weight: 0.7, mana: 550, reqKraft: 0, value: 320, minLevel: 27 },
   { id: 'heal_small', name: 'Kleiner Heiltrank', slot: 'potion', weight: 0.3, heal: 50, reqKraft: 0, value: 8, minLevel: 1 },
   { id: 'heal_mid', name: 'Heiltrank', slot: 'potion', weight: 0.4, heal: 130, reqKraft: 0, value: 25, minLevel: 6 },
   { id: 'heal_big', name: 'Großer Heiltrank', slot: 'potion', weight: 0.5, heal: 280, reqKraft: 0, value: 70, minLevel: 11 },
@@ -106,7 +128,8 @@ export function generateItem(rng: Rng, id: number, templateId: string, rarityIn:
   const affixes: Affix[] = [];
   for (let i = 0; i < count && pool.length; i++) {
     const def = pool.splice(rng.int(0, pool.length - 1), 1)[0]!;
-    affixes.push({ stat: def.stat, value: rng.int(def.min, def.max) });
+    const scale = 1 + t.minLevel / 8;
+    affixes.push({ stat: def.stat, value: Math.max(1, Math.round(rng.int(def.min, def.max) * (def.stat === 'kraft' ? 1 + t.minLevel / 20 : scale))) });
   }
   const name = affixes.length
     ? `${t.name} ${AFFIXES.find((a) => a.stat === affixes[0]!.stat)!.name}`

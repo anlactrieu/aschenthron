@@ -20,7 +20,7 @@ const DIRS: readonly [number, number][] = [
 ];
 
 /** Höchstzahl expandierter Knoten, damit unerreichbare Ziele nicht die ganze Karte fluten. */
-export const PATH_NODE_CAP = 8000;
+export const PATH_NODE_CAP = 25000;
 
 /** Binärer Min-Heap über (Knoten, Priorität). */
 class MinHeap {

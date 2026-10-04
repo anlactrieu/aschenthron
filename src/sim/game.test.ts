@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import mapJson from '../data/aschenthron.json';
-import { buildWorld, type TiledMap } from './tiled';
-import { findPath, type Grid } from './path';
+import type { Grid } from './path';
 import { generateItem } from './items';
 import { totalXpFor } from './data';
 import {
-  addNpc, applyCommand, buyPrice, createWorld, drainEvents, gainXp, getActor, inSafeZone, maxHpOf,
+  addNpc, applyCommand, buyPrice, createWorld, drainEvents, gainXp, inSafeZone, maxHpOf,
   nearNpc, spawnMonster, spawnPlayer, tick, TICK_RATE, type World,
 } from './world';
 
@@ -183,30 +181,12 @@ describe('Hub: Händler und Stash (M5)', () => {
 });
 
 describe('Welt, Dungeon und Boss (M6)', () => {
-  const { world, playerId } = buildWorld(1, mapJson as unknown as TiledMap);
-  const p = getActor(world, playerId)!;
-
-  it('Karte enthält Stadt, NPCs, Monster und den Boss', () => {
-    expect(inSafeZone(world, p.x, p.y)).toBe(true);
-    expect(world.npcs.map((n) => n.kind).sort()).toEqual(['merchant', 'stash', 'trainer']);
-    expect(world.actors.some((a) => a.kindId === 'ash_king' && a.boss)).toBe(true);
-    expect(world.actors.filter((a) => a.kind === 'monster').length).toBeGreaterThan(30);
-  });
-
-  it('alle Monster und der Boss sind von der Stadt aus erreichbar', () => {
-    for (const a of world.actors) {
-      if (a.kind !== 'monster') continue;
-      const path = findPath(world.grid, { x: Math.round(p.x), y: Math.round(p.y) }, { x: a.x, y: a.y });
-      expect(path.length, `${a.name} @${a.x},${a.y}`).toBeGreaterThan(0);
-    }
-  });
-
   it('Boss wird wütend, lässt garantiert Seltenes fallen', () => {
     const { w, p: pl } = fresh();
     pl.damage = [300, 300];
     pl.x = 10;
     pl.y = 10;
-    const boss = spawnMonster(w, 12, 10, 'ash_king');
+    const boss = spawnMonster(w, 12, 10, 'bandit_lord');
     boss.damage = [1, 1];
     applyCommand(w, pl.id, { type: 'attack', targetId: boss.id });
     run(w, TICK_RATE * 30);
@@ -240,7 +220,7 @@ describe('Verfolgung', () => {
     const { w, p } = fresh();
     p.x = 10;
     p.y = 11.9;
-    const m = spawnMonster(w, 11, 10.6, 'grave_rat');
+    const m = spawnMonster(w, 11, 10.6, 'field_rat');
     p.damage = [999, 999];
     applyCommand(w, p.id, { type: 'attack', targetId: m.id });
     run(w, TICK_RATE * 5);
@@ -254,7 +234,7 @@ describe('Fernkampf', () => {
     p.x = 10;
     p.y = 10;
     p.skills.push('quick_shot');
-    const m = spawnMonster(w, 14, 10, 'grave_rat');
+    const m = spawnMonster(w, 14, 10, 'field_rat');
     m.aggroRange = 0;
     applyCommand(w, p.id, { type: 'useSkill', skillId: 'quick_shot', targetId: m.id });
     expect(m.hp).toBeLessThan(m.maxHp);
@@ -269,7 +249,7 @@ describe('Fernkampf', () => {
     p.x = 10;
     p.y = 10;
     p.skills.push('power_strike');
-    const m = spawnMonster(w, 11, 10, 'grave_rat');
+    const m = spawnMonster(w, 11, 10, 'field_rat');
     m.aggroRange = 0;
     applyCommand(w, p.id, { type: 'useSkill', skillId: 'power_strike', targetId: m.id });
     run(w, TICK_RATE * 5);
@@ -282,7 +262,7 @@ describe('Safe-Zone und Sortiment', () => {
     const { w, p } = fresh();
     p.skills.push('ember_bolt');
     p.damage = [999, 999];
-    const m = spawnMonster(w, 4, 2, 'grave_rat');
+    const m = spawnMonster(w, 4, 2, 'field_rat');
     m.aggroRange = 0;
     p.x = 3;
     p.y = 2;

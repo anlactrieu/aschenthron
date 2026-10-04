@@ -3,7 +3,7 @@ import { findPath, isWalkable, type Grid, type Pt } from './path';
 import { rollDrop, rollPotion, templateById, generateItem, type Item, type Slot } from './items';
 import {
   ATTR_KEYS, MAX_LEVEL, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
-  monsterKind, skillById, totalXpFor, SHOP_ITEMS, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
+  monsterKind, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
 } from './data';
 
 export const TICK_RATE = 20;
@@ -31,7 +31,9 @@ export type Command =
   | { type: 'buy'; templateId: string }
   | { type: 'sell'; itemId: number }
   | { type: 'stashPut'; itemId: number }
-  | { type: 'stashTake'; itemId: number };
+  | { type: 'stashTake'; itemId: number }
+  | { type: 'acceptQuest'; questId: string }
+  | { type: 'turnInQuest'; questId: string };
 
 export type Attrs = Record<AttrKey, number>;
 
@@ -64,6 +66,7 @@ export interface Actor {
   skills: string[];
   skillCd: Record<string, number>;
   potionCd: number;
+  quests: Record<string, { state: 'active' | 'done' | 'turned'; progress: number }>;
   inventory: Item[];
   equipment: Partial<Record<Slot, Item>>;
   stash: Item[];
@@ -93,13 +96,17 @@ export interface Rect {
   h: number;
 }
 
-export type NpcKind = 'trainer' | 'merchant' | 'stash';
+export type NpcKind = 'trainer' | 'merchant' | 'stash' | 'quest' | 'smith';
 export interface Npc {
   id: number;
   kind: NpcKind;
   name: string;
   x: number;
   y: number;
+  /** Händler: Sortiment-Schlüssel; Lehrer: Stufe; Questgeber: Quest-IDs */
+  shop?: string;
+  tier?: number;
+  quests?: string[];
 }
 
 export type GameEvent =
@@ -116,6 +123,9 @@ export type GameEvent =
   | { type: 'deathPenalty'; xpLost: number; dropped: Item[] }
   | { type: 'respawned' }
   | { type: 'potion'; item: Item }
+  | { type: 'questProgress'; questId: string; progress: number; count: number }
+  | { type: 'questDone'; questId: string }
+  | { type: 'questTurned'; questId: string; xp: number; gold: number }
   | { type: 'enraged'; id: number }
   | { type: 'fail'; reason: string };
 
@@ -130,14 +140,16 @@ export interface World {
   safe: Rect[];
   npcs: Npc[];
   start: Pt;
+  /** Wiedererwachen nach dem Tod: nächste Stadt */
+  towns: Pt[];
 }
 
 export function createWorld(seed: number, grid: Grid, safe: Rect[] = []): World {
-  return { tick: 0, grid, rng: new Rng(seed), actors: [], nextId: 1, events: [], ground: [], safe, npcs: [], start: { x: 1, y: 1 } };
+  return { tick: 0, grid, rng: new Rng(seed), actors: [], nextId: 1, events: [], ground: [], safe, npcs: [], start: { x: 1, y: 1 }, towns: [] };
 }
 
-export function addNpc(w: World, kind: NpcKind, name: string, x: number, y: number): Npc {
-  const n: Npc = { id: w.nextId++, kind, name, x, y };
+export function addNpc(w: World, kind: NpcKind, name: string, x: number, y: number, extra: Partial<Npc> = {}): Npc {
+  const n: Npc = { id: w.nextId++, kind, name, x, y, ...extra };
   w.npcs.push(n);
   return n;
 }
@@ -147,7 +159,7 @@ function baseActor(w: World, kind: Actor['kind'], name: string, x: number, y: nu
     id: w.nextId++, kind, name, x, y, hp: 100, maxHp: 100, damage: [1, 2], speed: 0.1, attackCooldown: 20,
     cooldownLeft: 0, path: [], targetId: null, aggroRange: 0, alive: true, level: 1, xp: 0, statPoints: 0,
     attrs: { kraft: 10, gewandtheit: 10, ausdauer: 10, verstand: 10, willenskraft: 10 },
-    mana: 20, gold: 0, skills: [], skillCd: {}, potionCd: 0, inventory: [], equipment: {}, stash: [], pickupId: null,
+    mana: 20, gold: 0, skills: [], skillCd: {}, potionCd: 0, quests: {}, inventory: [], equipment: {}, stash: [], pickupId: null,
     diedAt: -1, boss: false, enraged: false, autoAttack: true, repathAt: 0,
   };
   w.actors.push(a);
@@ -163,7 +175,7 @@ export function spawnPlayer(w: World, x: number, y: number): Actor {
   return a;
 }
 
-export function spawnMonster(w: World, x: number, y: number, kindId = 'grave_rat'): Actor {
+export function spawnMonster(w: World, x: number, y: number, kindId = 'field_rat'): Actor {
   const k = monsterKind(kindId);
   const a = baseActor(w, 'monster', k.name, x, y);
   Object.assign(a, {
@@ -334,7 +346,9 @@ export function applyCommand(w: World, actorId: number, cmd: Command): void {
     case 'learnSkill': {
       const s = skillById(cmd.skillId);
       if (!s) return;
-      if (!nearNpc(w, a, 'trainer')) return fail(w, 'Kein Lehrer in der Nähe.');
+      const trainer = nearNpc(w, a, 'trainer');
+      if (!trainer) return fail(w, 'Kein Lehrer in der Nähe.');
+      if ((trainer.tier ?? 1) < s.tier) return fail(w, 'Das lehrt dieser Lehrer nicht.');
       if (a.skills.includes(s.id)) return fail(w, 'Bereits gelernt.');
       if (a.level < s.levelReq) return fail(w, `Benötigt Level ${s.levelReq}.`);
       if (a.gold < s.price) return fail(w, 'Nicht genug Gold.');
@@ -347,8 +361,9 @@ export function applyCommand(w: World, actorId: number, cmd: Command): void {
       useSkill(w, a, cmd.skillId, cmd.targetId);
       break;
     case 'buy': {
-      if (!nearNpc(w, a, 'merchant')) return fail(w, 'Kein Händler in der Nähe.');
-      if (!SHOP_ITEMS.includes(cmd.templateId)) return fail(w, 'Das führt die Händlerin nicht.');
+      const merchants = w.npcs.filter((n) => n.kind === 'merchant' && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
+      if (!merchants.length) return fail(w, 'Kein Händler in der Nähe.');
+      if (!merchants.some((m) => (SHOPS[m.shop ?? 'basic'] ?? []).includes(cmd.templateId))) return fail(w, 'Das führt der Händler nicht.');
       const price = buyPrice(cmd.templateId);
       if (a.gold < price) return fail(w, 'Nicht genug Gold.');
       const item = generateItem(w.rng, w.nextId++, cmd.templateId, 'normal');
@@ -369,6 +384,27 @@ export function applyCommand(w: World, actorId: number, cmd: Command): void {
       const price = sellPrice(it);
       a.gold += price;
       w.events.push({ type: 'gold', amount: price });
+      break;
+    }
+    case 'acceptQuest': {
+      const def = questById(cmd.questId);
+      const giver = w.npcs.find((n) => n.kind === 'quest' && n.quests?.includes(cmd.questId) && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
+      if (!def || !giver) return fail(w, 'Hier gibt es diese Aufgabe nicht.');
+      if (a.quests[def.id]) return fail(w, 'Aufgabe bereits angenommen.');
+      if (a.level < def.minLevel) return fail(w, `Benötigt Level ${def.minLevel}.`);
+      a.quests[def.id] = { state: 'active', progress: 0 };
+      break;
+    }
+    case 'turnInQuest': {
+      const def = questById(cmd.questId);
+      const st = a.quests[cmd.questId];
+      const giver = w.npcs.find((n) => n.kind === 'quest' && n.quests?.includes(cmd.questId) && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
+      if (!def || !st || !giver) return fail(w, 'Hier gibt es nichts abzugeben.');
+      if (st.state !== 'done') return fail(w, 'Aufgabe noch nicht erfüllt.');
+      st.state = 'turned';
+      a.gold += def.gold;
+      w.events.push({ type: 'questTurned', questId: def.id, xp: def.xp, gold: def.gold });
+      gainXp(w, a, def.xp);
       break;
     }
     case 'stashPut': {
@@ -477,7 +513,7 @@ function fight(w: World, a: Actor, t: Actor): void {
 
 function dealDamage(w: World, a: Actor, t: Actor, raw: number, ignoreArmor: boolean, skill?: string): void {
   if (t.kind === 'player' && inSafeZone(w, t.x, t.y)) return;
-  const amount = Math.max(1, raw - (ignoreArmor ? 0 : armorOf(t)));
+  const amount = Math.max(1, Math.round(ignoreArmor ? raw : (raw * ARMOR_K) / (ARMOR_K + armorOf(t))));
   t.hp = Math.max(0, t.hp - amount);
   w.events.push({ type: 'hit', attackerId: a.id, targetId: t.id, amount, skill });
   if (t.boss && !t.enraged && t.hp > 0 && t.hp < t.maxHp * 0.3) {
@@ -498,6 +534,17 @@ function dealDamage(w: World, a: Actor, t: Actor, raw: number, ignoreArmor: bool
 function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
   const k = monsterKind(m.kindId!);
   if (killer.kind === 'player') {
+    for (const q of QUESTS) {
+      const st = killer.quests[q.id];
+      if (st?.state === 'active' && q.target === m.kindId) {
+        st.progress++;
+        w.events.push({ type: 'questProgress', questId: q.id, progress: st.progress, count: q.count });
+        if (st.progress >= q.count) {
+          st.state = 'done';
+          w.events.push({ type: 'questDone', questId: q.id });
+        }
+      }
+    }
     gainXp(w, killer, k.xp);
     const gold = w.rng.int(k.gold[0], k.gold[1]);
     killer.gold += gold;
@@ -551,8 +598,11 @@ function onPlayerDeath(w: World, p: Actor): void {
   for (const item of dropped) w.ground.push({ id: w.nextId++, x, y, item, expiresAt: w.tick + CORPSE_LOOT_TTL });
   w.events.push({ type: 'deathPenalty', xpLost, dropped });
   // Respawn in der Stadt
-  p.x = w.start.x;
-  p.y = w.start.y;
+  const town = w.towns.length
+    ? w.towns.reduce((best, t) => (Math.hypot(t.x - p.x, t.y - p.y) < Math.hypot(best.x - p.x, best.y - p.y) ? t : best))
+    : w.start;
+  p.x = town.x;
+  p.y = town.y;
   p.alive = true;
   p.hp = maxHpOf(p);
   p.mana = maxManaOf(p);

@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import mapJson from '../data/aschenthron.json';
 import { buildWorld, type TiledMap } from '../sim/tiled';
-import { monsterKind, SKILLS } from '../sim/data';
+import { monsterKind, questById, SKILLS } from '../sim/data';
 import { exportPlayer, importPlayer } from '../sim/save';
 import {
   applyCommand, drainEvents, getActor, inSafeZone, maxHpOf, maxManaOf, tick, TICK_RATE, type Actor, type Command, type World,
@@ -12,10 +12,10 @@ import { Ui, describeItem } from './ui';
 
 const SAVE_KEY = 'aschenthron.save.v1';
 const TILE_COLORS: Record<number, [number, number]> = {
-  1: [0x3a3438, 0x35303a], 3: [0x2c3a2f, 0x28362b], 4: [0x2b3526, 0x273122], 5: [0x2e2a33, 0x2a262f], 6: [0x1c2a3d, 0x1c2a3d],
+  1: [0x3a3438, 0x35303a], 7: [0x4a4034, 0x453b30], 8: [0x3a3d36, 0x363932], 9: [0x3c3230, 0x382e2c], 12: [0x8a3a1a, 0x7a3216], 10: [0x2b3526, 0x273122], 11: [0x2e2a33, 0x2a262f], 3: [0x2c3a2f, 0x28362b], 4: [0x2b3526, 0x273122], 5: [0x2e2a33, 0x2a262f], 6: [0x1c2a3d, 0x1c2a3d],
 };
 const RARITY = { normal: 0xc9c4bd, magic: 0x6f8fff, rare: 0xf2c94c };
-const VIEW = 22;
+const VIEW = 32;
 
 function safeStorage(): Storage | null {
   try {
@@ -173,6 +173,9 @@ export class GameScene extends Phaser.Scene {
           say(`Du bist gestorben: −${e.xpLost} XP, ${e.dropped.length} Item(s) liegen an der Todesstelle (5 Min.).`);
           break;
         case 'potion': say(`Benutzt: ${e.item.name}`); break;
+        case 'questProgress': say(`Aufgabe: ${e.progress}/${e.count}`); break;
+        case 'questDone': say(`Aufgabe erfüllt: ${questById(e.questId)?.name} – beim Auftraggeber abgeben!`); break;
+        case 'questTurned': say(`Aufgabe abgegeben: +${e.xp} XP, +${e.gold} Gold`); break;
         case 'respawned': say('Du erwachst in der Stadt.'); break;
         case 'fail': say(e.reason); break;
       }
@@ -195,6 +198,11 @@ export class GameScene extends Phaser.Scene {
         const { sx, sy } = toScreen(x, y);
         if (sx < view.left - 64 || sx > view.right + 64 || sy < view.top - 64 || sy > view.bottom + 64) continue;
         if (gid === 2) this.drawBlock(g, sx, sy);
+        else if (gid === 10 || gid === 11) {
+          this.diamond(g, sx, sy, TILE_COLORS[gid]![(x + y) % 2]!);
+          if (gid === 10) this.prop(g, sx, sy, 0x1f3a22, 0x2f5a30, 34);
+          else this.prop(g, sx, sy, 0x55505a, 0x77727c, 14);
+        }
         else this.diamond(g, sx, sy, TILE_COLORS[gid]?.[(x + y) % 2] ?? 0x222222);
       }
     }
@@ -208,7 +216,7 @@ export class GameScene extends Phaser.Scene {
     }
     for (const n of w.npcs) {
       const { sx, sy } = toScreen(n.x, n.y);
-      const col = n.kind === 'trainer' ? 0xd8a24a : n.kind === 'merchant' ? 0x6ac08a : 0x9a7a5a;
+      const col = { trainer: 0xd8a24a, merchant: 0x6ac08a, stash: 0x9a7a5a, quest: 0xe8e060, smith: 0xc06a4a }[n.kind];
       g.fillStyle(0x000000, 0.35);
       g.fillEllipse(sx, sy, 26, 11);
       g.fillStyle(col, 1);
@@ -260,6 +268,12 @@ export class GameScene extends Phaser.Scene {
     this.quad(g, 0x3a302d, [sx - hw, sy, sx, sy + hh, sx, sy + hh - h, sx - hw, sy - h]);
     this.quad(g, 0x2c2422, [sx + hw, sy, sx, sy + hh, sx, sy + hh - h, sx + hw, sy - h]);
     this.diamond(g, sx, sy - h, 0x4b3f3a);
+  }
+
+  /** Einfaches Platzhalter-Objekt (Baum/Fels) auf einer Kachel */
+  private prop(g: Phaser.GameObjects.Graphics, sx: number, sy: number, dark: number, light: number, h: number): void {
+    this.quad(g, dark, [sx - 9, sy + 2, sx, sy + 7, sx + 9, sy + 2, sx, sy - h]);
+    this.quad(g, light, [sx - 7, sy, sx, sy - 5, sx + 7, sy, sx, sy - h]);
   }
 
   private outline(g: Phaser.GameObjects.Graphics, x: number, y: number, w: number, h: number): void {

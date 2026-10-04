@@ -1,10 +1,10 @@
-import { ATTR_KEYS, MAX_LEVEL, skillById, totalXpFor } from './data';
+import { ATTR_KEYS, MAX_LEVEL, questById, skillById, totalXpFor } from './data';
 import { isWalkable } from './path';
 import type { Item } from './items';
 import type { Actor, World } from './world';
 
 const KEYS = [
-  'x', 'y', 'hp', 'mana', 'level', 'xp', 'statPoints', 'attrs', 'gold', 'skills', 'inventory', 'equipment', 'stash', 'maxHp',
+  'x', 'y', 'hp', 'mana', 'level', 'xp', 'statPoints', 'attrs', 'gold', 'skills', 'inventory', 'equipment', 'stash', 'maxHp', 'quests',
 ] as const;
 
 const EQUIP_SLOTS = ['weapon', 'head', 'chest', 'hands', 'feet', 'ring'];
@@ -54,6 +54,13 @@ export function importPlayer(w: World, p: Actor, json: string): boolean {
     }
     p.hp = Math.max(1, num(s.hp, 1));
     p.mana = Math.max(0, num(s.mana, 0));
+    p.quests = {};
+    const qs = s.quests as Record<string, { state?: string; progress?: number }> | undefined;
+    for (const [id, st] of Object.entries(qs ?? {})) {
+      if (questById(id) && st && ['active', 'done', 'turned'].includes(st.state ?? '')) {
+        p.quests[id] = { state: st.state as 'active' | 'done' | 'turned', progress: Math.max(0, Math.floor(num(st.progress, 0))) };
+      }
+    }
     p.skillCd = {};
     p.path = [];
     p.targetId = null;

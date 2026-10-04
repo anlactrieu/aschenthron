@@ -1,7 +1,7 @@
-import { ATTR_KEYS, ATTR_NAME, SKILLS, SHOP_ITEMS, totalXpFor, MAX_LEVEL, monsterKind } from '../sim/data';
+import { ATTR_KEYS, ATTR_NAME, SKILLS, SHOPS, QUESTS, questById, totalXpFor, MAX_LEVEL, monsterKind } from '../sim/data';
 import { templateById, type Item, type Slot } from '../sim/items';
 import {
-  TICK_RATE, armorOf, buyPrice, carriedWeight, carryCapacity, damageRange, maxHpOf, maxManaOf, nearNpc, sellPrice,
+  NPC_RANGE, TICK_RATE, armorOf, buyPrice, carriedWeight, carryCapacity, damageRange, maxHpOf, maxManaOf, nearNpc, sellPrice,
   type Actor, type Command, type World,
 } from '../sim/world';
 
@@ -71,8 +71,8 @@ export class Ui {
   update(w: World, p: Actor, target?: Actor): void {
     this.updateHud(p, target);
     if (!this.open) return;
-    const near = [nearNpc(w, p, 'trainer'), nearNpc(w, p, 'merchant'), nearNpc(w, p, 'stash')].map((n) => n?.id ?? 0);
-    const key = JSON.stringify([p.inventory, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.gold, p.level, near]);
+    const near = w.npcs.filter((n) => Math.hypot(n.x - p.x, n.y - p.y) <= NPC_RANGE).map((n) => n.id);
+    const key = JSON.stringify([p.inventory, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.gold, p.level, near, p.quests]);
     if (key === this.key) return;
     this.key = key;
     this.renderPanel(w, p);
@@ -168,6 +168,12 @@ export class Ui {
       });
     }
 
+    const active = QUESTS.filter((q) => p.quests[q.id] && p.quests[q.id]!.state !== 'turned');
+    if (active.length) {
+      h('Aufgaben');
+      for (const q of active) out.push(el('div', '', `${q.name}: ${p.quests[q.id]!.state === 'done' ? 'fertig – abgeben!' : `${p.quests[q.id]!.progress}/${q.count}`}`));
+    }
+
     h('Ausgerüstet');
     for (const slot of Object.keys(SLOT_NAME) as Slot[]) {
       const it = p.equipment[slot];
@@ -188,9 +194,10 @@ export class Ui {
       out.push(this.itemRow(it.name, it, acts));
     }
 
-    if (nearNpc(w, p, 'trainer')) {
-      h('Lehrer Varn');
-      for (const s of SKILLS) {
+    const trainer = nearNpc(w, p, 'trainer');
+    if (trainer) {
+      h(trainer.name);
+      for (const s of SKILLS.filter((x) => x.tier <= (trainer.tier ?? 1))) {
         const learned = p.skills.includes(s.id);
         const row = el('div', 'margin:4px 0');
         row.append(el('div', '', `${s.name} [${s.area}] · Lv ${s.levelReq} · ${s.price}g`), el('div', 'font-size:11px;opacity:.7', s.desc));
@@ -198,11 +205,26 @@ export class Ui {
         out.push(row);
       }
     }
-    if (merchant) {
-      h('Händlerin Mirel');
-      for (const t of SHOP_ITEMS.map(templateById)) {
+    for (const m of w.npcs.filter((n) => n.kind === 'merchant' && Math.hypot(n.x - p.x, n.y - p.y) <= NPC_RANGE)) {
+      h(m.name);
+      for (const t of (SHOPS[m.shop ?? 'basic'] ?? []).map(templateById)) {
         const row = el('div', 'display:flex;justify-content:space-between;align-items:center;margin:2px 0');
         row.append(el('span', '', `${t.name} (${t.weight})`), this.btn(`${buyPrice(t.id)}g`, () => this.send({ type: 'buy', templateId: t.id })));
+        out.push(row);
+      }
+    }
+    for (const g of w.npcs.filter((n) => n.kind === 'quest' && Math.hypot(n.x - p.x, n.y - p.y) <= NPC_RANGE)) {
+      h(`${g.name} – Aufgaben`);
+      for (const id of g.quests ?? []) {
+        const def = questById(id);
+        if (!def) continue;
+        const st = p.quests[id];
+        const row = el('div', 'margin:6px 0');
+        row.append(el('div', 'font-weight:bold', `${def.name} (ab Lv ${def.minLevel})`), el('div', 'font-size:11px;opacity:.75', def.text), el('div', 'font-size:11px', `Belohnung: ${def.xp} XP, ${def.gold} Gold`));
+        if (!st) row.append(this.btn('Annehmen', () => this.send({ type: 'acceptQuest', questId: id })));
+        else if (st.state === 'active') row.append(el('i', '', `Fortschritt ${st.progress}/${def.count}`));
+        else if (st.state === 'done') row.append(this.btn('Abgeben', () => this.send({ type: 'turnInQuest', questId: id })));
+        else row.append(el('i', '', 'erledigt'));
         out.push(row);
       }
     }

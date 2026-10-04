@@ -27,8 +27,8 @@ export interface TiledMap {
   layers: TiledLayer[];
 }
 
-/** Nicht begehbare Tile-IDs: 2 = Wand, 6 = Wasser, 0 = leer */
-const BLOCKED = new Set([0, 2, 6]);
+/** Nicht begehbare Tile-IDs: 2 Wand, 6 Wasser, 10 Baum, 11 Fels/Grabstein, 12 Lava, 0 leer */
+const BLOCKED = new Set([0, 2, 6, 10, 11, 12]);
 
 export interface LoadedMap {
   grid: Grid;
@@ -57,7 +57,15 @@ export function buildWorld(seed: number, map: TiledMap): { world: World; tiles: 
   const start = objs.find((o) => o.type === 'start');
   if (!start) throw new Error('Tiled-Karte braucht ein Objekt vom Typ "start"');
   for (const o of objs) {
-    if (o.type === 'npc') addNpc(world, prop(o, 'kind') as NpcKind, o.name, o.x / ts, o.y / ts);
+    if (o.type === 'npc') {
+      const kind = prop(o, 'kind') as NpcKind;
+      addNpc(world, kind, o.name, o.x / ts, o.y / ts, {
+        shop: prop(o, 'shop'),
+        tier: prop(o, 'tier') ? Number(prop(o, 'tier')) : undefined,
+        quests: prop(o, 'quests')?.split(','),
+      });
+    }
+    if (o.type === 'townstart') world.towns.push({ x: o.x / ts, y: o.y / ts });
     if (o.type === 'monster') spawnMonster(world, o.x / ts, o.y / ts, prop(o, 'kind'));
   }
   const player = spawnPlayer(world, start.x / ts, start.y / ts);
