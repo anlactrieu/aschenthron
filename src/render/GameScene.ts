@@ -69,6 +69,8 @@ export class GameScene extends Phaser.Scene {
   private fpsText: Phaser.GameObjects.Text | null = null;
   private fx!: Fx;
   private gfxGround!: Phaser.GameObjects.Graphics;
+  private gfxShimmer!: Phaser.GameObjects.Graphics;
+  private lastShimmer = -1000;
   private hover: { npc?: Npc; actor?: Actor } | null = null;
   private cursor = '';
   private kicks = new Map<number, { x: number; y: number }>();
@@ -122,6 +124,7 @@ export class GameScene extends Phaser.Scene {
     else this.ui.say('Willkommen in Aschenthron. C: Charakter (Attributpunkte verteilen!) · Q/E: Heil-/Manatrank · N: Karte · M: Ton · Klick: laufen/angreifen/aufheben · Lehrer, Händlerin, Schmiede, Truhe und Aufgaben in der Stadt.');
     this.gfx = this.add.graphics().setDepth(OVERLAY_DEPTH);
     this.gfxGround = this.add.graphics().setDepth(-9e5);
+    this.gfxShimmer = this.add.graphics().setDepth(-9e5 + 1);
     this.ts = new URLSearchParams(location.search).has('slowfx') ? 6 : 1;
     this.fx = new Fx(this, this.ts);
     this.vignette = document.createElement('div');
@@ -334,7 +337,7 @@ export class GameScene extends Phaser.Scene {
             this.flash.set(e.targetId, this.now + 120 * this.ts);
             const pos = this.bodyPos(tg);
             if (pos) {
-              const poison = e.skill === 'poison_shot' && !e.crit && tg?.dot;
+              const poison = e.skill === 'dot' && !e.crit;
               const txt = e.crit ? `${e.amount}!` : String(e.amount);
               if (toPlayer) this.fx.floatText(pos.x, pos.y - 30, txt, '#ff6a5a', 18);
               else if (fromPlayer) this.fx.floatText(pos.x, pos.y - 26, txt, e.crit ? '#ffe45a' : poison ? '#8fe070' : '#ffffff', e.crit ? 22 : 15);
@@ -356,9 +359,10 @@ export class GameScene extends Phaser.Scene {
               else this.sfx.hit();
             } else if (toPlayer) this.sfx.hurt();
           };
-          // Der Angreifer holt sichtbar aus (Ausholen → Schlag/Wurf), erst dann trifft es
+          // Der Angreifer holt sichtbar aus (Ausholen → Schlag/Wurf), erst dann trifft es; Gift/Brand/Bodenschlag nicht
           let delay = 0;
-          if (at && tg && at.id !== tg.id) {
+          const ambient = e.skill === 'dot' || e.skill === 'slam';
+          if (at && tg && at.id !== tg.id && !ambient) {
             const a = this.dispPos(at);
             const t = this.dispPos(tg);
             const sxv = (t.x - a.x - (t.y - a.y)) * 32;
@@ -375,7 +379,9 @@ export class GameScene extends Phaser.Scene {
             this.later(delay, () => this.kick(at.id, (sxv / len) * (projectile ? -1 : 10), (syv / len) * (projectile ? -0.5 : 10)));
           }
           const from = this.bodyPos(at);
-          if (!e.skill) {
+          if (ambient) {
+            impact();
+          } else if (!e.skill) {
             this.later(delay, () => {
               const to = this.bodyPos(tg);
               const f = this.bodyPos(at);
@@ -601,7 +607,7 @@ export class GameScene extends Phaser.Scene {
     const g = this.gfx;
     g.clear();
     this.gfxGround.clear();
-    this.updateHover();
+    if (this.frame % 3 === 0) this.updateHover();
     const px = Math.round(p.x);
     const py = Math.round(p.y);
     this.updateChunks(px, py);
@@ -624,7 +630,10 @@ export class GameScene extends Phaser.Scene {
 
   /** Glitzern auf Wasser und pulsierende Lava (nur Darstellung, unter Props und Akteuren). */
   private shimmer(time: number, px: number, py: number): void {
-    const g = this.gfxGround;
+    if (time - this.lastShimmer < 120) return;
+    this.lastShimmer = time;
+    const g = this.gfxShimmer;
+    g.clear();
     const { w, h } = this.world.grid;
     const view = this.cameras.main.worldView;
     for (let y = Math.max(0, py - VIEW); y < Math.min(h, py + VIEW); y++) {
@@ -851,6 +860,7 @@ export class GameScene extends Phaser.Scene {
 
   private updateChests(time: number, px: number, py: number): void {
     const seen = new Set<string>();
+    const me = this.player();
     for (const c of this.world.chests) {
       let img = this.chestViews.get(c.id);
       const near = Math.abs(c.x - px) <= VIEW && Math.abs(c.y - py) <= VIEW;
@@ -870,7 +880,7 @@ export class GameScene extends Phaser.Scene {
       if (!c.opened) {
         const col = { wood: 0xc89860, iron: 0x9fb4d8, gold: 0xffd84a }[c.tier];
         if (c.tier !== 'wood' && (this.frame + c.id * 7) % 45 === 0) this.fx.sparkle(sx, sy - 6, col, 800);
-        if (Math.hypot(c.x - this.player().x, c.y - this.player().y) < 9) this.label(`c${c.id}`, c.tier === 'gold' ? 'Goldene Truhe' : c.tier === 'iron' ? 'Eisentruhe' : 'Truhe', sx, sy - 22 + Math.sin(time / 300) * 1.5, '#' + col.toString(16).padStart(6, '0'), seen, 11);
+        if (Math.hypot(c.x - me.x, c.y - me.y) < 9) this.label(`c${c.id}`, c.tier === 'gold' ? 'Goldene Truhe' : c.tier === 'iron' ? 'Eisentruhe' : 'Truhe', sx, sy - 22 + Math.sin(time / 300) * 1.5, '#' + col.toString(16).padStart(6, '0'), seen, 11);
       } else img.setAlpha(0.85);
       if (!c.opened) img.setAlpha(1);
     }

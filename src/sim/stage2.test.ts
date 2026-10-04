@@ -727,3 +727,64 @@ describe('Champions, Mini-Bosse und Boss-Fähigkeiten', () => {
     expect(p2.hp).toBeLessThan(h0 - 5);
   });
 });
+
+describe('Review-Fixes: DoT, Helfer, Netz, Spielstand', () => {
+  it('Gift-Ticks tragen den Skill "dot" und lösen keine Pfeil-Skills aus', () => {
+    const { w, p } = fresh();
+    armBow(w, p);
+    p.skills.push('poison_shot');
+    p.mana = 100;
+    const m = spawnMonster(w, 14, 10, 'bog_ghoul');
+    m.aggroRange = 0;
+    applyCommand(w, p.id, { type: 'useSkill', skillId: 'poison_shot', targetId: m.id });
+    drainEvents(w);
+    run(w, TICK_RATE * 3);
+    const hits = drainEvents(w).filter((e) => e.type === 'hit' && e.attackerId === p.id);
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits.every((e) => e.type === 'hit' && e.skill === 'dot')).toBe(true);
+  });
+
+  it('beschworene Helfer verschwinden, wenn der Boss wiedererscheint', () => {
+    const { w, p } = fresh();
+    p.x = 20;
+    p.y = 10;
+    const boss = spawnMonster(w, 10, 10, 'goblin_king');
+    boss.targetId = p.id;
+    boss.hp = boss.maxHp * 0.4;
+    boss.cooldownLeft = 9999;
+    tick(w);
+    expect(w.actors.filter((a) => a.summonedBy === boss.id)).toHaveLength(3);
+    boss.alive = false;
+    boss.diedAt = w.tick;
+    boss.targetId = null;
+    run(w, boss.respawnTicks + 5);
+    expect(boss.alive).toBe(true);
+    expect(w.actors.filter((a) => a.summonedBy === boss.id)).toHaveLength(0);
+  });
+
+  it('Netzfilter reicht Warnringe, Fehlschläge, Beschwörung und Ansturm weiter', async () => {
+    const { makeSnapshot } = await import('./net');
+    const { w, p } = fresh();
+    const m = spawnMonster(w, 14, 10, 'wolf');
+    const evs = [
+      { type: 'telegraph', x: 12, y: 10, r: 2, ms: 1000 },
+      { type: 'miss', attackerId: m.id, targetId: p.id },
+      { type: 'summon', id: m.id },
+      { type: 'charge', id: m.id },
+      { type: 'telegraph', x: 200, y: 10, r: 2, ms: 1000 },
+    ] as const;
+    const snap = makeSnapshot(w, p, [...evs]);
+    expect(snap.events.map((e) => e.type)).toEqual(['telegraph', 'miss', 'summon', 'charge']);
+  });
+
+  it('Spielstand meldet Gegenstände mit unbekannter Vorlage', async () => {
+    const { importPlayer } = await import('./save');
+    const { w, p } = fresh();
+    const good = generateItem(w.rng, w.nextId++, 'iron_ring', 'normal');
+    const bad = { ...generateItem(w.rng, w.nextId++, 'iron_ring', 'normal'), templateId: 'gibt_es_nicht' };
+    drainEvents(w);
+    importPlayer(w, p, JSON.stringify({ v: 1, mapV: 3, player: { level: 1, inventory: [good, bad] } }));
+    expect(p.inventory).toHaveLength(1);
+    expect(drainEvents(w).some((e) => e.type === 'fail' && e.reason.includes('nicht geladen'))).toBe(true);
+  });
+});

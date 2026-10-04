@@ -103,6 +103,8 @@ export interface Actor {
   chargeAt: number;
   chargeUntil: number;
   summoned: boolean;
+  /** Beschworener Helfer: Kennung des Beschwörers (wird beim Wiedererscheinen des Bosses entfernt) */
+  summonedBy?: number;
   /** Wartezeit bis zum Wiedererscheinen (Ticks) */
   respawnTicks: number;
   /** Faktor auf XP, Gold und Beute */
@@ -621,8 +623,10 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       a.pickupId = null;
       if (Math.hypot(a.x - c.x, a.y - c.y) <= CHEST_RANGE) return openChest(w, a, c);
       a.chestId = c.id;
-      a.path = findPath(w.grid, { x: Math.round(a.x), y: Math.round(a.y) }, { x: c.x, y: c.y + 1 }).concat([]);
-      if (!a.path.length) a.path = findPath(w.grid, { x: Math.round(a.x), y: Math.round(a.y) }, { x: c.x, y: c.y });
+      // zum Feld vor der Truhe laufen, sonst direkt zu ihrem Feld
+      const from = { x: Math.round(a.x), y: Math.round(a.y) };
+      a.path = isWalkable(w.grid, c.x, c.y + 1) ? findPath(w.grid, from, { x: c.x, y: c.y + 1 }) : [];
+      if (!a.path.length) a.path = findPath(w.grid, from, { x: c.x, y: c.y });
       break;
     }
     case 'acceptQuest': {
@@ -1015,7 +1019,7 @@ export function tick(w: World): void {
       if (!players.some((pl) => Math.abs(pl.x - a.x) < SLEEP_DIST && Math.abs(pl.y - a.y) < SLEEP_DIST)) continue;
     }
     if (!a.alive) {
-      if (a.kind === 'monster' && w.tick - a.diedAt >= a.respawnTicks && a.home) reviveMonster(a);
+      if (a.kind === 'monster' && w.tick - a.diedAt >= a.respawnTicks && a.home) reviveMonster(w, a);
       continue;
     }
     if (a.cooldownLeft > 0) a.cooldownLeft--;
@@ -1025,7 +1029,7 @@ export function tick(w: World): void {
         const src = getActor(w, a.dot.srcId) ?? a;
         const d = a.dot;
         if (w.tick >= d.until) a.dot = null;
-        dealDamage(w, src, a, d.perSec, true, 'poison_shot');
+        dealDamage(w, src, a, d.perSec, true, 'dot');
         if (!a.alive) continue;
       } else if (w.tick >= a.dot.until) a.dot = null;
     }
@@ -1079,7 +1083,9 @@ function regen(w: World, p: Actor): void {
   p.mana = Math.min(mmax, p.mana + 0.02 + (p.attrs.willenskraft - 10) * 0.005 + (safe ? 0.2 : 0));
 }
 
-function reviveMonster(m: Actor): void {
+function reviveMonster(w: World, m: Actor): void {
+  // Helfer vom letzten Mal verschwinden, sonst häufen sie sich über Respawns
+  if (m.abilities.includes('summon')) w.actors = w.actors.filter((x) => x.summonedBy !== m.id);
   m.alive = true;
   m.hp = m.maxHp;
   m.x = m.home!.x;
@@ -1157,6 +1163,7 @@ function useAbilities(w: World, m: Actor, t: Actor): void {
       const y = isWalkable(w.grid, sx, sy) ? sy : Math.round(m.y);
       const minion = spawnMonster(w, x, y, m.summonKind);
       minion.packId = pack;
+      minion.summonedBy = m.id;
       minion.targetId = t.id;
       minion.respawnTicks = 1e9; // Gerufene Helfer kommen nicht wieder
     }

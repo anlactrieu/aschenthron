@@ -102,6 +102,10 @@ export function makeSnapshot(w: World, you: Actor, events: GameEvent[]): Snapsho
       case 'hit': return byId.has(e.targetId) || e.targetId === you.id || e.attackerId === you.id;
       case 'died': case 'enraged': case 'pk': return byId.has('id' in e ? e.id : -1) || ('id' in e && e.id === you.id);
       case 'loot': return near({ x: e.x, y: e.y }, you);
+      case 'telegraph': return near({ x: e.x, y: e.y }, you);
+      case 'miss': return byId.has(e.targetId) || e.targetId === you.id || e.attackerId === you.id;
+      case 'summon': case 'charge': return byId.has(e.id) || e.id === you.id;
+      case 'chestOpened': return true;
       default: return false;
     }
   });

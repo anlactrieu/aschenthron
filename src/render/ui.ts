@@ -162,7 +162,6 @@ export class Ui {
     private useSkillSlot: (i: number) => void,
     private usePotionKind: (kind: 'heal' | 'mana') => void,
     private newGame: () => void,
-    private onDropToWorld?: (item: Item) => void,
   ) {
     const style = document.createElement('style');
     style.textContent = CSS;
@@ -254,8 +253,8 @@ export class Ui {
     const key = JSON.stringify([this.open, this.tab, p.inventory, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.gold, p.level, near.map((n) => n.id), p.quests, p.xp > 0]);
     if (key === this.key || this.dragging) return;
     this.key = key;
-    if (this.open) this.renderMain(w, p);
-    this.renderSide(w, p, this.open ? near : []);
+    if (this.open) this.renderMain(p);
+    this.renderSide(p, this.open ? near : []);
   }
 
   private updateHud(p: Actor, t?: Actor): void {
@@ -436,7 +435,6 @@ export class Ui {
         if (valuable && !confirm(`${d.item.name} wirklich auf den Boden werfen?`)) return;
         this.send({ type: 'drop', itemId: d.item.id });
       }
-      this.onDropToWorld?.(d.item);
       return;
     }
     if (!this.canDrop(d, zone)) {
@@ -535,7 +533,7 @@ export class Ui {
     return s;
   }
 
-  private renderMain(w: World, p: Actor): void {
+  private renderMain(p: Actor): void {
     const tabs = el('div', 'a-tabs');
     for (const [id, label] of [['inv', 'Inventar (I)'], ['char', 'Charakter (C)'], ['skills', 'Fertigkeiten (K)'], ['quests', 'Aufgaben (J)']] as [Tab, string][]) {
       const t = el('div', `a-tab${this.tab === id ? ' on' : ''}`, label);
@@ -552,7 +550,6 @@ export class Ui {
     else this.renderQuests(body, p);
     const title = el('h3', '', `${p.name} · Stufe ${p.level}`);
     this.main.replaceChildren(title, tabs, body);
-    void w;
   }
 
   private dollImage(p: Actor): string {
@@ -715,7 +712,7 @@ export class Ui {
 
   /* -------------------------------------------------- Händler-Fenster */
 
-  private renderSide(w: World, p: Actor, near: Npc[]): void {
+  private renderSide(p: Actor, near: Npc[]): void {
     if (!near.length) {
       this.side.style.display = 'none';
       return;
@@ -834,7 +831,6 @@ export class Ui {
     const title = el('h3', '', near.map((n) => n.name).join(' · '));
     this.side.replaceChildren(title, body);
     this.side.style.display = 'block';
-    void w;
   }
 
   private skillCard(s: SkillDef, p: Actor): HTMLElement {

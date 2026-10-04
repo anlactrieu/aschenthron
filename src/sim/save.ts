@@ -50,8 +50,11 @@ export function importPlayer(w: World, p: Actor, json: string): boolean {
     const spent = Object.values(p.skillRanks).reduce((n, r) => n + r, 0);
     const earned = SKILL_POINTS_START + SKILL_POINTS_PER_LEVEL * (p.level - 1);
     p.skillPoints = typeof s.skillPoints === 'number' ? Math.max(0, Math.floor(s.skillPoints)) : Math.max(0, earned - spent);
+    const rawCount = (Array.isArray(s.inventory) ? s.inventory.length : 0) + (Array.isArray(s.stash) ? s.stash.length : 0);
     p.inventory = Array.isArray(s.inventory) ? s.inventory.filter(isItem) : [];
     p.stash = Array.isArray(s.stash) ? s.stash.filter(isItem) : [];
+    const lost = rawCount - p.inventory.length - p.stash.length;
+    if (lost > 0) w.events.push({ type: 'fail', reason: `${lost} Gegenstand/Gegenstände aus dem Spielstand konnten nicht geladen werden (unbekannte Vorlage).`, to: p.id });
     p.equipment = {};
     for (const slot of EQUIP_SLOTS) {
       const it = (s.equipment as Record<string, unknown> | undefined)?.[slot];
