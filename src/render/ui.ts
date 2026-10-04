@@ -11,6 +11,8 @@ const STAT_NAME = { damage: 'Schaden', armor: 'Rüstung', maxHp: 'Leben', kraft:
 
 export function describeItem(i: Item): string {
   const base: string[] = [];
+  if (i.heal) base.push(`Heilt ${i.heal} LP`);
+  if (i.mana) base.push(`Stellt ${i.mana} MP wieder her`);
   if (i.damage) base.push(`Schaden ${i.damage[0]}-${i.damage[1]}`);
   if (i.armor) base.push(`Rüstung ${i.armor}`);
   const aff = i.affixes.map((a) => `+${a.value} ${STAT_NAME[a.stat]}`);
@@ -41,7 +43,7 @@ export class Ui {
   private key = '';
   private open = false;
 
-  constructor(private send: (c: Command) => void, private useSkillSlot: (i: number) => void, private newGame: () => void) {
+  constructor(private send: (c: Command) => void, private useSkillSlot: (i: number) => void, private usePotionKind: (kind: 'heal' | 'mana') => void, private newGame: () => void) {
     this.buildBars();
     this.hud.append(this.hotbar, this.bars);
     document.body.append(this.panel, this.hud, this.target, this.toast);
@@ -49,6 +51,8 @@ export class Ui {
       const k = e.key.toLowerCase();
       if (k === 'i' || k === 'c') this.toggle();
       if (k >= '1' && k <= '9') this.useSkillSlot(Number(k) - 1);
+      if (k === 'q') this.usePotionKind('heal');
+      if (k === 'e') this.usePotionKind('mana');
     });
   }
 
@@ -106,7 +110,8 @@ export class Ui {
     this.setBar(bp.mp, 'MP', p.mana, maxManaOf(p));
     this.setBar(bp.xp, 'XP', into, p.level >= MAX_LEVEL ? 1 : span);
     bp.gold.textContent = `Gold ${p.gold}`;
-    bp.pts.textContent = p.statPoints ? `${p.statPoints} Punkte (C)` : '';
+    const n = (k: 'heal' | 'mana') => p.inventory.filter((i) => i.slot === 'potion' && i[k] !== undefined).length;
+    bp.pts.textContent = `Q Heil ${n('heal')} · E Mana ${n('mana')}${p.statPoints ? ` · ${p.statPoints} Punkte (C)` : ''}`;
     if (this.panelHp) this.panelHp.textContent = `Leben ${Math.ceil(p.hp)}/${maxHpOf(p)} · Mana ${Math.floor(p.mana)}/${maxManaOf(p)}`;
 
     // Hotbar: Buttons nur bei geänderter Skill-Liste neu bauen, sonst Text in place aktualisieren
@@ -174,7 +179,10 @@ export class Ui {
     h('Rucksack');
     if (!p.inventory.length) out.push(el('i', '', 'leer'));
     for (const it of p.inventory) {
-      const acts: [string, () => void][] = [['Anlegen', () => this.send({ type: 'equip', itemId: it.id })], ['Fallen', () => this.send({ type: 'drop', itemId: it.id })]];
+      const acts: [string, () => void][] = [];
+      if (it.slot === 'potion') acts.push(['Benutzen', () => this.send({ type: 'usePotion', itemId: it.id })]);
+      else acts.push(['Anlegen', () => this.send({ type: 'equip', itemId: it.id })]);
+      acts.push(['Fallen', () => this.send({ type: 'drop', itemId: it.id })]);
       if (merchant) acts.push([`Verkaufen (${sellPrice(it)}g)`, () => this.send({ type: 'sell', itemId: it.id })]);
       if (stash) acts.push(['In Truhe', () => this.send({ type: 'stashPut', itemId: it.id })]);
       out.push(this.itemRow(it.name, it, acts));

@@ -4,7 +4,7 @@ import { buildWorld, type TiledMap } from '../sim/tiled';
 import { monsterKind, SKILLS } from '../sim/data';
 import { exportPlayer, importPlayer } from '../sim/save';
 import {
-  applyCommand, drainEvents, getActor, inSafeZone, tick, TICK_RATE, type Actor, type Command, type World,
+  applyCommand, drainEvents, getActor, inSafeZone, maxHpOf, maxManaOf, tick, TICK_RATE, type Actor, type Command, type World,
 } from '../sim/world';
 import { isWalkable } from '../sim/path';
 import { TILE_H, TILE_W, toScreen, toTile } from './iso';
@@ -52,9 +52,9 @@ export class GameScene extends Phaser.Scene {
     }
     const saved = store?.getItem(SAVE_KEY);
     const p = this.player();
-    this.ui = new Ui((c) => this.send(c), (i) => this.useSkillSlot(i), () => this.newGame());
+    this.ui = new Ui((c) => this.send(c), (i) => this.useSkillSlot(i), (k) => this.usePotionKind(k), () => this.newGame());
     if (saved && importPlayer(this.world, p, saved)) this.ui.say('Spielstand geladen.');
-    else this.ui.say('Willkommen in Aschenthron. C: Charakter (Attributpunkte verteilen!) · Klick: laufen/angreifen/aufheben · Lehrer, Händlerin und Truhe in der Stadt.');
+    else this.ui.say('Willkommen in Aschenthron. C: Charakter (Attributpunkte verteilen!) · Q/E: Heil-/Manatrank · Klick: laufen/angreifen/aufheben · Lehrer, Händlerin und Truhe in der Stadt.');
     this.gfx = this.add.graphics();
     this.cameras.main.setBackgroundColor('#0b0a0d');
     this.input.on('pointerdown', (ptr: Phaser.Input.Pointer) => this.onClick(ptr));
@@ -99,6 +99,17 @@ export class GameScene extends Phaser.Scene {
     }
     if (target) this.send({ type: 'useSkill', skillId: id, targetId: target.id });
     else this.ui.say('Kein Ziel in Reichweite.');
+  }
+
+  private usePotionKind(kind: 'heal' | 'mana'): void {
+    const p = this.player();
+    const potions = p.inventory.filter((i) => i.slot === 'potion' && i[kind] !== undefined);
+    // kleinsten ausreichenden Trank zuerst: sparsam, aber nicht wirkungslos
+    const need = kind === 'heal' ? maxHpOf(p) - p.hp : maxManaOf(p) - p.mana;
+    const sorted = [...potions].sort((a, b) => a[kind]! - b[kind]!);
+    const pick = sorted.find((i) => i[kind]! >= need) ?? sorted[sorted.length - 1];
+    if (pick) this.send({ type: 'usePotion', itemId: pick.id });
+    else this.ui.say(kind === 'heal' ? 'Kein Heiltrank im Rucksack.' : 'Kein Manatrank im Rucksack.');
   }
 
   private onClick(ptr: Phaser.Input.Pointer): void {
@@ -161,6 +172,7 @@ export class GameScene extends Phaser.Scene {
         case 'deathPenalty':
           say(`Du bist gestorben: −${e.xpLost} XP, ${e.dropped.length} Item(s) liegen an der Todesstelle (5 Min.).`);
           break;
+        case 'potion': say(`Benutzt: ${e.item.name}`); break;
         case 'respawned': say('Du erwachst in der Stadt.'); break;
         case 'fail': say(e.reason); break;
       }

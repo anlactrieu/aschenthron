@@ -1,7 +1,7 @@
 # HANDOFF – Aschenthron
 
 ## Stand
-Meilensteine 1–6 der `SPEC.md` umgesetzt und committet (Code-Stand `e4a6e2f`): Karte/Bewegung/Kampf, Drops/Inventar/Gewicht/Affixe, Attribute/Leveln/Lehrer/Skills, Todesstrafe (XP-Verlust + Item-Drop + Leichenlauf 5 Min.), Hub (Händler, Truhe, Safe-Zone ohne Kampf), Dungeon + Boss (Aschenkönig). Speichern in localStorage. 33 Tests, Lint und Build grün.
+Meilensteine 1–6 der `SPEC.md` umgesetzt und committet (Code-Stand `e4a6e2f`): Karte/Bewegung/Kampf, Drops/Inventar/Gewicht/Affixe, Attribute/Leveln/Lehrer/Skills, Todesstrafe (XP-Verlust + Item-Drop + Leichenlauf 5 Min.), Hub (Händler, Truhe, Safe-Zone ohne Kampf), Dungeon + Boss (Aschenkönig). Tränke (Heil/Mana, Q/E, 5 s Cooldown, Händler + Drops; Ausrüstungs-Drops auf 40 % gesenkt, Tränke 30 %). Speichern in localStorage. 33 Tests, Lint und Build grün.
 Befehle: `npm run dev | test | lint | build | pace` (pace = Bot-Messlauf Level-Tempo). Reset: `?neu` an die URL oder Button im Panel.
 `Browserspiele/` und `Spiele/` sind per `.gitignore` bewusst nicht im Repo.
 

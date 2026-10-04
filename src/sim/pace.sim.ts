@@ -27,6 +27,7 @@ describe('Level-Tempo (Messung)', () => {
       if (t % 10 !== 0) continue;
       if (p.statPoints > 0) applyCommand(w, p.id, { type: 'spendStat', attr: p.statPoints % 2 ? 'kraft' : 'ausdauer' });
       for (const it of [...p.inventory]) {
+        if (it.slot === 'potion') continue;
         const cur = p.equipment[it.slot];
         if (!cur || score(it) > score(cur)) applyCommand(w, p.id, { type: 'equip', itemId: it.id });
       }

@@ -1,14 +1,18 @@
 import type { Rng } from './rng';
 
 export type Slot = 'weapon' | 'head' | 'chest' | 'hands' | 'feet' | 'ring';
+/** Verbrauchsgegenstände belegen keinen Ausrüstungsslot */
+export type ItemSlot = Slot | 'potion';
 export type Rarity = 'normal' | 'magic' | 'rare';
 export type Stat = 'damage' | 'armor' | 'maxHp' | 'kraft';
 
 export interface ItemTemplate {
   id: string;
   name: string;
-  slot: Slot;
+  slot: ItemSlot;
   weight: number;
+  heal?: number;
+  mana?: number;
   /** Basiswerte (Waffe: Schaden min/max, Rüstung: Rüstung) */
   damage?: [number, number];
   armor?: number;
@@ -26,9 +30,11 @@ export interface Item {
   id: number;
   templateId: string;
   name: string;
-  slot: Slot;
+  slot: ItemSlot;
   rarity: Rarity;
   weight: number;
+  heal?: number;
+  mana?: number;
   damage?: [number, number];
   armor?: number;
   reqKraft: number;
@@ -55,6 +61,12 @@ export const TEMPLATES: ItemTemplate[] = [
   { id: 'silver_ring', name: 'Silberring', slot: 'ring', weight: 0.5, reqKraft: 0, value: 60, minLevel: 6 },
   { id: 'ember_ring', name: 'Glutring', slot: 'ring', weight: 0.5, reqKraft: 0, value: 140, minLevel: 11 },
   { id: 'iron_ring', name: 'Eisenring', slot: 'ring', weight: 0.5, reqKraft: 0, value: 12, minLevel: 1 },
+  { id: 'heal_small', name: 'Kleiner Heiltrank', slot: 'potion', weight: 0.3, heal: 50, reqKraft: 0, value: 8, minLevel: 1 },
+  { id: 'heal_mid', name: 'Heiltrank', slot: 'potion', weight: 0.4, heal: 130, reqKraft: 0, value: 25, minLevel: 6 },
+  { id: 'heal_big', name: 'Großer Heiltrank', slot: 'potion', weight: 0.5, heal: 280, reqKraft: 0, value: 70, minLevel: 11 },
+  { id: 'mana_small', name: 'Kleiner Manatrank', slot: 'potion', weight: 0.3, mana: 30, reqKraft: 0, value: 8, minLevel: 1 },
+  { id: 'mana_mid', name: 'Manatrank', slot: 'potion', weight: 0.4, mana: 70, reqKraft: 0, value: 25, minLevel: 6 },
+  { id: 'mana_big', name: 'Großer Manatrank', slot: 'potion', weight: 0.5, mana: 140, reqKraft: 0, value: 70, minLevel: 11 },
 ];
 
 interface AffixDef {
@@ -85,8 +97,9 @@ export function rollRarity(rng: Rng): Rarity {
   return r < 0.05 ? 'rare' : r < 0.3 ? 'magic' : 'normal';
 }
 
-export function generateItem(rng: Rng, id: number, templateId: string, rarity: Rarity): Item {
+export function generateItem(rng: Rng, id: number, templateId: string, rarityIn: Rarity): Item {
   const t = templateById(templateId);
+  const rarity: Rarity = t.slot === 'potion' ? 'normal' : rarityIn;
   const [lo, hi] = RARITY_AFFIXES[rarity];
   const count = rng.int(lo, hi);
   const pool = [...AFFIXES];
@@ -107,6 +120,8 @@ export function generateItem(rng: Rng, id: number, templateId: string, rarity: R
     weight: t.weight,
     damage: t.damage ? [...t.damage] : undefined,
     armor: t.armor,
+    heal: t.heal,
+    mana: t.mana,
     reqKraft: t.reqKraft,
     value: t.value * RARITY_VALUE[rarity] + affixes.length * 8,
     affixes,
@@ -114,7 +129,15 @@ export function generateItem(rng: Rng, id: number, templateId: string, rarity: R
 }
 
 export function rollDrop(rng: Rng, nextId: () => number, monsterLevel: number, forceRarity?: Rarity): Item {
-  const pool = TEMPLATES.filter((t) => t.minLevel <= monsterLevel && t.minLevel >= monsterLevel - 8);
+  const pool = TEMPLATES.filter((t) => t.slot !== 'potion' && t.minLevel <= monsterLevel && t.minLevel >= monsterLevel - 8);
   const t = pool[rng.int(0, pool.length - 1)]!;
   return generateItem(rng, nextId(), t.id, forceRarity ?? rollRarity(rng));
+}
+
+/** Stärkster Trank der Art, der zur Monsterstufe passt (Fenster wie bei Ausrüstung). */
+export function rollPotion(rng: Rng, nextId: () => number, monsterLevel: number): Item {
+  const kind: 'heal' | 'mana' = rng.next() < 0.6 ? 'heal' : 'mana';
+  const tier = TEMPLATES.filter((t) => t.slot === 'potion' && t[kind] !== undefined && t.minLevel <= monsterLevel);
+  const best = tier.filter((t) => t.minLevel === Math.max(...tier.map((x) => x.minLevel)));
+  return generateItem(rng, nextId(), best[rng.int(0, best.length - 1)]!.id, 'normal');
 }

@@ -312,3 +312,65 @@ describe('Safe-Zone und Sortiment', () => {
     expect(p.equipment.weapon).toBe(boost);
   });
 });
+
+describe('Tränke', () => {
+  const potion = (w: World, id: string) => generateItem(w.rng, w.nextId++, id, 'normal');
+
+  it('Heiltrank heilt, Manatrank stellt Mana her, Cooldown und Ablehnung bei vollen Werten', () => {
+    const { w, p } = fresh();
+    const h = potion(w, 'heal_small');
+    const m = potion(w, 'mana_small');
+    p.inventory.push(h, m);
+    applyCommand(w, p.id, { type: 'usePotion', itemId: h.id });
+    expect(p.inventory).toHaveLength(2); // volle LP: nicht verbraucht
+    p.hp = 20;
+    applyCommand(w, p.id, { type: 'usePotion', itemId: h.id });
+    expect(p.hp).toBe(70);
+    expect(p.inventory).toHaveLength(1);
+    p.mana = 0;
+    applyCommand(w, p.id, { type: 'usePotion', itemId: m.id });
+    expect(p.mana).toBe(0); // Cooldown läuft
+    run(w, 101);
+    p.mana = 0;
+    applyCommand(w, p.id, { type: 'usePotion', itemId: m.id });
+    expect(p.mana).toBe(20); // auf Maximum begrenzt
+    expect(p.inventory).toHaveLength(0);
+  });
+
+  it('Tränke lassen sich nicht anlegen', () => {
+    const { w, p } = fresh();
+    const h = potion(w, 'heal_small');
+    p.inventory.push(h);
+    applyCommand(w, p.id, { type: 'equip', itemId: h.id });
+    expect(p.inventory).toHaveLength(1);
+    expect(Object.keys(p.equipment)).toHaveLength(0);
+  });
+
+  it('Drops: Tränke häufiger als Ausrüstung', () => {
+    let gear = 0;
+    let potions = 0;
+    for (let seed = 1; seed <= 300; seed++) {
+      const w = createWorld(seed, open());
+      const p = spawnPlayer(w, 10, 10);
+      p.damage = [999, 999];
+      const m = spawnMonster(w, 11, 10, 'bog_ghoul');
+      applyCommand(w, p.id, { type: 'attack', targetId: m.id });
+      run(w, 60);
+      for (const g of w.ground) {
+        if (g.item.slot === 'potion') potions++;
+        else gear++;
+      }
+    }
+    expect(potions).toBeGreaterThan(gear);
+    expect(gear / 300).toBeLessThan(0.3);
+    expect(potions / 300).toBeGreaterThan(0.2);
+  });
+
+  it('Händler verkauft Tränke', () => {
+    const { w, p } = fresh();
+    addNpc(w, 'merchant', 'H', 2, 2);
+    p.gold = 100;
+    applyCommand(w, p.id, { type: 'buy', templateId: 'heal_small' });
+    expect(p.inventory[0]?.heal).toBe(50);
+  });
+});

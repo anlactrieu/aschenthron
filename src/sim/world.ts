@@ -1,9 +1,9 @@
 import { Rng } from './rng';
 import { findPath, isWalkable, type Grid, type Pt } from './path';
-import { rollDrop, templateById, generateItem, type Item, type Slot } from './items';
+import { rollDrop, rollPotion, templateById, generateItem, type Item, type Slot } from './items';
 import {
   ATTR_KEYS, MAX_LEVEL, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
-  monsterKind, skillById, totalXpFor, SHOP_ITEMS, type AttrKey,
+  monsterKind, skillById, totalXpFor, SHOP_ITEMS, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
 } from './data';
 
 export const TICK_RATE = 20;
@@ -21,6 +21,7 @@ export type Command =
   | { type: 'equip'; itemId: number }
   | { type: 'unequip'; slot: Slot }
   | { type: 'drop'; itemId: number }
+  | { type: 'usePotion'; itemId: number }
   | { type: 'spendStat'; attr: AttrKey }
   | { type: 'learnSkill'; skillId: string }
   | { type: 'useSkill'; skillId: string; targetId?: number }
@@ -59,6 +60,7 @@ export interface Actor {
   gold: number;
   skills: string[];
   skillCd: Record<string, number>;
+  potionCd: number;
   inventory: Item[];
   equipment: Partial<Record<Slot, Item>>;
   stash: Item[];
@@ -108,6 +110,7 @@ export type GameEvent =
   | { type: 'learned'; skillId: string }
   | { type: 'deathPenalty'; xpLost: number; dropped: Item[] }
   | { type: 'respawned' }
+  | { type: 'potion'; item: Item }
   | { type: 'enraged'; id: number }
   | { type: 'fail'; reason: string };
 
@@ -139,7 +142,7 @@ function baseActor(w: World, kind: Actor['kind'], name: string, x: number, y: nu
     id: w.nextId++, kind, name, x, y, hp: 100, maxHp: 100, damage: [1, 2], speed: 0.1, attackCooldown: 20,
     cooldownLeft: 0, path: [], targetId: null, aggroRange: 0, alive: true, level: 1, xp: 0, statPoints: 0,
     attrs: { kraft: 10, gewandtheit: 10, ausdauer: 10, verstand: 10, willenskraft: 10 },
-    mana: 20, gold: 0, skills: [], skillCd: {}, inventory: [], equipment: {}, stash: [], pickupId: null,
+    mana: 20, gold: 0, skills: [], skillCd: {}, potionCd: 0, inventory: [], equipment: {}, stash: [], pickupId: null,
     diedAt: -1, boss: false, enraged: false, autoAttack: true,
   };
   w.actors.push(a);
@@ -275,7 +278,7 @@ export function applyCommand(w: World, actorId: number, cmd: Command): void {
     }
     case 'equip': {
       const it = a.inventory.find((i) => i.id === cmd.itemId);
-      if (!it) return;
+      if (!it || it.slot === 'potion') return;
       const replaced = a.equipment[it.slot];
       const bonusLost = replaced ? replaced.affixes.filter((f) => f.stat === 'kraft').reduce((n, f) => n + f.value, 0) : 0;
       if (effectiveKraft(a) - bonusLost < it.reqKraft) {
@@ -302,6 +305,20 @@ export function applyCommand(w: World, actorId: number, cmd: Command): void {
       if (!it) return;
       a.inventory = a.inventory.filter((i) => i.id !== it.id);
       w.ground.push({ id: w.nextId++, x: Math.round(a.x), y: Math.round(a.y), item: it, expiresAt: null });
+      break;
+    }
+    case 'usePotion': {
+      const it = a.inventory.find((i) => i.id === cmd.itemId);
+      if (!it || it.slot !== 'potion') return;
+      if (a.potionCd > 0) return fail(w, 'Du musst kurz warten.');
+      const needHp = it.heal !== undefined && a.hp < maxHpOf(a);
+      const needMana = it.mana !== undefined && a.mana < maxManaOf(a);
+      if (!needHp && !needMana) return fail(w, 'Das brauchst du gerade nicht.');
+      if (it.heal) a.hp = Math.min(maxHpOf(a), a.hp + it.heal);
+      if (it.mana) a.mana = Math.min(maxManaOf(a), a.mana + it.mana);
+      a.inventory = a.inventory.filter((i) => i.id !== it.id);
+      a.potionCd = POTION_COOLDOWN_TICKS;
+      w.events.push({ type: 'potion', item: it });
       break;
     }
     case 'spendStat':
@@ -479,13 +496,16 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
     killer.gold += gold;
     w.events.push({ type: 'gold', amount: gold });
   }
-  if (w.rng.next() <= k.dropChance) {
-    const item = rollDrop(w.rng, () => w.nextId++, k.level, k.boss ? 'rare' : undefined);
-    const x = Math.round(m.x);
-    const y = Math.round(m.y);
+  const x = Math.round(m.x);
+  const y = Math.round(m.y);
+  const drop = (item: Item) => {
     w.ground.push({ id: w.nextId++, x, y, item, expiresAt: w.tick + MONSTER_LOOT_TTL });
     w.events.push({ type: 'loot', item, x, y });
+  };
+  if (k.boss || w.rng.next() <= k.dropChance * GEAR_DROP_FACTOR) {
+    drop(rollDrop(w.rng, () => w.nextId++, k.level, k.boss ? 'rare' : undefined));
   }
+  if (w.rng.next() <= POTION_DROP_CHANCE) drop(rollPotion(w.rng, () => w.nextId++, k.level));
 }
 
 export function gainXp(w: World, a: Actor, amount: number): void {
@@ -554,6 +574,7 @@ export function tick(w: World): void {
       continue;
     }
     if (a.cooldownLeft > 0) a.cooldownLeft--;
+    if (a.potionCd > 0) a.potionCd--;
     for (const id of Object.keys(a.skillCd)) if ((a.skillCd[id] ?? 0) > 0) a.skillCd[id]!--;
     if (a.kind === 'player') regen(w, a);
     else monsterAi(w, a);

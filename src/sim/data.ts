@@ -76,4 +76,9 @@ export const SAFE_REGEN = 0.5;
 export const FIELD_REGEN = 0.02;
 
 /** Sortiment der Händlerin (Normalqualität, Vorlagen-IDs). */
-export const SHOP_ITEMS = ['rusty_sword', 'bone_club', 'steel_sword', 'leather_cap', 'iron_helm', 'ash_mail', 'worn_gloves', 'cloth_boots', 'iron_greaves', 'iron_ring'];
+export const SHOP_ITEMS = ['rusty_sword', 'bone_club', 'steel_sword', 'leather_cap', 'iron_helm', 'ash_mail', 'worn_gloves', 'cloth_boots', 'iron_greaves', 'iron_ring', 'heal_small', 'heal_mid', 'mana_small', 'mana_mid'];
+
+/** Gegenstands-Drops: Ausrüstung seltener, Tränke häufiger. Faktor auf die Monster-dropChance. */
+export const GEAR_DROP_FACTOR = 0.4;
+export const POTION_DROP_CHANCE = 0.3;
+export const POTION_COOLDOWN_TICKS = 100;
