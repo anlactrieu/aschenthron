@@ -73,7 +73,7 @@ export function buildWorld(seed: number, map: TiledMap, opts: { player?: boolean
     }
     if (o.type === 'townstart') world.towns.push({ x: o.x / ts, y: o.y / ts });
     if (o.type === 'monster') {
-      const m = spawnMonster(world, o.x / ts, o.y / ts, prop(o, 'kind'));
+      const m = spawnMonster(world, o.x / ts, o.y / ts, prop(o, 'kind'), { champ: prop(o, 'champ'), unique: prop(o, 'unique') });
       m.packId = Number(prop(o, 'pack') ?? 0);
     }
   }

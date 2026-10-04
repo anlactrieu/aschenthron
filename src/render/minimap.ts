@@ -56,6 +56,10 @@ export class Minimap {
       c.fillRect(ch.x * k - 1, ch.y * k - 1, 3, 3);
     }
     for (const a of this.w.actors) {
+      if (a.kind === 'monster' && a.unique && a.alive) {
+        c.fillStyle = '#ff9a2a';
+        c.fillRect(a.x * k - 2, a.y * k - 2, 4, 4);
+      }
       if (a.kind === 'monster' && a.boss && a.alive) {
         c.fillStyle = '#e04030';
         c.fillRect(a.x * k - 2, a.y * k - 2, 4, 4);

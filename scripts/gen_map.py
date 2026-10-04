@@ -13,6 +13,7 @@ g = [[6] * W for _ in range(H)]
 BLOCK = {2, 6, 10, 11, 12, 13, 14}
 objs, oid = [], [1]
 pack_counter = [0]
+CHAMPIONS = [0]
 
 def sc(v): return int(round(v * S))
 
@@ -245,8 +246,13 @@ def spawn_pack(kinds, x, y, ground, size, leader=None, gap=3):
         mx, my = cx + random.randint(-3, 3), cy + random.randint(-3, 3)
         if free(mx, my) and (ground is None or g[my][mx] in ground) and not in_safe(mx, my) and not any(abs(mx - a) < 2 and abs(my - b) < 2 for _, a, b in members):
             members.append((random.choice(kinds), mx, my))
-    for kind, mx, my in members:
-        obj(kind, "monster", mx, my, kind=kind, pack=pid)
+    champ_roll = size >= 2 and random.random() < 0.10
+    for idx, (kind, mx, my) in enumerate(members):
+        if idx == 0 and champ_roll:
+            obj(kind, "monster", mx, my, kind=kind, pack=pid, champ=random.choice(['swift', 'armored', 'fiery', 'vampiric', 'thorned']))
+            CHAMPIONS[0] += 1
+        else:
+            obj(kind, "monster", mx, my, kind=kind, pack=pid)
         taken.append((mx, my))
     return len(members)
 
@@ -351,6 +357,37 @@ if cand:
     r = rooms[cand[0]]; cx, cy = room_center(r)
     obj("Webmutter Skarra", "monster", cx, cy, kind="web_mother", pack=0); taken.append((cx, cy))
 
+# ------------------------------------------------------------- Mini-Bosse
+def place_unique(zone, ground, uid, base, entry, min_f=0.35):
+    """Ein benannter Mini-Boss weit vom Zoneneingang entfernt (nie nahe der Stadt)."""
+    x0, y0, x1, y1 = zone
+    far = max(abs(entry[0] - x0), abs(entry[0] - x1)) + max(abs(entry[1] - y0), abs(entry[1] - y1))
+    for _ in range(4000):
+        x, y = random.randint(x0, x1), random.randint(y0, y1)
+        if not place_ok(x, y, ground, SPAWN_BUFFER, 4): continue
+        if (abs(x - entry[0]) + abs(y - entry[1])) / far < min_f: continue
+        obj(uid, "monster", x, y, kind=base, unique=uid, pack=0)
+        taken.append((x, y))
+        UNIQUE_COUNT[0] += 1
+        return True
+    print("WARN Mini-Boss nicht platziert:", uid, file=sys.stderr)
+    return False
+
+UNIQUE_COUNT = [0]
+place_unique(ZONES['farm'], (4,), 'rat_king', 'giant_rat', T1_E, 0.5)
+place_unique(ZONES['farm'], (4,), 'spotted_beast', 'feral_hound', T1_E, 0.45)
+place_unique(ZONES['forest'], (4,), 'goblin_shaman_brakk', 'goblin_shaman', P(50, 80), 0.5)
+place_unique(ZONES['forest'], (4,), 'venom_mother', 'venom_spider', P(50, 80), 0.6)
+place_unique(ZONES['camp'], (7, 4), 'captain_kolm', 'bandit_captain', P(30, 44), 0.5)
+place_unique(ZONES['swamp'], (3,), 'bog_brute', 'ghoul_alpha', P(78, 62), 0.5)
+place_unique(ZONES['swamp'], (3,), 'hexmaster_irva', 'bog_witch', P(78, 62), 0.7)
+place_unique(ZONES['grave'], (4,), 'crypt_ormund', 'crypt_guard', P(90, 98), 0.5)
+place_unique(ZONES['grave'], (4,), 'ghost_lord_sael', 'wraith', P(90, 98), 0.65)
+place_unique(ZONES['hills'], (8,), 'troll_chief_drogg', 'rock_troll', P(92, 49), 0.55)
+place_unique(ZONES['hills'], (8,), 'alpha_fenrik', 'dire_wolf', P(92, 49), 0.4)
+place_unique(ZONES['ash'], (9,), 'cinder_lord_zarkesh', 'ember_elemental', P(114, 76), 0.6)
+place_unique(ZONES['ash'], (9,), 'dread_valdor', 'death_knight', P(114, 76), 0.75)
+
 # -------------------------------------------------------------------- Truhen
 CHEST_COUNT = {}
 ctaken = []
@@ -423,7 +460,7 @@ tmj = {"compressionlevel": -1, "height": H, "width": W, "infinite": False, "orie
                   {"id": 2, "name": "objects", "type": "objectgroup", "x": 0, "y": 0, "visible": True, "opacity": 1, "draworder": "topdown", "objects": objs}]}
 json.dump(tmj, open("src/data/aschenthron.json", "w"), ensure_ascii=False)
 mons = [o for o in objs if o["type"] == "monster"]
-print("ok:", len(mons), "Monster in", pack_counter[0], "Rudeln,", sum(1 for o in objs if o["type"] == "npc"), "NPCs,", sum(CHEST_COUNT.values()), "Truhen", CHEST_COUNT, ", begehbar:", len(seen))
+print("ok:", len(mons), "Monster in", pack_counter[0], "Rudeln,", CHAMPIONS[0], "Champions,", UNIQUE_COUNT[0], "Mini-Bossen,", sum(1 for o in objs if o["type"] == "npc"), "NPCs,", sum(CHEST_COUNT.values()), "Truhen", CHEST_COUNT, ", begehbar:", len(seen))
 if "--preview" in sys.argv:
     ch = {1: 'T', 2: '#', 3: '~', 4: '.', 5: '_', 6: ' ', 7: '=', 8: ',', 9: ':', 10: 'f', 11: 'o', 12: '!', 13: 't', 14: 'i'}
     for y in range(0, H, 3):

@@ -62,6 +62,8 @@ export interface ActorLite {
   targetId: number | null;
   diedAt: number;
   pk: boolean;
+  champ?: string;
+  unique?: string;
   /** nur Spieler: angelegte Ausrüstung für die Optik */
   equipment?: Actor['equipment'];
 }
@@ -90,7 +92,7 @@ export function makeSnapshot(w: World, you: Actor, events: GameEvent[]): Snapsho
     if (!a.alive && a.kind === 'monster' && w.tick - a.diedAt > 20 * 4) continue;
     actors.push({
       id: a.id, kind: a.kind, kindId: a.kindId, name: a.name, x: a.x, y: a.y, hp: a.hp, maxHp: a.maxHp, alive: a.alive,
-      boss: a.boss, enraged: a.enraged, level: a.level, targetId: a.targetId, diedAt: a.diedAt, pk: a.pkUntil > w.tick,
+      boss: a.boss, enraged: a.enraged, level: a.level, targetId: a.targetId, diedAt: a.diedAt, pk: a.pkUntil > w.tick, champ: a.champ, unique: a.unique,
       equipment: a.kind === 'player' ? a.equipment : undefined,
     });
   }
@@ -113,7 +115,7 @@ export function actorFromLite(l: ActorLite, tick: number): Actor {
     attackCooldown: 20, cooldownLeft: 0, path: [], targetId: l.targetId, aggroRange: 0, alive: l.alive, level: l.level, xp: 0,
     statPoints: 0, attrs: { kraft: 10, gewandtheit: 10, ausdauer: 10, verstand: 10, willenskraft: 10 }, mana: 0, gold: 0, skills: [], skillRanks: {}, skillPoints: 0,
     skillCd: {}, potionCd: 0, quests: {}, inventory: [], equipment: l.equipment ?? {}, stash: [], pickupId: null, chestId: null, diedAt: l.diedAt,
-    boss: l.boss, enraged: l.enraged, autoAttack: true, repathAt: 0, dot: null, lastHitAt: -9999, packId: 0, pkUntil: l.pk ? tick + 1e6 : 0,
+    boss: l.boss, enraged: l.enraged, autoAttack: true, repathAt: 0, dot: null, lastHitAt: -9999, packId: 0, abilities: [], abilityAt: 0, chargeAt: 0, chargeUntil: 0, summoned: false, respawnTicks: 0, rewardMult: 1, champ: l.champ, unique: l.unique, pkUntil: l.pk ? tick + 1e6 : 0,
     attackedBy: null, damagers: {},
   };
 }

@@ -312,7 +312,8 @@ export class Ui {
     if (t && t.alive && t.kind === 'monster') {
       this.target.style.display = 'block';
       const k = monsterKind(t.kindId!);
-      this.target.textContent = `${t.name} (Stufe ${k.level}) ${Math.ceil(t.hp)}/${t.maxHp}`;
+      const mod = t.champ ? { swift: 'sehr schnell', armored: 'sehr zäh', fiery: 'setzt in Brand', vampiric: 'heilt sich durch Treffer', thorned: 'wirft Schaden zurück' }[t.champ] : '';
+      this.target.textContent = `${t.name} (Stufe ${k.level}) ${Math.ceil(t.hp)}/${t.maxHp}${mod ? ` – ${mod}` : t.unique ? ' – Mini-Boss' : ''}`;
     } else this.target.style.display = 'none';
   }
 

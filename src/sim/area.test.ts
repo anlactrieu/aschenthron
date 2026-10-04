@@ -23,6 +23,17 @@ describe('Gebiet „Aschental“: Inhalt und Größe', () => {
     expect(kinds.size).toBeGreaterThanOrEqual(40);
   });
 
+  it('Champions und benannte Mini-Bosse sind verteilt', () => {
+    const champs = monsters.filter((m) => m.champ);
+    const uniques = monsters.filter((m) => m.unique);
+    expect(champs.length).toBeGreaterThanOrEqual(12);
+    expect(uniques.length).toBeGreaterThanOrEqual(11);
+    expect(new Set(uniques.map((u) => u.unique)).size).toBe(uniques.length);
+    for (const u of uniques) expect(u.abilities.length).toBeGreaterThan(0);
+    // nie in Stadtnähe
+    for (const m of [...champs, ...uniques]) for (const t of w.towns) expect(Math.hypot(m.x - t.x, m.y - t.y)).toBeGreaterThan(14);
+  });
+
   it('NPCs: je Stadt Lehrer, Händler, Truhe, Schmied und Questgeber', () => {
     for (const kind of ['trainer', 'merchant', 'stash', 'smith', 'quest'] as const) {
       expect(w.npcs.filter((n) => n.kind === kind).length, kind).toBeGreaterThanOrEqual(2);

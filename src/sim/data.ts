@@ -41,6 +41,8 @@ export function totalXpFor(level: number): number {
 
 export type MonsterFamily = 'beast' | 'humanoid' | 'undead' | 'spider' | 'ghoul' | 'golem' | 'demon' | 'worm' | 'elemental';
 
+export type Ability = 'slam' | 'summon' | 'charge';
+
 export interface MonsterKind {
   id: string;
   name: string;
@@ -57,6 +59,9 @@ export interface MonsterKind {
   dropChance: number;
   boss?: boolean;
   color: number;
+  /** Fähigkeiten (Bosse und Mini-Bosse) */
+  abilities?: Ability[];
+  summonKind?: string;
 }
 
 /** Zentrale Skalierung: alle Monsterwerte folgen diesen Formeln (Balancing-Regler). */
@@ -71,7 +76,7 @@ export const SCALE = {
 
 function mk(
   id: string, name: string, level: number, family: MonsterFamily, color: number,
-  o: { speed?: number; cd?: number; aggro?: number; hp?: number; dmg?: number; boss?: boolean; drop?: number } = {},
+  o: { speed?: number; cd?: number; aggro?: number; hp?: number; dmg?: number; boss?: boolean; drop?: number; abil?: Ability[]; summon?: string } = {},
 ): MonsterKind {
   const hpM = (o.hp ?? 1) * (o.boss ? SCALE.bossHp : 1);
   const dmgM = (o.dmg ?? 1) * (o.boss ? SCALE.bossDmg : 1);
@@ -87,6 +92,8 @@ function mk(
     gold: [Math.round(level * 1.5 + 1), Math.round(level * 3 + 3)],
     dropChance: o.boss ? 1 : (o.drop ?? 0.5),
     boss: o.boss,
+    abilities: o.abil,
+    summonKind: o.summon,
   };
 }
 
@@ -145,14 +152,55 @@ export const MONSTERS: MonsterKind[] = [
   mk('imp', 'Imp', 24, 'demon', 0xd05a3a, { speed: 0.125, hp: 0.8, dmg: 1.3, cd: 16 }),
   mk('hell_spawn', 'Höllenbrut', 29, 'demon', 0xc0402a, { speed: 0.1, hp: 1.3, dmg: 1.25 }),
   // Bosse
-  mk('goblin_king', 'Goblinkönig Grix', 10, 'humanoid', 0x3a6a1a, { boss: true, speed: 0.1 }),
-  mk('bandit_lord', 'Räuberfürst Harkon', 12, 'humanoid', 0xc07a3a, { boss: true, speed: 0.1 }),
-  mk('bone_lord', 'Knochenfürst Morrik', 14, 'undead', 0xe8e0c0, { boss: true, speed: 0.09 }),
-  mk('bog_queen', 'Moorhexe Veshra', 16, 'humanoid', 0x9a4a9a, { boss: true, speed: 0.095 }),
-  mk('stone_colossus', 'Steinkoloss', 20, 'golem', 0xa09a8a, { boss: true, speed: 0.07 }),
-  mk('web_mother', 'Webmutter Skarra', 23, 'spider', 0x6a3a6a, { boss: true, speed: 0.1 }),
-  mk('ash_king', 'Aschenkönig', 30, 'demon', 0xd86a2a, { boss: true, speed: 0.085 }),
+  mk('goblin_king', 'Goblinkönig Grix', 10, 'humanoid', 0x3a6a1a, { boss: true, speed: 0.1, abil: ['slam', 'summon'], summon: 'goblin_scout' }),
+  mk('bandit_lord', 'Räuberfürst Harkon', 12, 'humanoid', 0xc07a3a, { boss: true, speed: 0.1, abil: ['slam'] }),
+  mk('bone_lord', 'Knochenfürst Morrik', 14, 'undead', 0xe8e0c0, { boss: true, speed: 0.09, abil: ['slam', 'summon'], summon: 'skeleton' }),
+  mk('bog_queen', 'Moorhexe Veshra', 16, 'humanoid', 0x9a4a9a, { boss: true, speed: 0.095, abil: ['slam', 'summon'], summon: 'bog_ghoul' }),
+  mk('stone_colossus', 'Steinkoloss', 20, 'golem', 0xa09a8a, { boss: true, speed: 0.07, abil: ['slam', 'charge'] }),
+  mk('web_mother', 'Webmutter Skarra', 23, 'spider', 0x6a3a6a, { boss: true, speed: 0.1, abil: ['summon', 'charge'], summon: 'cave_spider' }),
+  mk('ash_king', 'Aschenkönig', 30, 'demon', 0xd86a2a, { boss: true, speed: 0.085, abil: ['slam', 'summon', 'charge'], summon: 'imp' }),
 ];
+
+/** Champion-Modifikatoren: Anführer mancher Rudel, stärker, mit besonderer Eigenschaft und besserer Beute. */
+export const CHAMPION_MODS: Record<string, { name: string; hp: number; dmg: number; speed: number; desc: string }> = {
+  swift: { name: 'Flinker', hp: 1.8, dmg: 1.1, speed: 1.45, desc: 'sehr schnell' },
+  armored: { name: 'Gepanzerter', hp: 3.0, dmg: 1.0, speed: 1, desc: 'sehr zäh' },
+  fiery: { name: 'Feuriger', hp: 1.9, dmg: 1.3, speed: 1, desc: 'setzt in Brand' },
+  vampiric: { name: 'Blutsaugender', hp: 2.0, dmg: 1.15, speed: 1, desc: 'heilt sich durch Treffer' },
+  thorned: { name: 'Dorniger', hp: 2.0, dmg: 1.1, speed: 1, desc: 'wirft Schaden zurück' },
+};
+export const CHAMPION_REWARD = 3;
+
+/** Benannte Mini-Bosse: seltene Einzelgänger mit Fähigkeiten, langer Wartezeit und garantierter guter Beute. */
+export interface UniqueDef {
+  id: string;
+  name: string;
+  base: string;
+  hp: number;
+  dmg: number;
+  abilities: Ability[];
+  summon?: string;
+  respawnMin: number;
+}
+export const UNIQUES: UniqueDef[] = [
+  { id: 'rat_king', name: 'Rattenkönig Knabber', base: 'giant_rat', hp: 6, dmg: 1.5, abilities: ['summon'], summon: 'field_rat', respawnMin: 15 },
+  { id: 'spotted_beast', name: 'Fleckenbiest', base: 'feral_hound', hp: 6, dmg: 1.5, abilities: ['charge'], respawnMin: 15 },
+  { id: 'goblin_shaman_brakk', name: 'Schamane Brakk', base: 'goblin_shaman', hp: 5, dmg: 1.4, abilities: ['summon', 'slam'], summon: 'goblin', respawnMin: 18 },
+  { id: 'venom_mother', name: 'Giftmutter Zischel', base: 'venom_spider', hp: 5, dmg: 1.4, abilities: ['summon', 'charge'], summon: 'forest_spider', respawnMin: 18 },
+  { id: 'captain_kolm', name: 'Hauptmann Kolm', base: 'bandit_captain', hp: 4, dmg: 1.4, abilities: ['slam', 'charge'], respawnMin: 20 },
+  { id: 'bog_brute', name: 'Moorbestie Gluck', base: 'ghoul_alpha', hp: 5, dmg: 1.4, abilities: ['slam'], respawnMin: 20 },
+  { id: 'hexmaster_irva', name: 'Hexenmeisterin Irva', base: 'bog_witch', hp: 6, dmg: 1.5, abilities: ['summon', 'slam'], summon: 'bog_ghoul', respawnMin: 20 },
+  { id: 'crypt_ormund', name: 'Gruftwächter Ormund', base: 'crypt_guard', hp: 4.5, dmg: 1.4, abilities: ['slam', 'charge'], respawnMin: 22 },
+  { id: 'ghost_lord_sael', name: 'Geistfürst Sael', base: 'wraith', hp: 7, dmg: 1.6, abilities: ['summon', 'slam'], summon: 'skeleton', respawnMin: 22 },
+  { id: 'troll_chief_drogg', name: 'Trollhäuptling Drogg', base: 'rock_troll', hp: 4.5, dmg: 1.4, abilities: ['slam', 'charge'], respawnMin: 22 },
+  { id: 'alpha_fenrik', name: 'Alphawolf Fenrik', base: 'dire_wolf', hp: 6, dmg: 1.5, abilities: ['charge', 'summon'], summon: 'wolf', respawnMin: 22 },
+  { id: 'cinder_lord_zarkesh', name: 'Glutfürst Zarkesh', base: 'ember_elemental', hp: 4.5, dmg: 1.4, abilities: ['slam', 'summon'], summon: 'cinder_wisp', respawnMin: 25 },
+  { id: 'dread_valdor', name: 'Schreckensritter Valdor', base: 'death_knight', hp: 4, dmg: 1.4, abilities: ['charge', 'slam'], respawnMin: 25 },
+];
+export function uniqueDef(id: string): UniqueDef | undefined {
+  return UNIQUES.find((u) => u.id === id);
+}
+export const UNIQUE_REWARD = 6;
 
 export function monsterKind(id: string): MonsterKind {
   const k = MONSTERS.find((m) => m.id === id);

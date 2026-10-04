@@ -419,6 +419,31 @@ export class GameScene extends Phaser.Scene {
           }
           break;
         }
+        case 'telegraph': {
+          const { sx, sy } = toScreen(e.x, e.y);
+          this.fx.zone(sx, sy + 8, e.r, 0xff3a2a, e.ms);
+          this.sfx.warn();
+          break;
+        }
+        case 'summon': {
+          const boss = getActor(w, e.id);
+          const pos = this.bodyPos(boss);
+          if (pos) {
+            this.fx.ring(pos.x, pos.y + 20, 160, 0xb060ff, 600);
+            this.fx.burst(pos.x, pos.y, 0xb060ff, 700);
+          }
+          this.cameras.main.shake(180, 0.004);
+          say(`${boss?.name} ruft Verstärkung!`);
+          this.sfx.boss();
+          break;
+        }
+        case 'charge': {
+          const boss = getActor(w, e.id);
+          const pos = this.bodyPos(boss);
+          if (pos) this.fx.burst(pos.x, pos.y + 10, 0xc8b898, 500);
+          this.sfx.cast('Nahkampf');
+          break;
+        }
         case 'miss': {
           const at = getActor(w, e.attackerId);
           const tg = getActor(w, e.targetId);
@@ -998,6 +1023,15 @@ export class GameScene extends Phaser.Scene {
       else if (a.enraged) img.setTint(0xff9a8a);
       else img.clearTint();
       const hovered = this.hover?.actor?.id === a.id;
+      if (a.champ || a.unique) {
+        const col = a.unique ? 0xff9a2a : ({ swift: 0x6fe0ff, armored: 0xa0b0d0, fiery: 0xff7a2a, vampiric: 0xe03a4a, thorned: 0x7fe070 } as Record<string, number>)[a.champ!] ?? 0xffe45a;
+        const pulse = 0.5 + 0.5 * Math.sin(time / 260 + a.id);
+        g.lineStyle(2, col, 0.5 + 0.4 * pulse);
+        g.strokeEllipse(sx, sy + 8, (a.boss ? 60 : 44) + pulse * 6, (a.boss ? 26 : 19) + pulse * 3);
+        g.fillStyle(col, 0.12 + 0.1 * pulse);
+        g.fillEllipse(sx, sy + 8, a.boss ? 54 : 40, a.boss ? 24 : 17);
+        if (this.frame % 30 === a.id % 30) this.fx.sparkle(sx, sy - 20, col, 700);
+      }
       if (hovered) {
         g.lineStyle(2, 0xffffff, 0.75);
         g.strokeEllipse(sx, sy + 6, a.boss ? 70 : 40, a.boss ? 30 : 18);
@@ -1012,7 +1046,13 @@ export class GameScene extends Phaser.Scene {
           g.fillStyle(a.boss ? 0xe8832a : 0xd44a3a, 1);
           g.fillRect(sx - big / 2, top, big * Math.max(0, a.hp / a.maxHp), 5);
         }
-        if (a.boss || a.id === p.targetId || hovered) this.label(`a${a.id}`, a.name, sx, top - 10, a.boss ? '#ff9a4a' : '#e6cfcf', seen);
+        if (a.boss || a.champ || a.unique || a.id === p.targetId || hovered) this.label(`a${a.id}`, a.name, sx, top - 10, a.unique ? '#ff9a2a' : a.boss ? '#ff9a4a' : a.champ ? '#ffe45a' : '#e6cfcf', seen);
+        if (a.champ || a.unique) {
+          g.fillStyle(0x200000, 0.9);
+          g.fillRect(sx - big / 2, top, big, 5);
+          g.fillStyle(a.unique ? 0xff9a2a : 0xf0c040, 1);
+          g.fillRect(sx - big / 2, top, big * Math.max(0, a.hp / a.maxHp), 5);
+        }
       } else {
         if (a.id !== p.id) this.label(`a${a.id}`, `${a.name} (Lv ${a.level})${a.pkUntil > this.world.tick ? ' ☠' : ''}`, sx, sy + 8 - 66, a.pkUntil > this.world.tick ? '#ff5a4a' : '#9fd0ff', seen);
         // Spielerring in der Stadt = sicher

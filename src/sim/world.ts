@@ -1,9 +1,9 @@
 import { Rng } from './rng';
 import { findPath, isWalkable, type Grid, type Pt } from './path';
-import { itemReq, rollArrows, rollDrop, rollPotion, rollSpecial, templateById, generateItem, rerollAffixes, extendAffixes, SETS, type Item, type PowerId, type SetBonus, type Slot, type Stat } from './items';
+import { itemReq, rollUniqueSpecial, rollArrows, rollDrop, rollPotion, rollSpecial, templateById, generateItem, rerollAffixes, extendAffixes, SETS, type Item, type PowerId, type SetBonus, type Slot, type Stat } from './items';
 import {
   ATTR_KEYS, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
-  monsterKind, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
+  monsterKind, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
 } from './data';
 
 export const TICK_RATE = 20;
@@ -94,6 +94,19 @@ export interface Actor {
   lastHitAt: number;
   /** Rudel-Kennung (0 = Einzelgänger): Rudelmitglieder greifen gemeinsam an */
   packId: number;
+  /** Champion-Modifikator und Mini-Boss-Kennung */
+  champ?: string;
+  unique?: string;
+  abilities: Ability[];
+  summonKind?: string;
+  abilityAt: number;
+  chargeAt: number;
+  chargeUntil: number;
+  summoned: boolean;
+  /** Wartezeit bis zum Wiedererscheinen (Ticks) */
+  respawnTicks: number;
+  /** Faktor auf XP, Gold und Beute */
+  rewardMult: number;
   /** Spieler: bis zu diesem Tick als Mörder markiert (überall angreifbar) */
   pkUntil: number;
   /** Spieler: zuletzt von diesem Spieler angegriffen (Notwehr-Erkennung) */
@@ -165,6 +178,9 @@ type GameEventBase =
   | { type: 'pk'; id: number }
   | { type: 'chestOpened'; chestId: number }
   | { type: 'miss'; attackerId: number; targetId: number }
+  | { type: 'telegraph'; x: number; y: number; r: number; ms: number }
+  | { type: 'summon'; id: number }
+  | { type: 'charge'; id: number }
   | { type: 'refilled'; arrows: number }
   | { type: 'respecced' };
 
@@ -189,12 +205,13 @@ export interface World {
   /** Spieler dürfen einander außerhalb von Städten angreifen (Server-Einstellung) */
   pvp: boolean;
   chests: Chest[];
+  telegraphs: { id: number; x: number; y: number; r: number; at: number; dmg: number; src: number }[];
   /** Akteur des gerade ausgeführten Befehls (für `fail`-Ereignisse) */
   cmdActor: number | null;
 }
 
 export function createWorld(seed: number, grid: Grid, safe: Rect[] = []): World {
-  return { tick: 0, grid, rng: new Rng(seed), actors: [], nextId: 1, events: [], ground: [], safe, npcs: [], start: { x: 1, y: 1 }, towns: [], regions: [], pvp: false, chests: [], cmdActor: null };
+  return { tick: 0, grid, rng: new Rng(seed), actors: [], nextId: 1, events: [], ground: [], safe, npcs: [], start: { x: 1, y: 1 }, towns: [], regions: [], pvp: false, chests: [], telegraphs: [], cmdActor: null };
 }
 
 export function addNpc(w: World, kind: NpcKind, name: string, x: number, y: number, extra: Partial<Npc> = {}): Npc {
@@ -209,7 +226,7 @@ function baseActor(w: World, kind: Actor['kind'], name: string, x: number, y: nu
     cooldownLeft: 0, path: [], targetId: null, aggroRange: 0, alive: true, level: 1, xp: 0, statPoints: 0,
     attrs: { kraft: 10, gewandtheit: 10, ausdauer: 10, verstand: 10, willenskraft: 10 },
     mana: 20, gold: 0, skills: [], skillRanks: {}, skillPoints: 0, skillCd: {}, potionCd: 0, quests: {}, inventory: [], equipment: {}, stash: [], pickupId: null, chestId: null,
-    diedAt: -1, boss: false, enraged: false, autoAttack: true, repathAt: 0, dot: null, lastHitAt: -9999, packId: 0, pkUntil: 0, attackedBy: null, damagers: {},
+    diedAt: -1, boss: false, enraged: false, autoAttack: true, repathAt: 0, dot: null, lastHitAt: -9999, packId: 0, abilities: [], abilityAt: 0, chargeAt: 0, chargeUntil: 0, summoned: false, respawnTicks: MONSTER_RESPAWN_TICKS, rewardMult: 1, pkUntil: 0, attackedBy: null, damagers: {},
   };
   w.actors.push(a);
   return a;
@@ -238,13 +255,39 @@ export function removePlayer(w: World, id: number): void {
   }
 }
 
-export function spawnMonster(w: World, x: number, y: number, kindId = 'field_rat'): Actor {
+export function spawnMonster(w: World, x: number, y: number, kindId = 'field_rat', opts: { champ?: string; unique?: string } = {}): Actor {
   const k = monsterKind(kindId);
   const a = baseActor(w, 'monster', k.name, x, y);
   Object.assign(a, {
     kindId, level: k.level, hp: k.hp, maxHp: k.hp, damage: k.damage, speed: k.speed,
     attackCooldown: k.attackCooldown, aggroRange: k.aggroRange, home: { x, y }, boss: !!k.boss,
+    abilities: [...(k.abilities ?? [])], summonKind: k.summonKind,
   });
+  const scaleDmg = (m: number) => {
+    a.damage = [Math.max(1, Math.round(a.damage[0] * m)), Math.max(2, Math.round(a.damage[1] * m))];
+  };
+  const mod = opts.champ ? CHAMPION_MODS[opts.champ] : undefined;
+  if (mod && opts.champ) {
+    a.champ = opts.champ;
+    a.name = `${mod.name} ${k.name}`;
+    a.maxHp = a.hp = Math.round(k.hp * mod.hp);
+    scaleDmg(mod.dmg);
+    a.speed = k.speed * mod.speed;
+    a.attackCooldown = Math.round(k.attackCooldown / Math.sqrt(mod.speed));
+    a.rewardMult = CHAMPION_REWARD;
+  }
+  const u = opts.unique ? uniqueDef(opts.unique) : undefined;
+  if (u) {
+    a.unique = u.id;
+    a.name = u.name;
+    a.maxHp = a.hp = Math.round(k.hp * u.hp);
+    scaleDmg(u.dmg);
+    a.abilities = [...u.abilities];
+    a.summonKind = u.summon;
+    a.rewardMult = UNIQUE_REWARD;
+    a.respawnTicks = TICK_RATE * 60 * u.respawnMin;
+    a.aggroRange = Math.max(a.aggroRange, 7);
+  }
   return a;
 }
 
@@ -724,19 +767,24 @@ function dist(a: Actor, b: Actor): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
-function stepAlong(a: Actor): void {
+function speedOf(a: Actor, tickNow: number): number {
+  return a.chargeUntil > tickNow ? a.speed * 3 : a.speed;
+}
+
+function stepAlong(a: Actor, tickNow = 0): void {
   const next = a.path[0];
   if (!next) return;
   const dx = next.x - a.x;
   const dy = next.y - a.y;
   const d = Math.hypot(dx, dy);
-  if (d <= a.speed) {
+  const sp = speedOf(a, tickNow);
+  if (d <= sp) {
     a.x = next.x;
     a.y = next.y;
     a.path.shift();
   } else {
-    a.x += (dx / d) * a.speed;
-    a.y += (dy / d) * a.speed;
+    a.x += (dx / d) * sp;
+    a.y += (dy / d) * sp;
   }
 }
 
@@ -749,14 +797,14 @@ function chase(w: World, a: Actor, t: Actor): void {
     a.path = findPath(w.grid, { x: Math.round(a.x), y: Math.round(a.y) }, goal);
     if (a.path.length) a.path.pop();
   }
-  if (a.path.length) return stepAlong(a);
+  if (a.path.length) return stepAlong(a, w.tick);
   // Letzter Schritt: Ziel liegt im Nachbarfeld, aber noch außerhalb der Nahkampfreichweite
   const dx = t.x - a.x;
   const dy = t.y - a.y;
   const d = Math.hypot(dx, dy);
   if (d === 0) return;
-  const nx = a.x + (dx / d) * Math.min(a.speed, d);
-  const ny = a.y + (dy / d) * Math.min(a.speed, d);
+  const nx = a.x + (dx / d) * Math.min(speedOf(a, w.tick), d);
+  const ny = a.y + (dy / d) * Math.min(speedOf(a, w.tick), d);
   if (isWalkable(w.grid, Math.round(nx), Math.round(ny))) {
     a.x = nx;
     a.y = ny;
@@ -803,6 +851,13 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
   }
   w.events.push({ type: 'hit', attackerId: a.id, targetId: t.id, amount, skill, crit });
   if (a.kind === 'player' && t.kind === 'monster') t.damagers[a.id] = w.tick;
+  if (a.kind === 'monster' && a.champ && t.kind === 'player' && t.alive) {
+    if (a.champ === 'fiery') t.dot = { perSec: Math.max(2, Math.round(3 + a.level * 0.6)), until: w.tick + TICK_RATE * 4, srcId: a.id };
+    if (a.champ === 'vampiric') a.hp = Math.min(a.maxHp, a.hp + Math.round(amount * 0.4));
+  }
+  if (a.kind === 'player' && t.kind === 'monster' && t.champ === 'thorned' && !noReflect && a.alive) {
+    dealDamage(w, t, a, Math.max(1, Math.round(amount * 0.15)), true, undefined, true);
+  }
   if (a.kind === 'player' && t.kind === 'player') {
     // Angriff auf einen Unbeteiligten macht zum Mörder; Notwehr (Gegenschlag auf den Angreifer) nicht
     const selfDefense = a.attackedBy?.id === t.id && w.tick - a.attackedBy.at < TICK_RATE * 10;
@@ -860,7 +915,7 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
     gainXp(w, killer, Math.round(k.xp * (1 + powerOf(pl, 'xpBonus') / 100)));
     const mk = powerOf(pl, 'manaKill');
     if (mk > 0) pl.mana = Math.min(maxManaOf(killer), pl.mana + mk);
-    const gold = Math.round(w.rng.int(k.gold[0], k.gold[1]) * (1 + powerOf(pl, 'goldBonus') / 100));
+    const gold = Math.round(w.rng.int(k.gold[0], k.gold[1]) * m.rewardMult * (1 + powerOf(pl, 'goldBonus') / 100));
     pl.gold += gold;
     w.events.push({ type: 'gold', amount: gold, to: pl.id });
   }
@@ -874,6 +929,14 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
     drop(rollDrop(w.rng, () => w.nextId++, k.level, k.boss ? 'rare' : undefined));
   }
   if (w.rng.next() <= POTION_DROP_CHANCE) drop(rollPotion(w.rng, () => w.nextId++, k.level));
+  if (m.champ) drop(rollDrop(w.rng, () => w.nextId++, k.level, w.rng.next() < 0.25 ? 'rare' : 'magic'));
+  if (m.unique) {
+    drop(rollDrop(w.rng, () => w.nextId++, k.level, 'rare'));
+    if (w.rng.next() < 0.5) drop(rollDrop(w.rng, () => w.nextId++, k.level, 'rare'));
+    const sp = rollUniqueSpecial(w.rng, () => w.nextId++, k.level);
+    if (sp) drop(sp);
+    drop(rollPotion(w.rng, () => w.nextId++, k.level));
+  }
   if (w.rng.next() <= 0.05) drop(rollArrows(w.rng, () => w.nextId++, k.level));
   const special = rollSpecial(w.rng, () => w.nextId++, k.level, k.id, !!k.boss);
   if (special) drop(special);
@@ -942,6 +1005,8 @@ export function drainEvents(w: World): GameEvent[] {
 
 export function tick(w: World): void {
   w.tick++;
+  if (w.tick % 100 === 0) cleanupSummons(w);
+  processTelegraphs(w);
   for (const c of w.chests) if (c.opened && w.tick >= c.respawnAt) c.opened = false;
   w.ground = w.ground.filter((g) => g.expiresAt === null || g.expiresAt > w.tick);
   const players = w.actors.filter((x) => x.kind === 'player' && x.alive);
@@ -950,7 +1015,7 @@ export function tick(w: World): void {
       if (!players.some((pl) => Math.abs(pl.x - a.x) < SLEEP_DIST && Math.abs(pl.y - a.y) < SLEEP_DIST)) continue;
     }
     if (!a.alive) {
-      if (a.kind === 'monster' && w.tick - a.diedAt >= MONSTER_RESPAWN_TICKS && a.home) reviveMonster(a);
+      if (a.kind === 'monster' && w.tick - a.diedAt >= a.respawnTicks && a.home) reviveMonster(a);
       continue;
     }
     if (a.cooldownLeft > 0) a.cooldownLeft--;
@@ -988,11 +1053,22 @@ export function tick(w: World): void {
         chase(w, a, t);
       }
     } else {
-      stepAlong(a);
+      stepAlong(a, w.tick);
       if (a.pickupId !== null) tryPickup(w, a);
       if (a.chestId !== null) tryOpenChest(w, a);
     }
   }
+}
+
+function cleanupSummons(w: World): void {
+  let any = false;
+  for (const a of w.actors) {
+    if (a.kind === 'monster' && !a.alive && a.respawnTicks >= 1e9 && w.tick - a.diedAt > TICK_RATE * 6) {
+      any = true;
+      break;
+    }
+  }
+  if (any) w.actors = w.actors.filter((a) => !(a.kind === 'monster' && !a.alive && a.respawnTicks >= 1e9 && w.tick - a.diedAt > TICK_RATE * 6));
 }
 
 function regen(w: World, p: Actor): void {
@@ -1012,6 +1088,8 @@ function reviveMonster(m: Actor): void {
   m.path = [];
   m.dot = null;
   m.damagers = {};
+  m.summoned = false;
+  m.chargeUntil = 0;
   if (m.enraged) {
     m.enraged = false;
     m.damage = monsterKind(m.kindId!).damage;
@@ -1053,7 +1131,60 @@ function monsterAi(w: World, m: Actor, players: Actor[]): void {
   if (lost) {
     m.targetId = null;
     m.path = findPath(w.grid, { x: Math.round(m.x), y: Math.round(m.y) }, home);
+    return;
   }
+  if (m.abilities.length && t) useAbilities(w, m, t);
+}
+
+/** Boss-Fähigkeiten: Bodenschlag mit Warnring, Beschwörung bei halbem Leben, Ansturm. */
+function useAbilities(w: World, m: Actor, t: Actor): void {
+  const d = dist(m, t);
+  if (m.abilities.includes('slam') && w.tick >= m.abilityAt && d <= 8) {
+    const dmg = Math.round(((m.damage[0] + m.damage[1]) / 2) * 2.2);
+    const r = m.boss ? 3 : 2.4;
+    w.telegraphs.push({ id: w.nextId++, x: t.x, y: t.y, r, at: w.tick + 26, dmg, src: m.id });
+    w.events.push({ type: 'telegraph', x: t.x, y: t.y, r, ms: 26 * (1000 / TICK_RATE) });
+    m.abilityAt = w.tick + TICK_RATE * (m.boss ? 6 : 8);
+  }
+  if (m.abilities.includes('summon') && !m.summoned && m.hp < m.maxHp * 0.5 && m.summonKind) {
+    m.summoned = true;
+    w.events.push({ type: 'summon', id: m.id });
+    const pack = w.nextId++;
+    for (let i = 0; i < 3; i++) {
+      const sx = Math.round(m.x) + (i - 1) * 2;
+      const sy = Math.round(m.y) + 2;
+      const x = isWalkable(w.grid, sx, sy) ? sx : Math.round(m.x);
+      const y = isWalkable(w.grid, sx, sy) ? sy : Math.round(m.y);
+      const minion = spawnMonster(w, x, y, m.summonKind);
+      minion.packId = pack;
+      minion.targetId = t.id;
+      minion.respawnTicks = 1e9; // Gerufene Helfer kommen nicht wieder
+    }
+  }
+  if (m.abilities.includes('charge') && w.tick >= m.chargeAt && d >= 4 && d <= 10) {
+    m.chargeUntil = w.tick + 14;
+    m.chargeAt = w.tick + TICK_RATE * 9;
+    m.cooldownLeft = 0;
+    w.events.push({ type: 'charge', id: m.id });
+  }
+}
+
+function processTelegraphs(w: World): void {
+  if (!w.telegraphs.length) return;
+  const keep: World['telegraphs'] = [];
+  for (const tg of w.telegraphs) {
+    if (tg.at > w.tick) {
+      keep.push(tg);
+      continue;
+    }
+    const src = getActor(w, tg.src);
+    if (!src) continue;
+    for (const p of w.actors) {
+      if (p.kind !== 'player' || !p.alive) continue;
+      if (Math.hypot(p.x - tg.x, p.y - tg.y) <= tg.r) dealDamage(w, src, p, tg.dmg, false, 'slam');
+    }
+  }
+  w.telegraphs = keep;
 }
 
 const CHEST_RANGE = 2;

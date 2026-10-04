@@ -441,3 +441,19 @@ export function rollArrows(rng: Rng, nextId: () => number, monsterLevel: number)
   const best = tiers.filter((t) => t.minLevel === Math.max(...tiers.map((x) => x.minLevel)));
   return generateItem(rng, nextId(), best[rng.int(0, best.length - 1)]!.id, 'normal');
 }
+
+/** Mini-Boss-Beute: oft ein Unikat oder Set-Teil passend zur Stufe. */
+export function rollUniqueSpecial(rng: Rng, nextId: () => number, level: number): Item | null {
+  const r = rng.next();
+  if (r < 0.3) {
+    const pool = LEGENDARIES.filter((d) => !d.source && d.minLevel <= level + 2 && d.minLevel >= level - 10);
+    if (pool.length) return generateLegendary(rng, nextId(), pool[rng.int(0, pool.length - 1)]!.id);
+  } else if (r < 0.6) {
+    const sets = SETS.filter((d) => d.minLevel <= level + 2 && d.minLevel >= level - 10);
+    if (sets.length) {
+      const set = sets[rng.int(0, sets.length - 1)]!;
+      return generateSetPiece(rng, nextId(), set.id, rng.int(0, set.pieces.length - 1));
+    }
+  }
+  return null;
+}

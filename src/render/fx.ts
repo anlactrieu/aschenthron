@@ -6,7 +6,7 @@ import Phaser from 'phaser';
  */
 
 interface Effect {
-  kind: 'projectile' | 'arrow' | 'ring' | 'bolt' | 'slash' | 'sparkle' | 'column' | 'burst' | 'beamRing';
+  kind: 'zone' | 'projectile' | 'arrow' | 'ring' | 'bolt' | 'slash' | 'sparkle' | 'column' | 'burst' | 'beamRing';
   start: number;
   dur: number;
   x: number;
@@ -96,6 +96,10 @@ export class Fx {
   /** Pfeil: Schaft mit Spitze und Befiederung, fliegt in Blickrichtung. */
   arrow(x: number, y: number, x2: number, y2: number, color: number, dur = 170, onArrive?: () => void): void {
     this.add({ kind: 'arrow', x, y, x2, y2, dur, color, onArrive });
+  }
+  /** Warnring am Boden (Radius in Tiles), füllt sich bis zum Einschlag. */
+  zone(x: number, y: number, rTiles: number, color: number, dur: number): void {
+    this.add({ kind: 'zone', x, y, r: rTiles, dur, color });
   }
   ring(x: number, y: number, radius: number, color: number, dur = 380): void {
     this.add({ kind: 'ring', x, y, r: radius, dur, color });
@@ -201,6 +205,17 @@ export class Fx {
         g.fillCircle(x, y, 2.5);
         g.fillStyle(e.color, 0.9);
         g.fillCircle(x, y, 4.5);
+        break;
+      }
+      case 'zone': {
+        const rx = e.r! * 45.25;
+        const ry = e.r! * 22.6;
+        g.fillStyle(e.color, 0.10 + 0.22 * k);
+        g.fillEllipse(e.x, e.y, rx * 2, ry * 2);
+        g.fillStyle(e.color, 0.18 + 0.3 * k * k);
+        g.fillEllipse(e.x, e.y, rx * 2 * k, ry * 2 * k);
+        g.lineStyle(3, e.color, 0.55 + 0.4 * Math.abs(Math.sin(k * 14)));
+        g.strokeEllipse(e.x, e.y, rx * 2, ry * 2);
         break;
       }
       case 'arrow': {

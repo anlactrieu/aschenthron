@@ -610,3 +610,120 @@ describe('Treffer und Ausweichen', () => {
     expect(hits).toBeGreaterThan(misses);
   });
 });
+
+describe('Champions, Mini-Bosse und Boss-Fähigkeiten', () => {
+  it('Champions sind stärker, heißen anders und geben dreifache Belohnung plus gute Beute', async () => {
+    const { monsterKind } = await import('./data');
+    const { w } = fresh();
+    const normal = spawnMonster(w, 14, 10, 'wolf');
+    const champ = spawnMonster(w, 15, 10, 'wolf', { champ: 'armored' });
+    expect(champ.maxHp).toBeGreaterThan(normal.maxHp * 2.5);
+    expect(champ.name).toBe('Gepanzerter Wolf');
+    expect(champ.rewardMult).toBe(3);
+    expect(monsterKind('wolf').hp).toBe(normal.maxHp);
+    const swift = spawnMonster(w, 16, 10, 'wolf', { champ: 'swift' });
+    expect(swift.speed).toBeGreaterThan(normal.speed * 1.3);
+    let rare = 0;
+    for (let i = 0; i < 40; i++) {
+      const f = fresh();
+      f.p.damage = [9999, 9999];
+      const c = spawnMonster(f.w, 11, 10, 'wolf', { champ: 'vampiric' });
+      applyCommand(f.w, f.p.id, { type: 'attack', targetId: c.id });
+      run(f.w, 200);
+      if (f.w.ground.some((g) => g.item.rarity === 'magic' || g.item.rarity === 'rare')) rare++;
+    }
+    expect(rare).toBe(40);
+  });
+
+  it('Mini-Boss: benannt, zäh, mit Fähigkeiten und garantiert seltener Beute', async () => {
+    const { uniqueDef } = await import('./data');
+    const { w, p } = fresh();
+    p.damage = [9999, 9999];
+    const u = spawnMonster(w, 11, 10, 'giant_rat', { unique: 'rat_king' });
+    expect(u.name).toBe('Rattenkönig Knabber');
+    expect(u.abilities).toContain('summon');
+    expect(uniqueDef('rat_king')!.respawnMin).toBe(15);
+    expect(u.respawnTicks).toBe(15 * 60 * TICK_RATE);
+    applyCommand(w, p.id, { type: 'attack', targetId: u.id });
+    for (let i = 0; i < 400 && u.alive; i++) tick(w);
+    expect(u.alive).toBe(false);
+    expect(w.ground.filter((g) => g.item.rarity === 'rare').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('Bodenschlag warnt zuerst und trifft nur, wer im Ring stehen bleibt', () => {
+    const { w, p } = fresh();
+    p.maxHp = 5000;
+    p.hp = 5000;
+    p.x = 12;
+    p.y = 10;
+    const boss = spawnMonster(w, 14, 10, 'bandit_lord');
+    boss.targetId = p.id;
+    boss.damage = [20, 20];
+    boss.cooldownLeft = 9999; // kein normaler Hieb
+    tick(w);
+    const ev = drainEvents(w);
+    const tg = ev.find((e) => e.type === 'telegraph');
+    expect(tg).toBeDefined();
+    expect(p.hp).toBe(5000); // noch kein Schaden während der Warnung
+    // ausweichen
+    p.x = 4;
+    p.y = 4;
+    run(w, 40);
+    expect(p.hp).toBe(5000);
+    // zweiter Schlag: diesmal stehen bleiben
+    p.x = 12;
+    p.y = 10;
+    boss.targetId = p.id;
+    boss.abilityAt = 0;
+    boss.cooldownLeft = 9999;
+    run(w, 40);
+    expect(p.hp).toBeLessThan(5000);
+  });
+
+  it('Beschwörung bei halbem Leben (einmalig), Ansturm schließt die Lücke', () => {
+    const { w, p } = fresh();
+    p.x = 20;
+    p.y = 10;
+    const boss = spawnMonster(w, 10, 10, 'goblin_king');
+    boss.targetId = p.id;
+    boss.hp = boss.maxHp * 0.4;
+    boss.cooldownLeft = 9999;
+    const before = w.actors.filter((a) => a.kind === 'monster').length;
+    tick(w);
+    expect(w.actors.filter((a) => a.kind === 'monster').length).toBe(before + 3);
+    tick(w);
+    expect(w.actors.filter((a) => a.kind === 'monster').length).toBe(before + 3);
+    const cb = spawnMonster(w, 10, 14, 'stone_colossus');
+    cb.targetId = p.id;
+    p.x = 18;
+    p.y = 14;
+    cb.cooldownLeft = 9999;
+    const d0 = Math.hypot(cb.x - p.x, cb.y - p.y);
+    for (let i = 0; i < 12; i++) tick(w);
+    expect(d0 - Math.hypot(cb.x - p.x, cb.y - p.y)).toBeGreaterThan(2);
+  });
+
+  it('feuriger Champion setzt in Brand, Dorniger wirft Schaden zurück', () => {
+    const { w, p } = fresh();
+    p.maxHp = 5000;
+    p.hp = 5000;
+    p.x = 12;
+    p.y = 10;
+    const fire = spawnMonster(w, 13, 10, 'wolf', { champ: 'fiery' });
+    fire.targetId = p.id;
+    run(w, 60);
+    expect(p.dot).not.toBeNull();
+    const w2 = createWorld(9, open());
+    const p2 = spawnPlayer(w2, 10, 10);
+    p2.damage = [50, 50];
+    const th = spawnMonster(w2, 11, 10, 'wolf', { champ: 'thorned' });
+    th.maxHp = 99999;
+    th.hp = 99999;
+    p2.maxHp = 5000;
+    p2.hp = 5000;
+    applyCommand(w2, p2.id, { type: 'attack', targetId: th.id });
+    const h0 = p2.hp;
+    run(w2, 60);
+    expect(p2.hp).toBeLessThan(h0 - 5);
+  });
+});
