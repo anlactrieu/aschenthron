@@ -11,9 +11,10 @@ import { toScreen, toTile } from './iso';
 import { Ui, describeItem } from './ui';
 import { Sfx } from './audio';
 import { Minimap } from './minimap';
+import { Fx } from './fx';
 import type { RemoteSession } from '../net/client';
 import {
-  ensureTexture, lookOf, monsterCanvas, playerCanvas, registerStaticArt, tileCanvas, TILE_H, TILE_VARIANTS, TILE_W, WALL_VARIANTS,
+  ensureTexture, tileBase, lookOf, monsterCanvas, playerCanvas, registerStaticArt, tileCanvas, TILE_H, TILE_VARIANTS, TILE_W, WALL_VARIANTS,
 } from './art';
 
 const SAVE_KEY = 'aschenthron.save.v1';
@@ -38,6 +39,8 @@ interface ActorView {
   lastY: number;
   movingUntil: number;
   flip: boolean;
+  swingUntil?: number;
+  swingDir?: number;
 }
 
 export class GameScene extends Phaser.Scene {
@@ -59,6 +62,16 @@ export class GameScene extends Phaser.Scene {
   private sfx!: Sfx;
   private minimap!: Minimap;
   private fpsText: Phaser.GameObjects.Text | null = null;
+  private fx!: Fx;
+  private gfxGround!: Phaser.GameObjects.Graphics;
+  private hover: { npc?: Npc; actor?: Actor } | null = null;
+  private cursor = '';
+  private kicks = new Map<number, { x: number; y: number }>();
+  private lootBorn = new Map<number, { t: number; dx: number }>();
+  private vignette!: HTMLDivElement;
+  private ambientKind: 'embers' | 'mist' | null = null;
+  private lastTime = 0;
+  private now = 0;
   private regionName = '';
   private resetting = false;
   private ended = false;
@@ -100,6 +113,11 @@ export class GameScene extends Phaser.Scene {
     else if (saved && importPlayer(this.world, p, saved)) this.ui.say('Spielstand geladen.');
     else this.ui.say('Willkommen in Aschenthron. C: Charakter (Attributpunkte verteilen!) · Q/E: Heil-/Manatrank · N: Karte · M: Ton · Klick: laufen/angreifen/aufheben · Lehrer, Händlerin, Schmiede, Truhe und Aufgaben in der Stadt.');
     this.gfx = this.add.graphics().setDepth(OVERLAY_DEPTH);
+    this.gfxGround = this.add.graphics().setDepth(-9e5);
+    this.fx = new Fx(this);
+    this.vignette = document.createElement('div');
+    this.vignette.style.cssText = 'position:fixed;inset:0;pointer-events:none;transition:opacity 1.2s,background 1.2s;opacity:1;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 58%,rgba(0,0,0,.45) 100%)';
+    document.body.appendChild(this.vignette);
     if (new URLSearchParams(location.search).has('fps')) {
       this.fpsText = this.add.text(0, 0, '', { fontSize: '14px', color: '#9fff9f', backgroundColor: '#000a' }).setScrollFactor(0).setDepth(OVERLAY_DEPTH + 5);
     }
@@ -211,7 +229,8 @@ export class GameScene extends Phaser.Scene {
         tick(this.world);
       }
     }
-    this.handleEvents(time);
+    this.now = time;
+    this.handleEvents();
     this.autosave += dt;
     if (this.autosave > 5000) {
       this.autosave = 0;
@@ -228,51 +247,219 @@ export class GameScene extends Phaser.Scene {
 
   /* ------------------------------------------------------------ Ereignisse */
 
-  private handleEvents(time: number): void {
+  /** Bildschirmposition der Körpermitte eines Akteurs (für Effekte) */
+  private bodyPos(a: Actor | undefined): { x: number; y: number } | null {
+    if (!a) return null;
+    const pos = this.dispPos(a);
+    const { sx, sy } = toScreen(pos.x, pos.y);
+    return { x: sx, y: sy - (a.boss ? 34 : 18) };
+  }
+
+  private kick(id: number, dx: number, dy: number): void {
+    this.kicks.set(id, { x: dx, y: dy });
+  }
+
+  private skillFx(e: { attackerId: number; targetId: number; skill: string }, fxSeen: Set<string>): void {
+    const at = getActor(this.world, e.attackerId);
+    const tg = getActor(this.world, e.targetId);
+    const from = this.bodyPos(at);
+    const to = this.bodyPos(tg);
+    if (!from || !to) return;
+    const tag = `${e.attackerId}:${e.skill}`;
+    switch (e.skill) {
+      case 'lightning': this.fx.bolt(to.x, to.y + 10, 0x9fc0ff); this.cameras.main.shake(120, 0.004); break;
+      case 'whirlwind':
+        if (!fxSeen.has(tag)) {
+          fxSeen.add(tag);
+          this.fx.ring(from.x, from.y + 18, 150, 0xe8e8f0, 320);
+          this.fx.slash(from.x, from.y, 0xdadae8, 0);
+          this.fx.slash(from.x, from.y, 0xdadae8, Math.PI);
+        }
+        break;
+      case 'frost_nova':
+        if (!fxSeen.has(tag)) {
+          fxSeen.add(tag);
+          this.fx.ring(from.x, from.y + 18, 210, 0x7fd0ff, 460);
+          this.fx.burst(from.x, from.y, 0xaee4ff, 520);
+        }
+        break;
+      case 'power_strike': this.fx.slash(to.x, to.y, 0xffe0a0, 0.3); break;
+      case 'skull_split': this.fx.slash(to.x, to.y, 0xff9a60, 0.3); this.fx.ring(to.x, to.y + 14, 60, 0xff9a60, 300); this.cameras.main.shake(130, 0.006); break;
+      default: break;
+    }
+  }
+
+  private handleEvents(): void {
     const say = (m: string) => this.ui.say(m);
     const w = this.world;
+    const fxSeen = new Set<string>();
     for (const e of this.remote ? this.remote.drainEvents() : drainEvents(w)) {
       switch (e.type) {
         case 'hit': {
-          this.flash.set(e.targetId, time + 110);
           const sk = e.skill ? SKILLS.find((s) => s.id === e.skill) : undefined;
-          if (e.attackerId === this.playerId) {
-            say(`Du triffst für ${e.amount}${e.crit ? ' (KRITISCH!)' : ''}${sk ? ` (${sk.name})` : ''}`);
-            if (sk) this.sfx.cast(sk.area);
-            else this.sfx.hit();
-          } else if (e.targetId === this.playerId) {
-            say(`Du erleidest ${e.amount} Schaden`);
-            this.sfx.hurt();
+          const at = getActor(w, e.attackerId);
+          const tg = getActor(w, e.targetId);
+          const fromPlayer = e.attackerId === this.playerId;
+          const toPlayer = e.targetId === this.playerId;
+          const projectile = e.skill && ['quick_shot', 'multishot', 'poison_shot', 'ember_bolt', 'fireball'].includes(e.skill);
+          const from = this.bodyPos(at);
+          const to = this.bodyPos(tg);
+          // Wirkung am Ziel: Zahl, Blitz, Rückstoß – bei Geschossen erst beim Einschlag
+          const impact = () => {
+            this.flash.set(e.targetId, this.now + 110);
+            const pos = this.bodyPos(tg) ?? to;
+            if (pos) {
+              const poison = e.skill === 'poison_shot' && !e.crit && tg?.dot;
+              const txt = e.crit ? `${e.amount}!` : String(e.amount);
+              if (toPlayer) this.fx.floatText(pos.x, pos.y - 30, txt, '#ff6a5a', 18);
+              else if (fromPlayer) this.fx.floatText(pos.x, pos.y - 26, txt, e.crit ? '#ffe45a' : poison ? '#8fe070' : '#ffffff', e.crit ? 22 : 15);
+              else this.fx.floatText(pos.x, pos.y - 26, txt, '#cfcfcf', 12);
+              this.fx.burst(pos.x, pos.y, toPlayer ? 0xff5a4a : e.crit ? 0xffe45a : 0xffffff, 260);
+            }
+            if (at && tg && at.id !== tg.id) {
+              const a = this.dispPos(at);
+              const t = this.dispPos(tg);
+              const sxv = (t.x - a.x - (t.y - a.y)) * 32;
+              const syv = (t.x - a.x + (t.y - a.y)) * 16;
+              const len = Math.hypot(sxv, syv) || 1;
+              this.kick(tg.id, (sxv / len) * 4, (syv / len) * 4);
+            }
+            if (e.crit || (tg?.boss && fromPlayer)) this.cameras.main.shake(70, e.crit ? 0.004 : 0.0025);
+            if (toPlayer) this.cameras.main.shake(60, 0.002);
+            if (fromPlayer) {
+              if (sk) this.sfx.cast(sk.area);
+              else this.sfx.hit();
+            } else if (toPlayer) this.sfx.hurt();
+          };
+          // Der Angreifer holt sichtbar aus: Ausfallschritt, Neigung und Schlagbogen (Nahkampf)
+          if (at && tg && at.id !== tg.id) {
+            const a = this.dispPos(at);
+            const t = this.dispPos(tg);
+            const sxv = (t.x - a.x - (t.y - a.y)) * 32;
+            const syv = (t.x - a.x + (t.y - a.y)) * 16;
+            const len = Math.hypot(sxv, syv) || 1;
+            this.kick(at.id, (sxv / len) * (projectile ? -2 : 9), (syv / len) * (projectile ? -1 : 9));
+            const v = this.actorViews.get(at.id);
+            if (v) {
+              v.swingUntil = this.now + 170;
+              v.swingDir = sxv >= 0 ? 1 : -1;
+            }
+          }
+          if (!e.skill && from && to && at) {
+            // normaler Hieb: Schlagbogen an der Waffenseite; Monster mit Klauen-/Bissspur
+            const col = at.kind === 'player' ? 0xf0f0ff : 0xffb0a0;
+            this.fx.slash(to.x, to.y, col, (from.x <= to.x ? 0 : Math.PI) + (at.kind === 'player' ? 0 : 0.5));
+          }
+          if (projectile && from && to && e.skill) {
+            const col = { quick_shot: 0xe8d8a0, multishot: 0xe8d8a0, poison_shot: 0x7fe060, ember_bolt: 0xff8a2a, fireball: 0xff5a1a }[e.skill as 'quick_shot'];
+            const dur = e.skill === 'fireball' ? 240 : e.skill === 'ember_bolt' ? 200 : 170;
+            const done = () => {
+              impact();
+              if (e.skill === 'fireball' && !fxSeen.has(`${e.attackerId}:fb:done`)) {
+                fxSeen.add(`${e.attackerId}:fb:done`);
+                this.fx.ring(to.x, to.y + 14, 130, 0xff6a2a, 420);
+                this.fx.burst(to.x, to.y, 0xffa040, 520);
+                this.cameras.main.shake(110, 0.004);
+              }
+            };
+            if (e.skill === 'quick_shot' || e.skill === 'multishot' || e.skill === 'poison_shot') this.fx.arrow(from.x, from.y, to.x, to.y, col, dur, done);
+            else this.fx.projectile(from.x, from.y, to.x, to.y, col, dur, done);
+          } else {
+            impact();
+            if (sk && e.skill) this.skillFx({ attackerId: e.attackerId, targetId: e.targetId, skill: e.skill }, fxSeen);
           }
           break;
         }
-        case 'died':
+        case 'died': {
+          const dead = getActor(w, e.id);
           if (e.id !== this.playerId) {
-            say(`${getActor(w, e.id)?.name ?? 'Monster'} besiegt.`);
+            const pos = this.bodyPos(dead);
+            if (pos) {
+              this.fx.burst(pos.x, pos.y, dead?.boss ? 0xffb040 : 0xd8d0c0, dead?.boss ? 900 : 420);
+              if (dead?.boss) {
+                this.fx.ring(pos.x, pos.y + 20, 200, 0xffb040, 700);
+                this.cameras.main.shake(350, 0.008);
+                this.ui.banner(`${dead.name} ist gefallen!`, '#ffb040');
+              }
+            }
             this.sfx.kill();
+            if (dead?.boss) say(`${dead.name} besiegt.`);
           }
           break;
-        case 'loot': say(`Beute: ${e.item.name}`); break;
+        }
+        case 'loot': {
+          const r = e.item.rarity;
+          if (r === 'legendary' || r === 'set') {
+            this.sfx.legendary();
+            this.ui.banner(`${r === 'legendary' ? 'Legendär' : 'Set-Teil'}: ${e.item.name}`, r === 'legendary' ? '#ff8a2a' : '#5fd070');
+            this.cameras.main.flash(220, r === 'legendary' ? 255 : 120, r === 'legendary' ? 150 : 255, 60);
+            say(`Beute: ${e.item.name}!`);
+          } else if (r === 'rare') say(`Beute: ${e.item.name}`);
+          break;
+        }
         case 'pickedUp': say(`Erhalten: ${e.item.name} (${describeItem(e.item)})`); this.sfx.pickup(); break;
         case 'tooHeavy': say(`Zu schwer: ${e.item.name}`); break;
         case 'cannotEquip': say(`${e.item.name}: ${e.reason}`); break;
-        case 'xp': say(`+${e.amount} XP`); break;
-        case 'gold': say(`+${e.amount} Gold`); this.sfx.coin(); break;
-        case 'levelUp': say(`LEVEL ${e.level}! +5 Attributpunkte (C)`); this.sfx.levelUp(); break;
+        case 'xp': {
+          const pos = this.bodyPos(this.player());
+          if (pos) this.fx.floatText(pos.x - 22, pos.y - 44, `+${e.amount} XP`, '#9fd0ff', 12, 1100);
+          break;
+        }
+        case 'gold': {
+          this.sfx.coin();
+          const pos = this.bodyPos(this.player());
+          if (pos) this.fx.floatText(pos.x + 22, pos.y - 34, `+${e.amount}g`, '#ffd84a', 12, 1100);
+          break;
+        }
+        case 'levelUp': {
+          say(`LEVEL ${e.level}! +5 Attributpunkte (C)`);
+          this.sfx.levelUp();
+          const pos = this.bodyPos(this.player());
+          if (pos) {
+            this.fx.column(pos.x, pos.y + 20, 0xfff0a0, 1400);
+            this.fx.ring(pos.x, pos.y + 20, 170, 0xfff0a0, 600);
+          }
+          this.ui.banner(`Stufe ${e.level}!`, '#ffe45a');
+          break;
+        }
         case 'learned': say(`Gelernt: ${SKILLS.find((s) => s.id === e.skillId)?.name}`); this.sfx.quest(); break;
-        case 'enraged': say(`${getActor(w, e.id)?.name} wird wütend!`); this.sfx.boss(); break;
-        case 'healed': say(`Du heilst dich um ${e.amount}.`); this.sfx.potion(); break;
+        case 'enraged': {
+          const boss = getActor(w, e.id);
+          const pos = this.bodyPos(boss);
+          if (pos) this.fx.ring(pos.x, pos.y + 20, 180, 0xff3a2a, 600);
+          this.cameras.main.shake(250, 0.006);
+          say(`${boss?.name} wird wütend!`);
+          this.sfx.boss();
+          break;
+        }
+        case 'healed': {
+          const pos = this.bodyPos(this.player());
+          if (pos) {
+            this.fx.sparkle(pos.x, pos.y, 0x6fff9a);
+            this.fx.floatText(pos.x, pos.y - 30, `+${e.amount}`, '#6fff9a', 16);
+          }
+          this.sfx.potion();
+          break;
+        }
         case 'crafted': say(`Geschmiedet: ${e.item.name}`); this.sfx.pickup(); break;
-        case 'potion': say(`Benutzt: ${e.item.name}`); this.sfx.potion(); break;
+        case 'potion': {
+          const pos = this.bodyPos(this.player());
+          if (pos) this.fx.sparkle(pos.x, pos.y, e.item.heal ? 0xff6a7a : 0x6a8aff);
+          say(`Benutzt: ${e.item.name}`);
+          this.sfx.potion();
+          break;
+        }
         case 'questProgress': say(`Aufgabe: ${e.progress}/${e.count}`); break;
         case 'questDone': say(`Aufgabe erfüllt: ${questById(e.questId)?.name} – beim Auftraggeber abgeben!`); this.sfx.quest(); break;
         case 'questTurned': say(`Aufgabe abgegeben: +${e.xp} XP, +${e.gold} Gold`); this.sfx.quest(); break;
         case 'deathPenalty':
           say(`Du bist gestorben: −${e.xpLost} XP, ${e.dropped.length} Item(s) liegen an der Todesstelle (5 Min.).`);
           this.sfx.death();
+          this.cameras.main.shake(300, 0.008);
           break;
         case 'respawned': say('Du erwachst in der Stadt.'); break;
         case 'fail': say(e.reason); break;
+        default: break;
       }
     }
   }
@@ -307,6 +494,8 @@ export class GameScene extends Phaser.Scene {
   private draw(time: number, p: Actor): void {
     const g = this.gfx;
     g.clear();
+    this.gfxGround.clear();
+    this.updateHover();
     const px = Math.round(p.x);
     const py = Math.round(p.y);
     this.updateChunks(px, py);
@@ -315,11 +504,62 @@ export class GameScene extends Phaser.Scene {
     this.updateLoot(time, g);
     this.updateActors(time, p, g);
     for (const r of this.world.safe) this.outline(g, r.x, r.y, r.w, r.h);
+    this.shimmer(time, px, py);
+    this.fx.setAmbient(this.ambientKind, this.cameras.main.worldView, time - this.lastTime);
+    this.lastTime = time;
+    this.fx.update(time, g);
     const cp = this.camPos ?? p;
     const { sx, sy } = toScreen(cp.x, cp.y);
     this.cameras.main.centerOn(Math.round(sx), Math.round(sy - 14));
     if (this.frame % 6 === 0) this.minimap.draw(p.x, p.y);
     this.updateRegion(p);
+  }
+
+  /** Glitzern auf Wasser und pulsierende Lava (nur Darstellung, unter Props und Akteuren). */
+  private shimmer(time: number, px: number, py: number): void {
+    const g = this.gfxGround;
+    const { w, h } = this.world.grid;
+    const view = this.cameras.main.worldView;
+    for (let y = Math.max(0, py - VIEW); y < Math.min(h, py + VIEW); y++) {
+      for (let x = Math.max(0, px - VIEW); x < Math.min(w, px + VIEW); x++) {
+        const gid = this.tiles[y * w + x];
+        if (gid !== 6 && gid !== 12) continue;
+        const { sx, sy } = toScreen(x, y);
+        if (sx < view.left - 40 || sx > view.right + 40 || sy < view.top - 20 || sy > view.bottom + 20) continue;
+        const hh = hash(x, y);
+        if (gid === 6) {
+          const phase = ((hh % 1000) / 1000 + time / 2400) % 1;
+          if (phase < 0.2) {
+            const a = Math.sin((phase / 0.2) * Math.PI);
+            g.fillStyle(0xcfe8ff, 0.32 * a);
+            g.fillRect(sx - 10 + (hh % 17), sy - 4 + (hh % 7), 7, 1);
+            g.fillRect(sx - 4 + (hh % 9), sy + 1 + (hh % 5), 4, 1);
+          }
+        } else {
+          const pulse = 0.5 + 0.5 * Math.sin(time / 420 + (hh % 100));
+          g.fillStyle(0xffd070, 0.12 + 0.2 * pulse);
+          g.fillRect(sx - 12 + (hh % 19), sy - 3 + (hh % 9), 9, 2);
+        }
+      }
+    }
+  }
+
+  private updateHover(): void {
+    const ptr = this.input.activePointer;
+    const wp = this.cameras.main.getWorldPoint(ptr.x, ptr.y);
+    const hit = this.pick(wp.x, wp.y);
+    this.hover = hit;
+    let cursor = '';
+    if (hit?.actor) cursor = 'crosshair';
+    else if (hit?.npc) cursor = 'pointer';
+    else {
+      const t = toTile(wp.x, wp.y);
+      if (this.world.ground.some((gi) => Math.hypot(gi.x - t.x, gi.y - t.y) < 0.8)) cursor = 'pointer';
+    }
+    if (cursor !== this.cursor) {
+      this.cursor = cursor;
+      this.input.setDefaultCursor(cursor || 'default');
+    }
   }
 
   private updateRegion(p: Actor): void {
@@ -330,6 +570,11 @@ export class GameScene extends Phaser.Scene {
     const name = hit?.name ?? '';
     if (name !== this.regionName) {
       this.regionName = name;
+      const dungeon = ['Gruft der Moorhexe', 'Katakomben', 'Tiefenmine', 'Thron der Asche'].includes(name);
+      this.vignette.style.background = dungeon
+        ? 'radial-gradient(ellipse at center,rgba(8,6,20,.15) 30%,rgba(2,0,10,.82) 100%)'
+        : 'radial-gradient(ellipse at center,rgba(0,0,0,0) 58%,rgba(0,0,0,.45) 100%)';
+      this.ambientKind = name === 'Aschenöde' || name === 'Thron der Asche' ? 'embers' : name === 'Moorlande' || name === 'Gruft der Moorhexe' ? 'mist' : null;
       if (hit) this.ui.banner(`${hit.name}${hit.levels && hit.levels !== 'Stadt' ? ` · Stufe ${hit.levels}` : ''}`);
     }
   }
@@ -383,13 +628,44 @@ export class GameScene extends Phaser.Scene {
         if (!gid) continue;
         const ground = PROP_GIDS.has(gid) ? this.groundUnder(x, y) : gid;
         const { sx, sy } = toScreen(x, y);
-        ctx.drawImage(tileCanvas(ground, hash(x, y) % TILE_VARIANTS), sx - TILE_W / 2 - minSx, sy - TILE_H / 2 - minSy);
+        const ox = sx - TILE_W / 2 - minSx;
+        const oy = sy - TILE_H / 2 - minSy;
+        ctx.drawImage(tileCanvas(ground, hash(x, y) % TILE_VARIANTS), ox, oy);
+        this.dither(ctx, x, y, ground, ox, oy);
       }
     }
     const key = `chunk_${cx}_${cy}`;
     if (this.textures.exists(key)) this.textures.remove(key);
     this.textures.addCanvas(key, c);
     this.chunks.set(`${cx}_${cy}`, this.add.image(minSx, minSy, key).setOrigin(0, 0).setDepth(-1e6));
+  }
+
+  /** Weicher Übergang: an Grenzen zu anderen Bodenarten streut die Nachbarfarbe Pixel auf die Kachelkante. */
+  private dither(ctx: CanvasRenderingContext2D, x: number, y: number, ground: number, ox: number, oy: number): void {
+    // Kanten der Raute (Ecken relativ zur Mitte): oben, rechts, unten, links
+    const T: [number, number] = [0, -16];
+    const R: [number, number] = [32, 0];
+    const B: [number, number] = [0, 16];
+    const L: [number, number] = [-32, 0];
+    const edges: [number, number, [number, number], [number, number]][] = [
+      [1, 0, R, B], [-1, 0, L, T], [0, 1, L, B], [0, -1, T, R],
+    ];
+    for (const [dx, dy, A, Bc] of edges) {
+      let ng = this.gidAt(x + dx, y + dy);
+      if (PROP_GIDS.has(ng)) ng = this.groundUnder(x + dx, y + dy);
+      if (ng === ground || ng === 0 || ground === 6 || ground === 12) continue;
+      ctx.fillStyle = '#' + tileBase(ng).toString(16).padStart(6, '0');
+      const n = hash(x * 7 + dx + 3, y * 13 + dy + 5);
+      for (let i = 0; i < 12; i++) {
+        const t = (((n >>> (i * 2)) ^ (i * 2654435761)) >>> 0) % 100 / 100;
+        const depth = (((n >>> 5) + i * 7919) >>> 0) % 100 / 100;
+        if (depth > 0.55) continue;
+        // Punkt auf der Kante, nach innen zur Mitte hin versetzt
+        const px = (A[0] + (Bc[0] - A[0]) * t) * (1 - depth * 0.42);
+        const py = (A[1] + (Bc[1] - A[1]) * t) * (1 - depth * 0.42);
+        ctx.fillRect(Math.round(ox + TILE_W / 2 + px), Math.round(oy + TILE_H / 2 + py), 2, 1);
+      }
+    }
   }
 
   private updateProps(px: number, py: number): void {
@@ -478,6 +754,9 @@ export class GameScene extends Phaser.Scene {
 
   private updateLoot(time: number, g: Phaser.GameObjects.Graphics): void {
     const live = new Set<number>();
+    const p = this.player();
+    const seen = new Set<string>();
+    const hoverTile = this.hoverTile();
     for (const gi of this.world.ground) {
       live.add(gi.id);
       const { sx, sy } = toScreen(gi.x, gi.y);
@@ -485,23 +764,52 @@ export class GameScene extends Phaser.Scene {
       if (!img) {
         img = this.add.image(sx, sy, `loot_${gi.item.rarity}`).setOrigin(0.5, 0.7);
         this.lootViews.set(gi.id, img);
+        this.lootBorn.set(gi.id, { t: time, dx: ((gi.id * 37) % 25) - 12 });
       }
-      const bob = Math.sin(time / 280 + gi.id) * 2;
-      img.setPosition(sx, sy + 2 + bob).setDepth(sy + 4);
-      if (gi.item.rarity !== 'normal') {
-        const col = { magic: 0x6f8fff, rare: 0xf2c94c, set: 0x5fd070, legendary: 0xff8a2a }[gi.item.rarity as 'magic'];
-        g.fillStyle(col, 0.18);
-        g.fillRect(sx - 6, sy - 56, 12, 56);
-        g.fillStyle(col, 0.28);
-        g.fillRect(sx - 3, sy - 56, 6, 56);
+      const born = this.lootBorn.get(gi.id)!;
+      const k = Math.min(1, (time - born.t) / 480);
+      // Bogenflug aus dem Gegner
+      const arc = -Math.sin(k * Math.PI) * 30;
+      const slide = (1 - k) * born.dx;
+      const bob = k >= 1 ? Math.sin(time / 280 + gi.id) * 2 : 0;
+      img.setPosition(sx + slide, sy + 2 + bob + arc).setDepth(sy + 4);
+      const r = gi.item.rarity;
+      const col = { normal: 0xc9c4bd, magic: 0x6f8fff, rare: 0xf2c94c, set: 0x5fd070, legendary: 0xff8a2a }[r];
+      if (r !== 'normal') {
+        const pulse = r === 'legendary' ? 0.75 + 0.25 * Math.sin(time / 180) : 1;
+        const wide = r === 'legendary' ? 16 : r === 'set' ? 12 : 8;
+        const tall = r === 'legendary' ? 110 : 60;
+        g.fillStyle(col, 0.16 * pulse);
+        g.fillRect(sx - wide, sy - tall, wide * 2, tall);
+        g.fillStyle(col, 0.3 * pulse);
+        g.fillRect(sx - wide / 2, sy - tall, wide, tall);
+        if ((r === 'legendary' || r === 'set') && (this.frame + gi.id) % 40 === 0) this.fx.sparkle(sx, sy - 10, col, 900);
+      }
+      // Beutenamen in Seltenheitsfarbe: magisch und besser immer in der Nähe, Normales nur nah oder unter dem Mauszeiger
+      const near = Math.hypot(gi.x - p.x, gi.y - p.y);
+      const hov = hoverTile && Math.hypot(gi.x - hoverTile.x, gi.y - hoverTile.y) < 0.9;
+      if (near < 12 && (r !== 'normal' || near < 5 || hov) && k >= 1) {
+        this.label(`l${gi.id}`, gi.item.name, sx, sy - (r === 'legendary' ? 24 : 18), '#' + col.toString(16).padStart(6, '0'), seen, r === 'normal' ? 11 : 12);
+      }
+      if (hov) {
+        g.lineStyle(2, col, 0.9);
+        g.strokeEllipse(sx, sy + 4, 30, 14);
       }
     }
+    this.cleanLabels(seen, ['l']);
     for (const [id, img] of this.lootViews) {
       if (!live.has(id)) {
         img.destroy();
         this.lootViews.delete(id);
+        this.lootBorn.delete(id);
       }
     }
+  }
+
+  private hoverTile(): { x: number; y: number } | null {
+    const ptr = this.input.activePointer;
+    const wp = this.cameras.main.getWorldPoint(ptr.x, ptr.y);
+    return toTile(wp.x, wp.y);
   }
 
   private updateActors(time: number, p: Actor, g: Phaser.GameObjects.Graphics): void {
@@ -543,24 +851,48 @@ export class GameScene extends Phaser.Scene {
         const key = `mon_${k.id}_${frame}`;
         img.setTexture(ensureTexture(this, key, () => monsterCanvas(k.id, k.family, k.color, !!k.boss, frame)));
       }
-      img.setVisible(true).setPosition(sx, sy + 8).setDepth(sy + 8).setFlipX(view.flip);
+      // Rückstoß/Ausfallschritt aus Treffern, klingt schnell ab
+      const kk = this.kicks.get(a.id);
+      let ox = 0;
+      let oy = 0;
+      if (kk) {
+        ox = kk.x;
+        oy = kk.y;
+        kk.x *= 0.78;
+        kk.y *= 0.78;
+        if (Math.abs(kk.x) + Math.abs(kk.y) < 0.2) this.kicks.delete(a.id);
+      }
+      img.setVisible(true).setPosition(sx + ox, sy + 8 + oy).setDepth(sy + 8).setFlipX(view.flip);
       if (!a.alive) {
-        img.setAngle(view.flip ? -90 : 90).setAlpha(0.55).setTint(0x664444);
+        const age = a.kind === 'monster' ? (this.world.tick - a.diedAt) / (TICK_RATE * 4) : 0;
+        img.setAngle(view.flip ? -90 : 90).setAlpha(Math.max(0, 0.6 - age * 0.6)).setTint(0x664444).setScale(1);
         img.setDepth(sy);
         continue;
       }
-      img.setAngle(0).setAlpha(1);
-      if ((this.flash.get(a.id) ?? 0) > time) img.setTint(0xff7070);
+      // leichtes Atmen, wenn sie stehen
+      const swing = view.swingUntil && view.swingUntil > time ? (1 - (view.swingUntil - time) / 170) : -1;
+      const tilt = swing >= 0 ? (view.swingDir ?? 1) * (swing < 0.4 ? -14 * (swing / 0.4) : -14 + 40 * ((swing - 0.4) / 0.6)) : 0;
+      img.setAngle(tilt).setAlpha(1).setScale(1, time < view.movingUntil ? 1 : 1 + 0.022 * Math.sin(time / 330 + a.id));
+      if ((this.flash.get(a.id) ?? 0) > time) img.setTint(0xffffff);
+      else if (a.dot) img.setTint(0x9aff9a);
       else if (a.enraged) img.setTint(0xff9a8a);
       else img.clearTint();
+      const hovered = this.hover?.actor?.id === a.id;
+      if (hovered) {
+        g.lineStyle(2, 0xffffff, 0.75);
+        g.strokeEllipse(sx, sy + 6, a.boss ? 70 : 40, a.boss ? 30 : 18);
+      }
       if (a.kind === 'monster') {
         const big = a.boss ? 56 : 28;
         const top = sy + 8 - (a.boss ? 110 : 62);
-        g.fillStyle(0x200000, 0.9);
-        g.fillRect(sx - big / 2, top, big, 5);
-        g.fillStyle(a.boss ? 0xe8832a : 0xd44a3a, 1);
-        g.fillRect(sx - big / 2, top, big * Math.max(0, a.hp / a.maxHp), 5);
-        if (a.boss || a.id === p.targetId) this.label(`a${a.id}`, a.name, sx, top - 10, a.boss ? '#ff9a4a' : '#e6cfcf', seen);
+        // Balken nur bei Schaden, Ziel, Mauszeiger oder Boss
+        if (a.boss || a.hp < a.maxHp - 0.5 || a.id === p.targetId || hovered) {
+          g.fillStyle(0x200000, 0.9);
+          g.fillRect(sx - big / 2, top, big, 5);
+          g.fillStyle(a.boss ? 0xe8832a : 0xd44a3a, 1);
+          g.fillRect(sx - big / 2, top, big * Math.max(0, a.hp / a.maxHp), 5);
+        }
+        if (a.boss || a.id === p.targetId || hovered) this.label(`a${a.id}`, a.name, sx, top - 10, a.boss ? '#ff9a4a' : '#e6cfcf', seen);
       } else {
         if (a.id !== p.id) this.label(`a${a.id}`, `${a.name} (Lv ${a.level})${a.pkUntil > this.world.tick ? ' ☠' : ''}`, sx, sy + 8 - 66, a.pkUntil > this.world.tick ? '#ff5a4a' : '#9fd0ff', seen);
         // Spielerring in der Stadt = sicher

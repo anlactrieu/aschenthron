@@ -46,6 +46,16 @@ function shade(n: number, f: number): number {
   return (r << 16) | (g << 8) | b;
 }
 
+function mix(a: number, b: number, t: number): number {
+  const ch = (s: number) => Math.round(((a >> s) & 255) * (1 - t) + ((b >> s) & 255) * t);
+  return (ch(16) << 16) | (ch(8) << 8) | ch(0);
+}
+
+/** Grundfarbe einer Kachelart (für Übergänge an Terraingrenzen). */
+export function tileBase(gid: number): number {
+  return (TILE_PAL[gid] ?? TILE_PAL[4]!).base;
+}
+
 function rect(c: Ctx, x: number, y: number, w: number, h: number, col: number | string): void {
   c.fillStyle = typeof col === 'number' ? css(col) : col;
   c.fillRect(x, y, w, h);
@@ -126,7 +136,7 @@ export function tileCanvas(gid: number, variant: number): HTMLCanvasElement {
     const px = Math.floor(r() * TILE_W);
     const py = Math.floor(r() * TILE_H);
     const sz = r() < 0.2 ? 3 : 2;
-    rect(x, px, py, sz, sz - (r() < 0.5 ? 1 : 0), pal.dots[Math.floor(r() * pal.dots.length)]!);
+    rect(x, px, py, sz, sz - (r() < 0.5 ? 1 : 0), mix(pal.base, pal.dots[Math.floor(r() * pal.dots.length)]!, 0.55));
   }
   if (pal.seams !== undefined) {
     x.strokeStyle = css(pal.seams);
@@ -149,10 +159,6 @@ export function tileCanvas(gid: number, variant: number): HTMLCanvasElement {
     for (let i = 0; i < 2; i++) x.fillRect(12 + Math.floor(r() * 36), 8 + Math.floor(r() * 16), 9, 2);
   }
   x.restore();
-  // dezente Kante
-  x.strokeStyle = 'rgba(0,0,0,0.18)';
-  diamondPath(x, TILE_W - 1, TILE_H - 1);
-  x.stroke();
   tileCache.set(key, c);
   return c;
 }

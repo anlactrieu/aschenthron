@@ -43,6 +43,7 @@ export class Ui {
   private toast = el('div', 'position:fixed;left:12px;bottom:84px;width:420px;color:#c9b79c;font:13px/1.35 system-ui,sans-serif;pointer-events:none;text-shadow:0 1px 2px #000');
   private bannerEl = el('div', 'position:fixed;left:50%;top:70px;transform:translateX(-50%);color:#e8d9b0;font:bold 22px system-ui,sans-serif;text-shadow:0 2px 6px #000;letter-spacing:1px;opacity:0;transition:opacity .6s;pointer-events:none');
   private bannerTimer = 0;
+  private tip = el('div', 'position:fixed;z-index:50;max-width:260px;background:rgba(10,8,14,.97);border:1px solid #6b5a48;color:#c9b79c;font:12px/1.45 system-ui,sans-serif;padding:8px 10px;pointer-events:none;display:none');
   private msgs: string[] = [];
   private key = '';
   private open = false;
@@ -50,7 +51,7 @@ export class Ui {
   constructor(private send: (c: Command) => void, private useSkillSlot: (i: number) => void, private usePotionKind: (kind: 'heal' | 'mana') => void, private newGame: () => void) {
     this.buildBars();
     this.hud.append(this.hotbar, this.bars);
-    document.body.append(this.panel, this.hud, this.target, this.toast, this.bannerEl);
+    document.body.append(this.panel, this.hud, this.target, this.toast, this.bannerEl, this.tip);
     window.addEventListener('keydown', (e) => {
       const k = e.key.toLowerCase();
       if (k === 'i' || k === 'c') this.toggle();
@@ -66,8 +67,9 @@ export class Ui {
     this.key = '';
   }
 
-  banner(text: string): void {
+  banner(text: string, color = '#e8d9b0'): void {
     this.bannerEl.textContent = text;
+    this.bannerEl.style.color = color;
     this.bannerEl.style.opacity = '1';
     window.clearTimeout(this.bannerTimer);
     this.bannerTimer = window.setTimeout(() => (this.bannerEl.style.opacity = '0'), 2800);
@@ -154,6 +156,7 @@ export class Ui {
   }
 
   private renderPanel(w: World, p: Actor): void {
+    this.tip.style.display = 'none';
     const out: HTMLElement[] = [];
     const h = (t: string) => out.push(el('div', 'margin-top:10px;font-weight:bold;border-top:1px solid #4b3f3a;padding-top:6px', t));
     const [lo, hi] = damageRange(p);
@@ -214,7 +217,7 @@ export class Ui {
       acts.push(['Fallen', () => this.send({ type: 'drop', itemId: it.id })]);
       if (merchant) acts.push([`Verkaufen (${sellPrice(it)}g)`, () => this.send({ type: 'sell', itemId: it.id })]);
       if (stash) acts.push(['In Truhe', () => this.send({ type: 'stashPut', itemId: it.id })]);
-      out.push(this.itemRow(it.name, it, acts));
+      out.push(this.itemRow(it.name, it, acts, it.slot === 'potion' ? undefined : p.equipment[it.slot]));
     }
 
     const trainer = nearNpc(w, p, 'trainer');
@@ -262,7 +265,7 @@ export class Ui {
         if (it.rarity !== 'rare') acts.push([`Aufwerten (${craftCost(it, 'upgrade')}g)`, () => this.send({ type: 'craft', itemId: it.id, op: 'upgrade' })]);
         if (it.rarity !== 'normal') acts.push([`Neu würfeln (${craftCost(it, 'reroll')}g)`, () => this.send({ type: 'craft', itemId: it.id, op: 'reroll' })]);
         if (it.rarity === 'rare' && it.affixes.length < 5) acts.push([`Affix + (${craftCost(it, 'extend')}g)`, () => this.send({ type: 'craft', itemId: it.id, op: 'extend' })]);
-        out.push(this.itemRow(it.name, it, acts));
+        out.push(this.itemRow(it.name, it, acts, it.slot === 'potion' ? undefined : p.equipment[it.slot]));
       }
     }
     if (stash) {
@@ -280,8 +283,56 @@ export class Ui {
     return b;
   }
 
-  private itemRow(label: string, it: Item | undefined, actions: [string, () => void][]): HTMLElement {
+  /** Werte eines Gegenstands als Zahlen (für den Vergleich mit dem angelegten Stück). */
+  private statsOf(i: Item): Record<string, number> {
+    const o: Record<string, number> = {};
+    if (i.damage) o['Schaden'] = (i.damage[0] + i.damage[1]) / 2;
+    if (i.armor) o['Rüstung'] = i.armor;
+    if (i.heal) o['Heilung'] = i.heal;
+    if (i.mana) o['Mana (Trank)'] = i.mana;
+    for (const a of i.affixes) {
+      const n = STAT_NAME[a.stat];
+      o[n === 'Schaden' ? 'Schaden' : n] = (o[n === 'Schaden' ? 'Schaden' : n] ?? 0) + a.value;
+    }
+    return o;
+  }
+
+  private showTip(it: Item, equipped: Item | undefined, ev: MouseEvent): void {
+    const box = this.tip;
+    box.replaceChildren();
+    box.append(el('div', `font-weight:bold;color:${RARITY_COLOR[it.rarity]}`, it.name));
+    const rar = { normal: 'Normal', magic: 'Magisch', rare: 'Selten', set: 'Set', legendary: 'Legendär' }[it.rarity];
+    box.append(el('div', 'opacity:.6', `${rar}${it.slot !== 'potion' ? ' · ' + ({ weapon: 'Waffe', head: 'Kopf', chest: 'Brust', hands: 'Hände', feet: 'Füße', ring: 'Ring' } as Record<string, string>)[it.slot] : ' · Trank'}`));
+    for (const part of describeItem(it).split(' · ')) box.append(el('div', '', part));
+    if (equipped && equipped.id !== it.id && it.slot !== 'potion') {
+      const a = this.statsOf(it);
+      const b = this.statsOf(equipped);
+      box.append(el('div', 'margin-top:6px;border-top:1px solid #4b3f3a;padding-top:4px;opacity:.7', `Verglichen mit: ${equipped.name}`));
+      for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+        const d = Math.round(((a[k] ?? 0) - (b[k] ?? 0)) * 10) / 10;
+        if (d === 0) continue;
+        box.append(el('div', `color:${d > 0 ? '#6fe08a' : '#ff7a6a'}`, `${d > 0 ? '▲ +' : '▼ '}${d} ${k}`));
+      }
+    } else if (!equipped && it.slot !== 'potion') box.append(el('div', 'margin-top:6px;color:#6fe08a', 'Slot ist frei'));
+    box.style.display = 'block';
+    this.moveTip(ev);
+  }
+
+  private moveTip(ev: MouseEvent): void {
+    const w = this.tip.offsetWidth;
+    const h = this.tip.offsetHeight;
+    const x = ev.clientX - w - 16 < 8 ? ev.clientX + 16 : ev.clientX - w - 16;
+    this.tip.style.left = `${x}px`;
+    this.tip.style.top = `${Math.min(window.innerHeight - h - 8, Math.max(8, ev.clientY - 20))}px`;
+  }
+
+  private itemRow(label: string, it: Item | undefined, actions: [string, () => void][], equipped?: Item): HTMLElement {
     const d = el('div', 'margin:4px 0');
+    if (it) {
+      d.onmouseenter = (ev) => this.showTip(it, equipped ?? undefined, ev);
+      d.onmousemove = (ev) => this.moveTip(ev);
+      d.onmouseleave = () => (this.tip.style.display = 'none');
+    }
     d.append(el('div', it ? `color:${RARITY_COLOR[it.rarity]}` : '', label));
     if (it) d.append(el('div', 'font-size:11px;opacity:.7', describeItem(it)));
     for (const [n, f] of actions) d.append(this.btn(n, f));

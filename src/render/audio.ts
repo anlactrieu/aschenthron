@@ -148,6 +148,12 @@ export class Sfx {
     this.tone(180, 1.2, 'sawtooth', 0.25, 40);
     this.noise(0.9, 0.3, 500);
   }
+  legendary(): void {
+    if (!this.gate('legendary', 800)) return;
+    [392, 494, 587, 784, 988].forEach((f, i) => this.tone(f, 0.5, 'triangle', 0.22, undefined, i * 0.09));
+    this.tone(98, 1.0, 'sine', 0.25, 196);
+    this.noise(0.4, 0.12, 6000, 0.35);
+  }
   boss(): void {
     if (!this.gate('boss', 1000)) return;
     this.tone(80, 0.9, 'sawtooth', 0.3, 50);
