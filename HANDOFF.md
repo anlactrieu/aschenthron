@@ -1,20 +1,27 @@
 # HANDOFF – Aschenthron
 
-## Stand
-Seit der ersten Nachtarbeit dazugekommen: Insel „Aschental“ v3 (240×180, MAP_VERSION 3, ~650 Monster in Rudeln, 76 Truhen, Monsterfamilien in Stufen: Ratten, Hunde/Wölfe, Goblins, Banditen, Spinnen, Sumpf, Untote, Trolle/Golems, Würmer, Asche), Item-Anforderungen (Stufe + Attribute), Bögen/Stäbe/Roben/Lederwämser, Köcher + Pfeilbündel (Fernkampf-Skills brauchen Bogen + Pfeile), Schatztruhen (anklicken), neues Inventar (Figur mit Slots, Icon-Raster, Drag-and-drop, Tooltip-Vergleich, Anforderungen rot), HP/MP-Orbs + Schnellleiste, Juice (Kampfzahlen, Hiebe mit Ausholen/Schlag, Pfeile/Zauber mit Einschlag, Bodenschatten, Schritt-Wippen), Avatar zeigt Waffe/Köcher/Robe. Mehrspieler-Server (Branch gemergt) unverändert.
-Befehle: `npm run dev | server | test | lint | build | pace`; Karte neu: `python3 scripts/gen_map.py`; URL-Parameter: `?neu` (Neustart), `?fps`, `?slowfx`, `?server=…&name=…`.
-Recherche-Ergebnisse (T4C-Prinzipien, Sprite-Pakete): siehe SPEC.md. Nichts wurde heruntergeladen.
-Danach dazugekommen: Skillpunkte + Ränge + Neuverteilen, Treffer/Ausweichen, Champions + 13 Mini-Bosse + Boss-Mechaniken (Warnring-Bodenschlag, Beschwörung, Ansturm), neue Affixe (Tempo/Kritisch/Regeneration/Treffsicherheit/Ausweichen), Aufgabenarten (Truhen/Champions/Mini-Bosse), Rasten (R), ▲-Upgrade-Hinweis und Wurfqualität im Tooltip, Rückansicht-Sprites, Kartenversion im Spielstand. Code-Review über alles seit dem Mehrspieler-Review erledigt und gefixt. Echter Drag-Test (Mausziehen im Browser) bestanden: Rucksack→Slot, Slot→Rucksack, Pfeile→Köcher, Rucksack→Welt.
-Offene Ideen (nach Wert): Fremd-Sprites einbauen (nur mit Freigabe des Users, siehe SPEC), Gruppen-/Begleiter-System, Handel/Bank, mehr Boss-Phasen, Gildenfunktionen online, Delta-Schnappschüsse im Mehrspieler.
+## Überblick (Stand: alle Solo-Pakete P1–P4 + Animation-Fix committet und online)
+- Dark-Fantasy-ARPG im T4C-Geist (Phaser 4 + TypeScript, Vite). Sim in `src/sim` ist Autorität (online-fähig), Render in `src/render`. Karte `src/data/aschenthron.json` (MAP_VERSION 4, aus `scripts/gen_map.py`).
+- **Online-Test:** https://anlactrieu.github.io/aschenthron/ (GitHub Pages, Workflow `.github/workflows/pages.yml`, baut bei jedem Push auf `main` nach Tests; `BASE_PATH=/aschenthron/`). Repo: https://github.com/anlactrieu/aschenthron (öffentlich). Mehrspieler-Server ist NICHT online (nur lokal: `npm run server`).
+- Befehle: `npm run dev | server | test | lint | build | pace`; URL-Parameter `?neu`, `?fps`, `?slowfx`, `?stunde=22`, `?wetter=regen|nebel|asche|klar`, `?server=…&name=…`.
+- Verifikation zuletzt: 200 Tests, tsc, Lint, Build grün. Pace (`npm run pace`, Seeds 2024/7): Level 30 nach ≈ 8,4–8,5 h Bot-Zeit, 8–9 Tode.
+- Skripte/Doku: `SPEC.md` (Stufe 4/5), `ASSETS.md` (DCSS CC0), `README.md` (Steuerung).
 
-## Verifikation (Stand Nachtarbeit)
-- 69 Unit- und Server-Tests (echte WebSocket-Verbindungen, 2 lokale Clients), Lint, Build grün.
-- Bot-Messlauf (`npm run pace`): Level 30 nach ~5,8 h Spielzeit, 3 Tode.
-- Headless-Skripte gegen die laufende Szene: Klick-Matrix auf Boss, Normalmonster, NPCs (inkl. Namensschild/Marker) – alle Treffer; Bodenklick läuft.
-- Echte Mausklicks nur auf das DOM-UI (Panel, Hotbar); auf dem Canvas keine, weil das Browser-Pane nicht sichtbar war.
-- Framerate: im Browser-Pane der App (auf dem Mac, Pane sichtbar) 59–61 FPS gemessen mit `?fps`; im Pane unsichtbar sind Werte nicht aussagekräftig. In einem normalen Browser-Tab nicht gemessen. Mehrspieler nur lokal geprüft.
+## Offene TODOs (nach Wert)
+1. **User-Testfeedback abwarten** (Online-Test): Animation (Laufen/Schlag/Bogen), Balance, Optik.
+2. Aus Code-Review P3 offen: Quest-Belohnungen umgehen das Gewichtslimit; Talk-Aufgaben werden über den NPC-Anzeigenamen zugeordnet (besser über ID); `gen_map.py` hat doppelte Spawn-Funktionen (`dungeon_spawns2`, `dungeon_chests`).
+3. P4 offen: Esc in den Credits schließt auch das Hauptfenster; Bodenbeute bleibt prozeduraler Beutel; Treffer-Blitz (`setTint(0xffffff)`) kaum sichtbar (Phaser-Tint multipliziert → `setTintFill`); Statuseffekt-Chips ohne DCSS-Icons; Robe/Umhang bewegen sich nicht mit den Beinen; Gürtel/Beine/Edelsteine ohne Sprite; nur eine männliche Basisfigur; Köcher am Avatar entfällt; Monsterschützen ohne Anlege-Animation.
+4. Weltboss: Banner erscheint auch bei weiter Entfernung; Tod ohne Effekt/Ton; Edelstein-Drop ohne Sound/Banner.
+5. Entscheidungen offen: weiche Gewichtsstrafe (aktuell hartes Limit beim Aufheben/Kaufen); Bot-Todesspiralen (Seed 99: 10,5 h, 27 Tode, frühe Schleifen Stufe 3) sind Bot-Artefakte.
+6. Nicht umgesetzt (nur Mehrspieler): Chat, Gruppen, Spieler-Handel, Gilden, Kopfgeld/Duelle, Login; Delta-Schnappschüsse; Server-Hosting.
+7. Technik: UI-Panel serialisiert pro Frame JSON (Dirty-Flag), A* in `chase` fast jeden Tick pro Monster (drosseln).
 
-## Stand P1 Kampftiefe (umgesetzt, ungecommittet; 128 Tests, tsc/Lint/Build grün)
+## Letzte 3 Entscheidungen
+1. **GitHub Pages statt eigener Server** (öffentliches Repo): kostenlos, Einzelspieler läuft komplett im Browser (Spielstand in localStorage). Mehrspieler bräuchte einen eigenen Host.
+2. **Sprite-Animation rein im Render** (kein Neu-Download): Schrittframes 1/4, stärkere Posen, Waffenpivot aus Alphakanal. Grund: DCSS-Sprites sind statische Einzelbilder.
+3. **Arbeit in Paketen P1–P4 über Subagenten, jeweils vom Hauptgespräch nachgeprüft und committet.** Grund: gemeinsame Dateien (`world.ts`, `items.ts`, `ui.ts`) vertragen keine Parallelarbeit.
+
+## Stand P1 Kampftiefe (umgesetzt, committet)
 - Schadensarten `DmgType` (`data.ts`): Skills mit `dmgType` (Glut-/Feuerball fire, Frostnova frost, Giftpfeil poison), Monster mit `dmgType` (Imp/Schamane/Lava-/Glutwesen/Höllenbrut fire, Sumpfhexe/Giftspinne/Höhlenspinne poison, Totenbeschwörer frost, Champion „feurig“ fire). `dealDamage` bekommt die Art als letzten Parameter, wendet `resistOf` nach Rüstung an (100 % = 0 Schaden, „immun“) und liefert den Schaden (−1 bei Fehlschlag). Resistenzen Monster: `FAMILY_RES`; Spieler: Affixe `resFire/resFrost/resPoison` (Deckel 75 %, Charakterfenster, Zielanzeige „Schwach/Resistent/Immun“ via `resNote`).
 - Statuseffekte: `Actor.status` (Ende-Tick je `slow|stun|burn`), `burn` (Schaden/Verursacher), `applyStatus` (Resistenz verkürzt Dauer, Bosse halbe Betäubung). Slow = ×0,6 Tempo/Angriffstempo, Stun = keine Aktion/Skills. Quellen: Frostnova slow 4 s, Wuchtschlag 0,8 s/Schädelspalter 1,5 s stun, Glutblitz/Feuerball burn 3 s (10 %/s des Treffers), Spinnenbiss slow 2 s (Giftspinne/Höhlenspinne zusätzlich Gift-DoT), Champion „feurig“ burn 4 s. HUD: Status-Chips über der Schnellleiste; Monster: Farbton + Punkte neben dem Balken.
 - Monster-Rollen (`Ability` `heal|poisonBite|archer|raise`): Heiler (Goblinschamane, neu Knochenakolyth L11) alle 4 s +12 % an verletzte Verbündete (<75 %) im Radius 6, Vorrang vor Angriff, nur im Kampf; Schützen (neu Goblinschütze L5, Räuberschütze L6) über `castAi` (Reichweite 7, Abstand 3,5, Skill `quick_shot`); Totenbeschwörer (neu, L14) alle 12 s ein Skelett, max. 3, Helfer geben weder XP noch Beute (`rewardMult 0`) und verschwinden beim Tod/Respawn (`dismissSummons`).
@@ -23,7 +30,7 @@ Offene Ideen (nach Wert): Fremd-Sprites einbauen (nur mit Freigabe des Users, si
 - Pace (2 Seeds): 2024 → L30 nach 7,7 h, 12 Tode; 7 → 8,2 h, 20 Tode.
 - Offen: Skill-Icons/Töne für Frost/Gift nicht angepasst; keine Sichtprüfung im Browser (nur tsc/Tests/Build); Knochenakolyth nur 1× auf der Karte (Spawn-Gewicht erhöhen); Heiler heilt auch Mini-Bosse/Bosse.
 
-## Stand P2 Ausrüstung & Loot (umgesetzt, ungecommittet; 169 Tests, tsc/Lint/Build grün)
+## Stand P2 Ausrüstung & Loot (umgesetzt, committet)
 - Slots `belt` (Gürtel), `cloak` (Umhang), `legs` (Beine): `Slot`/`SLOTS`/`EQUIP_SLOT_LIST` in `items.ts` (einzige Quelle; `save.ts` und `net.ts` nutzen sie), je 6 Vorlagen Stufe 1–27, Icons in `icons.ts`, Doll in `ui.ts` jetzt 12 Felder (zwei Spalten links, zwei rechts, Figur frei in der Mitte, 324×196). Händler führen die unteren Stufen. Altspielstände unverändert gültig.
 - Zweihand: Template-Feld `hands` (Bögen, Stäbe, Streit-/Groß-/Holzfälleraxt, Zweihänder, Kriegshammer, Schreckensspalter, Schädelbrecher, Aschenrichter), `handsOf(item)` fällt für Altgegenstände auf die Vorlage zurück. Regeln in `world.ts` (`offhandIssue`, Befehl `equip`): Zweihandwaffe schickt die Nebenhand in den Rucksack (Bogen behält Pfeile); Nebenhand bei Bogen nur Pfeile, bei anderen Zweihändern gar nichts (Meldung „Zweihandwaffe: Nebenhand muss frei sein“). `importPlayer` räumt Altstände mit Konflikt auf. Zweihänder ≈ +45 % Schaden gegenüber Einhändern; neue Einhänder (Dolche, Schreckensklinge, Aschensäbel); Glutaxt/Kriegsklinge bleiben einhändig.
 - Waffentempo: Template-Feld `speed` (Dolche 0,8, Hämmer 1,25). **Wichtig:** die Angriffspause hatte schon eine Untergrenze von 6 Ticks, die Spieler ab Gewandtheit ≈ 26 erreichen (Eile-Affixe und -Edelsteine bringen dann nichts mehr). `attackCooldownOf` wendet Waffentempo und Gewandtheit-Schwelle deshalb NACH der Untergrenze an (Minimum 4) und liefert dann einen Bruchteil; `startCooldown` schreibt den Rest gut. Ohne Waffentempo/Schwelle bleibt alles ganzzahlig wie zuvor.
@@ -35,7 +42,7 @@ Offene Ideen (nach Wert): Fremd-Sprites einbauen (nur mit Freigabe des Users, si
 - Pace-Bot ignoriert Zweihänder und Edelsteine. Messung (Endstand, `npm run pace`): Seed 2024 → L30 nach 9,3 h, 25 Tode; Seed 7 → 8,4 h, 18 Tode; zusätzlich Seed 99 → 9,9 h, 31 Tode; Seed 5 → 11,0 h, 11 Tode. Streuung der Tode ist groß (kleine RNG-Änderungen kippen den Bot in Todesspiralen am Goblinlager L3–8); frühere Zwischenstände mit ähnlichen Einstellungen lagen bei 12–22 Toden.
 - Offen: Browser nur kurz geprüft (Inventar mit 12 Feldern, Tooltip, Schmied, Charakter); Edelstein-/Slot-Icons sind schlichte Platzhalter; Sound/Banner für Edelstein-Drops fehlt; Edelsteine im Schmied nur per Knopf, kein Drag-and-drop; Gewandtheit-Untergrenze der Angriffspause (siehe oben) bremst Eile-Affixe grundsätzlich.
 
-## Stand P3 Welt & Endgame (umgesetzt, ungecommittet; tsc/Lint/Build grün)
+## Stand P3 Welt & Endgame (umgesetzt, committet)
 - **Karte v4** (`MAP_VERSION` 4, `scripts/gen_map.py`, jetzt 300×240): alles Neue entsteht nach dem alten Entwurf mit eigenem Zufallsstrom (`random.seed(20261006)`), die alten Zonen blieben daher unverändert. Neu: **Goblinbau** (Nordwesten, Zugang vom Räuberlager-Nordrand bei x=28, Stufe 8–12, Goblin-Familie inkl. neuer Goblinbrecher L11/Kriegsherr L12, **Goblinkönig Grix jetzt im Bau**, keine Wächter im Bossraum, Eingangsräume höchstens 2er-Rudel), **Spinnennest** (Süden, Zugang vom Totenacker-Südrand, 13–18; neue Brutspinne/Netzlauerer/Nestmatrone, Boss **Spinnenkönigin Vyrra** L18), **Aschengrund** (Osten hinter der Aschenöde, 28–32, 52 Rudel/92 Monster: Höllenhund L29, Verdammter Ritter L30, Grubenteufel L32 + Höllenbrut; 8 Truhen Stufe 28–32 nur Eisen/Gold), je Dungeon 3–5 Truhen. Düsterwald: Rudel nahe dem Eingang (Entfernung < 0,5) nachträglich auf höchstens 3 gekürzt und Anführer der zweiten Band von Goblinkrieger auf Goblinschütze gesenkt (Ursache der Todesschleifen: Stufe-4-Bot stirbt am Wald-Osthang, respawnt in Felsenwacht und läuft wieder hinein). Unerreichbare Bosse/Mini-Bosse werden jetzt verschoben statt gelöscht (Drogg lag vorher in einer Tasche).
 - **Aufgaben** (`data.ts`, `world.ts`, neu `quests.ts`): Arten `visit` (Region `place` betreten, alle 0,5 s geprüft), `bring` (Quest-Gegenstand **nur als Zähler**, kein Inventar-Item, daher nicht verkaufbar/verlierbar; Quellen: Monsterliste mit Chance je Kill oder Truhen einer Region), `talk` (Befehl `talk {npcId}`; Ziel-NPC per Name; sofort erfüllt UND abgegeben, Folgeglied steht beim Ziel-NPC), `unique` mit optionalem `target` (bestimmter Boss). Felder `chain`, `requires` (Vorgänger muss `turned` sein, sonst Fehler „Erst … abschließen“), `reward: 'rare'|'unique'` (Rucksack; unique würfelt Unikat/Set-Teil, sonst Seltenes), `outro` (Chatzeile). 5 Ketten: Spuren des Goblinkönigs (4), Das Schweigen im Moor (4), Der letzte Eid (4, endet im Weltboss Morvath), Pells Fund (3), Netze der Königin (3). Lore-NPCs sind normale `kind="quest"`-NPCs (Karte: Eigenschaft `quests`), Dialog in `NPC_LORE` (`data.ts`, Schlüssel = NPC-Name; 2–4 Absätze): Chronistin Maren (Aschenhafen), Torwache Haldor (Felsenwacht), Jägerin Ysa (Räuberlager-Süd), Eremit Olm (Moorlande), Schatzsucher Pell (Tiefenmine, Eingangsraum), Ritter Aldric (Aschenöde-West). `quests.ts`: `questAvailable`, `questChains`, `questMarks` (Minimap-Ziele), `questWhere` (Region-Namen für J-Liste). Neue Ereignisse `questItem`, `talk`, `worldBoss`; `questTurned` trägt `item`.
 - **Weltbosse** (`UNIQUES` mit `world: true`, Abwehrradius 6 statt 7): Moorverschlinger Gurrak (Moorlande, 25 min), Bergkönig Thurgrim (Hochland, 32 min), Aschenfürst Morvath (Aschengrund, 40 min). Beute (`WORLD_BOSS_LOOT`): 2 garantierte Seltene mit Affix-Stufen ≥ T4 (`rollWorldDrop`/`boostAffixTiers`, 35 % T5), 1–2 Edelsteine Qualität ≥ 2 (`rollGem(…, minQuality)`), Unikat/Set 60 % (`rollWorldSpecial`), 2 neue Endgame-Unikate (Schneide des Abgrunds, Ägide des Wächters, minLevel 28). Ereignis `worldBoss` (spawn bei `reviveMonster`, dead bei Tod) wird online an alle gesendet (`net.ts`). Banner in `GameScene`, Zielanzeige „Weltboss“, Minimap lila.
@@ -44,6 +51,13 @@ Offene Ideen (nach Wert): Fremd-Sprites einbauen (nur mit Freigabe des Users, si
 - **Tests** (`p3.test.ts`, `render/atmosphere.test.ts`, 196 Tests gesamt): Ketten/Freischaltung, alle Aufgabenarten, Talk (Reichweite, Auto-Abgabe), Save 3→4 und Wandposition, Regionszuordnung/Erreichbarkeit der neuen Zonen, Weltboss-Respawn/Beute/Events, Beute-Tabellen Stufe 1–32, Tag/Nacht- und Wetterfunktionen.
 - **Messung Browser** (Pane sichtbar): 57–61 FPS in Moorlande bei Nacht+Regen, Nebel und Aschengrund mit Ascheflocken (`?fps`).
 - Offen/Annahmen: Quest-Gegenstände sind Zähler (kein echtes Item); Nacht-Gefahr nicht umgesetzt (nur Optik); keine eigenen NPC-Sprites (alle Lore-NPCs nutzen die gelbe Questgeber-Figur, Grafik kommt in P4); Weltboss-Spawn-Banner wird auch gezeigt, wenn man weit weg ist (Sim-Ereignis ohne Reichweite); Todesschleifen des Bots bei Respawn in Felsenwacht bleiben ein Artefakt (stirbt der Bot im Wald-Osthang, respawnt er dort). Spezialeffekte/Sounds für Weltboss-Tod und neue Skills fehlen.
+
+## Stand P4 Echte Grafik (umgesetzt, committet)
+- Paket „Dungeon Crawl 32x32 Tiles“ (DCSS, CC0, 5,7 MB ZIP von opengameart.org, 2026-10-05, Lizenz auf Seite + `LICENSE.txt` geprüft) → nur 277 genutzte PNGs (ca. 160 KB) in `public/assets/dcss/` (Ordnerstruktur des Pakets). Details/Dateiliste: `ASSETS.md`.
+- `src/render/spriteMap.ts`: Zuordnung Monster-ID (63/63 mit Sprite, einige mit Färbung `tint`/Skalierung), Item-Vorlage (106 von 118 ohne Edelsteine; Gürtel + Beinlinge → prozedural), Skill-ID (11/11), NPC nach Name (16 benannte) und Art, Truhen, Spieler-Ebenen je Vorlage (`PLAYER_LAYERS`). `SPRITE_SCALE` (normal 2, Boss 3, Truhe 2; 3× war in der Stadt zu groß). `src/render/sprites.ts`: Vorlader (`preloadSprites` in `main.ts` vor Spielstart, Fehler/Timeout erlaubt), in Node ohne `Image` ein No-op; `sprite(path)` liefert Bild oder `null` (= Fallback).
+- `art.ts`: `spriteCanvas` (Umriss, Hochskalierung, Bildhöhe so, dass die unterste Pixelzeile auf `FEET_ORIGIN_Y` liegt), `monsterCanvas`/`npcCanvas`/`chestCanvas`/`playerCanvas` nutzen Sprites mit prozeduralem Fallback; Bewegungsphasen per Verschiebung/Stauchung (`pose`), Waffe wird beim Ausholen/Schlag gedreht; Bosse mit goldenem Umriss. Spieler: Ebenen Umhang (hinter dem Körper) → Basis → Beine → Stiefel → Körper → Handschuhe → Haar/Helm → Schild → Waffe; `lookKey` ist der gemeinsame Cache-/Texturschlüssel (`Look.ids` enthält die Vorlagen-IDs). Inventarfigur: `playerPortrait` (4×). Rückansicht = gleiches Sprite. Köcher wird am Avatar nicht gezeichnet.
+- `icons.ts`: `itemIcon`/`skillIcon`/`potionIcon` bevorzugen Sprites (32 px + Umriss, ×2, CSS skaliert pixelig), Rarity-Rahmen bleibt. Credits: `src/render/credits.ts` (F1 / Knopf im Charakterfenster, Esc schließt). Test `spriteMap.test.ts` prüft Dateien/IDs/Abdeckung.
+- Offen: Bodenbeute bleibt der prozedurale Beutel; Edelsteine/Gürtel/Beinlinge ohne Sprite; Treffer-Blitz (`setTint(0xffffff)`) ändert wie vorher nichts sichtbar (Multiplikation); Statuseffekt-Chips im HUD ohne DCSS-Icons; Spielerfigur nur männlich/menschlich (`PLAYER_BASE`); Terrain/Wände weiter prozedural (Isometric Stone Soup wäre ein zweiter Download).
 
 ## Stand T4C-Quick-Wins (ungecommittet, 107 Tests grün, Lint/Build ok)
 - Amulett + 2. Ring: `EquipSlot` (`items.ts`), `equipSlotFor` (`world.ts`), Befehl `equip` mit optionalem `to`, 9 Amulett-Vorlagen, Icon in `icons.ts`, Doll-Positionen in `ui.ts`. Nicht im Händlersortiment (Pace-Balance).
@@ -62,29 +76,6 @@ Offene Ideen (nach Wert): Fremd-Sprites einbauen (nur mit Freigabe des Users, si
 - Starttränke: `giveStarterKit` (`world.ts`, 3 kleine Heiltränke) in `tiled.ts` und `addPlayer` → Tode auf L1–3 weg (Bot 0 statt 6–9). Restliche frühe Tode L4–8 am Goblinlager (Goblinkönig Grix + Wölfe/Spinnen kommen dazu, Rudel-Alarm), L16 Sumpf. Messung danach: 9,0 h bis L30, 18 Tode.
 - Offen: Goblinlager-Eingang entschärfen (Rudel-Alarm-Radius oder Mini-Boss weiter weg), Sumpf L16.
 
-## Stand P4 Echte Grafik (umgesetzt, ungecommittet; 200 Tests, tsc/Lint/Build grün)
-- Paket „Dungeon Crawl 32x32 Tiles“ (DCSS, CC0, 5,7 MB ZIP von opengameart.org, 2026-10-05, Lizenz auf Seite + `LICENSE.txt` geprüft) → nur 277 genutzte PNGs (ca. 160 KB) in `public/assets/dcss/` (Ordnerstruktur des Pakets). Details/Dateiliste: `ASSETS.md`.
-- `src/render/spriteMap.ts`: Zuordnung Monster-ID (63/63 mit Sprite, einige mit Färbung `tint`/Skalierung), Item-Vorlage (106 von 118 ohne Edelsteine; Gürtel + Beinlinge → prozedural), Skill-ID (11/11), NPC nach Name (16 benannte) und Art, Truhen, Spieler-Ebenen je Vorlage (`PLAYER_LAYERS`). `SPRITE_SCALE` (normal 2, Boss 3, Truhe 2; 3× war in der Stadt zu groß). `src/render/sprites.ts`: Vorlader (`preloadSprites` in `main.ts` vor Spielstart, Fehler/Timeout erlaubt), in Node ohne `Image` ein No-op; `sprite(path)` liefert Bild oder `null` (= Fallback).
-- `art.ts`: `spriteCanvas` (Umriss, Hochskalierung, Bildhöhe so, dass die unterste Pixelzeile auf `FEET_ORIGIN_Y` liegt), `monsterCanvas`/`npcCanvas`/`chestCanvas`/`playerCanvas` nutzen Sprites mit prozeduralem Fallback; Bewegungsphasen per Verschiebung/Stauchung (`pose`), Waffe wird beim Ausholen/Schlag gedreht; Bosse mit goldenem Umriss. Spieler: Ebenen Umhang (hinter dem Körper) → Basis → Beine → Stiefel → Körper → Handschuhe → Haar/Helm → Schild → Waffe; `lookKey` ist der gemeinsame Cache-/Texturschlüssel (`Look.ids` enthält die Vorlagen-IDs). Inventarfigur: `playerPortrait` (4×). Rückansicht = gleiches Sprite. Köcher wird am Avatar nicht gezeichnet.
-- `icons.ts`: `itemIcon`/`skillIcon`/`potionIcon` bevorzugen Sprites (32 px + Umriss, ×2, CSS skaliert pixelig), Rarity-Rahmen bleibt. Credits: `src/render/credits.ts` (F1 / Knopf im Charakterfenster, Esc schließt). Test `spriteMap.test.ts` prüft Dateien/IDs/Abdeckung.
-- Offen: Bodenbeute bleibt der prozedurale Beutel; Edelsteine/Gürtel/Beinlinge ohne Sprite; Treffer-Blitz (`setTint(0xffffff)`) ändert wie vorher nichts sichtbar (Multiplikation); Statuseffekt-Chips im HUD ohne DCSS-Icons; Spielerfigur nur männlich/menschlich (`PLAYER_BASE`); Terrain/Wände weiter prozedural (Isometric Stone Soup wäre ein zweiter Download).
-
-## Letzte 3 Entscheidungen (aktuell)
-0. **Level-Kurve per Stufenfaktor 0,8 statt global skalieren.** Grund: frühe Level bleiben flüssig, Endgame streckt sich; 1,2 erzeugte Todesspiralen.
-1. **Ringe: Gegenstand bleibt `slot:'ring'`, zweites Feld nur als `ring2` im Equipment.** Grund: keine Item-/Save-Migration, alte Spielstände gültig.
-2. **Zauberer nutzen vorhandenen Skill-Namen `ember_bolt` als Hit-Skill.** Grund: Projektil-VFX/Ton ohne Render-Änderung.
-3. **Amulette nicht im Shop.** Grund: Pace-Bot kauft Shop-Ausrüstung, Balance sollte unverändert bleiben.
-
-## Frühere Entscheidungen
-1. **Code-Review-Fixes:** Kämpfen in der Safe-Zone verboten, Händlersortiment in der Sim (`SHOP_ITEMS`), Drop-Pool deckt alle Slots ab. Grund: Safe-Zone ermöglichte risikoloses Farmen; Sim soll Autorität sein (online-fähig).
-2. **XP-Kurve `150*(l-1)*l`:** Bot erreicht Level 20 in ~56 Min. Grund: Spec verlangt lange Kurve; Bot ist idealisiert, Wert noch nicht durch echtes Spielen geprüft.
-3. **Pace-Messung als `npm run pace`** statt im Standard-Test. Grund: lange Laufzeit, keine Assertions.
-
-## Advisor-Bewertung (Qualität, Tiefe, Optik, Juice)
-Fazit: starkes technisches Fundament und Breite, aber als Spiel noch Prototyp: wenig Tiefe (alle Monster Nahkämpfer, Bosse nur HP-Sack mit Wut, 5 Affixarten, alle Skills erlernbar, Fernkampf mit Schwert), Optik kohärent aber brettartig (Raster-Kante, harte Terraingrenzen, Wände verdecken Monster), Juice fast nicht vorhanden (keine Zahlenpopups, 9 von 12 Skills ohne Effekt, kein Angriffsimpuls, Legendär-Drop wie jeder Pickup).
-Plan Juice (nur Render, Events existieren): schwebende Kampfzahlen, Skill-VFX (Projektile/Ringe/Blitz), Treffergefühl (Lunge, Flash, Hit-Stop, Shake), Loot-Momente (Namen am Boden in Seltenheitsfarbe, Bogenflug, Legendär-Sound/Banner, Item-Vergleich-Tooltip), Lesbarkeit (HP-Balken nur bei Schaden/Ziel, Cursor-Highlight, Level-Up-Effekt), Atmosphäre (Kachelkante weg, Dithering, Wasser/Lava-Animation, Partikel, Vignette).
-Plan Tiefe: Fernkampf-/Zaubermonster, Boss-Mechaniken (Bodenmarker, Adds, Ansturm), Champion-Packs, mehr Affixe, Bögen/Stäbe. Entscheidungen des Users nötig: Skill-Ränge/Punkte ja/nein; Monsterdichte (Gruppen 1–5 mit weniger Spawnpunkten vs. jetzt).
-
 ## Animation-Fix (nach Stand P4)
 - Problem: DCSS-Sprites wirkten beim Laufen schwebend, Schlag/Schuss kaum sichtbar. Lösung rein im Render (`art.ts`, `GameScene.ts`, `fx.ts`), keine neuen Assets.
 - Frames: 0 Stand, 1/4 Schritt links/rechts, 2 Ausholen/Anlegen, 3 Schlag/Schuss; Laufzyklus 1,0,4,0 (110 ms je Bild, Wippe `bob` synchron, Schatten fest). Prozeduraler Fallback mappt 4 auf 1.
@@ -92,16 +83,6 @@ Plan Tiefe: Fernkampf-/Zaubermonster, Boss-Mechaniken (Bodenmarker, Adds, Anstur
 - Monster: Neigung ±4° + Squash je Schritt, Hüpfen im Bob; Ausholen -8°, Lunge +10° mit Squash; Bosse/große Sprites gedämpft (damp 0,5/0,7). Idle: Atmen.
 - `fx.swing` (neue Sichel in Angriffsrichtung) ersetzt `slash` beim Basisangriff.
 - Offen: Pfeil-Anlegen/Sehne nur für Bogenträger (Monsterschützen nutzen Monster-Lunge); Feinabstimmung der Optik auf dem Mac.
-
-## Offene TODOs
-- Mehrspieler im echten Netz/mit 3+ Spielern nur per Test und kurzem Live-Check geprüft; Chat, Gruppen, Gilden, Handel fehlen
-- Framerate im Browser-Pane nicht belastbar messbar (unsichtbar); auf dem Mac prüfen, ggf. `?fps`-Anzeige ergänzen
-- UI-Panel serialisiert pro Frame JSON (Dirty-Flag), `you` wird online mit jedem Schnappschuss komplett gesendet (Delta wäre besser)
-- User fragen: Level-Tempo auf ~3 h strecken und Monster härter machen? (Bot starb 0-mal)
-- Framerate auf dem Mac prüfen lassen (im Browser-Pane nicht belastbar messbar)
-- Aus Review offen: UI-Panel serialisiert pro Frame JSON (Dirty-Flag), A* in `chase` fast jeden Tick pro Monster (drosseln, Heap)
-- Echte Grafik statt Platzhalter (Lizenzen in `ASSETS.md` tracken), Sound
-- Stufe 2 der Spec (Crafting, Sets, legendäre Effekte, mehr Skills), dann Mini-Server/PvP
 
 ## Dateien
 `src/sim/world.ts` (Kern: Tick, Befehle, Kampf, Tod), `data.ts` (Monster, Skills, XP, Shop), `items.ts`, `tiled.ts` (Kartenlader), `save.ts`; `src/render/GameScene.ts` (Phaser), `ui.ts` (DOM-HUD/Panel); Karte `src/data/aschenthron.json` (aus `scripts/gen_map.py`).
@@ -116,3 +97,4 @@ Plan Tiefe: Fernkampf-/Zaubermonster, Boss-Mechaniken (Bodenmarker, Adds, Anstur
 - Neue Slots: `Object.keys(equipment)`-Schleifen müssen `EquipSlot` nutzen; `net.ts`-Validierung und `save.ts` `EQUIP_SLOTS` führen die Slotliste separat (beim Erweitern alle drei anpassen).
 - Drop-Pool-Test verlangt pro Slot für Stufe 2–16 eine Vorlage mit minLevel ≤ Stufe (neue Slots brauchen eine Stufe-1-Vorlage).
 - Pace-Bot-Tode sind teils Bot-Artefakte (Fallback „far“ läuft zu hochstufigen Rudeln, Todesspirale am Leichenort); nicht eins zu eins als Spieler-Frust werten.
+
