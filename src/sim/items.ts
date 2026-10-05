@@ -10,7 +10,9 @@ export type EquipSlot = Slot | 'ring2';
 /** Verbrauchsgegenstände belegen keinen Ausrüstungsslot */
 export type ItemSlot = Slot | 'potion' | 'gem';
 export type Rarity = 'normal' | 'magic' | 'rare' | 'set' | 'legendary';
-export type Stat = 'damage' | 'armor' | 'maxHp' | 'kraft' | 'maxMana' | 'haste' | 'crit' | 'regen' | 'accuracy' | 'evasion' | 'resFire' | 'resFrost' | 'resPoison';
+export type Stat = 'damage' | 'armor' | 'maxHp' | 'kraft' | 'maxMana' | 'haste' | 'crit' | 'regen' | 'accuracy' | 'evasion' | 'resFire' | 'resFrost' | 'resPoison'
+  /** Stufe 6: Build-Werte (Prozent, negativ = Nachteil) */
+  | 'spellFire' | 'spellFrost' | 'healPower' | 'manaCost' | 'ctrl' | 'move' | 'parry';
 /** Besondere Effekte legendärer Gegenstände und Set-Boni */
 export type PowerId = 'lifesteal' | 'crit' | 'thorns' | 'manaKill' | 'xpBonus' | 'goldBonus';
 export interface Power {
@@ -64,6 +66,8 @@ export interface ItemTemplate {
   off?: 'arrows' | 'shield';
   /** Zusatzschaden der Pfeile bei Fernkampf-Skills */
   arrowBonus?: number;
+  /** Build-Hinweis für den Tooltip: wofür der Gegenstand gedacht ist und was er kostet */
+  hint?: string;
   value: number;
   minLevel: number;
 }
@@ -233,6 +237,39 @@ export const TEMPLATES: ItemTemplate[] = [
   { id: 'mana_mid', name: 'Manatrank', slot: 'potion', weight: 0.4, mana: 70, reqKraft: 0, value: 25, minLevel: 6 },
   { id: 'mana_big', name: 'Großer Manatrank', slot: 'potion', weight: 0.5, mana: 140, reqKraft: 0, value: 70, minLevel: 11 },
 ];
+
+/* ------------------------------------------------ Build-Gegenstände (Stufe 6)
+ * Jeder trägt einen Nachteil (negativer Basiswert) oder schwächere Grundwerte als gleichstufige Standardstücke
+ * und einen Build-Hinweis; sie ersetzen kein Standardstück, sondern stützen einen Spielstil. */
+const B = (t: Omit<ItemTemplate, 'reqKraft'> & { reqKraft?: number }): ItemTemplate => ({ reqKraft: 0, ...t });
+TEMPLATES.push(
+  // Elementarmagier: Feuer gegen Frostschutz und umgekehrt
+  B({ id: 'pyre_staff', name: 'Pyromantenstab', slot: 'weapon', kind: 'staff', hands: 2, weight: 4, damage: [7, 12], req: { verstand: 22 }, base: [{ stat: 'maxMana', value: 28 }, { stat: 'spellFire', value: 12 }, { stat: 'resFrost', value: -8 }], hint: 'Elementarmagier (Feuer): stärkere Feuerzauber, schwächerer Frostschutz.', value: 190, minLevel: 11 }),
+  B({ id: 'ash_igniter', name: 'Aschenzünder', slot: 'weapon', kind: 'staff', hands: 2, weight: 5, damage: [14, 24], req: { verstand: 34 }, base: [{ stat: 'maxMana', value: 60 }, { stat: 'spellFire', value: 20 }, { stat: 'resFrost', value: -12 }], hint: 'Elementarmagier (Feuer): stärkere Feuerzauber, schwächerer Frostschutz.', value: 680, minLevel: 21 }),
+  B({ id: 'rime_staff', name: 'Raureifstab', slot: 'weapon', kind: 'staff', hands: 2, weight: 4, damage: [7, 12], req: { verstand: 22 }, base: [{ stat: 'maxMana', value: 28 }, { stat: 'spellFrost', value: 12 }, { stat: 'resFire', value: -8 }], hint: 'Elementarmagier (Frost): stärkere Frostzauber, schwächerer Feuerschutz.', value: 190, minLevel: 11 }),
+  B({ id: 'glacier_staff', name: 'Gletscherstab', slot: 'weapon', kind: 'staff', hands: 2, weight: 5, damage: [14, 24], req: { verstand: 34 }, base: [{ stat: 'maxMana', value: 60 }, { stat: 'spellFrost', value: 20 }, { stat: 'resFire', value: -12 }], hint: 'Elementarmagier (Frost): stärkere Frostzauber, schwächerer Feuerschutz.', value: 680, minLevel: 21 }),
+  B({ id: 'ember_cloak', name: 'Glutmantel', slot: 'cloak', weight: 2.5, armor: 2, base: [{ stat: 'spellFire', value: 10 }, { stat: 'resFire', value: 10 }, { stat: 'resFrost', value: -10 }], hint: 'Feuermagier: stärkere Feuerzauber und Feuerschutz auf Kosten des Frostschutzes.', value: 280, minLevel: 16 }),
+  B({ id: 'rime_cloak', name: 'Raureifmantel', slot: 'cloak', weight: 2.5, armor: 2, base: [{ stat: 'spellFrost', value: 10 }, { stat: 'resFrost', value: 10 }, { stat: 'resFire', value: -10 }], hint: 'Frostmagier: stärkere Frostzauber und Frostschutz auf Kosten des Feuerschutzes.', value: 280, minLevel: 16 }),
+  // Heiler und Unterstützer
+  B({ id: 'mender_staff', name: 'Linderungsstab', slot: 'weapon', kind: 'staff', hands: 2, weight: 3, damage: [3, 6], req: { verstand: 14 }, base: [{ stat: 'maxMana', value: 16 }, { stat: 'healPower', value: 18 }, { stat: 'manaCost', value: 8 }], hint: 'Heiler: stärkere Heilung, aber teurere Zauber und kaum Schaden.', value: 90, minLevel: 6 }),
+  B({ id: 'healer_rod', name: 'Heilerstab', slot: 'weapon', kind: 'staff', hands: 2, weight: 4, damage: [8, 14], req: { verstand: 26 }, base: [{ stat: 'maxMana', value: 40 }, { stat: 'healPower', value: 28 }, { stat: 'manaCost', value: 10 }], hint: 'Heiler: stärkere Heilung, aber teurere Zauber und wenig Schaden.', value: 360, minLevel: 16 }),
+  B({ id: 'mender_ring', name: 'Ring der Linderung', slot: 'ring', weight: 0.5, base: [{ stat: 'healPower', value: 15 }, { stat: 'manaCost', value: 10 }], hint: 'Heiler: stärkere Heilung, Zauber kosten mehr Mana.', value: 110, minLevel: 6 }),
+  B({ id: 'recovery_ring', name: 'Ring der Genesung', slot: 'ring', weight: 0.5, base: [{ stat: 'healPower', value: 25 }, { stat: 'manaCost', value: 12 }, { stat: 'maxMana', value: 20 }], hint: 'Heiler: stärkere Heilung, Zauber kosten mehr Mana.', value: 340, minLevel: 16 }),
+  B({ id: 'saint_ring', name: 'Ring der Heiligen', slot: 'ring', weight: 0.5, base: [{ stat: 'healPower', value: 35 }, { stat: 'manaCost', value: 15 }, { stat: 'maxMana', value: 40 }], hint: 'Heiler: stärkere Heilung, Zauber kosten mehr Mana.', value: 1000, minLevel: 26 }),
+  // Zauberdurchfluss: günstigere Zauber, weniger Leben
+  B({ id: 'flow_ring', name: 'Strömungsring', slot: 'ring', weight: 0.5, base: [{ stat: 'manaCost', value: -10 }, { stat: 'maxHp', value: -20 }], hint: 'Zaubernde Builds: günstigere Zauber, aber weniger Leben.', value: 210, minLevel: 11 }),
+  B({ id: 'tide_ring', name: 'Gezeitenring', slot: 'ring', weight: 0.5, base: [{ stat: 'manaCost', value: -15 }, { stat: 'maxHp', value: -40 }, { stat: 'maxMana', value: 30 }], hint: 'Zaubernde Builds: günstigere Zauber, aber deutlich weniger Leben.', value: 640, minLevel: 21 }),
+  // Kontrolle und Debuff
+  B({ id: 'binding_amulet', name: 'Amulett des Banns', slot: 'amulet', weight: 0.5, base: [{ stat: 'ctrl', value: 20 }, { stat: 'maxMana', value: 15 }, { stat: 'damage', value: -3 }], hint: 'Kontrolle: Betäubung, Verlangsamung und Stille wirken länger, dein Schaden sinkt.', value: 220, minLevel: 11 }),
+  B({ id: 'warlock_amulet', name: 'Amulett des Zwingherrn', slot: 'amulet', weight: 0.5, base: [{ stat: 'ctrl', value: 30 }, { stat: 'maxMana', value: 30 }, { stat: 'damage', value: -6 }], hint: 'Kontrolle: Betäubung, Verlangsamung und Stille wirken länger, dein Schaden sinkt.', value: 680, minLevel: 21 }),
+  // Nahkampf: Parade, Schild, Tempo
+  B({ id: 'parry_blade', name: 'Parierklinge', slot: 'weapon', weight: 7, damage: [6, 10], reqKraft: 12, base: [{ stat: 'parry', value: 6 }, { stat: 'accuracy', value: -8 }], hint: 'Duellant (mit Parieren): wehrt Treffer ab, trifft aber schlechter und hat weniger Grundschaden.', value: 110, minLevel: 6 }),
+  B({ id: 'duelist_blade', name: 'Duellantenklinge', slot: 'weapon', weight: 8, damage: [14, 24], reqKraft: 22, base: [{ stat: 'parry', value: 9 }, { stat: 'accuracy', value: -12 }], hint: 'Duellant (mit Parieren): wehrt Treffer ab, trifft aber schlechter und hat weniger Grundschaden.', value: 380, minLevel: 16 }),
+  B({ id: 'bulwark_shield', name: 'Bollwerkschild', slot: 'offhand', off: 'shield', weight: 8, armor: 13, reqKraft: 22, base: [{ stat: 'parry', value: 5 }, { stat: 'move', value: -12 }, { stat: 'haste', value: -8 }], hint: 'Schildkämpfer: viel Rüstung und Parade, aber langsamer in Bewegung und Angriff.', value: 240, minLevel: 11 }),
+  B({ id: 'tower_shield', name: 'Turmschild', slot: 'offhand', off: 'shield', weight: 12, armor: 24, reqKraft: 30, base: [{ stat: 'parry', value: 7 }, { stat: 'move', value: -15 }, { stat: 'haste', value: -10 }], hint: 'Schildkämpfer: viel Rüstung und Parade, aber langsamer in Bewegung und Angriff.', value: 720, minLevel: 21 }),
+  B({ id: 'bastion_plate', name: 'Bastionspanzer', slot: 'chest', weight: 22, armor: 20, reqKraft: 26, base: [{ stat: 'move', value: -8 }, { stat: 'evasion', value: -10 }], hint: 'Schildkämpfer: sehr viel Rüstung, aber langsamer und leichter zu treffen.', value: 380, minLevel: 16 }),
+  B({ id: 'windrunner_boots', name: 'Windläuferstiefel', slot: 'feet', weight: 2, armor: 2, base: [{ stat: 'move', value: 8 }, { stat: 'evasion', value: 6 }, { stat: 'resPoison', value: -6 }], hint: 'Fernkämpfer und Läufer: schneller und wendiger, aber kaum Rüstung und giftanfällig.', value: 170, minLevel: 11 }),
+);
 
 /* ------------------------------------------------ Edelsteine */
 

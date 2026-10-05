@@ -38,7 +38,8 @@ function run(skillId: string, o: { weapon?: string | null; offhand?: string | nu
   const { w, p, victims } = setup(o.seed ?? 5, o.weapon ?? 'steel_sword', o.offhand ?? null, o.rank ?? 1, o.crit ?? false);
   if (o.hurt) p.hp = 100;
   applyCommand(w, p.id, { type: 'useSkill', skillId, targetId: victims[0]!.id });
-  const ev = drainEvents(w).filter((e) => e.type !== 'note');
+  // Beute-Inhalte hängen am Drop-Pool (wächst mit neuen Vorlagen) und gehören nicht zur Skill-Logik
+  const ev = drainEvents(w).filter((e) => e.type !== 'note').map((e) => (e.type === 'loot' ? { type: 'loot' } : e.type === 'pickedUp' ? { type: 'pickedUp' } : e));
   return {
     ev,
     hp: Math.round(p.hp),

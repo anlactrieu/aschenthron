@@ -1,5 +1,5 @@
 import { ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, STATUS_IDS, SCHOOL_NAME, schoolOf, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, uniqueDef, NPC_LORE, type QuestDef, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
-import { POWER_TEXT, TIER_COLOR, GEM_COLOR, affixRange, gemAffix, gemName, handsOf, itemAffixes, itemReq, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
+import { POWER_TEXT, TEMPLATES, TIER_COLOR, GEM_COLOR, affixRange, gemAffix, gemName, handsOf, itemAffixes, itemReq, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
 import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
   bulkSellable, sellPrice, critChance, attrBonus, equipSlotFor, socketCost, maxHpOf, maxManaOf, missingReq, nearNpc, powerOf, resistOf, type Actor, type Command, type Npc, type World,
@@ -15,10 +15,10 @@ const SLOT_NAME: Record<EquipSlot, string> = { weapon: 'Waffe', head: 'Kopf', ch
 
 /** Affixzeile: Prozent-Werte als "+3 % Angriffstempo", sonst "+3 Schaden". */
 function affixText(a: { stat: keyof typeof STAT_NAME; value: number }): string {
-  return `+${a.value} ${STAT_NAME[a.stat]}`;
+  return `${a.value < 0 ? '−' : '+'}${Math.abs(a.value)} ${STAT_NAME[a.stat]}`;
 }
 
-const AFFIX_WEIGHT: Record<string, number> = { damage: 3, armor: 2, maxHp: 0.25, kraft: 2.5, maxMana: 0.2, haste: 4, crit: 5, regen: 6, accuracy: 0.8, evasion: 0.8, resFire: 0.8, resFrost: 0.8, resPoison: 0.8 };
+const AFFIX_WEIGHT: Record<string, number> = { damage: 3, armor: 2, maxHp: 0.25, kraft: 2.5, maxMana: 0.2, haste: 4, crit: 5, regen: 6, accuracy: 0.8, evasion: 0.8, resFire: 0.8, resFrost: 0.8, resPoison: 0.8, spellFire: 2, spellFrost: 2, healPower: 1.5, manaCost: -1.5, ctrl: 1.5, move: 1.5, parry: 3 };
 
 /** Grobe Gesamtwertung eines Ausrüstungsstücks (für den ▲-Hinweis auf Verbesserungen). */
 function gearScore(i: Item): number {
@@ -45,6 +45,7 @@ function equippedFor(p: Actor, it: Item): Item | undefined {
 const STAT_NAME = {
   damage: 'Schaden', armor: 'Rüstung', maxHp: 'Leben', kraft: 'Kraft', maxMana: 'Mana', haste: '% Angriffstempo', crit: '% Kritisch', regen: 'Leben/s',
   accuracy: 'Treffsicherheit', evasion: 'Ausweichen', resFire: '% Feuerwiderstand', resFrost: '% Frostwiderstand', resPoison: '% Giftwiderstand',
+  spellFire: '% Feuerzauberschaden', spellFrost: '% Frostzauberschaden', healPower: '% Heilung', manaCost: '% Manakosten', ctrl: '% Kontrolldauer', move: '% Bewegungstempo', parry: '% Parieren',
 } as const;
 const BAG_COLS = 8;
 
@@ -66,12 +67,13 @@ export function describeItem(i: Item): string {
     base.push(`${h === 2 ? 'Zweihand' : 'Einhand'}${sp < 1 ? ' · Tempo schnell' : sp > 1 ? ' · Tempo langsam' : ''}`);
   }
   if (i.armor) base.push(`Rüstung ${i.armor}`);
-  const aff = i.affixes.map((a) => `+${a.value} ${STAT_NAME[a.stat]}`);
+  const aff = i.affixes.map((a) => affixText(a));
   if (i.sockets?.length) aff.push(`Sockel ${i.sockets.filter(Boolean).length}/${i.sockets.length}`);
   if (i.power) aff.push(POWER_TEXT[i.power.id](i.power.value));
   if (i.setId) aff.push(`Set: ${setById(i.setId).name}`);
   const need = reqLabels(i);
-  return [...base, ...aff, `Gewicht ${i.weight}`, need.length ? `Benötigt ${need.join(', ')}` : ''].filter(Boolean).join(' · ');
+  const hint = i.slot === 'potion' || i.slot === 'gem' ? '' : TEMPLATES.find((t) => t.id === i.templateId)?.hint;
+  return [...base, ...aff, ...(hint ? [`Build: ${hint}`] : []), `Gewicht ${i.weight}`, need.length ? `Benötigt ${need.join(', ')}` : ''].filter(Boolean).join(' · ');
 }
 
 /** Anforderungen als Textliste (nur Werte über dem Grundwert). */
@@ -427,7 +429,7 @@ export class Ui {
     box.append(sub);
     // gewürfelte Affixe und Sockel zeigt der Block darunter (mit Stufe bzw. Edelstein), nicht doppelt
     const tmpl = it.slot === 'potion' || it.slot === 'gem' ? undefined : templateById(it.templateId);
-    const skip = new Set(it.affixes.slice(tmpl?.base?.length ?? 0).map((a) => `+${a.value} ${STAT_NAME[a.stat]}`));
+    const skip = new Set(it.affixes.slice(tmpl?.base?.length ?? 0).map((a) => affixText(a)));
     for (const part of describeItem(it).split(' · ')) {
       if (part.startsWith('Benötigt ') || skip.has(part) || (it.sockets?.length && part.startsWith('Sockel '))) continue;
       box.append(el('div', '', part));
@@ -783,7 +785,7 @@ export class Ui {
         h.style.color = '#5fd070';
         body.append(h);
         for (const [n, b] of st.bonuses) {
-          const txt = [...(b.affixes ?? []).map((a) => `+${a.value} ${STAT_NAME[a.stat]}`), ...(b.power ? [POWER_TEXT[b.power.id](b.power.value)] : [])].join(', ');
+          const txt = [...(b.affixes ?? []).map((a) => affixText(a)), ...(b.power ? [POWER_TEXT[b.power.id](b.power.value)] : [])].join(', ');
           body.append(el('div', 'a-note', `${n} Teile: ${txt}`));
         }
       }

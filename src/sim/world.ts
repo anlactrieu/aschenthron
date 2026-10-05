@@ -407,6 +407,11 @@ export function passiveSum(a: Actor, key: PassiveKey): number {
   return cap !== undefined ? Math.min(cap, sum) : sum;
 }
 
+/** Paradechance in Prozent: Skill (gedeckelt) plus Gegenstände, insgesamt höchstens 25. */
+function parryChance(a: Actor): number {
+  return Math.min(25, passiveSum(a, 'parry') + affixSum(a, 'parry'));
+}
+
 /** Wirkt Parieren? Einhandwaffe (kein Bogen/Stab) oder Schild nötig. */
 function canParry(a: Actor): boolean {
   const wp = a.equipment.weapon;
@@ -993,7 +998,8 @@ export function activeSkills(p: Actor): string[] {
 function castHeal(w: World, a: Actor, s: SkillDef, rank: number, manaCost: number): void {
   const lvl = 1 + a.level * 0.1;
   const scale = s.scales ? Math.max(0, a.attrs[s.scales] - 10) * 3 : 0;
-  const amount = Math.round((s.heal! + scale) * lvl * rankDamage(rank));
+  const healMod = affixSum(a, 'healPower');
+  const amount = Math.round((s.heal! + scale) * lvl * rankDamage(rank) * (healMod !== 0 ? Math.max(0.2, 1 + healMod / 100) : 1));
   a.mana -= manaCost;
   a.skillCd[s.id] = Math.round(s.cooldown * rankCooldown(rank));
   const before = a.hp;
@@ -1025,13 +1031,22 @@ function skillRawDamage(w: World, a: Actor, s: SkillDef, rank: number, arrows: I
   const matches = wp?.damage && ((s.area === 'Fernkampf' && wp.kind === 'bow') || (s.area === 'Magie' && wp.kind === 'staff'));
   const weaponBonus = matches ? ((wp!.damage![0] + wp!.damage![1]) / 2) * 0.9 : 0;
   const spell = s.area === 'Magie' ? 1 + attrBonus(a, 'verstand') / 100 : 1;
-  return Math.round((w.rng.int(lo, hi) * lvl + scale + weaponBonus + (arrows?.arrowBonus ?? 0)) * rankDamage(rank) * spell);
+  const school = s.area === 'Magie' && s.dmgType ? affixSum(a, s.dmgType === 'fire' ? 'spellFire' : s.dmgType === 'frost' ? 'spellFrost' : 'healPower') : 0;
+  const schoolMod = school !== 0 && s.dmgType !== 'poison' ? Math.max(0.2, 1 + school / 100) : 1;
+  return Math.round((w.rng.int(lo, hi) * lvl + scale + weaponBonus + (arrows?.arrowBonus ?? 0)) * rankDamage(rank) * spell * schoolMod);
 }
 
 /** Nebenwirkungen eines Treffers: Statuseffekt (Brand: 10 % des Treffers pro Sekunde) und Gift über Zeit. */
 function skillRiders(w: World, a: Actor, s: SkillDef, v: Actor, amount: number, dt: DmgType): void {
-  if (s.status) applyStatus(w, v, s.status.id, s.status.seconds, s.status.id === 'stun' ? 'physical' : dt, s.status.id === 'burn' ? { perSec: Math.max(1, Math.round(amount * 0.1)), srcId: a.id } : undefined);
+  if (s.status) applyStatus(w, v, s.status.id, ctrlSeconds(a, s.status.id, s.status.seconds), s.status.id === 'stun' ? 'physical' : dt, s.status.id === 'burn' ? { perSec: Math.max(1, Math.round(amount * 0.1)), srcId: a.id } : undefined);
   if (s.dot && resistOf(v, dt) < 100) v.dot = { perSec: Math.max(1, Math.round((amount * s.dot.factor) / s.dot.seconds)), until: w.tick + s.dot.seconds * TICK_RATE, srcId: a.id };
+}
+
+/** Dauer eines Kontrolleffekts, den `a` verhängt: Gegenstände mit Kontrolldauer verlängern (oder verkürzen) sie. */
+function ctrlSeconds(a: Actor, id: StatusId, seconds: number): number {
+  if (EFFECTS[id].kind !== 'control' || a.kind !== 'player') return seconds;
+  const c = affixSum(a, 'ctrl');
+  return c !== 0 ? seconds * Math.max(0.3, 1 + c / 100) : seconds;
 }
 
 /** Skills ohne Schaden: Schutz/Verband auf sich, Schwächung/Kontrolle/Bannung auf einen Gegner, Läuterung. */
@@ -1070,9 +1085,11 @@ function castEffect(w: World, a: Actor, s: SkillDef, rank: number, manaCost: num
   const e = s.effect;
   if (e) {
     const mag = e.mag !== undefined ? Math.min(e.cap ?? Infinity, e.mag + (e.magPerRank ?? 0) * (rank - 1)) : undefined;
-    applyStatus(w, t, e.id, e.seconds, 'physical', undefined, mag);
+    const heal = e.id === 'bandage' ? affixSum(a, 'healPower') : 0;
+    const shown = mag !== undefined && heal !== 0 ? Math.round(mag * Math.max(0.2, 1 + heal / 100) * 10) / 10 : mag;
+    applyStatus(w, t, e.id, ctrlSeconds(a, e.id, e.seconds), 'physical', undefined, shown);
     if (t.status[e.id]) {
-      const amount = mag === undefined ? '' : e.id === 'bandage' ? `${mag} % Leben pro Sekunde, ` : `${mag} %, `;
+      const amount = shown === undefined ? '' : e.id === 'bandage' ? `${shown} % Leben pro Sekunde, ` : `${shown} %, `;
       note(w, a, `${EFFECTS[e.id].label}${self ? '' : ` auf ${t.name}`}: ${amount}bis ${Math.max(1, Math.round((t.status[e.id]! - w.tick) / TICK_RATE))} s.`);
     }
   }
@@ -1086,8 +1103,9 @@ function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void 
   if (a.status.stun) return fail(w, 'Du bist betäubt.');
   if (a.status.silence) return fail(w, 'Du bist zum Schweigen gebracht.');
   const rank = a.skillRanks[s.id] ?? 1;
-  const cheaper = passiveSum(a, 'manaCost');
-  const manaCost = Math.round(s.mana * rankMana(rank) * (cheaper > 0 ? 1 - cheaper / 100 : 1));
+  // Manakosten: Manafluss (−) und Gegenstände (+/−), nie unter 40 % der Grundkosten
+  const costMod = affixSum(a, 'manaCost') - passiveSum(a, 'manaCost');
+  const manaCost = Math.round(s.mana * rankMana(rank) * (costMod !== 0 ? Math.max(0.4, 1 + costMod / 100) : 1));
   if (a.mana < manaCost) return fail(w, 'Nicht genug Mana.');
   if (s.heal !== undefined) return castHeal(w, a, s, rank, manaCost);
   if (s.effect || s.action) return castEffect(w, a, s, rank, manaCost, targetId);
@@ -1129,7 +1147,9 @@ function dist(a: Actor, b: Actor): number {
 }
 
 function speedOf(a: Actor, tickNow: number): number {
-  return (a.chargeUntil > tickNow ? a.speed * 3 : a.speed) * (a.status.slow ? SLOW_FACTOR : 1);
+  const gear = a.kind === 'player' ? affixSum(a, 'move') : 0;
+  const move = gear !== 0 ? Math.min(1.3, Math.max(0.6, 1 + gear / 100)) : 1;
+  return (a.chargeUntil > tickNow ? a.speed * 3 : a.speed) * (a.status.slow ? SLOW_FACTOR : 1) * move;
 }
 
 function stepAlong(a: Actor, tickNow = 0): void {
@@ -1327,7 +1347,7 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
     return -1;
   }
   // Parieren: Nahkampftreffer (kein Skill, keine Zauber/Pfeile) auf Spieler mit passender Waffe; Würfel nur bei gelerntem Skill
-  if (canMiss && !noReflect && !skill && t.kind === 'player' && passiveSum(t, 'parry') > 0 && canParry(t) && w.rng.next() * 100 < passiveSum(t, 'parry')) {
+  if (canMiss && !noReflect && !skill && t.kind === 'player' && parryChance(t) > 0 && canParry(t) && w.rng.next() * 100 < parryChance(t)) {
     t.lastHitAt = w.tick;
     t.resting = false;
     note(w, t, `Du parierst den Angriff von ${a.name}.`);
