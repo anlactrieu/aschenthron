@@ -101,6 +101,8 @@ export class GameScene extends Phaser.Scene {
   private ambientKind: 'embers' | 'mist' | null = null;
   private lastTime = 0;
   private now = 0;
+  private prevPos = new Map<number, { x: number; y: number }>();
+  private interp = new Map<number, { x: number; y: number }>();
   private arrows = new Set<string>();
   private arrowActive = false;
   private lastArrowMove = 0;
@@ -380,6 +382,7 @@ export class GameScene extends Phaser.Scene {
       const step = 1000 / TICK_RATE;
       while (this.acc >= step) {
         this.acc -= step;
+        this.snapshotPrev();
         tick(this.world);
       }
     }
@@ -1333,9 +1336,32 @@ export class GameScene extends Phaser.Scene {
     this.cleanLabels(seen, ['a']);
   }
 
-  /** Anzeigeposition: lokal exakt, online geglättet zwischen den 10-Hz-Schnappschüssen. */
+  /** Position vor dem letzten Simulationsschritt, damit die Darstellung zwischen den 20 Schritten pro Sekunde gleiten kann. */
+  private snapshotPrev(): void {
+    for (const a of this.world.actors) {
+      const v = this.prevPos.get(a.id);
+      if (v) {
+        v.x = a.x;
+        v.y = a.y;
+      } else this.prevPos.set(a.id, { x: a.x, y: a.y });
+    }
+  }
+
+  /** Anzeigeposition: lokal zwischen letztem und aktuellem Simulationsschritt interpoliert, online geglättet zwischen den 10-Hz-Schnappschüssen. */
   private dispPos(a: Actor): { x: number; y: number } {
-    if (!this.remote) return a;
+    if (!this.remote) {
+      const v = this.prevPos.get(a.id);
+      if (!v) return a;
+      const dx = a.x - v.x;
+      const dy = a.y - v.y;
+      if (Math.abs(dx) + Math.abs(dy) > 2) return a;     // Sprung (Wiederbelebung, Teleport): nicht gleiten
+      const k = Math.min(1, this.acc / (1000 / TICK_RATE));
+      let o = this.interp.get(a.id);
+      if (!o) this.interp.set(a.id, (o = { x: 0, y: 0 }));
+      o.x = v.x + dx * k;
+      o.y = v.y + dy * k;
+      return o;
+    }
     let d = this.disp.get(a.id);
     if (!d) {
       d = { x: a.x, y: a.y };
