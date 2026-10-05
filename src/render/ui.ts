@@ -121,6 +121,7 @@ const CSS = `
 .hb .k{position:absolute;left:2px;top:0;font:bold 11px system-ui;color:#ffe8b0;text-shadow:0 0 3px #000,0 0 3px #000}
 .hb .cd{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.62)}
 .hb .c{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:bold 15px system-ui;color:#fff;text-shadow:0 0 4px #000}
+.hb.armed{border-color:#ffd86a;box-shadow:inset 0 0 8px #000,0 0 10px #ffd86a}
 .hb.nomana img{filter:grayscale(.8) brightness(.6)}
 .hb .cnt{position:absolute;right:3px;bottom:0;font:bold 12px system-ui;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000}
 `;
@@ -155,6 +156,7 @@ export class Ui {
   private msgs: string[] = [];
   private key = '';
   private hotKey = '';
+  private armedId: string | null = null;
   private hotButtons: { el: HTMLElement; cd: HTMLElement; txt: HTMLElement }[] = [];
   private potionBtns: { heal: HTMLElement; mana: HTMLElement } | null = null;
   private arrows: HTMLElement | null = null;
@@ -225,6 +227,10 @@ export class Ui {
     this.main.style.display = this.open ? 'block' : 'none';
     this.key = '';
     if (!this.open) this.tip.style.display = 'none';
+  }
+
+  setArmed(id: string | null): void {
+    this.armedId = id;
   }
 
   banner(text: string, color = '#e8d9b0'): void {
@@ -335,6 +341,7 @@ export class Ui {
       const txt = cd > 0 ? String(Math.ceil(cd / TICK_RATE)) : '';
       if (hb.txt.textContent !== txt) hb.txt.textContent = txt;
       hb.el.classList.toggle('nomana', p.mana < s.mana);
+      hb.el.classList.toggle('armed', this.armedId === id);
     });
 
     if (t && t.alive && t.kind === 'monster') {

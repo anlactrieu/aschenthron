@@ -83,6 +83,7 @@ export class GameScene extends Phaser.Scene {
   private timers: { at: number; fn: () => void }[] = [];
   private fireballs = new Map<number, { impacts: (() => void)[]; target: number }>();
   private regionName = '';
+  private armedSkill: string | null = null;
   private resetting = false;
   private ended = false;
   private camPos: { x: number; y: number } | null = null;
@@ -121,7 +122,7 @@ export class GameScene extends Phaser.Scene {
     this.minimap = new Minimap(this.world, this.tiles);
     if (this.remote) this.ui.say(`Verbunden als ${p.name}${this.remote.pvp ? ' – PvP außerhalb der Städte aktiv, Angreifer werden zu Mördern' : ''}. Klick auf Spieler greift an.`);
     else if (saved && importPlayer(this.world, p, saved)) this.ui.say('Spielstand geladen.');
-    else this.ui.say('Willkommen in Aschenthron. C: Charakter (Attributpunkte verteilen!) · Q/E: Heil-/Manatrank · R: Rasten · N: Karte · M: Ton · Klick: laufen/angreifen/aufheben · Lehrer, Händlerin, Schmiede, Truhe und Aufgaben in der Stadt.');
+    else this.ui.say('Willkommen in Aschenthron. Dein Startgold reicht für eine Wahl: Schwert und Rüstung (Händlerin) oder Bogen, Köcher, Pfeile und Schnellschuss (Händlerin + Lehrer). C: Charakter (Attributpunkte verteilen!) · Q/E: Heil-/Manatrank · R: Rasten · N: Karte · M: Ton · Klick: laufen/angreifen/aufheben · Lehrer, Händlerin, Schmiede, Truhe und Aufgaben in der Stadt.');
     this.gfx = this.add.graphics().setDepth(OVERLAY_DEPTH);
     this.gfxGround = this.add.graphics().setDepth(-9e5);
     this.gfxShimmer = this.add.graphics().setDepth(-9e5 + 1);
@@ -135,6 +136,10 @@ export class GameScene extends Phaser.Scene {
     }
     this.cameras.main.setBackgroundColor('#0b0a0d');
     this.input.on('pointerdown', (ptr: Phaser.Input.Pointer) => this.onClick(ptr));
+    this.input.mouse?.disableContextMenu();
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') this.setArmed(null);
+    });
     window.addEventListener('beforeunload', () => {
       if (!this.resetting) this.save();
     });
@@ -164,19 +169,26 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** Klassische Menüführung: Fertigkeit wählen (1–9 oder Leiste), dann Ziel anklicken. Selbstzauber wirken sofort. */
   private useSkillSlot(i: number): void {
     const p = this.player();
     const id = p.skills[i];
     if (!id) return;
     const s = SKILLS.find((x) => x.id === id)!;
-    let target = p.targetId !== null ? getActor(this.world, p.targetId) : undefined;
-    if (!target || !target.alive) {
-      target = this.world.actors
-        .filter((a) => a.kind === 'monster' && a.alive && Math.hypot(a.x - p.x, a.y - p.y) <= s.range)
-        .sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
+    if (s.heal !== undefined || s.aoeSelf) {
+      this.setArmed(null);
+      this.send({ type: 'useSkill', skillId: id });
+      return;
     }
-    if (target) this.send({ type: 'useSkill', skillId: id, targetId: target.id });
-    else this.ui.say('Kein Ziel in Reichweite.');
+    if (this.armedSkill === id) return this.setArmed(null);
+    this.setArmed(id);
+    this.ui.say(`${s.name} gewählt – Ziel anklicken (Rechtsklick oder Esc: abbrechen).`);
+  }
+
+  private setArmed(id: string | null): void {
+    this.armedSkill = id;
+    this.ui.setArmed(id);
+    this.game.canvas.style.cursor = id ? 'crosshair' : '';
   }
 
   private usePotionKind(kind: 'heal' | 'mana'): void {
@@ -218,6 +230,10 @@ export class GameScene extends Phaser.Scene {
     const t = toTile(ptr.worldX, ptr.worldY);
     const w = this.world;
     const hit = this.pick(ptr.worldX, ptr.worldY);
+    if (this.armedSkill) {
+      if (ptr.rightButtonDown()) return this.setArmed(null);
+      if (hit?.actor) return this.send({ type: 'useSkill', skillId: this.armedSkill, targetId: hit.actor.id });
+    }
     if (hit?.npc) {
       this.ui.toggle(true);
       this.send({ type: 'moveTo', x: Math.round(hit.npc.x), y: Math.round(hit.npc.y + 1) });

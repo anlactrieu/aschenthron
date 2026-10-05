@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Grid } from './path';
 import { generateItem } from './items';
-import { totalXpFor } from './data';
+import { skillById, totalXpFor } from './data';
 import {
-  addNpc, applyCommand, buyPrice, createWorld, drainEvents, gainXp, inSafeZone, maxHpOf,
+  addNpc, applyCommand, buyPrice, START_GOLD, createWorld, drainEvents, gainXp, inSafeZone, maxHpOf,
   nearNpc, spawnMonster, spawnPlayer, tick, TICK_RATE, type World,
 } from './world';
 
@@ -33,6 +33,19 @@ describe('Charakter und Leveln (M3)', () => {
     expect(p.level).toBe(3);
     expect(p.statPoints).toBe(10 + 10);
     expect(p.hp).toBe(maxHpOf(p));
+  });
+
+  it('Startgold reicht für das Bogen-Set samt Schnellschuss oder für Schwert plus Rüstung, aber nicht für beides', () => {
+    const bow = buyPrice('hunt_bow') + buyPrice('leather_quiver') + buyPrice('wood_arrows') + skillById('quick_shot')!.price;
+    const melee = buyPrice('rusty_sword') + buyPrice('leather_cap') + buyPrice('worn_gloves') + buyPrice('cloth_boots');
+    expect(bow).toBeLessThanOrEqual(START_GOLD);
+    expect(melee).toBeLessThanOrEqual(START_GOLD);
+    expect(bow + buyPrice('rusty_sword')).toBeGreaterThan(START_GOLD);
+    const { w, p } = fresh();
+    addNpc(w, 'trainer', 'Lehrer', 2, 2);
+    expect(p.gold).toBe(START_GOLD);
+    applyCommand(w, p.id, { type: 'learnSkill', skillId: 'quick_shot' });
+    expect(p.skills).toEqual(['quick_shot']); // schon auf Stufe 1 lernbar
   });
 
   it('Lehrer: Skill lernen kostet Gold, braucht Level und Nähe', () => {
