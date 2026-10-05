@@ -36,7 +36,7 @@ const equip = (w: World, p: Actor, tpl: string) => {
 describe('Stufe 6: Skills und Zauber (Phase 2)', () => {
   it('Daten: jeder Skill hat Gruppe, Wirkung und (neue) vollständige Info; IDs eindeutig', () => {
     expect(new Set(SKILLS.map((s) => s.id)).size).toBe(SKILLS.length);
-    for (const s of SKILLS.filter((x) => x.info || x.passive || x.effect || x.action)) {
+    for (const s of SKILLS) {
       expect(schoolOf(s)).toBeTruthy();
       expect(s.info, s.id).toBeDefined();
       for (const v of Object.values(s.info!)) expect(v.length).toBeGreaterThan(10);

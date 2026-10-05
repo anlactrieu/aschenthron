@@ -1,6 +1,8 @@
 # HANDOFF – Aschenthron
 
-## AKTUELL: Stufe 6 (Build-Tiefe) – Phase 1 (Fundament) umgesetzt und committet, Phase 2/3 offen
+## AKTUELL: Stufe 6 (Build-Tiefe) – ALLE Phasen (1–5) und Moosbrück umgesetzt, gepusht
+- Phase 4/5: Buildprofil (`src/sim/build.ts`, Anzeige im Charakterfenster `renderChar`), `info` für alle 27 Skills, Benchmark `builds.bench.test.ts` (DPS gegen reglose Puppe, Schranke Faktor 6), `build.test.ts`. 263 Tests. Gemessen: Fern/Zauber 2–5× Nahkampf-DPS im Altbestand (nicht angefasst, Balance-Vorgabe).
+- Offene Ideen: Moosbrück-Questgeber/Lore; Buildprofil-Werte (Parieren/Heilkraft) im Werte-Block anzeigen; Nahkampf-Balance (Entscheidung User).
 - Phase 1: `effects.ts` (EFFECTS-Tabelle, mergeStatus, controlDr, cleanse/dispel), `STATUS_IDS` in `data.ts`, `SkillDef.school/target/passive/info` + `schoolOf`, `useSkill` zerlegt (Golden-Test `skills.golden.test.ts` + Snapshot beweist identische Werte), Event `note` (Kampflog, immer mit `to`), `activeSkills(p)` für Hotbar/Slots. 223 Tests, Lint, Build grün. NICHT gepusht (Push auf main deployt Pages).
 - Offen aus Phase 1: Blitzschlag-Fix (kein passender DmgType; eigener Commit/Entscheidung), Gratis-Respec-Merker kommt mit Phase 2 (`save.ts` KEYS).
 - Phase 2 umgesetzt (Commit nach Phase 1): 16 neue Skills in `data.ts` (Zauber: Läuterung, Elementarschild, Entkräftung, Entzaubern, Steinhaut, Verstummen, Fluch der Blöße; Passive: Manafluss, Parieren, Schildbeherrschung, Rüstungsbrecher, Präzision, Ausweichtraining, Schleichen, Überleben; aktiv: Erste Hilfe), neue Status ward/stoneskin/bandage/weaken/curse/silence, `passiveSum`/`PASSIVE_CAP`, `castEffect`, Monster-Fähigkeiten `ward` (Goblinschamane, Sumpfhexe, Totenbeschwörer) und `dispel` (Knochenakolyth), Gratis-Respec (`freeRespec` in `save.ts`), UI-Info (`skillInfo`), Statusicons. Pace danach: Seed 2024 8,3 h / 10 Tode. 238 Tests, Lint, Build grün; Browser kurz geprüft.

@@ -5,6 +5,7 @@ import {
   bulkSellable, sellPrice, critChance, attrBonus, equipSlotFor, socketCost, maxHpOf, maxManaOf, missingReq, nearNpc, powerOf, resistOf, type Actor, type Command, type Npc, type World,
   activeSkills,
 } from '../sim/world';
+import { buildProfile } from '../sim/build';
 import { itemIcon, potionIcon, skillIcon, statusIcon } from './icons';
 import { giverLocation, questAvailable, questChains, questWhere, targetName } from '../sim/quests';
 import { lookKey, lookOf, playerPortrait } from './art';
@@ -763,6 +764,16 @@ export class Ui {
       b.onclick = () => p.statPoints > 0 && this.send({ type: 'spendStat', attr: k });
       row.append(b);
       body.append(row);
+    }
+    // Buildprofil: Einschätzung, welchem Archetyp der Charakter ähnelt (keine Klassen, nur Hinweis)
+    const prof = buildProfile(p);
+    body.append(el('div', 'a-sec', 'Buildprofil'));
+    if (!prof.primary) body.append(el('div', 'a-note', 'Noch unspezialisiert: Verteile Attribute, lerne Fertigkeiten und rüste Ausrüstung aus, dann zeigt sich dein Stil.'));
+    else {
+      body.append(el('div', '', prof.secondary ? `Hybrid: ${prof.primary.name} + ${prof.secondary.name}` : prof.primary.name));
+      body.append(el('div', 'a-note', `Passt am besten: ${prof.primary.tip}`));
+      if (prof.secondary) body.append(el('div', 'a-note', `Zweite Richtung: ${prof.secondary.tip}`));
+      body.append(el('div', 'a-note', `Weitere: ${prof.scores.slice(prof.secondary ? 2 : 1, 4).filter((x) => x.score >= 20).map((x) => `${x.arch.name} ${x.score}`).join(' · ') || '–'}`));
     }
     body.append(el('div', 'a-sec', 'Werte'));
     const rows: [string, string][] = [

@@ -167,7 +167,7 @@ Ausgenommen (nur Mehrspieler): Chat, Gruppen, Spieler-Handel, Gilden, Kopfgeld/D
 - **P3 Welt & Endgame:** Tag/Nacht + Wetter, Lore-NPCs + Questketten, Goblin-/Spinnen-Dungeon, Elite-Zone + Weltbosse (Respawn), Level-Kurve bleibt (Bot ≈ 8 h).
 - **P4 Grafik:** CC0-Pack (Dungeon Crawl 32x32) einbauen, `ASSETS.md` + Credits, prozeduraler Fallback.
 
-## Stufe 6: Build-Tiefe für Skills, Zauber und Items (entschieden, noch NICHT umgesetzt)
+## Stufe 6: Build-Tiefe für Skills, Zauber und Items (umgesetzt: Phase 1–5, dazu Stadt Moosbrück)
 Ziel: freie Builds statt Itemleiter, nur Prinzipien klassischer freier MMORPGs, eigene Namen. Bestehende IDs, Speicherformate und Balance bleiben. Zauber = `SkillDef` mit `area: 'Magie'` (kein Parallelsystem), Skillpunkte bleiben die einzige Währung. Umsetzung in frischer Session, je Phase ein Commit mit Tests/Lint/Build.
 
 **Entscheidungen (User):**
@@ -182,3 +182,5 @@ Ziel: freie Builds statt Itemleiter, nur Prinzipien klassischer freier MMORPGs, 
 **Phase 4/5 (später):** Skillkarte mit Info-Zeilen, Buildprofil/Archetyp-Empfehlung, Statusicons, Interaktionstests, Build-Benchmark (Zeit bis Sieg Level 10/20/30, 5 Builds), Pace-Kontrolle.
 
 **Risiken:** IDs nie entfernen/umbenennen; unbekannte Stats/Powers tolerant laden; Snapshot-Felder optional + Defaults in `actorFromLite`; `ActorLite.st` erweitern; Tests mit festen Skill-Listen (`stage2.test.ts`) prüfen.
+
+**Umsetzungsstand:** Alle Phasen umgesetzt (Effektsystem `effects.ts`, 27 Skills mit `info`, 21 Build-Items, Buildprofil `build.ts`, Benchmark `builds.bench.test.ts`, Stadt Moosbrück). Messung: Fern-/Zauberbuilds liefern im Altbestand 2–5× den Nahkampf-DPS (reglose Zielpuppe); bewusst nicht angefasst (Balance-Vorgabe), siehe Kommentar im Benchmark.
