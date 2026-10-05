@@ -1,4 +1,5 @@
 import { ATTR_KEYS } from './data';
+import { EQUIP_SLOT_LIST } from './items';
 import { isWalkable } from './path';
 import type { Actor, Command, GameEvent, GroundItem, World } from './world';
 
@@ -25,7 +26,7 @@ export function validateCommand(w: World, c: unknown): Command | null {
     case 'drop': case 'usePotion': case 'sell': case 'stashPut': case 'stashTake':
       return int(o.itemId) ? ({ type: o.type, itemId: o.itemId } as Command) : null;
     case 'unequip':
-      return ['weapon', 'head', 'chest', 'hands', 'feet', 'ring', 'ring2', 'amulet', 'offhand'].includes(o.slot as string) ? { type: 'unequip', slot: o.slot as 'weapon' } : null;
+      return EQUIP_SLOT_LIST.includes(o.slot as never) ? { type: 'unequip', slot: o.slot as 'weapon' } : null;
     case 'spendStat':
       return ATTR_KEYS.includes(o.attr as never) ? { type: 'spendStat', attr: o.attr as never } : null;
     case 'learnSkill': case 'trainSkill':
@@ -42,6 +43,10 @@ export function validateCommand(w: World, c: unknown): Command | null {
       return str(o.questId) ? ({ type: o.type, questId: o.questId } as Command) : null;
     case 'craft':
       return int(o.itemId) && ['upgrade', 'reroll', 'extend'].includes(o.op as string) ? { type: 'craft', itemId: o.itemId, op: o.op as 'upgrade' } : null;
+    case 'socket':
+      return int(o.gemId) && int(o.itemId) && (o.index === undefined || (int(o.index) && o.index >= 0 && o.index < 3))
+        ? { type: 'socket', gemId: o.gemId, itemId: o.itemId, ...(o.index !== undefined ? { index: o.index } : {}) }
+        : null;
     default:
       return null;
   }

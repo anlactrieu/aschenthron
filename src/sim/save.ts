@@ -1,13 +1,12 @@
 import { ATTR_KEYS, MAP_VERSION, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, questById, skillById, totalXpFor } from './data';
 import { isWalkable } from './path';
-import { LEGENDARIES, SETS, TEMPLATES, type Item } from './items';
+import { EQUIP_SLOT_LIST, GEM_KINDS, LEGENDARIES, SETS, TEMPLATES, handsOf, type Item } from './items';
 import { maxHpOf, maxManaOf, type Actor, type World } from './world';
 
 const KEYS = [
   'x', 'y', 'hp', 'mana', 'level', 'xp', 'statPoints', 'attrs', 'gold', 'skills', 'inventory', 'equipment', 'stash', 'maxHp', 'quests', 'skillRanks', 'skillPoints',
 ] as const;
 
-const EQUIP_SLOTS = ['weapon', 'head', 'chest', 'hands', 'feet', 'ring', 'ring2', 'amulet', 'offhand'];
 
 /** Serialisiert nur den Spieler; die Welt wird beim Laden neu aufgebaut. */
 export function exportPlayer(p: Actor): string {
@@ -41,6 +40,9 @@ const isItem = (i: unknown): i is Item => {
   if (!TEMPLATES.some((t) => t.id === it.templateId)) return false;
   if (it.setId !== undefined && !SETS.some((x) => x.id === it.setId)) return false;
   if (it.unique !== undefined && !LEGENDARIES.some((x) => x.id === it.unique)) return false;
+  const okGem = (g: unknown) => !!g && typeof g === 'object' && GEM_KINDS.includes((g as { kind: never }).kind) && [1, 2, 3].includes((g as { q: number }).q);
+  if (it.sockets !== undefined && (!Array.isArray(it.sockets) || it.sockets.length > 3 || !it.sockets.every((g) => g === null || okGem(g)))) return false;
+  if (it.slot === 'gem' && !okGem(it.gem)) return false;
   return true;
 };
 
@@ -74,9 +76,16 @@ export function importPlayer(w: World, p: Actor, json: string): boolean {
     const lost = rawCount - p.inventory.length - p.stash.length;
     if (lost > 0) w.events.push({ type: 'fail', reason: `${lost} Gegenstand/Gegenstände aus dem Spielstand konnten nicht geladen werden (unbekannte Vorlage).`, to: p.id });
     p.equipment = {};
-    for (const slot of EQUIP_SLOTS) {
+    for (const slot of EQUIP_SLOT_LIST) {
       const it = migrateItem((s.equipment as Record<string, unknown> | undefined)?.[slot]);
       if (isItem(it)) (p.equipment as Record<string, Item>)[slot] = it;
+    }
+    // Altstände: Zweihandwaffe plus unpassende Nebenhand (Bogen nur mit Pfeilen) – Nebenhand in den Rucksack
+    const wp = p.equipment.weapon;
+    const off = p.equipment.offhand;
+    if (wp && off && handsOf(wp) === 2 && !(wp.kind === 'bow' && off.off === 'arrows')) {
+      delete p.equipment.offhand;
+      p.inventory.push(off);
     }
     const x = Math.round(num(s.x, w.start.x));
     const y = Math.round(num(s.y, w.start.y));

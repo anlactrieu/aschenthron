@@ -521,7 +521,7 @@ export class GameScene extends Phaser.Scene {
             this.ui.banner(`${r === 'legendary' ? 'Legendär' : 'Set-Teil'}: ${e.item.name}`, r === 'legendary' ? '#ff8a2a' : '#5fd070');
             this.cameras.main.flash(220, r === 'legendary' ? 255 : 120, r === 'legendary' ? 150 : 255, 60);
             say(`Beute: ${e.item.name}!`);
-          } else if (r === 'rare') say(`Beute: ${e.item.name}`);
+          } else if (r === 'rare' || e.item.slot === 'gem') say(`Beute: ${e.item.name}`);
           break;
         }
         case 'respecced': say('Alles neu verteilt: Attribute und Fertigkeiten sind zurückgesetzt.'); this.sfx.quest(); break;
@@ -579,7 +579,7 @@ export class GameScene extends Phaser.Scene {
           this.sfx.potion();
           break;
         }
-        case 'crafted': say(`Geschmiedet: ${e.item.name}`); this.sfx.pickup(); break;
+        case 'crafted': say(e.op === 'socket' ? `Edelstein eingesetzt: ${e.item.name}` : `Geschmiedet: ${e.item.name}`); this.sfx.pickup(); break;
         case 'potion': {
           const pos = this.bodyPos(this.player());
           if (pos) this.fx.sparkle(pos.x, pos.y, e.item.heal ? 0xff6a7a : 0x6a8aff);

@@ -1,10 +1,11 @@
 import { Rng } from './rng';
 import { findPath, isWalkable, type Grid, type Pt } from './path';
-import { itemReq, rollUniqueSpecial, rollDrop, rollPotion, rollSpecial, templateById, generateItem, rerollAffixes, extendAffixes, SETS, type Item, type PowerId, type SetBonus, type EquipSlot, type Stat } from './items';
+import { itemReq, itemAffixes, gemTemplateId, handsOf, weaponSpeedOf, rollGem, rollUniqueSpecial, rollDrop, rollPotion, rollSpecial, templateById, generateItem, rerollAffixes, extendAffixes, SETS, type GemInfo, type Item, type PowerId, type SetBonus, type EquipSlot, type Stat } from './items';
 import {
   ATTR_KEYS, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
   monsterKind, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
   FAMILY_RES, MAX_RES, SLOW_FACTOR, type DmgType, type StatusId,
+  ATTR_THRESHOLD, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, WILL_STATUS_PER_POINT, WILL_STATUS_CAP, GEM_MIN_LEVEL, GEM_DROP, GEM_SOCKET_COST,
 } from './data';
 
 export const TICK_RATE = 20;
@@ -31,6 +32,8 @@ const MONSTER_RESPAWN_TICKS = 20 * 45;
 const MONSTER_LOOT_TTL = 20 * 180;
 const CORPSE_LOOT_TTL = 20 * 300;
 const LEASH = 14;
+/** Rudel-Alarm: nur Rudelmitglieder in diesem Umkreis (Felder) eilen dem Angegriffenen zu Hilfe (kleiner = Lager lassen sich einzeln abziehen) */
+const PACK_ALERT_RANGE = 8;
 /** Monster schlafen (kein Tick), wenn kein Spieler näher ist als dies */
 const SLEEP_DIST = 32;
 const REPATH_TICKS = 8;
@@ -56,7 +59,8 @@ export type Command =
   | { type: 'openChest'; chestId: number }
   | { type: 'acceptQuest'; questId: string }
   | { type: 'turnInQuest'; questId: string }
-  | { type: 'craft'; itemId: number; op: 'upgrade' | 'reroll' | 'extend' };
+  | { type: 'craft'; itemId: number; op: 'upgrade' | 'reroll' | 'extend' }
+  | { type: 'socket'; gemId: number; itemId: number; index?: number };
 
 export type Attrs = Record<AttrKey, number>;
 
@@ -341,7 +345,7 @@ export const CARRY_PER_KRAFT = 2;
 
 /** Zielfeld beim Anlegen: Ringe füllen erst das freie Feld, sonst ersetzt der erste Ring (oder das gewünschte Feld). */
 export function equipSlotFor(a: Actor, it: Item, to?: 'ring' | 'ring2'): EquipSlot {
-  if (it.slot !== 'ring') return it.slot === 'potion' ? 'weapon' : it.slot;
+  if (it.slot !== 'ring') return it.slot === 'potion' || it.slot === 'gem' ? 'weapon' : it.slot;
   if (to) return to;
   return a.equipment.ring && !a.equipment.ring2 ? 'ring2' : 'ring';
 }
@@ -360,9 +364,14 @@ export function activeSetBonuses(a: Actor): { name: string; pieces: number; bonu
   return out;
 }
 
+/** Schwellenbonus eines Attributs in Prozent (ab ATTR_THRESHOLD, sonst 0). */
+export function attrBonus(a: Actor, k: AttrKey): number {
+  return a.attrs[k] >= ATTR_THRESHOLD ? ATTR_THRESHOLD_BONUS[k].pct : 0;
+}
+
 function affixSum(a: Actor, stat: Stat): number {
   let sum = 0;
-  for (const it of equippedItems(a)) for (const f of it.affixes) if (f.stat === stat) sum += f.value;
+  for (const it of equippedItems(a)) for (const f of itemAffixes(it)) if (f.stat === stat) sum += f.value;
   for (const set of activeSetBonuses(a)) for (const [, b] of set.bonuses) for (const f of b.affixes ?? []) if (f.stat === stat) sum += f.value;
   return sum;
 }
@@ -370,7 +379,7 @@ function affixSum(a: Actor, stat: Stat): number {
 /** Resistenz in Prozent gegen eine Schadensart: Spieler über Affixe (höchstens 75), Monster über ihre Familie (negativ = Schwäche, 100 = immun). */
 export function resistOf(a: Actor, dt: DmgType): number {
   if (dt === 'physical') return 0;
-  if (a.kind === 'player') return Math.min(MAX_RES, affixSum(a, RES_STAT[dt]));
+  if (a.kind === 'player') return Math.min(MAX_RES, affixSum(a, RES_STAT[dt]) + Math.max(0, Math.floor((a.attrs.willenskraft - 10) / 2)) * WILL_RES_PER_2);
   return (a.kindId && FAMILY_RES[monsterKind(a.kindId).family]?.[dt]) || 0;
 }
 
@@ -379,7 +388,9 @@ export function applyStatus(w: World, t: Actor, id: StatusId, seconds: number, d
   if (!t.alive) return;
   const res = resistOf(t, dt);
   if (res >= 100) return;
-  const secs = seconds * (id === 'stun' && t.boss ? 0.5 : 1) * (1 - Math.max(0, res) / 100);
+  // Willenskraft verkürzt Betäubung und Verlangsamung zusätzlich
+  const will = id === 'stun' || id === 'slow' ? 1 - Math.min(WILL_STATUS_CAP, Math.max(0, t.attrs.willenskraft - 10) * WILL_STATUS_PER_POINT) : 1;
+  const secs = seconds * (id === 'stun' && t.boss ? 0.5 : 1) * (1 - Math.max(0, res) / 100) * will;
   const until = w.tick + Math.round(secs * TICK_RATE);
   if (until <= w.tick) return;
   if ((t.status[id] ?? 0) < until) t.status[id] = until;
@@ -419,22 +430,36 @@ export function damageRange(a: Actor): [number, number] {
     hi += Math.round(wpn.damage[1] * f);
   }
   const bonus = affixSum(a, 'damage') + Math.floor((effectiveKraft(a) - 10) / 2);
-  return [Math.max(1, lo + bonus), Math.max(1, hi + bonus)];
+  const f = 1 + attrBonus(a, 'kraft') / 100;
+  return [Math.max(1, Math.round((lo + bonus) * f)), Math.max(1, Math.round((hi + bonus) * f))];
 }
 
 export function maxHpOf(a: Actor): number {
-  return Math.max(10, a.maxHp + (a.attrs.ausdauer - 10) * 5 + affixSum(a, 'maxHp'));
+  return Math.max(10, Math.round((a.maxHp + (a.attrs.ausdauer - 10) * 5 + affixSum(a, 'maxHp')) * (1 + attrBonus(a, 'ausdauer') / 100)));
 }
 
 export function maxManaOf(a: Actor): number {
   return 20 + (a.attrs.verstand - 10) * 5 + affixSum(a, 'maxMana');
 }
 
+/** Startet die Angriffspause; ein Bruchteil-Rest der letzten Pause (negativ) wird gutgeschrieben, damit Tempo-Boni unter einem Tick wirken. */
+function startCooldown(a: Actor): void {
+  a.cooldownLeft = attackCooldownOf(a) + Math.min(0, a.cooldownLeft);
+}
+
 export function attackCooldownOf(a: Actor): number {
   const base = a.attackCooldown - Math.floor((a.attrs.gewandtheit - 10) / 2);
-  // Eile (Affix): bis zu 40 % schneller
-  const cd = Math.max(6, Math.round(base * (1 - Math.min(0.4, affixSum(a, 'haste') / 100))));
-  return a.status.slow ? Math.round(cd / SLOW_FACTOR) : cd;
+  // Eile (Affix, Edelsteine): bis zu 40 % schneller, Untergrenze 6 Ticks
+  let cd = Math.max(6, Math.round(base * (1 - Math.min(0.4, affixSum(a, 'haste') / 100))));
+  // Waffentempo (Dolche 0,8, Hämmer 1,25) und Gewandtheit-Schwelle wirken nach der Untergrenze, sonst gingen sie bei hoher Gewandtheit verloren;
+  // der Bruchteil bleibt als Rest in `cooldownLeft` erhalten (siehe `startCooldown`)
+  const wpn = a.equipment.weapon;
+  const wSpeed = wpn ? weaponSpeedOf(wpn) : 1;
+  const tempo = attrBonus(a, 'gewandtheit');
+  const frac = wSpeed !== 1 || tempo > 0;
+  if (frac) cd = Math.max(4, (cd * wSpeed) / (1 + tempo / 100));
+  if (a.status.slow) cd /= SLOW_FACTOR;
+  return frac ? cd : Math.round(cd);
 }
 
 /** Fehlende Anforderungen für einen Gegenstand (leer = anlegbar). `replaced`: ersetztes Stück, dessen Kraft-Bonus nicht zählt. */
@@ -491,7 +516,9 @@ export function nearNpc(w: World, a: Actor, kind: NpcKind): Npc | undefined {
 }
 
 export function sellPrice(i: Item): number {
-  return Math.max(1, Math.floor(i.value * 0.5));
+  // gesockelte Edelsteine zählen mit
+  const gems = (i.sockets ?? []).reduce((n, g) => n + (g ? templateById(gemTemplateId(g)).value : 0), 0);
+  return Math.max(1, Math.floor((i.value + gems) * 0.5));
 }
 
 export function buyPrice(templateId: string): number {
@@ -562,7 +589,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
     }
     case 'equip': {
       const it = a.inventory.find((i) => i.id === cmd.itemId);
-      if (!it || it.slot === 'potion') return;
+      if (!it || it.slot === 'potion' || it.slot === 'gem') return;
       const target = equipSlotFor(a, it, cmd.to);
       const replaced = a.equipment[target];
       const missing = missingReq(a, it, replaced);
@@ -570,10 +597,21 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
         w.events.push({ type: 'cannotEquip', item: it, reason: `Benötigt ${missing.join(', ')}`, to: a.id });
         return;
       }
+      const hands = offhandIssue(a, it);
+      if (hands) {
+        w.events.push({ type: 'cannotEquip', item: it, reason: hands, to: a.id });
+        return;
+      }
       const old = a.equipment[target];
       a.inventory = a.inventory.filter((i) => i.id !== it.id);
       if (old) a.inventory.push(old);
       a.equipment[target] = it;
+      // Zweihandwaffe: die Nebenhand wandert in den Rucksack (Bögen behalten Pfeile)
+      const off = a.equipment.offhand;
+      if (it.slot === 'weapon' && handsOf(it) === 2 && off && !(it.kind === 'bow' && off.off === 'arrows')) {
+        delete a.equipment.offhand;
+        a.inventory.push(off);
+      }
       a.hp = Math.min(a.hp, maxHpOf(a));
       break;
     }
@@ -728,7 +766,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       if (!nearNpc(w, a, 'smith')) return fail(w, 'Kein Schmied in der Nähe.');
       if (cmd.op !== 'upgrade' && cmd.op !== 'reroll' && cmd.op !== 'extend') return fail(w, 'Unbekannte Schmiedearbeit.');
       const it = a.inventory.find((i) => i.id === cmd.itemId);
-      if (!it || it.slot === 'potion') return;
+      if (!it || it.slot === 'potion' || it.slot === 'gem') return;
       if (it.rarity === 'legendary' || it.rarity === 'set') return fail(w, 'Das lässt sich nicht verändern.');
       const cost = craftCost(it, cmd.op);
       if (cmd.op === 'upgrade' && it.rarity === 'rare') return fail(w, 'Bereits selten.');
@@ -742,6 +780,24 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       } else if (cmd.op === 'reroll') rerollAffixes(w.rng, it, it.rarity, it.affixes.length);
       else extendAffixes(w.rng, it);
       w.events.push({ type: 'crafted', item: it, op: cmd.op, to: a.id });
+      break;
+    }
+    case 'socket': {
+      if (!nearNpc(w, a, 'smith')) return fail(w, 'Kein Schmied in der Nähe.');
+      const gemItem = a.inventory.find((i) => i.id === cmd.gemId);
+      const it = a.inventory.find((i) => i.id === cmd.itemId) ?? equippedItems(a).find((i) => i.id === cmd.itemId);
+      if (!gemItem || gemItem.slot !== 'gem' || !gemItem.gem || !it || it.slot === 'gem' || it.slot === 'potion') return fail(w, 'Das lässt sich nicht einsetzen.');
+      if (!it.sockets?.length) return fail(w, 'Dieser Gegenstand hat keine Sockel.');
+      const index = cmd.index ?? it.sockets.findIndex((x) => !x);
+      if (index < 0) return fail(w, 'Alle Sockel sind belegt – wähle einen Sockel zum Ersetzen (der alte Edelstein geht verloren).');
+      if (!Number.isInteger(index) || index >= it.sockets.length) return fail(w, 'Ungültiger Sockel.');
+      const cost = socketCost(gemItem.gem);
+      if (a.gold < cost) return fail(w, 'Nicht genug Gold.');
+      a.gold -= cost;
+      it.sockets[index] = { ...gemItem.gem };
+      a.inventory = a.inventory.filter((i) => i.id !== gemItem.id);
+      a.hp = Math.min(a.hp, maxHpOf(a));
+      w.events.push({ type: 'crafted', item: it, op: 'socket', to: a.id });
       break;
     }
     case 'stashPut': {
@@ -765,6 +821,20 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       break;
     }
   }
+}
+
+/** Goldkosten für das Einsetzen eines Edelsteins (wächst mit der Qualität). */
+export function socketCost(g: GemInfo): number {
+  return GEM_SOCKET_COST * g.q * g.q;
+}
+
+/** Nebenhand-Regeln bei Zweihandwaffen: Bögen erlauben nur Pfeile, andere Zweihänder verlangen eine freie Nebenhand. */
+function offhandIssue(a: Actor, it: Item): string | null {
+  if (it.slot !== 'offhand') return null;
+  const wp = a.equipment.weapon;
+  if (!wp || handsOf(wp) !== 2) return null;
+  if (wp.kind === 'bow') return it.off === 'arrows' ? null : 'Bogen: In der Nebenhand nur Pfeile';
+  return 'Zweihandwaffe: Nebenhand muss frei sein';
 }
 
 export function craftCost(item: Item, op: 'upgrade' | 'reroll' | 'extend'): number {
@@ -832,7 +902,8 @@ function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void 
       const wp = a.equipment.weapon;
       const matches = wp?.damage && ((s.area === 'Fernkampf' && wp.kind === 'bow') || (s.area === 'Magie' && wp.kind === 'staff'));
       const weaponBonus = matches ? ((wp!.damage![0] + wp!.damage![1]) / 2) * 0.9 : 0;
-      amount = Math.round((w.rng.int(lo, hi) * lvl + scale + weaponBonus + (arrows?.arrowBonus ?? 0)) * rankDamage(rank));
+      const spell = s.area === 'Magie' ? 1 + attrBonus(a, 'verstand') / 100 : 1;
+      amount = Math.round((w.rng.int(lo, hi) * lvl + scale + weaponBonus + (arrows?.arrowBonus ?? 0)) * rankDamage(rank) * spell);
     }
     const dt = s.dmgType ?? 'physical';
     const dealt = dealDamage(w, a, v, amount, s.ignoresArmor, s.id, false, !s.ignoresArmor, dt);
@@ -938,7 +1009,7 @@ function bowAi(w: World, a: Actor, t: Actor): boolean {
   a.stuck = 0;
   if (a.cooldownLeft > 0) return true;
   if (inSafeZone(w, a.x, a.y)) return true;
-  a.cooldownLeft = attackCooldownOf(a);
+  startCooldown(a);
   const bonus = affixSum(a, 'damage') + Math.floor((a.attrs.gewandtheit - 10) / 2) + (a.equipment.offhand.arrowBonus ?? 0);
   const [wlo, whi] = wpn.damage ?? [0, 0];
   const lo = Math.max(1, a.damage[0] + wlo + bonus);
@@ -950,7 +1021,7 @@ function bowAi(w: World, a: Actor, t: Actor): boolean {
 function fight(w: World, a: Actor, t: Actor): void {
   if (a.cooldownLeft > 0) return;
   if (a.kind === 'player' && inSafeZone(w, a.x, a.y)) return;
-  a.cooldownLeft = attackCooldownOf(a);
+  startCooldown(a);
   const [lo, hi] = damageRange(a);
   dealDamage(w, a, t, w.rng.int(lo, hi), false, undefined, false, true, a.dmgType);
 }
@@ -1130,6 +1201,7 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
     drop(rollDrop(w.rng, () => w.nextId++, k.level, k.boss ? 'rare' : undefined));
   }
   if (w.rng.next() <= POTION_DROP_CHANCE) drop(rollPotion(w.rng, () => w.nextId++, k.level));
+  if (k.level >= GEM_MIN_LEVEL && w.rng.next() < (k.boss ? GEM_DROP.boss : m.unique ? GEM_DROP.unique : m.champ ? GEM_DROP.champion : GEM_DROP.normal)) drop(rollGem(w.rng, () => w.nextId++, k.level));
   if (m.champ) drop(rollDrop(w.rng, () => w.nextId++, k.level, w.rng.next() < 0.25 ? 'rare' : 'magic'));
   if (m.unique) {
     drop(rollDrop(w.rng, () => w.nextId++, k.level, 'rare'));
@@ -1219,7 +1291,7 @@ export function tick(w: World): void {
       if (a.kind === 'monster' && w.tick - a.diedAt >= a.respawnTicks && a.home) reviveMonster(w, a);
       continue;
     }
-    if (a.cooldownLeft > 0) a.cooldownLeft--;
+    if (a.cooldownLeft > 0) a.cooldownLeft--; // darf knapp unter 0 fallen (Rest, s. startCooldown)
     if (a.potionCd > 0) a.potionCd--;
     if (a.dot) {
       if (w.tick % TICK_RATE === 0) {
@@ -1306,7 +1378,7 @@ function regen(w: World, p: Actor): void {
   const max = maxHpOf(p);
   p.hp = Math.min(max, p.hp + ((safe ? SAFE_REGEN : FIELD_REGEN + (p.attrs.ausdauer - 10) * 0.002) + Math.min(MAX_REGEN_PER_SEC, affixSum(p, 'regen')) / TICK_RATE) * (safe ? 1 : boost));
   const mmax = maxManaOf(p);
-  p.mana = Math.min(mmax, p.mana + (0.02 + (p.attrs.willenskraft - 10) * 0.005 + (safe ? 0.2 : 0)) * boost);
+  p.mana = Math.min(mmax, p.mana + (0.02 + (p.attrs.willenskraft - 10) * 0.005 + (safe ? 0.2 : 0)) * boost * (1 + attrBonus(p, 'willenskraft') / 100));
 }
 
 function reviveMonster(w: World, m: Actor): void {
@@ -1334,7 +1406,7 @@ function reviveMonster(w: World, m: Actor): void {
 function alertPack(w: World, m: Actor, targetId: number): void {
   if (!m.packId) return;
   for (const o of w.actors) {
-    if (o.kind === 'monster' && o.alive && o.packId === m.packId && o.targetId === null && o.id !== m.id && Math.hypot(o.x - m.x, o.y - m.y) <= 14) {
+    if (o.kind === 'monster' && o.alive && o.packId === m.packId && o.targetId === null && o.id !== m.id && Math.hypot(o.x - m.x, o.y - m.y) <= PACK_ALERT_RANGE) {
       o.targetId = targetId;
       o.autoAttack = true;
     }
@@ -1473,6 +1545,7 @@ function openChest(w: World, a: Actor, c: Chest): void {
     drop(rollDrop(w.rng, () => w.nextId++, c.level, rarity));
   }
   for (let i = 0; i < (c.tier === 'wood' ? 1 : 2); i++) drop(rollPotion(w.rng, () => w.nextId++, c.level));
+  if (c.level >= GEM_MIN_LEVEL && w.rng.next() < GEM_DROP.chest[c.tier]) drop(rollGem(w.rng, () => w.nextId++, c.level));
   if (c.tier !== 'wood') {
     const special = rollSpecial(w.rng, () => w.nextId++, c.level, '', false);
     if (special && w.rng.next() < (c.tier === 'gold' ? 1 : 0.4)) drop(special);

@@ -1,5 +1,5 @@
 import type { Item } from '../sim/items';
-import { templateById } from '../sim/items';
+import { GEM_COLOR, templateById } from '../sim/items';
 import type { SkillDef } from '../sim/data';
 
 /** Prozedurale Item- und Skill-Icons (16×16 logisch, mit Umriss, ×3 hochskaliert) als Data-URLs. */
@@ -119,14 +119,19 @@ export function itemIcon(it: Item): string {
   } else if (it.slot === 'weapon') {
     const id = it.templateId;
     url = make((c) => {
-      if (id === 'cinder_axe') {
+      if (id.endsWith('_axe')) {
         r(c, 7, 3, 2, 12, 0x6a4a2a);
         r(c, 3, 2, 6, 6, col);
         r(c, 3, 3, 2, 4, shade(col, 1.3));
-      } else if (id === 'doom_hammer' || id === 'bone_club') {
+      } else if (id.endsWith('hammer') || id === 'bone_club') {
         r(c, 7, 6, 2, 9, 0x6a4a2a);
         r(c, 3, 2, 10, 5, id === 'bone_club' ? 0xd8d0b8 : col);
         r(c, 3, 2, 10, 1, shade(col, 1.4));
+      } else if (id.endsWith('_dagger')) {
+        diag(c, 4, 12, 7, shade(col, 1.2), 2);
+        diag(c, 5, 12, 7, shade(col, 0.8), 1);
+        r(c, 3, 10, 4, 2, 0x6a4a2a);
+        r(c, 2, 12, 3, 2, 0x4a3020);
       } else {
         diag(c, 2, 14, 10, shade(col, 1.2), 2);
         diag(c, 3, 14, 10, shade(col, 0.8), 1);
@@ -175,6 +180,51 @@ export function itemIcon(it: Item): string {
       r(c, 3, 10, 11, 4, shade(col, 0.8));
       r(c, 3, 13, 11, 1, 0x2a2018);
       r(c, 5, 2, 6, 2, shade(col, 1.3));
+    });
+  } else if (it.slot === 'gem' && it.gem) {
+    const gc = GEM_COLOR[it.gem.kind];
+    const q = it.gem.q;
+    url = make((c) => {
+      // Facettierter Stein, mit der Qualität größer und glänzender
+      const w = 6 + q * 2;
+      const x0 = 8 - w / 2;
+      const y0 = 8 - Math.round(w / 2);
+      r(c, x0 + 1, y0, w - 2, 1, shade(gc, 1.35));
+      r(c, x0, y0 + 1, w, w - 3, gc);
+      r(c, x0 + 1, y0 + w - 2, w - 2, 1, shade(gc, 0.75));
+      r(c, x0 + 2, y0 + w - 1, w - 4, 1, shade(gc, 0.55));
+      r(c, x0 + 1, y0 + 1, 2, 2, 0xffffff);
+      r(c, x0 + w - 3, y0 + 2, 1, w - 5, shade(gc, 0.75));
+      if (q === 3) r(c, 13, 2, 2, 2, 0xffffff);
+    });
+  } else if (it.slot === 'belt') {
+    url = make((c) => {
+      r(c, 1, 6, 14, 4, shade(col, 0.8));
+      r(c, 1, 6, 14, 1, shade(col, 1.3));
+      r(c, 1, 9, 14, 1, shade(col, 0.5));
+      r(c, 6, 5, 4, 6, 0xd8b848);
+      r(c, 7, 6, 2, 4, 0x1a1418);
+      r(c, 11, 7, 1, 2, shade(col, 0.5));
+    });
+  } else if (it.slot === 'cloak') {
+    url = make((c) => {
+      r(c, 4, 1, 8, 2, shade(col, 1.2));
+      r(c, 3, 3, 10, 4, col);
+      r(c, 2, 7, 12, 4, shade(col, 0.9));
+      r(c, 1, 11, 14, 3, shade(col, 0.7));
+      r(c, 7, 3, 2, 10, shade(col, 0.55));
+      r(c, 4, 4, 1, 7, shade(col, 1.35));
+      r(c, 6, 1, 4, 1, 0xd8b848);
+    });
+  } else if (it.slot === 'legs') {
+    url = make((c) => {
+      r(c, 3, 1, 10, 3, shade(col, 1.2));
+      r(c, 3, 4, 4, 11, col);
+      r(c, 9, 4, 4, 11, col);
+      r(c, 7, 4, 2, 3, shade(col, 0.6));
+      r(c, 3, 11, 4, 1, shade(col, 0.6));
+      r(c, 9, 11, 4, 1, shade(col, 0.6));
+      r(c, 4, 4, 1, 8, shade(col, 1.4));
     });
   } else {
     const gem = [0xd04050, 0x4060d0, 0x40b060, 0xe0c040, 0xa050d0, 0xff8a2a][tier]!;

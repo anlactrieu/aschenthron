@@ -1,14 +1,14 @@
-import { ATTR_KEYS, ATTR_NAME, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
-import { POWER_TEXT, affixRange, itemReq, setById, templateById, type EquipSlot, type Item } from '../sim/items';
+import { ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
+import { POWER_TEXT, TIER_COLOR, GEM_COLOR, affixRange, gemAffix, gemName, handsOf, itemAffixes, itemReq, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
 import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
-  critChance, equipSlotFor, maxHpOf, maxManaOf, missingReq, nearNpc, powerOf, resistOf, type Actor, type Command, type Npc, type World,
+  critChance, attrBonus, equipSlotFor, socketCost, maxHpOf, maxManaOf, missingReq, nearNpc, powerOf, resistOf, type Actor, type Command, type Npc, type World,
 } from '../sim/world';
 import { itemIcon, potionIcon, skillIcon } from './icons';
 import { lookOf, playerCanvas } from './art';
 
 const RARITY_COLOR: Record<Item['rarity'], string> = { normal: '#c9c4bd', magic: '#7f9fff', rare: '#f2c94c', set: '#5fd070', legendary: '#ff8a2a' };
-const SLOT_NAME: Record<EquipSlot, string> = { weapon: 'Waffe', head: 'Kopf', chest: 'Brust', hands: 'Hände', feet: 'Füße', ring: 'Ring', ring2: 'Ring', amulet: 'Amulett', offhand: 'Nebenhand' };
+const SLOT_NAME: Record<EquipSlot, string> = { weapon: 'Waffe', head: 'Kopf', chest: 'Brust', hands: 'Hände', feet: 'Füße', ring: 'Ring', ring2: 'Ring', amulet: 'Amulett', offhand: 'Nebenhand', belt: 'Gürtel', cloak: 'Umhang', legs: 'Beine' };
 
 /** Affixzeile: Prozent-Werte als "+3 % Angriffstempo", sonst "+3 Schaden". */
 function affixText(a: { stat: keyof typeof STAT_NAME; value: number }): string {
@@ -22,14 +22,14 @@ function gearScore(i: Item): number {
   let v = 0;
   if (i.damage) v += ((i.damage[0] + i.damage[1]) / 2) * (i.kind === 'bow' || i.kind === 'staff' ? 1.2 : 1.5);
   if (i.armor) v += i.armor * 2;
-  for (const a of i.affixes) v += a.value * (AFFIX_WEIGHT[a.stat] ?? 1);
+  for (const a of itemAffixes(i)) v += a.value * (AFFIX_WEIGHT[a.stat] ?? 1);
   if (i.power) v += 12;
   if (i.rarity === 'set') v += 8;
   return v;
 }
 
 function isUpgrade(p: Actor, it: Item): boolean {
-  if (it.slot === 'potion' || it.off === 'arrows') return false;
+  if (it.slot === 'potion' || it.slot === 'gem' || it.off === 'arrows') return false;
   const cur = p.equipment[equipSlotFor(p, it)];
   if (missingReq(p, it, cur).length) return false;
   return !cur || gearScore(it) > gearScore(cur) * 1.05;
@@ -37,7 +37,7 @@ function isUpgrade(p: Actor, it: Item): boolean {
 
 /** Das angelegte Stück im selben Slot (Tränke haben keins). */
 function equippedFor(p: Actor, it: Item): Item | undefined {
-  return it.slot === 'potion' ? undefined : p.equipment[equipSlotFor(p, it)];
+  return it.slot === 'potion' || it.slot === 'gem' ? undefined : p.equipment[equipSlotFor(p, it)];
 }
 const STAT_NAME = {
   damage: 'Schaden', armor: 'Rüstung', maxHp: 'Leben', kraft: 'Kraft', maxMana: 'Mana', haste: '% Angriffstempo', crit: '% Kritisch', regen: 'Leben/s',
@@ -45,14 +45,26 @@ const STAT_NAME = {
 } as const;
 const BAG_COLS = 8;
 
+/** Wirkung eines Edelsteins als Text ("+10 Schaden"). */
+const gemEffect = (g: GemInfo, slot: Item['slot']) => affixText(gemAffix(g, slot));
+
 export function describeItem(i: Item): string {
   const base: string[] = [];
+  if (i.slot === 'gem' && i.gem) {
+    base.push(`In Waffen: ${gemEffect(i.gem, 'weapon')}`, `In Rüstung und Schilden: ${gemEffect(i.gem, 'chest')}`, 'Einsetzen beim Schmied');
+  }
   if (i.off === 'arrows') base.push(`Pfeile (+${i.arrowBonus ?? 0} Schaden bei Fernkampf-Skills)`);
   if (i.heal) base.push(`Heilt ${i.heal} LP`);
   if (i.mana) base.push(`Stellt ${i.mana} MP wieder her`);
   if (i.damage) base.push(`Schaden ${i.damage[0]}-${i.damage[1]}`);
+  if (i.slot === 'weapon') {
+    const h = handsOf(i);
+    const sp = weaponSpeedOf(i);
+    base.push(`${h === 2 ? 'Zweihand' : 'Einhand'}${sp < 1 ? ' · Tempo schnell' : sp > 1 ? ' · Tempo langsam' : ''}`);
+  }
   if (i.armor) base.push(`Rüstung ${i.armor}`);
   const aff = i.affixes.map((a) => `+${a.value} ${STAT_NAME[a.stat]}`);
+  if (i.sockets?.length) aff.push(`Sockel ${i.sockets.filter(Boolean).length}/${i.sockets.length}`);
   if (i.power) aff.push(POWER_TEXT[i.power.id](i.power.value));
   if (i.setId) aff.push(`Set: ${setById(i.setId).name}`);
   const need = reqLabels(i);
@@ -119,9 +131,9 @@ const CSS = `
 .a-card img{width:36px;height:36px;image-rendering:pixelated;flex:none}
 .a-bar{height:8px;background:#241f2a;border:1px solid #3a3040;position:relative}
 .a-bar>div{height:100%}
-.a-doll{position:relative;width:236px;height:268px;margin:0 auto;background:radial-gradient(ellipse at 50% 60%,#2a2230 0%,#120f16 70%);border:1px solid #3a3040}
+.a-doll{position:relative;width:324px;height:196px;margin:0 auto;background:radial-gradient(ellipse at 50% 60%,#2a2230 0%,#120f16 70%);border:1px solid #3a3040}
 .a-doll .a-slot{position:absolute}
-.a-doll img.me{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:120px;image-rendering:pixelated;opacity:.95;pointer-events:none}
+.a-doll img.me{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:104px;image-rendering:pixelated;opacity:.95;pointer-events:none}
 .orb{position:relative;width:92px;height:92px;border-radius:50%;border:3px solid #6b5a48;background:#0b080d;overflow:hidden;box-shadow:0 0 0 2px #14100c,0 4px 14px rgba(0,0,0,.7),inset 0 0 14px #000}
 .orb .liq{position:absolute;left:0;right:0;bottom:0}
 .orb .shine{position:absolute;left:14%;top:10%;width:38%;height:26%;border-radius:50%;background:rgba(255,255,255,.18);filter:blur(2px)}
@@ -375,7 +387,7 @@ export class Ui {
     const o: Record<string, number> = {};
     if (i.damage) o['Schaden'] = (i.damage[0] + i.damage[1]) / 2;
     if (i.armor) o['Rüstung'] = i.armor;
-    for (const a of i.affixes) o[STAT_NAME[a.stat]] = (o[STAT_NAME[a.stat]] ?? 0) + a.value;
+    for (const a of itemAffixes(i)) o[STAT_NAME[a.stat]] = (o[STAT_NAME[a.stat]] ?? 0) + a.value;
     return o;
   }
 
@@ -387,29 +399,53 @@ export class Ui {
     head.style.cssText = `font-weight:bold;color:${RARITY_COLOR[it.rarity]}`;
     box.append(head);
     const rar = { normal: 'Normal', magic: 'Magisch', rare: 'Selten', set: 'Set', legendary: 'Legendär' }[it.rarity];
-    const sub = el('div', '', `${rar} · ${it.slot === 'potion' ? 'Trank' : it.off === 'arrows' ? 'Pfeile' : it.off === 'shield' ? 'Schild' : SLOT_NAME[it.slot]}`);
+    const slotName = it.slot === 'potion' ? 'Trank' : it.slot === 'gem' ? 'Edelstein' : it.off === 'arrows' ? 'Pfeile' : it.off === 'shield' ? 'Schild' : SLOT_NAME[it.slot];
+    const baseName = it.slot !== 'potion' && it.slot !== 'gem' && it.rarity === 'rare' ? templateById(it.templateId).name : '';
+    const sub = el('div', '', `${rar} · ${slotName}${baseName ? ` (${baseName})` : ''}`);
     sub.style.opacity = '.6';
     box.append(sub);
+    // gewürfelte Affixe und Sockel zeigt der Block darunter (mit Stufe bzw. Edelstein), nicht doppelt
+    const tmpl = it.slot === 'potion' || it.slot === 'gem' ? undefined : templateById(it.templateId);
+    const skip = new Set(it.affixes.slice(tmpl?.base?.length ?? 0).map((a) => `+${a.value} ${STAT_NAME[a.stat]}`));
     for (const part of describeItem(it).split(' · ')) {
-      if (part.startsWith('Benötigt ')) continue;
+      if (part.startsWith('Benötigt ') || skip.has(part) || (it.sockets?.length && part.startsWith('Sockel '))) continue;
       box.append(el('div', '', part));
     }
-    if (it.affixes.length && it.slot !== 'potion') {
+    if (it.affixes.length && it.slot !== 'potion' && it.slot !== 'gem') {
       const t = templateById(it.templateId);
       const base = t.base?.length ?? 0;
       const q = el('div');
       q.style.cssText = 'margin-top:4px;font-size:11px';
       it.affixes.slice(base).forEach((a) => {
-        const [lo, hi] = affixRange(a.stat, t.minLevel);
-        const pct = hi > lo ? Math.round(((a.value - lo) / (hi - lo)) * 100) : 100;
-        const line = el('div', '', `${affixText(a)} (Wurf ${Math.max(0, Math.min(100, pct))} %)`);
-        line.style.color = pct >= 85 ? '#6fe08a' : pct >= 50 ? '#d8c890' : '#9a8a78';
+        let line: HTMLElement;
+        if (a.tier) {
+          // Affix-Stufe T1–T5 mit Spannweite dieser Stufe (T5 golden)
+          const [lo, hi] = affixRange(a.stat, t.minLevel, a.tier);
+          line = el('div', '', `${affixText(a)} · T${a.tier} (${lo}–${hi})`);
+          line.style.color = TIER_COLOR[a.tier - 1]!;
+          if (a.tier === 5) line.style.fontWeight = 'bold';
+        } else {
+          const [lo, hi] = affixRange(a.stat, t.minLevel);
+          const pct = hi > lo ? Math.round(((a.value - lo) / (hi - lo)) * 100) : 100;
+          line = el('div', '', `${affixText(a)} (Wurf ${Math.max(0, Math.min(100, pct))} %)`);
+          line.style.color = pct >= 85 ? '#6fe08a' : pct >= 50 ? '#d8c890' : '#9a8a78';
+        }
         q.append(line);
       });
       if (q.childNodes.length) box.append(q);
     }
+    if (it.sockets?.length) {
+      const sk = el('div');
+      sk.style.cssText = 'margin-top:4px;font-size:11px';
+      for (const g of it.sockets) {
+        const line = el('div', '', g ? `◆ ${gemName(g)}: ${gemEffect(g, it.slot)}` : '◇ leerer Sockel');
+        line.style.color = g ? `#${GEM_COLOR[g.kind].toString(16).padStart(6, '0')}` : '#7a6a58';
+        sk.append(line);
+      }
+      box.append(sk);
+    }
     const labels = reqLabels(it);
-    if (labels.length && it.slot !== 'potion') {
+    if (labels.length && it.slot !== 'potion' && it.slot !== 'gem') {
       const missing = this.lastP ? missingReq(this.lastP, it, equipped) : [];
       const line = el('div');
       line.append('Benötigt: ');
@@ -422,7 +458,7 @@ export class Ui {
       line.style.marginTop = '3px';
       box.append(line);
     }
-    if (equipped && equipped.id !== it.id && it.slot !== 'potion') {
+    if (equipped && equipped.id !== it.id && it.slot !== 'potion' && it.slot !== 'gem') {
       const a = this.statsOf(it);
       const b = this.statsOf(equipped);
       const h = el('div', '', `Verglichen mit: ${equipped.name}`);
@@ -435,7 +471,7 @@ export class Ui {
         line.style.color = d > 0 ? '#6fe08a' : '#ff7a6a';
         box.append(line);
       }
-    } else if (!equipped && it.slot !== 'potion') {
+    } else if (!equipped && it.slot !== 'potion' && it.slot !== 'gem' && !(this.lastP && Object.values(this.lastP.equipment).some((e) => e?.id === it.id))) {
       const free = el('div', '', 'Slot ist frei');
       free.style.cssText = 'margin-top:6px;color:#6fe08a';
       box.append(free);
@@ -598,7 +634,14 @@ export class Ui {
     const doll = el('div', 'a-doll');
     doll.dataset.drop = 'bag';
     doll.append(Object.assign(el('img', 'me'), { src: this.dollImage(p) }));
-    const pos: Record<EquipSlot, [number, number]> = { head: [95, 6], amulet: [10, 6], chest: [95, 100], weapon: [10, 100], hands: [180, 100], feet: [95, 214], ring: [10, 214], ring2: [180, 6], offhand: [180, 214] };
+    // 12 Felder in zwei Spalten links und zwei rechts, die Figur steht frei in der Mitte:
+    // links außen Amulett/Waffe/Hände, links innen Kopf/Brust/Beine, rechts innen Umhang/Gürtel/Füße, rechts außen Ring/Nebenhand/Ring
+    const pos: Record<EquipSlot, [number, number]> = {
+      amulet: [8, 10], weapon: [8, 70], hands: [8, 130],
+      head: [64, 10], chest: [64, 70], legs: [64, 130],
+      cloak: [214, 10], belt: [214, 70], feet: [214, 130],
+      ring: [270, 10], offhand: [270, 70], ring2: [270, 130],
+    };
     for (const slot of Object.keys(pos) as EquipSlot[]) {
       const it = p.equipment[slot] ?? null;
       const s = this.slotEl(it, it ? '' : SLOT_NAME[slot]);
@@ -663,12 +706,17 @@ export class Ui {
     body.append(el('div', 'a-sec', `Attribute${p.statPoints ? ` – ${p.statPoints} Punkte zu verteilen` : ''}`));
     const help: Record<string, string> = {
       kraft: 'mehr Schaden, mehr Tragkraft', gewandtheit: 'schnellere Hiebe, Fernkampf', ausdauer: 'mehr Leben und Regeneration',
-      verstand: 'mehr Mana, stärkere Magie', willenskraft: 'schnellere Mana-Regeneration',
+      verstand: 'mehr Mana, stärkere Magie', willenskraft: `schnellere Mana-Regeneration, +${WILL_RES_PER_2} % Resistenz je 2 Punkte über 10, kürzere Betäubung/Verlangsamung`,
     };
     for (const k of ATTR_KEYS) {
       const row = el('div', 'a-row');
       const left = el('div');
-      left.append(el('div', '', `${ATTR_NAME[k]}: ${p.attrs[k]}`), el('div', 'a-note', help[k]));
+      const th = ATTR_THRESHOLD_BONUS[k];
+      const reached = attrBonus(p, k) > 0;
+      const thLine = el('div', 'a-note', `ab ${ATTR_THRESHOLD}: +${th.pct} % ${th.text}${reached ? ' (aktiv)' : ''}`);
+      thLine.style.color = reached ? '#6fe08a' : '#9a8a70';
+      thLine.style.opacity = '1';
+      left.append(el('div', '', `${ATTR_NAME[k]}: ${p.attrs[k]}`), el('div', 'a-note', help[k]), thLine);
       row.append(left);
       const b = el('button', `a-btn${p.statPoints ? '' : ' off'}`, '+');
       b.onclick = () => p.statPoints > 0 && this.send({ type: 'spendStat', attr: k });
@@ -807,7 +855,9 @@ export class Ui {
     if (smith) {
       body.append(el('div', 'a-sec', `${smith.name} – Schmiede`));
       body.append(el('div', 'a-note', 'Aufwerten (normal → magisch → selten), Affixe neu würfeln, Affix hinzufügen (selten).'));
-      const gear = p.inventory.filter((i) => i.slot !== 'potion' && i.rarity !== 'legendary' && i.rarity !== 'set');
+      const gems = p.inventory.filter((i) => i.slot === 'gem' && i.gem);
+      const gear = p.inventory.filter((i) => i.slot !== 'potion' && i.slot !== 'gem' && (i.rarity !== 'legendary' && i.rarity !== 'set' || i.sockets?.length));
+      body.append(el('div', 'a-note', gems.length ? 'Edelsteine: Knopf je Gegenstand mit Sockel. Ersetzen zerstört den alten Edelstein.' : 'Edelsteine (selten, ab Stufe 8) setzt der Schmied in Sockel von Waffen, Brust, Kopf, Beinen und Schilden.'));
       if (!gear.length) body.append(el('i', 'a-note', 'Nichts zu verbessern.'));
       for (const it of gear) {
         const c = el('div', 'a-card');
@@ -824,10 +874,31 @@ export class Ui {
           b.onclick = () => this.send({ type: 'craft', itemId: it.id, op });
           row.append(b);
         };
-        if (it.rarity !== 'rare') add(`Aufwerten ${craftCost(it, 'upgrade')}g`, 'upgrade');
-        if (it.rarity !== 'normal') add(`Neu würfeln ${craftCost(it, 'reroll')}g`, 'reroll');
-        if (it.rarity === 'rare' && it.affixes.length < 5) add(`Affix + ${craftCost(it, 'extend')}g`, 'extend');
+        const craftable = it.rarity !== 'legendary' && it.rarity !== 'set';
+        if (craftable && it.rarity !== 'rare') add(`Aufwerten ${craftCost(it, 'upgrade')}g`, 'upgrade');
+        if (craftable && it.rarity !== 'normal') add(`Neu würfeln ${craftCost(it, 'reroll')}g`, 'reroll');
+        if (craftable && it.rarity === 'rare' && it.affixes.length < 5) add(`Affix + ${craftCost(it, 'extend')}g`, 'extend');
         t.append(row);
+        if (it.sockets?.length && gems.length) {
+          // je Edelsteinart (gleiche Vorlage) ein Knopf: setzt in den ersten leeren Sockel, sonst ersetzt Sockel 1
+          const full = it.sockets.every(Boolean);
+          const seen = new Set<string>();
+          const grow = el('div');
+          grow.style.marginTop = '3px';
+          for (const g of gems) {
+            if (seen.has(g.templateId)) continue;
+            seen.add(g.templateId);
+            const gi = g.gem!;
+            const b = el('button', `a-btn${p.gold >= socketCost(gi) ? '' : ' off'}`, `${full ? 'Ersetze mit' : '+'} ${gemName(gi)} ${socketCost(gi)}g`);
+            b.style.cssText += `;margin:0 4px 3px 0;border-color:#${GEM_COLOR[gi.kind].toString(16).padStart(6, '0')}`;
+            b.onclick = () => {
+              if (full && !confirm(`${gemName(gi)} ersetzt den Edelstein in Sockel 1 (der alte geht verloren). Fortfahren?`)) return;
+              this.send({ type: 'socket', gemId: g.id, itemId: it.id, ...(full ? { index: 0 } : {}) });
+            };
+            grow.append(b);
+          }
+          t.append(grow);
+        }
         c.append(t);
         c.onmouseenter = (ev) => this.showTip(it, equippedFor(p, it), ev);
         c.onmousemove = (ev) => this.moveTip(ev);

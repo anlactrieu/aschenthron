@@ -4,6 +4,25 @@ export const ATTR_NAME: Record<AttrKey, string> = {
   kraft: 'Kraft', gewandtheit: 'Gewandtheit', ausdauer: 'Ausdauer', verstand: 'Verstand', willenskraft: 'Willenskraft',
 };
 
+/** Attribut-Schwellen: ab diesem Wert gibt es einen festen Bonus (Prozent) */
+export const ATTR_THRESHOLD = 30;
+export const ATTR_THRESHOLD_BONUS: Record<AttrKey, { pct: number; text: string }> = {
+  kraft: { pct: 5, text: 'Nahkampfschaden' },
+  gewandtheit: { pct: 5, text: 'Angriffstempo' },
+  ausdauer: { pct: 5, text: 'Leben' },
+  verstand: { pct: 5, text: 'Zauberschaden' },
+  willenskraft: { pct: 10, text: 'Manaregeneration' },
+};
+/** Willenskraft: +1 % Resistenz (Feuer/Frost/Gift) je 2 Punkte über 10; verkürzt Betäubung und Verlangsamung um 1 % je Punkt über 10 (höchstens 40 %) */
+export const WILL_RES_PER_2 = 1;
+export const WILL_STATUS_PER_POINT = 0.01;
+export const WILL_STATUS_CAP = 0.4;
+
+/** Edelsteine: Drop-Chancen (je Monster ab Stufe GEM_MIN_LEVEL; Champions, Mini-Bosse, Bosse und Truhen öfter) und Einsetzkosten (Gold je Qualität²) */
+export const GEM_MIN_LEVEL = 8;
+export const GEM_DROP = { normal: 0.012, champion: 0.12, unique: 0.5, boss: 0.6, chest: { wood: 0.03, iron: 0.1, gold: 0.3 } };
+export const GEM_SOCKET_COST = 30;
+
 /** Version der Weltkarte: Spielstände mit anderer Version starten in der Stadt (Koordinaten passen nicht mehr). */
 export const MAP_VERSION = 3;
 
@@ -294,12 +313,12 @@ export const SAFE_REGEN = 0.5;
 export const FIELD_REGEN = 0.02;
 
 export const SHOPS: Record<string, string[]> = {
-  basic: ['rusty_sword', 'bone_club', 'steel_sword', 'leather_cap', 'iron_helm', 'ash_mail', 'worn_gloves', 'cloth_boots', 'iron_greaves', 'iron_ring', 'heal_small', 'heal_mid', 'mana_small', 'mana_mid', 'hunt_bow', 'twig_staff', 'cloth_robe', 'leather_vest', 'wood_arrows', 'iron_arrows', 'wood_shield'],
-  advanced: ['steel_sword', 'cinder_axe', 'war_blade', 'iron_helm', 'warden_helm', 'plate_cuirass', 'bone_plate', 'iron_gauntlets', 'ember_gauntlets', 'iron_greaves', 'steel_boots', 'silver_ring', 'heal_mid', 'heal_big', 'mana_mid', 'mana_big', 'yew_bow', 'horn_bow', 'oak_staff', 'bone_staff', 'acolyte_robe', 'hunter_vest', 'bone_leather', 'iron_arrows', 'steel_arrows', 'ember_arrows', 'iron_shield', 'steel_shield'],
+  basic: ['rusty_sword', 'bone_club', 'steel_sword', 'leather_cap', 'iron_helm', 'ash_mail', 'worn_gloves', 'cloth_boots', 'iron_greaves', 'iron_ring', 'heal_small', 'heal_mid', 'mana_small', 'mana_mid', 'hunt_bow', 'twig_staff', 'cloth_robe', 'leather_vest', 'wood_arrows', 'iron_arrows', 'wood_shield', 'cloth_belt', 'leather_belt', 'rag_cloak', 'wool_cloak', 'cloth_pants', 'leather_pants', 'iron_dagger', 'woodcutter_axe'],
+  advanced: ['steel_sword', 'cinder_axe', 'war_blade', 'iron_helm', 'warden_helm', 'plate_cuirass', 'bone_plate', 'iron_gauntlets', 'ember_gauntlets', 'iron_greaves', 'steel_boots', 'silver_ring', 'heal_mid', 'heal_big', 'mana_mid', 'mana_big', 'yew_bow', 'horn_bow', 'oak_staff', 'bone_staff', 'acolyte_robe', 'hunter_vest', 'bone_leather', 'iron_arrows', 'steel_arrows', 'ember_arrows', 'iron_shield', 'steel_shield', 'leather_belt', 'iron_belt', 'wool_cloak', 'hunter_cloak', 'leather_pants', 'chain_legs', 'steel_dagger', 'battle_axe', 'claymore'],
 };
 
 /** Gegenstands-Drops: Ausrüstung seltener, Tränke häufiger. Faktor auf die Monster-dropChance. */
-export const GEAR_DROP_FACTOR = 0.4;
+export const GEAR_DROP_FACTOR = 0.5;
 export const POTION_DROP_CHANCE = 0.3;
 export const POTION_COOLDOWN_TICKS = 100;
 
