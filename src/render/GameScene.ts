@@ -29,6 +29,15 @@ const ZOOM_MIN = 0.55;
 const ZOOM_MAX = 1.1;
 const ZOOM_KEY = 'aschenthron.zoom';
 const CHUNK = 16;
+/** Pfeiltasten → Kachelrichtung (isometrisch: oben = −x −y, rechts = +x −y) */
+const ARROW_DIRS: Record<string, [number, number]> = { ArrowUp: [-1, -1], ArrowDown: [1, 1], ArrowLeft: [-1, 1], ArrowRight: [1, -1] };
+
+/** Tippt der Spieler gerade in ein Eingabefeld (z. B. Spielstand-Code)? Dann bleiben die Pfeiltasten beim Feld. */
+function typingInField(e: KeyboardEvent): boolean {
+  const t = e.target as HTMLElement | null;
+  return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+}
+
 const PROP_GIDS = new Set([2, 10, 11, 13, 14, ...Array.from({ length: TOWN_GID.doorLast - TOWN_GID.wall + 1 }, (_, i) => TOWN_GID.wall + i)]);
 const OVERLAY_DEPTH = 1e7;
 /** Dauer eines Hiebs/Wurfs in ms (Ausholen 40 %, Schlag 60 %) */
@@ -92,6 +101,9 @@ export class GameScene extends Phaser.Scene {
   private ambientKind: 'embers' | 'mist' | null = null;
   private lastTime = 0;
   private now = 0;
+  private arrows = new Set<string>();
+  private arrowActive = false;
+  private lastArrowMove = 0;
   private ts = 1;
   private timers: { at: number; fn: () => void }[] = [];
   private fireballs = new Map<number, { impacts: (() => void)[]; target: number }>();
@@ -137,7 +149,7 @@ export class GameScene extends Phaser.Scene {
     this.minimap = new Minimap(this.world, this.tiles);
     if (this.remote) this.ui.say(`Verbunden als ${p.name}${this.remote.pvp ? ' – PvP außerhalb der Städte aktiv, Angreifer werden zu Mördern' : ''}. Klick auf Spieler greift an.`);
     else if (saved && importPlayer(this.world, p, saved)) this.ui.say('Spielstand geladen.');
-    else this.ui.say('Willkommen im Hafen von Aschenhafen! Hafenmeister Joren (Haus mit Anker, links vom Platz) zeigt dir die Stadt: Lehrhaus (Buch), Kaufhaus (Münzen), Schmiede (Amboss), Lager (Truhe), Wache (Schild). Mit Startgold, Schwert oder Bogen geht es auf die Felder. C: Charakter (Attributpunkte verteilen!) · K: Fertigkeiten · Q/E: Tränke · R: Rasten · N: Karte · Klick: laufen/angreifen/aufheben.');
+    else this.ui.say('Willkommen im Hafen von Aschenhafen! Hafenmeister Joren (Haus mit Anker, links vom Platz) zeigt dir die Stadt: Lehrhaus (Buch), Kaufhaus (Münzen), Schmiede (Amboss), Lager (Truhe), Wache (Schild). Mit Startgold, Schwert oder Bogen geht es auf die Felder. C: Charakter (Attributpunkte verteilen!) · K: Fertigkeiten · Q/E: Tränke · R: Rasten · N: Karte · Pfeiltasten oder Klick: laufen · Klick auf Gegner: angreifen.');
     this.gfx = this.add.graphics().setDepth(OVERLAY_DEPTH);
     this.gfxGround = this.add.graphics().setDepth(-9e5);
     this.gfxShimmer = this.add.graphics().setDepth(-9e5 + 1);
@@ -157,7 +169,15 @@ export class GameScene extends Phaser.Scene {
     this.input.mouse?.disableContextMenu();
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') this.setArmed(null);
+      if (ARROW_DIRS[e.key] && !typingInField(e) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        this.arrows.add(e.key);
+      }
     });
+    window.addEventListener('keyup', (e) => {
+      if (ARROW_DIRS[e.key]) this.arrows.delete(e.key);
+    });
+    window.addEventListener('blur', () => this.arrows.clear());
     window.addEventListener('beforeunload', () => {
       if (!this.resetting) this.save();
     });
@@ -165,6 +185,49 @@ export class GameScene extends Phaser.Scene {
 
   private player(): Actor {
     return getActor(this.world, this.playerId)!;
+  }
+
+  /** Laufen mit den Pfeiltasten: Bildschirmrichtung in Kachelrichtung umgerechnet, solange gedrückt in kurzen Abständen ein Ziel in der Nähe setzen. */
+  private arrowMove(time: number): void {
+    if (!this.arrows.size) {
+      if (this.arrowActive) {
+        this.arrowActive = false;
+        const p = this.player();
+        this.send({ type: 'moveTo', x: Math.round(p.x), y: Math.round(p.y) });
+      }
+      return;
+    }
+    if (time - this.lastArrowMove < (this.remote ? 250 : 100)) return;
+    this.lastArrowMove = time;
+    const p = this.player();
+    if (!p.alive) return;
+    let dx = 0;
+    let dy = 0;
+    for (const k of this.arrows) {
+      dx += ARROW_DIRS[k]![0];
+      dy += ARROW_DIRS[k]![1];
+    }
+    dx = Math.sign(dx);
+    dy = Math.sign(dy);
+    if (!dx && !dy) return;
+    const ox = Math.round(p.x);
+    const oy = Math.round(p.y);
+    const w = this.world;
+    // weitestes begehbares Ziel in Blickrichtung; an Wänden entlang der freien Achse gleiten
+    const tries: [number, number][] = [[dx, dy], [dx, 0], [0, dy]];
+    for (const [tx, ty] of tries) {
+      if (!tx && !ty) continue;
+      for (let k = 3; k >= 1; k--) {
+        const x = ox + tx * k;
+        const y = oy + ty * k;
+        if (isWalkable(w.grid, x, y)) {
+          this.arrowActive = true;
+          this.setArmed(null);
+          this.send({ type: 'moveTo', x, y });
+          return;
+        }
+      }
+    }
   }
 
   private send(c: Command): void {
@@ -321,6 +384,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.now = time;
+    this.arrowMove(time);
     this.handleEvents();
     if (this.timers.length) {
       const due = this.timers.filter((t) => t.at <= time);
