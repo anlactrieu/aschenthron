@@ -1,4 +1,4 @@
-import { ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, STATUS_IDS, SCHOOL_NAME, schoolOf, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, uniqueDef, NPC_LORE, type QuestDef, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
+import { NPC_ROLE, npcKeyOf, ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, STATUS_IDS, SCHOOL_NAME, schoolOf, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, uniqueDef, NPC_LORE, type QuestDef, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
 import { POWER_TEXT, TEMPLATES, TIER_COLOR, GEM_COLOR, affixRange, gemAffix, gemName, handsOf, itemAffixes, itemReq, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
 import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
@@ -943,8 +943,19 @@ export class Ui {
     const merchants = near.filter((n) => n.kind === 'merchant');
     const stash = near.find((n) => n.kind === 'stash');
     const smith = near.find((n) => n.kind === 'smith');
-    const givers = near.filter((n) => n.kind === 'quest');
+    const givers = near.filter((n) => n.kind === 'quest' || !!n.quests?.length);
     const talkers = near.filter((n) => NPC_LORE[n.name]);
+    // Rolle jedes NPCs in Reichweite: was kann ich hier tun?
+    for (const n of near) if (NPC_ROLE[n.name]) body.append(el('div', 'a-note', `${n.name}: ${NPC_ROLE[n.name]}`));
+    // Gesprächsziel einer offenen Aufgabe ohne eigenen Dialogtext (Lehrer, Händler, Schmied, Lager)
+    for (const n of near) {
+      if (NPC_LORE[n.name]) continue;
+      const pend = QUESTS.find((q) => q.kind === 'talk' && q.target === npcKeyOf(n.name) && p.quests[q.id]?.state === 'active');
+      if (!pend) continue;
+      const b = el('button', 'a-btn', `Anliegen vortragen: ${pend.name}`);
+      b.onclick = () => this.send({ type: 'talk', npcId: n.id });
+      body.append(b);
+    }
     for (const t of talkers) {
       // Gespräch: Text des NPC; mit offener Gesprächsaufgabe gibt es einen Knopf, das Anliegen vorzutragen
       body.append(el('div', 'a-sec', `Gespräch – ${t.name}`));
@@ -956,7 +967,7 @@ export class Ui {
         box.append(d);
       }
       body.append(box);
-      const pending = QUESTS.find((q) => q.kind === 'talk' && q.target === t.name && p.quests[q.id]?.state === 'active');
+      const pending = QUESTS.find((q) => q.kind === 'talk' && q.target === npcKeyOf(t.name) && p.quests[q.id]?.state === 'active');
       if (pending) {
         const b = el('button', 'a-btn', `Anliegen vortragen: ${pending.name}`);
         b.onclick = () => this.send({ type: 'talk', npcId: t.id });

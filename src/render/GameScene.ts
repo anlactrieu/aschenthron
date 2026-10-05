@@ -10,6 +10,7 @@ import {
 } from '../sim/world';
 import { isWalkable } from '../sim/path';
 import { toScreen, toTile } from './iso';
+import { DOOR_ICONS, TOWN_GID, WATER_PROP_GIDS, registerTownArt } from './town';
 import { Ui, describeItem } from './ui';
 import { Sfx } from './audio';
 import { Minimap } from './minimap';
@@ -28,7 +29,7 @@ const ZOOM_MIN = 0.55;
 const ZOOM_MAX = 1.1;
 const ZOOM_KEY = 'aschenthron.zoom';
 const CHUNK = 16;
-const PROP_GIDS = new Set([2, 10, 11, 13, 14]);
+const PROP_GIDS = new Set([2, 10, 11, 13, 14, ...Array.from({ length: TOWN_GID.doorLast - TOWN_GID.wall + 1 }, (_, i) => TOWN_GID.wall + i)]);
 const OVERLAY_DEPTH = 1e7;
 /** Dauer eines Hiebs/Wurfs in ms (Ausholen 40 %, Schlag 60 %) */
 const SWING_MS = 240;
@@ -119,6 +120,7 @@ export class GameScene extends Phaser.Scene {
       this.playerId = built.playerId;
     }
     registerStaticArt(this);
+    registerTownArt(this);
     const store = this.remote ? null : safeStorage();
     const params = new URLSearchParams(location.search);
     if (!this.remote && params.has('neu')) {
@@ -135,7 +137,7 @@ export class GameScene extends Phaser.Scene {
     this.minimap = new Minimap(this.world, this.tiles);
     if (this.remote) this.ui.say(`Verbunden als ${p.name}${this.remote.pvp ? ' – PvP außerhalb der Städte aktiv, Angreifer werden zu Mördern' : ''}. Klick auf Spieler greift an.`);
     else if (saved && importPlayer(this.world, p, saved)) this.ui.say('Spielstand geladen.');
-    else this.ui.say('Willkommen in Aschenthron. Dein Startgold reicht für eine Wahl: Schwert und Rüstung (Händlerin) oder Bogen, Pfeile und Schnellschuss (Händlerin + Lehrer). C: Charakter (Attributpunkte verteilen!) · Q/E: Heil-/Manatrank · R: Rasten · N: Karte · M: Ton · Klick: laufen/angreifen/aufheben · Lehrer, Händlerin, Schmiede, Truhe und Aufgaben in der Stadt.');
+    else this.ui.say('Willkommen im Hafen von Aschenhafen! Hafenmeister Joren (Haus mit Anker, links vom Platz) zeigt dir die Stadt: Lehrhaus (Buch), Kaufhaus (Münzen), Schmiede (Amboss), Lager (Truhe), Wache (Schild). Mit Startgold, Schwert oder Bogen geht es auf die Felder. C: Charakter (Attributpunkte verteilen!) · K: Fertigkeiten · Q/E: Tränke · R: Rasten · N: Karte · Klick: laufen/angreifen/aufheben.');
     this.gfx = this.add.graphics().setDepth(OVERLAY_DEPTH);
     this.gfxGround = this.add.graphics().setDepth(-9e5);
     this.gfxShimmer = this.add.graphics().setDepth(-9e5 + 1);
@@ -878,7 +880,7 @@ export class GameScene extends Phaser.Scene {
       for (let x = x0; x <= Math.min(x1, w - 1); x++) {
         const gid = this.tiles[y * w + x] ?? 0;
         if (!gid) continue;
-        const ground = PROP_GIDS.has(gid) ? this.groundUnder(x, y) : gid;
+        const ground = WATER_PROP_GIDS.has(gid) ? 6 : PROP_GIDS.has(gid) ? this.groundUnder(x, y) : gid;
         const { sx, sy } = toScreen(x, y);
         const ox = sx - TILE_W / 2 - minSx;
         const oy = sy - TILE_H / 2 - minSy;
@@ -904,7 +906,8 @@ export class GameScene extends Phaser.Scene {
     ];
     for (const [dx, dy, A, Bc] of edges) {
       let ng = this.gidAt(x + dx, y + dy);
-      if (PROP_GIDS.has(ng)) ng = this.groundUnder(x + dx, y + dy);
+      if (WATER_PROP_GIDS.has(ng)) ng = 6;
+      else if (PROP_GIDS.has(ng)) ng = this.groundUnder(x + dx, y + dy);
       if (ng === ground || ng === 0 || ground === 6 || ground === 12) continue;
       ctx.fillStyle = '#' + tileBase(ng).toString(16).padStart(6, '0');
       const n = hash(x * 7 + dx + 3, y * 13 + dy + 5);
@@ -967,11 +970,29 @@ export class GameScene extends Phaser.Scene {
     } else if (gid === 13) {
       key = `grave_${v % 2}`;
       oy = 0.88;
+    } else if (gid >= TOWN_GID.wall && gid <= TOWN_GID.doorLast) {
+      ({ key, oy, dy } = this.townProp(x, y, gid, v));
     } else {
       key = 'pillar';
       oy = 0.92;
     }
     return this.add.image(sx, sy + dy, key).setOrigin(0.5, oy).setDepth(sy + TILE_H / 2);
+  }
+
+  /** Stadtprops: Hauswand, Tür mit Berufsschild (Achse nach den Nachbarwänden), Dekoration. */
+  private townProp(x: number, y: number, gid: number, v: number): { key: string; oy: number; dy: number } {
+    const wall = (gx: number, gy: number) => this.gidAt(gx, gy) === TOWN_GID.wall;
+    if (gid === TOWN_GID.wall) return { key: `twn_wall_${v % 4}`, oy: 1, dy: TILE_H / 2 };
+    if (gid >= TOWN_GID.doorFirst) {
+      const axis = wall(x - 1, y) || wall(x + 1, y) ? 'x' : 'y';
+      return { key: `twn_door_${DOOR_ICONS[gid - TOWN_GID.doorFirst]}_${axis}`, oy: 1, dy: TILE_H / 2 };
+    }
+    const m: Record<number, { key: string; oy: number; dy: number }> = {
+      [TOWN_GID.barrel]: { key: 'twn_barrel', oy: 0.9, dy: 8 }, [TOWN_GID.crates]: { key: 'twn_crates', oy: 0.9, dy: 8 }, [TOWN_GID.well]: { key: 'twn_well', oy: 0.92, dy: 10 },
+      [TOWN_GID.lantern]: { key: 'twn_lantern', oy: 0.95, dy: 8 }, [TOWN_GID.stall]: { key: 'twn_stall', oy: 0.9, dy: 8 }, [TOWN_GID.post]: { key: 'twn_post', oy: 0.9, dy: 8 },
+      [TOWN_GID.flowers]: { key: 'twn_flowers', oy: 0.9, dy: 8 }, [TOWN_GID.boat]: { key: 'twn_boat', oy: 0.8, dy: 8 }, [TOWN_GID.ship]: { key: 'twn_ship', oy: 0.82, dy: 10 },
+    };
+    return m[gid] ?? { key: 'pillar', oy: 0.92, dy: 8 };
   }
 
   private updateNpcs(time: number): void {

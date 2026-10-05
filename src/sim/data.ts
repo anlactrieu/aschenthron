@@ -527,6 +527,7 @@ export const CHAIN_MOOR = 'Das Schweigen im Moor';
 export const CHAIN_OATH = 'Der letzte Eid';
 export const CHAIN_MINE = 'Pells Fund';
 export const CHAIN_WEB = 'Netze der Königin';
+export const CHAIN_ARRIVAL = 'Ankunft in Aschenhafen';
 
 QUESTS.push(
   chainQ(CHAIN_GOBLIN, 2, { id: 'c_gob1', kind: 'talk', name: 'Ein Wort mit der Jägerin', text: 'Chronistin Maren schickt dich zu Jägerin Ysa am Räuberlager: Sie hat die Spuren des Goblinkönigs gelesen.', minLevel: 5, target: 'ysa', outro: 'Ysa nickt knapp: „Dann hör gut zu. Es gibt Arbeit.“' }),
@@ -553,6 +554,15 @@ QUESTS.push(
   chainQ(CHAIN_WEB, 3, { id: 'c_web3', kind: 'kill', name: 'Spinnenkönigin Vyrra', text: 'Töte die Königin des Nests, bevor sie sich ausbreitet.', minLevel: 17, requires: 'c_web2', target: 'spider_queen', reward: 'rare', outro: 'Haldor schweigt lange. „Schlaf gut heute Nacht. Ich werde es nicht.“' }),
 );
 
+// Ankunftskette für neue Spieler: ein Rundgang, bei dem jede Rolle der Stadt einmal erklärt wird (reine Gesprächsaufgaben, kleine Belohnung)
+QUESTS.push(
+  chainQ(CHAIN_ARRIVAL, 3, { id: 'c_arr1', kind: 'talk', name: 'Im Lehrhaus', text: 'Hafenmeister Joren schickt dich zum Lehrhaus nördlich der Straße: Lehrer Varn zeigt dir, wie du Fertigkeiten lernst.', minLevel: 1, target: 'varn', outro: 'Varn: „Fertigkeiten lernst du hier gegen Skillpunkte und Gold. Jede Stufe bringt einen Punkt. Wähle dir einen Stil, nicht alles.“' }),
+  chainQ(CHAIN_ARRIVAL, 3, { id: 'c_arr2', kind: 'talk', name: 'Im Kaufhaus', text: 'Varn rät dir, bei Händlerin Mirel Tränke und eine erste Ausrüstung zu kaufen.', minLevel: 1, requires: 'c_arr1', target: 'mirel', outro: 'Mirel: „Waffen, Rüstung, Tränke. Du kannst hier auch alles verkaufen, was du nicht brauchst. Zieh Gegenstände in den Rucksack, um zu kaufen.“' }),
+  chainQ(CHAIN_ARRIVAL, 3, { id: 'c_arr3', kind: 'talk', name: 'In der Schmiede', text: 'Mirel verweist dich an Schmiedin Ilse: Sie verbessert Gegenstände.', minLevel: 1, requires: 'c_arr2', target: 'ilse', outro: 'Ilse: „Ich werte Gegenstände auf, würfle Zusatzwerte neu und setze Edelsteine ein. Komm wieder, wenn du Gold und gute Beute hast.“' }),
+  chainQ(CHAIN_ARRIVAL, 3, { id: 'c_arr4', kind: 'talk', name: 'Im Lagerhaus', text: 'Ilse schickt dich ins Lagerhaus zu Lagerverwalter Ottmar. Dort liegt dein Besitz sicher.', minLevel: 1, requires: 'c_arr3', target: 'ottmar', outro: 'Ottmar: „Alles in meinem Lager bleibt dir auch beim Tod. Lass wertvolle Dinge hier, wenn du in gefährliche Gegenden gehst.“' }),
+  chainQ(CHAIN_ARRIVAL, 3, { id: 'c_arr5', kind: 'talk', name: 'Bei der Wache', text: 'Zuletzt zur Wache: Hauptmann Brandt hat die ersten Aufträge für dich.', minLevel: 1, requires: 'c_arr4', target: 'brandt', outro: 'Brandt: „Gut, dass du dich umgesehen hast. Nimm dir einen Auftrag, jage in den Feldern und komm zurück. Viel Glück.“' }),
+);
+
 /** Stabile NPC-Schlüssel (Gesprächsaufgaben referenzieren diese statt des Anzeigenamens) → Anzeigename. */
 export const NPC_KEYS: Record<string, string> = {
   maren: 'Chronistin Maren',
@@ -561,6 +571,25 @@ export const NPC_KEYS: Record<string, string> = {
   olm: 'Eremit Olm',
   pell: 'Schatzsucher Pell',
   aldric: 'Ritter Aldric',
+  joren: 'Hafenmeister Joren',
+  varn: 'Lehrer Varn',
+  mirel: 'Händlerin Mirel',
+  ilse: 'Schmiedin Ilse',
+  ottmar: 'Lagerverwalter Ottmar',
+  brandt: 'Hauptmann Brandt',
+};
+
+/** Rollenhinweis im Fenster jedes Stadt-NPCs: Was kann ich hier tun? */
+export const NPC_ROLE: Record<string, string> = {
+  'Hafenmeister Joren': 'Willkommen! Frag mich, wenn du nicht weißt, wohin.',
+  'Lehrer Varn': 'Hier lernst du Fertigkeiten und verteilst deine Skillpunkte neu.',
+  'Händlerin Mirel': 'Kaufen und verkaufen: Waffen, Rüstung, Tränke.',
+  'Händler Wenzel': 'Spezialausrüster: Ausrüstung für besondere Spielstile (Stäbe, Schilde, Ringe).',
+  'Schmiedin Ilse': 'Gegenstände aufwerten, Zusatzwerte neu würfeln, Edelsteine einsetzen.',
+  'Lagerverwalter Ottmar': 'Sicheres Lager: Hier abgelegte Gegenstände bleiben dir auch beim Tod.',
+  'Hauptmann Brandt': 'Aufträge der Wache: Jagd, Truhen und Anführer.',
+  'Kräuterfrau Odda': 'Aufträge rund um Kräuter und die Ghule im Moor.',
+  'Chronistin Maren': 'Geschichten und Spuren der Insel; ihre Aufträge führen weit hinaus.',
 };
 /** Schlüssel eines NPC (aus dem Anzeigenamen) oder undefined. */
 export function npcKeyOf(name: string): string | undefined {
@@ -569,6 +598,11 @@ export function npcKeyOf(name: string): string | undefined {
 
 /** Dialoge der benannten NPCs (2–4 Absätze). Schlüssel: NPC-Name. Die Aufgaben stehen an den NPCs der Karte (Eigenschaft `quests`). */
 export const NPC_LORE: Record<string, string[]> = {
+  'Hafenmeister Joren': [
+    'Willkommen in Aschenhafen. Das Schiff hinter dir bringt jeden, der hier neu anfängt.',
+    'Nördlich der Straße: das Lehrhaus (Buchzeichen) für Fertigkeiten, das Kaufhaus (Münzen) für Waren, die Schmiede (Amboss) und das Lager (Truhe). Die Wache (Schild) vergibt Aufträge, die Kräuterfrau (Blatt) auch.',
+    'Geh deinen Weg erst einmal in Ruhe ab. Vor der Stadt warten auf den Feldern Ratten und Hunde – zum Üben genau richtig. Wenn du magst, mache einen Rundgang: Ich schicke dich zum Lehrer.',
+  ],
   'Chronistin Maren': [
     'Ich schreibe auf, was andere vergessen wollen. Aschental war einmal ein Garten, bevor der Thron der Asche den Himmel verbrannte.',
     'Die Felder, der Wald, das Moor – überall liegen Namen im Boden, die niemand mehr trägt. Jede Truhe, jedes Grab gehört zu einer Geschichte.',

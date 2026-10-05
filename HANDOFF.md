@@ -1,6 +1,13 @@
 # HANDOFF – Aschenthron
 
-## AKTUELL: Stufe 6 (Build-Tiefe) – ALLE Phasen (1–5) und Moosbrück umgesetzt, gepusht
+## AKTUELL: Aschenhafen als Hafenstadt (lokal committet, NICHT gepusht) + Stufe 6 komplett
+- **Aschenhafen neu** (`scripts/gen_map.py`, Abschnitt "Aschenhafen als Hafenstadt"; Moosbrück entfernt): Stadt x14–47/y132–175 + Kai/Stege bis y183, Nord- und Osttor, Hauptstraße + Querstraße mit Brunnen, Hafenplatz mit Marktständen, Booten, Schiff. 9 Häuser (8×6, Dielen, Tür mit Berufsschild), je ein NPC: Hafenmeister Joren (Anker, Willkommens-Infos + Ankunftskette), Lehrer Varn (Buch), Händlerin Mirel (Münzen), Schmiedin Ilse (Amboss), Lagerverwalter Ottmar (Truhe), Hauptmann Brandt (Schild), Kräuterfrau Odda (Blatt), Händler Wenzel (Schwert, Shop `artisan`), Chronistin Maren (Schriftrolle). Start am Hafen (31,170). MAP_VERSION unverändert (nur Wasser und Altstadt umgebaut).
+- **Grafik** `src/render/town.ts` (prozedural): neue Kacheln 15 Dielen, 16 Pflaster, 17 Blumenwiese (TILE_PAL in `art.ts`), Props 18 Hauswand, 19 Fass, 20 Kisten, 21 Brunnen, 22 Laterne, 23 Boot, 24 Stand, 25 Pfahl, 26 Schiff, 27 Blumenkasten (blockiert, `tiled.ts` BLOCKED), Türen 28–36 (begehbar, Symbol je Beruf, Achse aus Nachbarwänden in `GameScene.townProp`).
+- **Ankunftskette** `CHAIN_ARRIVAL` (`data.ts`, 5 Gesprächsaufgaben, jede Station erklärt ihre Rolle), `NPC_ROLE` (Hinweiszeile im NPC-Fenster), `NPC_KEYS` erweitert. Sim: `acceptQuest`/`turnInQuest` akzeptieren jetzt jeden NPC mit `quests` (nicht nur `kind quest`); UI zeigt Aufgaben und "Anliegen vortragen" für alle NPCs (Bug behoben: Vergleich `q.target === t.name` statt NPC-Schlüssel).
+- Rudel im Umkreis 18 um das Osttor (47,141) entfernt (nur Feldratten bleiben) für sanften Einstieg. Pace danach: Seed 2024 11,4 h / 12 Tode (4 auf L1), Seed 7 8,6 h / 28 Tode – große Streuung (Bot-Todesspiralen, vorher 7,4–11,0 h über Seeds); nicht weiter getunt.
+- Offen: Pace-Bot-Start am Hafen prüfen; Schilder/Türen sind klein (Zoom ≥ 1 gut lesbar).
+
+## Stufe 6 (Build-Tiefe) – ALLE Phasen (1–5) umgesetzt und gepusht (Stand vor der Hafenstadt)
 - Phase 4/5: Buildprofil (`src/sim/build.ts`, Anzeige im Charakterfenster `renderChar`), `info` für alle 27 Skills, Benchmark `builds.bench.test.ts` (DPS gegen reglose Puppe, Schranke Faktor 6), `build.test.ts`. 263 Tests. Gemessen: Fern/Zauber 2–5× Nahkampf-DPS im Altbestand (nicht angefasst, Balance-Vorgabe).
 - Offene Ideen: Moosbrück-Questgeber/Lore; Buildprofil-Werte (Parieren/Heilkraft) im Werte-Block anzeigen; Nahkampf-Balance (Entscheidung User).
 - Phase 1: `effects.ts` (EFFECTS-Tabelle, mergeStatus, controlDr, cleanse/dispel), `STATUS_IDS` in `data.ts`, `SkillDef.school/target/passive/info` + `schoolOf`, `useSkill` zerlegt (Golden-Test `skills.golden.test.ts` + Snapshot beweist identische Werte), Event `note` (Kampflog, immer mit `to`), `activeSkills(p)` für Hotbar/Slots. 223 Tests, Lint, Build grün. NICHT gepusht (Push auf main deployt Pages).

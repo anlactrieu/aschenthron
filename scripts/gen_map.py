@@ -4,13 +4,13 @@ Gids: 1 Stadtstein, 2 Wand, 3 Sumpf, 4 Gras, 5 Dungeonboden, 6 Wasser, 7 Weg, 8 
 10 Baum, 11 Fels, 12 Lava, 13 Grabstein, 14 Säule (alle blockiert außer 1,3,4,5,7,8,9).
 Monster stehen in Rudeln (1–5, mit Anführer einer höheren Stufe). Je weiter vom Zoneneingang, desto stärker.
 Alles hier ist eigener Entwurf. Danach in Tiled editierbar; das Spiel liest nur die JSON-Datei."""
-import json, random, collections, sys
+import json, math, random, collections, sys
 
 S = 1.5                                  # Skalierung gegenüber dem ersten Entwurf (160x120)
 W, H, TS = 300, 240, 32
 random.seed(20261005)
 g = [[6] * W for _ in range(H)]
-BLOCK = {2, 6, 10, 11, 12, 13, 14}
+BLOCK = {2, 6, 10, 11, 12, 13, 14, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27}
 objs, oid = [], [1]
 pack_counter = [0]
 CHAMPIONS = [0]
@@ -557,48 +557,105 @@ for pid, (tag, f) in PACK_META.items():
             objs.remove(o); trim += 1
 print("Düsterwald: %d Rudelmitglieder im Eingangsbereich gekürzt" % trim, file=sys.stderr)
 
-# ------------------------------------------------------------------ Moosbrück (Stadt Nr. 3, nur auf Wasserfläche südlich von Aschenhafen)
-# Entsteht nach allem Alten, ohne Zufall und nur auf zuvor leeren Wasserkacheln: Spielstände bleiben gültig (MAP_VERSION unverändert).
-# Jeder NPC wohnt in einem eigenen Haus mit Tür; die Häuser liegen an einer Straße, der Platz davor ist die Stadtmitte.
-TOWN3 = (14, 155, 47, 180)
-t3x, t3y = TOWN3[0], TOWN3[1]
-assert all(g[y][x] == 6 for y in range(t3y - 1, TOWN3[3] + 2) for x in range(t3x - 1, TOWN3[2] + 2)), "Moosbrück: Fläche nicht frei"
-fill(TOWN3, 1)
-for x in range(TOWN3[0], TOWN3[2] + 1): g[TOWN3[1]][x] = g[TOWN3[3]][x] = 2
-for y in range(TOWN3[1], TOWN3[3] + 1): g[y][TOWN3[0]] = g[y][TOWN3[2]] = 2
-T3_E = (TOWN3[2], t3y + 13)
-for d in range(-1, 2): g[T3_E[1] + d][T3_E[0]] = 1          # Osttor
+# ------------------------------------------------------------------ Aschenhafen als Hafenstadt (Stufe 6)
+# Entsteht nach allem Alten, ohne Zufall: Die alte ummauerte Stadt wird zu einer größeren Hafenstadt auf Wasser und Altstadt umgebaut
+# (Spielstände bleiben gültig, MAP_VERSION unverändert; wer in einem neuen Haus stand, startet wieder am Hafen).
+# Oben Mauer mit Nord- und Osttor, in der Mitte Hauptstraße und Querstraße mit Brunnen, jede Rolle in einem eigenen Haus mit Türschild,
+# unten Hafenplatz mit Kai, Stegen, Booten und dem Schiff, mit dem man ankommt.
+# Kacheln: 15 Dielen, 16 Pflaster, 17 Blumenwiese, 18 Hauswand, 19 Fass, 20 Kisten, 21 Brunnen, 22 Laterne, 23 Boot, 24 Marktstand,
+# 25 Pfahl, 26 Schiff, 27 Blumenkasten, 28-36 Türen (Symbol: Anker, Buch, Münzen, Amboss, Truhe, Schild, Blatt, Schriftrolle, Schwert).
+TOWN = (14, 132, 47, 175)
+tx0, ty0, tx1, ty1 = TOWN
+for y in range(ty0 - 1, ty1 + 10):
+    for x in range(tx0 - 2, tx1 + 2):
+        assert g[y][x] in (6, 1, 2, 7), ("Aschenhafen: Fläche nicht frei", x, y, g[y][x])
+def L(lx, ly): return tx0 + lx, ty0 + ly
+def setg(lx, ly, gid):
+    x, y = L(lx, ly)
+    g[y][x] = gid
+fill(TOWN, 1)
+for lx in range(0, 34):
+    setg(lx, 0, 2)
+for ly in range(0, 35):
+    setg(0, ly, 2); setg(33, ly, 2)
+for d in (-1, 0, 1):
+    setg(17 + d, 0, 1)                      # Nordtor (Straße von Norden bei x=31)
+    setg(33, 9 + d, 1)                      # Osttor (Straße nach Osten bei y=141)
+# Plätze: Stadtmitte um den Brunnen, Hafenplatz
+for ly in range(6, 13):
+    for lx in range(14, 21): setg(lx, ly, 16)
+for ly in range(35, 41):
+    for lx in range(2, 32): setg(lx, ly, 16)
+setg(17, 9, 21)                             # Brunnen
+# Kai (Dielen) und Stege über dem Wasser
+for ly in range(41, 44):
+    for lx in range(2, 32): setg(lx, ly, 15)
+for ly in range(44, 52):
+    for lx in (16, 17, 18): setg(lx, ly, 15)            # Hauptsteg
+for ly in range(44, 50):
+    for lx in (6, 7): setg(lx, ly, 15)                  # Nebensteg
+for lx, ly in [(15, 46), (19, 46), (15, 51), (19, 51), (5, 49), (8, 49)]: setg(lx, ly, 25)
+for lx, ly in [(9, 46), (11, 44), (23, 44)]: setg(lx, ly, 23)
+setg(21, 47, 26)                                         # Schiff, am Hauptsteg vertäut
 
-def house(ox, oy, door_south):
-    """Haus 9x7 (Außenmaß) in Stadtkoordinaten: Wand außen, innen Stadtstein, Tür mittig zur Straße. Liefert (Innenmitte, Tür)."""
-    x0, y0 = t3x + ox, t3y + oy
-    for x in range(x0, x0 + 9):
-        g[y0][x] = g[y0 + 6][x] = 2
-    for y in range(y0, y0 + 7):
-        g[y][x0] = g[y][x0 + 8] = 2
-    for y in range(y0 + 1, y0 + 6):
-        for x in range(x0 + 1, x0 + 8): g[y][x] = 1
-    door = (x0 + 4, y0 + 6 if door_south else y0)
-    g[door[1]][door[0]] = 1
-    return (x0 + 4, y0 + 3), door
+def house(lx0, ly0, door_side, icon):
+    """Haus 8x6 (Außenmaß): Wände, Dielen, Tür mit Berufsschild. Liefert die Kachel direkt hinter der Tür (Platz des NPC)."""
+    for lx in range(lx0, lx0 + 8):
+        setg(lx, ly0, 18); setg(lx, ly0 + 5, 18)
+    for ly in range(ly0, ly0 + 6):
+        setg(lx0, ly, 18); setg(lx0 + 7, ly, 18)
+    for ly in range(ly0 + 1, ly0 + 5):
+        for lx in range(lx0 + 1, lx0 + 7): setg(lx, ly, 15)
+    door = {'S': (lx0 + 4, ly0 + 5), 'N': (lx0 + 4, ly0), 'E': (lx0 + 7, ly0 + 3), 'W': (lx0, ly0 + 3)}[door_side]
+    inner = {'S': (0, -1), 'N': (0, 1), 'E': (-1, 0), 'W': (1, 0)}[door_side]
+    setg(door[0], door[1], 28 + ICONS.index(icon))
+    return (door[0] + inner[0], door[1] + inner[1])
+ICONS = ['anchor', 'book', 'coins', 'anvil', 'chest', 'shield', 'leaf', 'scroll', 'sword']
+SPOT = {}
+SPOT['wache'] = house(5, 1, 'S', 'shield')
+SPOT['kraeuter'] = house(22, 1, 'S', 'leaf')
+SPOT['lehrer'] = house(5, 12, 'N', 'book')
+SPOT['haendler'] = house(22, 12, 'N', 'coins')
+SPOT['schmied'] = house(5, 20, 'E', 'anvil')
+SPOT['ausruester'] = house(22, 20, 'W', 'sword')
+SPOT['lager'] = house(5, 28, 'E', 'chest')
+SPOT['chronik'] = house(22, 28, 'W', 'scroll')
+SPOT['hafen'] = house(3, 35, 'E', 'anchor')
+# Schmuck: Gärten, Bäume, Laternen, Fässer, Kisten, Marktstände, Blumenkästen
+for ly in range(8, 12):
+    for lx in range(1, 4): setg(lx, ly, 17)
+    for lx in range(30, 33): setg(lx, ly, 17)
+for lx, ly in [(2, 3), (2, 5), (31, 3), (31, 5), (2, 15), (31, 15), (2, 26), (31, 26)]: setg(lx, ly, 10)
+for lx, ly in [(14, 3), (20, 3), (14, 14), (20, 14), (14, 18), (20, 18), (14, 26), (20, 26), (14, 34), (20, 34), (9, 9), (26, 9), (11, 36), (24, 36)]: setg(lx, ly, 22)
+for lx, ly in [(13, 21), (13, 26), (21, 26), (21, 21), (13, 29), (30, 40)]: setg(lx, ly, 19)
+for lx, ly in [(13, 25), (21, 25), (2, 36), (27, 42)]: setg(lx, ly, 20)
+for lx, ly in [(13, 37), (22, 37)]: setg(lx, ly, 24)
+for lx, ly in [(7, 7), (11, 7), (24, 7), (28, 7), (7, 11), (11, 11), (24, 11), (28, 11)]: setg(lx, ly, 27)
 
-HOUSES = {}
-HOUSES['lehrer'] = house(3, 3, True)          # oben links, Tür zur Straße (Süden)
-HOUSES['haendler'] = house(14, 3, True)
-HOUSES['schmied'] = house(3, 15, False)       # unten links, Tür zur Straße (Norden)
-HOUSES['lager'] = house(14, 15, False)
-for tx_, ty_ in [(27, 5), (30, 8), (28, 19), (31, 21), (26, 22)]:     # ein paar Bäume am Ostrand
-    g[t3y + ty_][t3x + tx_] = 10
-# Brücke zum Festland (Roggenfelder-Ufer) und Anschluss an die Ostroute von Aschenhafen
-road([T3_E, (56, T3_E[1]), (56, 141)])
-obj("Moosbrück", "townstart", t3x + 28, t3y + 13)
-obj("Moosbrück", "safezone", TOWN3[0] - 1, TOWN3[1] - 1, TOWN3[2] - TOWN3[0] + 3, TOWN3[3] - TOWN3[1] + 3)
-obj("Moosbrück", "region", TOWN3[0] - 1, TOWN3[1] - 1, TOWN3[2] - TOWN3[0] + 3, TOWN3[3] - TOWN3[1] + 3, levels="Stadt")
-npc_h = lambda name, house_key, **props: obj(name, "npc", *HOUSES[house_key][0], **props)
-npc_h("Lehrmeisterin Selka", 'lehrer', kind="trainer", tier=1)
-npc_h("Händler Wenzel", 'haendler', kind="merchant", shop="artisan")
-npc_h("Schmied Brenn", 'schmied', kind="smith")
-npc_h("Lagerverwalter Ottmar", 'lager', kind="stash")
+# alte Objekte der Stadt entfernen (NPCs, Zonen, Start), neue setzen
+def in_old_town(o): return TOWN1[0] - 2 <= o["x"] // TS <= TOWN1[2] + 2 and TOWN1[1] - 2 <= o["y"] // TS <= TOWN1[3] + 2
+objs[:] = [o for o in objs if not ((o["type"] == "npc" and in_old_town(o)) or (o["type"] in ("safezone", "region", "townstart") and o["name"] == "Aschenhafen") or o["type"] == "start")]
+# Sanfter Einstieg: um das Osttor (die Straße zu den Feldern) bleiben ganze Rudel weg, damit Anfänger nicht beim ersten Schritt in gemischte Gruppen laufen
+GATE_E = L(33, 9)
+near = [o for o in objs if o["type"] == "monster" and math.hypot(o["x"] // TS - GATE_E[0], o["y"] // TS - GATE_E[1]) <= 18 and not prop(o, "unique")]
+dropped = [o for o in near if prop(o, "kind") != "field_rat"]      # nur die schwächsten Tiere (Feldratten) bleiben als Übungsziel
+objs[:] = [o for o in objs if o not in dropped]
+print("Aschenhafen: %d Monster am Osttor entfernt, %d Feldratten bleiben" % (len(dropped), len(near) - len(dropped)), file=sys.stderr)
+START = L(17, 38)
+obj("Start", "start", *START)
+obj("Aschenhafen", "townstart", *START)
+obj("Aschenhafen", "safezone", tx0 - 1, ty0 - 1, tx1 - tx0 + 3, 55)
+obj("Aschenhafen", "region", tx0 - 1, ty0 - 1, tx1 - tx0 + 3, 55, levels="Stadt")
+def npc_at(name, key, **props): obj(name, "npc", *L(*SPOT[key]), **props)
+npc_at("Hafenmeister Joren", 'hafen', kind="quest", quests="c_arr1")
+npc_at("Lehrer Varn", 'lehrer', kind="trainer", tier=1, quests="c_arr2")
+npc_at("Händlerin Mirel", 'haendler', kind="merchant", shop="basic", quests="c_arr3")
+npc_at("Schmiedin Ilse", 'schmied', kind="smith", quests="c_arr4")
+npc_at("Lagerverwalter Ottmar", 'lager', kind="stash", quests="c_arr5")
+npc_at("Hauptmann Brandt", 'wache', kind="quest", quests="q_rats,q_chests1,q_hounds,q_goblins,q_bandits,q_spiders,q_goblin_scouts,q_unique1")
+npc_at("Kräuterfrau Odda", 'kraeuter', kind="quest", quests="q_herbs,q_ghouls")
+npc_at("Händler Wenzel", 'ausruester', kind="merchant", shop="artisan")
+npc_at("Chronistin Maren", 'chronik', kind="quest", quests="c_gob1")
 
 # ------------------------------------------------------------------ Prüfung
 sx, sy = START

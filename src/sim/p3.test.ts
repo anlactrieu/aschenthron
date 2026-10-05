@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import mapJson from '../data/aschenthron.json';
 import { buildWorld, type TiledMap } from './tiled';
-import { MAP_VERSION, NPC_KEYS, NPC_LORE, QUESTS, UNIQUES, WORLD_BOSS_LOOT, questById, uniqueDef } from './data';
+import { MAP_VERSION, NPC_KEYS, NPC_LORE, NPC_ROLE, QUESTS, UNIQUES, WORLD_BOSS_LOOT, questById, uniqueDef } from './data';
 import { findPath, isWalkable, type Grid } from './path';
 import { exportPlayer, importPlayer } from './save';
 import { validateCommand } from './net';
@@ -30,11 +30,11 @@ const events = (w: World) => drainEvents(w);
 describe('P3: Aufgabenketten', () => {
   const chains = questChains();
 
-  it('mindestens drei Ketten mit je 3–4 Gliedern, Vorgänger in derselben Kette, Folgeglieder nicht frei', () => {
+  it('mindestens drei Ketten mit je 3–5 Gliedern, Vorgänger in derselben Kette, Folgeglieder nicht frei', () => {
     expect(chains.length).toBeGreaterThanOrEqual(3);
     for (const c of chains) {
       expect(c.quests.length, c.name).toBeGreaterThanOrEqual(3);
-      expect(c.quests.length, c.name).toBeLessThanOrEqual(4);
+      expect(c.quests.length, c.name).toBeLessThanOrEqual(5);
       c.quests.forEach((q, i) => {
         if (i === 0) expect(q.requires, q.id).toBeUndefined();
         else expect(q.requires, q.id).toBe(c.quests[i - 1]!.id);
@@ -52,7 +52,8 @@ describe('P3: Aufgabenketten', () => {
       if (q.kind === 'talk') {
         expect(NPC_KEYS[q.target], q.id).toBeDefined();
         expect(w.npcs.some((n) => n.name === NPC_KEYS[q.target]), q.id).toBe(true);
-        expect(NPC_LORE[NPC_KEYS[q.target]!], q.id).toBeDefined();
+        // Gesprächsziele haben entweder einen Dialogtext oder (Stadt-NPCs) einen Rollenhinweis
+        expect(NPC_LORE[NPC_KEYS[q.target]!] ?? NPC_ROLE[NPC_KEYS[q.target]!], q.id).toBeDefined();
       }
       if (q.kind === 'visit') expect(w.regions.some((r) => r.name === q.place), q.id).toBe(true);
       if (q.kind === 'bring') expect(q.monsters?.length || q.chestRegion, q.id).toBeTruthy();
@@ -61,10 +62,10 @@ describe('P3: Aufgabenketten', () => {
     }
   });
 
-  it('Lore-NPCs: 6 benannte NPCs mit 2–4 Absätzen, alle auf der Karte erreichbar', () => {
+  it('Lore-NPCs: 7 benannte NPCs mit 2–4 Absätzen, alle auf der Karte erreichbar', () => {
     const { w, p } = build();
     const names = Object.keys(NPC_LORE);
-    expect(names).toHaveLength(6);
+    expect(names).toHaveLength(7);
     for (const n of names) {
       const para = NPC_LORE[n]!;
       expect(para.length).toBeGreaterThanOrEqual(2);

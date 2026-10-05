@@ -27,8 +27,8 @@ export interface TiledMap {
   layers: TiledLayer[];
 }
 
-/** Nicht begehbare Tile-IDs: 2 Wand, 6 Wasser, 10 Baum, 11 Fels, 12 Lava, 13 Grabstein, 14 Säule, 0 leer */
-const BLOCKED = new Set([0, 2, 6, 10, 11, 12, 13, 14]);
+/** Nicht begehbare Tile-IDs: 2 Wand, 6 Wasser, 10 Baum, 11 Fels, 12 Lava, 13 Grabstein, 14 Säule, 0 leer; Stadt: 18 Hauswand, 19 Fass, 20 Kisten, 21 Brunnen, 22 Laterne, 23 Boot, 24 Stand, 25 Pfahl, 26 Schiff, 27 Blumenkasten (begehbar: 15 Dielen, 16 Pflaster, 17 Blumenwiese, 28–36 Türen) */
+const BLOCKED = new Set([0, 2, 6, 10, 11, 12, 13, 14, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]);
 
 export interface LoadedMap {
   grid: Grid;

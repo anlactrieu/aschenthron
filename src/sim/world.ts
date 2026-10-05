@@ -881,7 +881,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
     }
     case 'acceptQuest': {
       const def = questById(cmd.questId);
-      const giver = w.npcs.find((n) => n.kind === 'quest' && n.quests?.includes(cmd.questId) && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
+      const giver = w.npcs.find((n) => n.quests?.includes(cmd.questId) && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
       if (!def || !giver) return fail(w, 'Hier gibt es diese Aufgabe nicht.');
       if (a.quests[def.id]) return fail(w, 'Aufgabe bereits angenommen.');
       if (a.level < def.minLevel) return fail(w, `Benötigt Level ${def.minLevel}.`);
@@ -892,7 +892,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
     case 'turnInQuest': {
       const def = questById(cmd.questId);
       const st = a.quests[cmd.questId];
-      const giver = w.npcs.find((n) => n.kind === 'quest' && n.quests?.includes(cmd.questId) && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
+      const giver = w.npcs.find((n) => n.quests?.includes(cmd.questId) && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
       if (!def || !st || !giver) return fail(w, 'Hier gibt es nichts abzugeben.');
       if (st.state !== 'done') return fail(w, 'Aufgabe noch nicht erfüllt.');
       finishQuest(w, a, def);

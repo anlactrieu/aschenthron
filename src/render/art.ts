@@ -326,6 +326,10 @@ const TILE_PAL: Record<number, TilePalette> = {
   8: { base: 0x4a5040, dots: [0x6a6e5c, 0x3a4a30, 0x585e4c], dotCount: 55 },
   9: { base: 0x3a3230, dots: [0x6a4a3a, 0x2a2220, 0x4a3c38], dotCount: 55 },
   12: { base: 0x8a2a10, dots: [0xf08a20, 0x3a1008, 0xc84a14], dotCount: 45 },
+  // Stadt (Stufe 6): Dielen, Marktplatzpflaster, Blumenwiese
+  15: { base: 0x7a5a38, dots: [0x6a4a2c, 0x8a6a44, 0x70522f], dotCount: 22 },
+  16: { base: 0x6e665e, dots: [0x80786e, 0x5c554e, 0x766e66], dotCount: 50, seams: 0x4e4741 },
+  17: { base: 0x3a5a30, dots: [0x4a6e3a, 0x2f4a28, 0x44663a], dotCount: 60 },
 };
 
 const tileCache = new Map<string, HTMLCanvasElement>();
@@ -359,6 +363,23 @@ export function tileCanvas(gid: number, variant: number): HTMLCanvasElement {
     x.stroke();
   }
   if (gid === 4 && r() < 0.15) rect(x, 28 + Math.floor(r() * 8), 12 + Math.floor(r() * 6), 2, 2, 0xc0b060);
+  if (gid === 15) {
+    // Dielen: Fugen parallel zur Kachelkante, wechselnde Brettlängen
+    x.strokeStyle = css(0x4a3220);
+    x.lineWidth = 1;
+    for (let i = -4; i <= 4; i++) {
+      x.beginPath();
+      x.moveTo(TILE_W / 2 + i * 8, 0);
+      x.lineTo(TILE_W / 2 + i * 8 + TILE_W / 2, TILE_H / 2);
+      x.lineTo(TILE_W / 2 + i * 8, TILE_H);
+      x.stroke();
+    }
+    for (let i = 0; i < 5; i++) rect(x, 8 + Math.floor(r() * 46), 4 + Math.floor(r() * 22), 2, 1, 0x3a2818);
+  }
+  if (gid === 17) {
+    const cols = [0xe05a5a, 0xf0d84a, 0xf0f0f0, 0xb07ae0];
+    for (let i = 0; i < 9; i++) rect(x, 8 + Math.floor(r() * 48), 4 + Math.floor(r() * 24), 2, 2, cols[Math.floor(r() * cols.length)]!);
+  }
   if (gid === 9 && r() < 0.3) rect(x, 20 + Math.floor(r() * 24), 8 + Math.floor(r() * 14), 2, 2, 0xd86a2a);
   if (gid === 6) {
     x.fillStyle = 'rgba(160,200,230,0.25)';
@@ -1157,4 +1178,4 @@ export function ensureTexture(scene: Phaser.Scene, key: string, make: () => HTML
   return key;
 }
 
-export { WALL_H };
+export { WALL_H, mkCanvas, ctxOf, rng, rect, css, shade, mix, outline, upscale, grounded, diamondPath };
