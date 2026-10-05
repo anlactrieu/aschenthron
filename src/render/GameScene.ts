@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
 import mapJson from '../data/aschenthron.json';
 import { buildWorld, type TiledMap } from '../sim/tiled';
-import { DMG_COLOR, STATUS_COLOR, monsterKind, npcKeyOf, questById, SKILLS, type StatusId } from '../sim/data';
+import { DMG_COLOR, STATUS_COLOR, monsterKind, npcKeyOf, questById, SKILLS, STATUS_IDS } from '../sim/data';
 import { questAvailable, questMarks, type QuestMark } from '../sim/quests';
 import { exportPlayer, importPlayer } from '../sim/save';
 import {
   applyCommand, drainEvents, getActor, maxHpOf, maxManaOf, regionAt, tick, TICK_RATE, type Actor, type Chest, type Command, type Npc, type World,
+  activeSkills,
 } from '../sim/world';
 import { isWalkable } from '../sim/path';
 import { toScreen, toTile } from './iso';
@@ -209,7 +210,7 @@ export class GameScene extends Phaser.Scene {
   /** Klassische Menüführung: Fertigkeit wählen (1–9 oder Leiste), dann Ziel anklicken. Selbstzauber wirken sofort. */
   private useSkillSlot(i: number): void {
     const p = this.player();
-    const id = p.skills[i];
+    const id = activeSkills(p)[i];
     if (!id) return;
     const s = SKILLS.find((x) => x.id === id)!;
     if (s.heal !== undefined || s.aoeSelf) {
@@ -584,6 +585,7 @@ export class GameScene extends Phaser.Scene {
           } else if (r === 'rare' || e.item.slot === 'gem') say(`Beute: ${e.item.name}`);
           break;
         }
+        case 'note': say(e.text); break;
         case 'respecced': say('Alles neu verteilt: Attribute und Fertigkeiten sind zurückgesetzt.'); this.sfx.quest(); break;
         case 'chestOpened': {
           this.sfx.chest();
@@ -1215,7 +1217,7 @@ export class GameScene extends Phaser.Scene {
           g.fillRect(sx - big / 2, top, big * Math.max(0, a.hp / a.maxHp), 5);
         }
         // Statussymbole: kleine Punkte neben dem Balken (Verlangsamung, Betäubung, Brand), Gift grün
-        const pips = [...(['slow', 'stun', 'burn'] as StatusId[]).filter((id) => a.status[id]).map((id) => parseInt(STATUS_COLOR[id].slice(1), 16)), ...(a.dot ? [0x7fe060] : [])];
+        const pips = [...STATUS_IDS.filter((id) => a.status[id]).map((id) => parseInt(STATUS_COLOR[id].slice(1), 16)), ...(a.dot ? [0x7fe060] : [])];
         pips.forEach((c, i) => {
           g.fillStyle(0x000000, 0.8);
           g.fillCircle(sx + big / 2 + 7 + i * 9, top + 2, 4);

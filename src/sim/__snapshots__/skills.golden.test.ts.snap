@@ -1,0 +1,2639 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Skills golden > Fehlerpfade: Bogen fehlt, Pfeile fehlen, Stab-Bonus, Zweihand-Nahkampf 1`] = `
+{
+  "auto": true,
+  "cd": {},
+  "ev": [
+    {
+      "reason": "Dafür brauchst du einen Bogen.",
+      "to": 1,
+      "type": "fail",
+    },
+  ],
+  "hp": 5000,
+  "mana": 5000,
+  "next": 0.7727432732935995,
+  "target": null,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 243,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Fehlerpfade: Bogen fehlt, Pfeile fehlen, Stab-Bonus, Zweihand-Nahkampf 2`] = `
+{
+  "auto": true,
+  "cd": {},
+  "ev": [
+    {
+      "reason": "Dafür brauchst du Pfeile in der Nebenhand.",
+      "to": 1,
+      "type": "fail",
+    },
+  ],
+  "hp": 5000,
+  "mana": 5000,
+  "next": 0.7727432732935995,
+  "target": null,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 243,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Fehlerpfade: Bogen fehlt, Pfeile fehlen, Stab-Bonus, Zweihand-Nahkampf 3`] = `
+{
+  "auto": false,
+  "cd": {
+    "ember_bolt": 30,
+  },
+  "ev": [
+    {
+      "amount": 105,
+      "attackerId": 1,
+      "crit": false,
+      "dt": "fire",
+      "skill": "ember_bolt",
+      "targetId": 3,
+      "type": "hit",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4990,
+  "next": 0.21976301027461886,
+  "target": 3,
+  "victims": [
+    {
+      "burn": {
+        "perSec": 11,
+        "srcId": 1,
+      },
+      "dot": null,
+      "hp": 138,
+      "status": {
+        "burn": 60,
+      },
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Fehlerpfade: Bogen fehlt, Pfeile fehlen, Stab-Bonus, Zweihand-Nahkampf 4`] = `
+{
+  "auto": false,
+  "cd": {
+    "ember_bolt": 30,
+  },
+  "ev": [
+    {
+      "amount": 105,
+      "attackerId": 1,
+      "crit": false,
+      "dt": "fire",
+      "skill": "ember_bolt",
+      "targetId": 3,
+      "type": "hit",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4990,
+  "next": 0.21976301027461886,
+  "target": 3,
+  "victims": [
+    {
+      "burn": {
+        "perSec": 11,
+        "srcId": 1,
+      },
+      "dot": null,
+      "hp": 138,
+      "status": {
+        "burn": 60,
+      },
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Fehlerpfade: Bogen fehlt, Pfeile fehlen, Stab-Bonus, Zweihand-Nahkampf 5`] = `
+{
+  "auto": true,
+  "cd": {},
+  "ev": [
+    {
+      "reason": "Ziel außer Reichweite.",
+      "to": 1,
+      "type": "fail",
+    },
+  ],
+  "hp": 5000,
+  "mana": 5000,
+  "next": 0.7727432732935995,
+  "target": null,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 243,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Rang 4, Krit, mehrere Seeds 1`] = `
+{
+  "auto": true,
+  "cd": {},
+  "ev": [
+    {
+      "reason": "Ziel außer Reichweite.",
+      "to": 1,
+      "type": "fail",
+    },
+  ],
+  "hp": 5000,
+  "mana": 5000,
+  "next": 0.5274470399599522,
+  "target": null,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 243,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Rang 4, Krit, mehrere Seeds 2`] = `
+{
+  "auto": true,
+  "cd": {},
+  "ev": [
+    {
+      "reason": "Ziel außer Reichweite.",
+      "to": 1,
+      "type": "fail",
+    },
+  ],
+  "hp": 5000,
+  "mana": 5000,
+  "next": 0.28529605525545776,
+  "target": null,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 243,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Rang 4, Krit, mehrere Seeds 3`] = `
+{
+  "auto": true,
+  "cd": {},
+  "ev": [
+    {
+      "reason": "Ziel außer Reichweite.",
+      "to": 1,
+      "type": "fail",
+    },
+  ],
+  "hp": 5000,
+  "mana": 5000,
+  "next": 0.4561921926215291,
+  "target": null,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 243,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Rang 4, Krit, mehrere Seeds 4`] = `
+{
+  "auto": true,
+  "cd": {
+    "whirlwind": 82,
+  },
+  "ev": [
+    {
+      "attackerId": 1,
+      "targetId": 4,
+      "type": "miss",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4981,
+  "next": 0.9683778982143849,
+  "target": 4,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 243,
+      "status": {},
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Rang 4, Krit, mehrere Seeds 5`] = `
+{
+  "auto": true,
+  "cd": {
+    "whirlwind": 82,
+  },
+  "ev": [
+    {
+      "amount": 33,
+      "attackerId": 1,
+      "crit": false,
+      "skill": "whirlwind",
+      "targetId": 4,
+      "type": "hit",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4981,
+  "next": 0.6308333419729024,
+  "target": 4,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 210,
+      "status": {},
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Rang 4, Krit, mehrere Seeds 6`] = `
+{
+  "auto": true,
+  "cd": {
+    "whirlwind": 82,
+  },
+  "ev": [
+    {
+      "amount": 35,
+      "attackerId": 1,
+      "crit": false,
+      "skill": "whirlwind",
+      "targetId": 4,
+      "type": "hit",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4981,
+  "next": 0.481180417817086,
+  "target": 4,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 208,
+      "status": {},
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Rang 4, Krit, mehrere Seeds 7`] = `
+{
+  "auto": false,
+  "cd": {
+    "frost_nova": 115,
+  },
+  "ev": [
+    {
+      "amount": 189,
+      "attackerId": 1,
+      "crit": false,
+      "dt": "frost",
+      "skill": "frost_nova",
+      "targetId": 4,
+      "type": "hit",
+    },
+    {
+      "amount": 416,
+      "attackerId": 1,
+      "crit": true,
+      "dt": "frost",
+      "skill": "frost_nova",
+      "targetId": 6,
+      "type": "hit",
+    },
+    {
+      "id": 6,
+      "type": "died",
+    },
+    {
+      "amount": 174,
+      "to": 1,
+      "type": "xp",
+    },
+    {
+      "amount": 24,
+      "to": 1,
+      "type": "gold",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4979,
+  "next": 0.13893358339555562,
+  "target": 4,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 54,
+      "status": {
+        "slow": 80,
+      },
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 0,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Rang 4, Krit, mehrere Seeds 8`] = `
+{
+  "auto": false,
+  "cd": {
+    "frost_nova": 115,
+  },
+  "ev": [
+    {
+      "amount": 179,
+      "attackerId": 1,
+      "crit": false,
+      "dt": "frost",
+      "skill": "frost_nova",
+      "targetId": 4,
+      "type": "hit",
+    },
+    {
+      "amount": 203,
+      "attackerId": 1,
+      "crit": false,
+      "dt": "frost",
+      "skill": "frost_nova",
+      "targetId": 6,
+      "type": "hit",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4979,
+  "next": 0.4992015736643225,
+  "target": 4,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 64,
+      "status": {
+        "slow": 80,
+      },
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 10,
+      "status": {
+        "slow": 80,
+      },
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Rang 4, Krit, mehrere Seeds 9`] = `
+{
+  "auto": false,
+  "cd": {
+    "frost_nova": 115,
+  },
+  "ev": [
+    {
+      "amount": 378,
+      "attackerId": 1,
+      "crit": true,
+      "dt": "frost",
+      "skill": "frost_nova",
+      "targetId": 4,
+      "type": "hit",
+    },
+    {
+      "id": 4,
+      "type": "died",
+    },
+    {
+      "amount": 149,
+      "to": 1,
+      "type": "xp",
+    },
+    {
+      "amount": 24,
+      "to": 1,
+      "type": "gold",
+    },
+    {
+      "amount": 348,
+      "attackerId": 1,
+      "crit": true,
+      "dt": "frost",
+      "skill": "frost_nova",
+      "targetId": 6,
+      "type": "hit",
+    },
+    {
+      "id": 6,
+      "type": "died",
+    },
+    {
+      "amount": 174,
+      "to": 1,
+      "type": "xp",
+    },
+    {
+      "amount": 26,
+      "to": 1,
+      "type": "gold",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4979,
+  "next": 0.28674706909805536,
+  "target": 4,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 0,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 0,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Rang 4, Krit, mehrere Seeds 10`] = `
+{
+  "auto": false,
+  "cd": {
+    "fireball": 74,
+  },
+  "ev": [
+    {
+      "amount": 271,
+      "attackerId": 1,
+      "crit": false,
+      "dt": "fire",
+      "skill": "fireball",
+      "targetId": 4,
+      "type": "hit",
+    },
+    {
+      "id": 4,
+      "type": "died",
+    },
+    {
+      "amount": 149,
+      "to": 1,
+      "type": "xp",
+    },
+    {
+      "amount": 27,
+      "to": 1,
+      "type": "gold",
+    },
+    {
+      "amount": 372,
+      "attackerId": 1,
+      "crit": false,
+      "dt": "fire",
+      "skill": "fireball",
+      "targetId": 5,
+      "type": "hit",
+    },
+    {
+      "id": 5,
+      "type": "died",
+    },
+    {
+      "amount": 149,
+      "to": 1,
+      "type": "xp",
+    },
+    {
+      "amount": 15,
+      "to": 1,
+      "type": "gold",
+    },
+    {
+      "item": {
+        "affixes": [],
+        "armor": undefined,
+        "arrowBonus": undefined,
+        "damage": undefined,
+        "hands": undefined,
+        "heal": 130,
+        "id": 8,
+        "kind": undefined,
+        "mana": undefined,
+        "name": "Heiltrank",
+        "off": undefined,
+        "rarity": "normal",
+        "req": undefined,
+        "reqKraft": 0,
+        "slot": "potion",
+        "speed": undefined,
+        "templateId": "heal_mid",
+        "value": 25,
+        "weight": 0.4,
+      },
+      "type": "loot",
+      "x": 13,
+      "y": 11,
+    },
+    {
+      "amount": 494,
+      "attackerId": 1,
+      "crit": true,
+      "dt": "fire",
+      "skill": "fireball",
+      "targetId": 7,
+      "type": "hit",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4972,
+  "next": 0.42738195578567684,
+  "target": 4,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 0,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 0,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": {
+        "perSec": 25,
+        "srcId": 1,
+      },
+      "dot": null,
+      "hp": 448,
+      "status": {
+        "burn": 60,
+      },
+      "target": 1,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Rang 4, Krit, mehrere Seeds 11`] = `
+{
+  "auto": false,
+  "cd": {
+    "fireball": 74,
+  },
+  "ev": [
+    {
+      "amount": 257,
+      "attackerId": 1,
+      "crit": false,
+      "dt": "fire",
+      "skill": "fireball",
+      "targetId": 4,
+      "type": "hit",
+    },
+    {
+      "id": 4,
+      "type": "died",
+    },
+    {
+      "amount": 149,
+      "to": 1,
+      "type": "xp",
+    },
+    {
+      "amount": 26,
+      "to": 1,
+      "type": "gold",
+    },
+    {
+      "amount": 815,
+      "attackerId": 1,
+      "crit": true,
+      "dt": "fire",
+      "skill": "fireball",
+      "targetId": 5,
+      "type": "hit",
+    },
+    {
+      "id": 5,
+      "type": "died",
+    },
+    {
+      "amount": 149,
+      "to": 1,
+      "type": "xp",
+    },
+    {
+      "amount": 19,
+      "to": 1,
+      "type": "gold",
+    },
+    {
+      "amount": 610,
+      "attackerId": 1,
+      "crit": true,
+      "dt": "fire",
+      "skill": "fireball",
+      "targetId": 7,
+      "type": "hit",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4972,
+  "next": 0.9151977864094079,
+  "target": 4,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 0,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 0,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": {
+        "perSec": 31,
+        "srcId": 1,
+      },
+      "dot": null,
+      "hp": 332,
+      "status": {
+        "burn": 60,
+      },
+      "target": 1,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Rang 4, Krit, mehrere Seeds 12`] = `
+{
+  "auto": false,
+  "cd": {
+    "fireball": 74,
+  },
+  "ev": [
+    {
+      "amount": 532,
+      "attackerId": 1,
+      "crit": true,
+      "dt": "fire",
+      "skill": "fireball",
+      "targetId": 4,
+      "type": "hit",
+    },
+    {
+      "id": 4,
+      "type": "died",
+    },
+    {
+      "amount": 149,
+      "to": 1,
+      "type": "xp",
+    },
+    {
+      "amount": 24,
+      "to": 1,
+      "type": "gold",
+    },
+    {
+      "amount": 692,
+      "attackerId": 1,
+      "crit": true,
+      "dt": "fire",
+      "skill": "fireball",
+      "targetId": 5,
+      "type": "hit",
+    },
+    {
+      "id": 5,
+      "type": "died",
+    },
+    {
+      "amount": 149,
+      "to": 1,
+      "type": "xp",
+    },
+    {
+      "amount": 23,
+      "to": 1,
+      "type": "gold",
+    },
+    {
+      "amount": 257,
+      "attackerId": 1,
+      "crit": false,
+      "dt": "fire",
+      "skill": "fireball",
+      "targetId": 7,
+      "type": "hit",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4972,
+  "next": 0.5264285774901509,
+  "target": 4,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 0,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 0,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": {
+        "perSec": 26,
+        "srcId": 1,
+      },
+      "dot": null,
+      "hp": 685,
+      "status": {
+        "burn": 60,
+      },
+      "target": 1,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Rang 4, Krit, mehrere Seeds 13`] = `
+{
+  "auto": false,
+  "cd": {
+    "multishot": 57,
+  },
+  "ev": [
+    {
+      "attackerId": 1,
+      "targetId": 5,
+      "type": "miss",
+    },
+    {
+      "amount": 155,
+      "attackerId": 1,
+      "crit": false,
+      "skill": "multishot",
+      "targetId": 7,
+      "type": "hit",
+    },
+    {
+      "attackerId": 1,
+      "targetId": 6,
+      "type": "miss",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4983,
+  "next": 0.45527112716808915,
+  "target": 5,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 243,
+      "status": {},
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 58,
+      "status": {},
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Rang 4, Krit, mehrere Seeds 14`] = `
+{
+  "auto": false,
+  "cd": {
+    "multishot": 57,
+  },
+  "ev": [
+    {
+      "amount": 165,
+      "attackerId": 1,
+      "crit": false,
+      "skill": "multishot",
+      "targetId": 5,
+      "type": "hit",
+    },
+    {
+      "amount": 165,
+      "attackerId": 1,
+      "crit": false,
+      "skill": "multishot",
+      "targetId": 7,
+      "type": "hit",
+    },
+    {
+      "amount": 302,
+      "attackerId": 1,
+      "crit": true,
+      "skill": "multishot",
+      "targetId": 6,
+      "type": "hit",
+    },
+    {
+      "id": 6,
+      "type": "died",
+    },
+    {
+      "amount": 149,
+      "to": 1,
+      "type": "xp",
+    },
+    {
+      "amount": 19,
+      "to": 1,
+      "type": "gold",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4983,
+  "next": 0.971613448113203,
+  "target": 5,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 78,
+      "status": {},
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 0,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 48,
+      "status": {},
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Rang 4, Krit, mehrere Seeds 15`] = `
+{
+  "auto": false,
+  "cd": {
+    "multishot": 57,
+  },
+  "ev": [
+    {
+      "amount": 151,
+      "attackerId": 1,
+      "crit": false,
+      "skill": "multishot",
+      "targetId": 5,
+      "type": "hit",
+    },
+    {
+      "amount": 330,
+      "attackerId": 1,
+      "crit": true,
+      "skill": "multishot",
+      "targetId": 7,
+      "type": "hit",
+    },
+    {
+      "id": 7,
+      "type": "died",
+    },
+    {
+      "amount": 174,
+      "to": 1,
+      "type": "xp",
+    },
+    {
+      "amount": 23,
+      "to": 1,
+      "type": "gold",
+    },
+    {
+      "item": {
+        "affixes": [],
+        "armor": 1,
+        "arrowBonus": undefined,
+        "damage": undefined,
+        "hands": undefined,
+        "heal": undefined,
+        "id": 9,
+        "kind": undefined,
+        "mana": undefined,
+        "name": "Lederkappe",
+        "off": undefined,
+        "rarity": "normal",
+        "req": {
+          "kraft": 5,
+          "level": 1,
+        },
+        "reqKraft": 5,
+        "slot": "head",
+        "speed": undefined,
+        "templateId": "leather_cap",
+        "value": 8,
+        "weight": 2,
+      },
+      "type": "loot",
+      "x": 11,
+      "y": 12,
+    },
+    {
+      "amount": 160,
+      "attackerId": 1,
+      "crit": false,
+      "skill": "multishot",
+      "targetId": 6,
+      "type": "hit",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4983,
+  "next": 0.831733848201111,
+  "target": 5,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 92,
+      "status": {},
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 15,
+      "status": {},
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 0,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Rang 4, Krit, mehrere Seeds 16`] = `
+{
+  "auto": false,
+  "cd": {
+    "poison_shot": 49,
+  },
+  "ev": [
+    {
+      "attackerId": 1,
+      "targetId": 5,
+      "type": "miss",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4989,
+  "next": 0.281103502959013,
+  "target": 5,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 243,
+      "status": {},
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Rang 4, Krit, mehrere Seeds 17`] = `
+{
+  "auto": false,
+  "cd": {
+    "poison_shot": 49,
+  },
+  "ev": [
+    {
+      "amount": 142,
+      "attackerId": 1,
+      "crit": false,
+      "dt": "poison",
+      "skill": "poison_shot",
+      "targetId": 5,
+      "type": "hit",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4989,
+  "next": 0.4992015736643225,
+  "target": 5,
+  "victims": [
+    {
+      "burn": null,
+      "dot": {
+        "perSec": 28,
+        "srcId": 1,
+        "until": 160,
+      },
+      "hp": 101,
+      "status": {},
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Rang 4, Krit, mehrere Seeds 18`] = `
+{
+  "auto": false,
+  "cd": {
+    "poison_shot": 49,
+  },
+  "ev": [
+    {
+      "amount": 132,
+      "attackerId": 1,
+      "crit": false,
+      "dt": "poison",
+      "skill": "poison_shot",
+      "targetId": 5,
+      "type": "hit",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4989,
+  "next": 0.48672957462258637,
+  "target": 5,
+  "victims": [
+    {
+      "burn": null,
+      "dot": {
+        "perSec": 26,
+        "srcId": 1,
+        "until": 160,
+      },
+      "hp": 111,
+      "status": {},
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Rang 4, Krit, mehrere Seeds 19`] = `
+{
+  "auto": false,
+  "cd": {
+    "lightning": 98,
+  },
+  "ev": [
+    {
+      "amount": 470,
+      "attackerId": 1,
+      "crit": false,
+      "skill": "lightning",
+      "targetId": 4,
+      "type": "hit",
+    },
+    {
+      "id": 4,
+      "type": "died",
+    },
+    {
+      "amount": 149,
+      "to": 1,
+      "type": "xp",
+    },
+    {
+      "amount": 27,
+      "to": 1,
+      "type": "gold",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4965,
+  "next": 0.45527112716808915,
+  "target": 4,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 0,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Rang 4, Krit, mehrere Seeds 20`] = `
+{
+  "auto": false,
+  "cd": {
+    "lightning": 98,
+  },
+  "ev": [
+    {
+      "amount": 431,
+      "attackerId": 1,
+      "crit": false,
+      "skill": "lightning",
+      "targetId": 4,
+      "type": "hit",
+    },
+    {
+      "id": 4,
+      "type": "died",
+    },
+    {
+      "amount": 149,
+      "to": 1,
+      "type": "xp",
+    },
+    {
+      "amount": 26,
+      "to": 1,
+      "type": "gold",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4965,
+  "next": 0.7858669895213097,
+  "target": 4,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 0,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Rang 4, Krit, mehrere Seeds 21`] = `
+{
+  "auto": false,
+  "cd": {
+    "lightning": 98,
+  },
+  "ev": [
+    {
+      "amount": 922,
+      "attackerId": 1,
+      "crit": true,
+      "skill": "lightning",
+      "targetId": 4,
+      "type": "hit",
+    },
+    {
+      "id": 4,
+      "type": "died",
+    },
+    {
+      "amount": 149,
+      "to": 1,
+      "type": "xp",
+    },
+    {
+      "amount": 24,
+      "to": 1,
+      "type": "gold",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4965,
+  "next": 0.19491625181399286,
+  "target": 4,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 0,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Rang 4, Krit, mehrere Seeds 22`] = `
+{
+  "auto": true,
+  "cd": {
+    "healing_hand": 164,
+  },
+  "ev": [
+    {
+      "amount": 462,
+      "to": 1,
+      "type": "healed",
+    },
+  ],
+  "hp": 562,
+  "mana": 4983,
+  "next": 0.5274470399599522,
+  "target": null,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 243,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Rang 4, Krit, mehrere Seeds 23`] = `
+{
+  "auto": true,
+  "cd": {
+    "healing_hand": 164,
+  },
+  "ev": [
+    {
+      "amount": 462,
+      "to": 1,
+      "type": "healed",
+    },
+  ],
+  "hp": 562,
+  "mana": 4983,
+  "next": 0.28529605525545776,
+  "target": null,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 243,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > Rang 4, Krit, mehrere Seeds 24`] = `
+{
+  "auto": true,
+  "cd": {
+    "healing_hand": 164,
+  },
+  "ev": [
+    {
+      "amount": 462,
+      "to": 1,
+      "type": "healed",
+    },
+  ],
+  "hp": 562,
+  "mana": 4983,
+  "next": 0.4561921926215291,
+  "target": null,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 243,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > ember_bolt Rang 1 1`] = `
+{
+  "auto": false,
+  "cd": {
+    "ember_bolt": 30,
+  },
+  "ev": [
+    {
+      "amount": 112,
+      "attackerId": 1,
+      "crit": false,
+      "dt": "fire",
+      "skill": "ember_bolt",
+      "targetId": 3,
+      "type": "hit",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4990,
+  "next": 0.21976301027461886,
+  "target": 3,
+  "victims": [
+    {
+      "burn": {
+        "perSec": 11,
+        "srcId": 1,
+      },
+      "dot": null,
+      "hp": 131,
+      "status": {
+        "burn": 60,
+      },
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > fireball Rang 1 1`] = `
+{
+  "auto": false,
+  "cd": {
+    "fireball": 90,
+  },
+  "ev": [
+    {
+      "amount": 184,
+      "attackerId": 1,
+      "crit": false,
+      "dt": "fire",
+      "skill": "fireball",
+      "targetId": 3,
+      "type": "hit",
+    },
+    {
+      "amount": 223,
+      "attackerId": 1,
+      "crit": false,
+      "dt": "fire",
+      "skill": "fireball",
+      "targetId": 4,
+      "type": "hit",
+    },
+    {
+      "id": 4,
+      "type": "died",
+    },
+    {
+      "amount": 149,
+      "to": 1,
+      "type": "xp",
+    },
+    {
+      "amount": 22,
+      "to": 1,
+      "type": "gold",
+    },
+    {
+      "item": {
+        "affixes": [],
+        "armor": 2,
+        "arrowBonus": undefined,
+        "damage": undefined,
+        "hands": undefined,
+        "heal": undefined,
+        "id": 7,
+        "kind": undefined,
+        "mana": undefined,
+        "name": "Lederwams",
+        "off": undefined,
+        "rarity": "normal",
+        "req": {
+          "gewandtheit": 11,
+          "level": 1,
+        },
+        "reqKraft": 0,
+        "slot": "chest",
+        "speed": undefined,
+        "templateId": "leather_vest",
+        "value": 30,
+        "weight": 8,
+      },
+      "type": "loot",
+      "x": 13,
+      "y": 11,
+    },
+    {
+      "amount": 178,
+      "attackerId": 1,
+      "crit": false,
+      "dt": "fire",
+      "skill": "fireball",
+      "targetId": 6,
+      "type": "hit",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4976,
+  "next": 0.013821420492604375,
+  "target": 3,
+  "victims": [
+    {
+      "burn": {
+        "perSec": 18,
+        "srcId": 1,
+      },
+      "dot": null,
+      "hp": 59,
+      "status": {
+        "burn": 60,
+      },
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 0,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": {
+        "perSec": 18,
+        "srcId": 1,
+      },
+      "dot": null,
+      "hp": 764,
+      "status": {
+        "burn": 60,
+      },
+      "target": 1,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > frost_nova Rang 1 1`] = `
+{
+  "auto": false,
+  "cd": {
+    "frost_nova": 140,
+  },
+  "ev": [
+    {
+      "amount": 124,
+      "attackerId": 1,
+      "crit": false,
+      "dt": "frost",
+      "skill": "frost_nova",
+      "targetId": 3,
+      "type": "hit",
+    },
+    {
+      "amount": 108,
+      "attackerId": 1,
+      "crit": false,
+      "dt": "frost",
+      "skill": "frost_nova",
+      "targetId": 5,
+      "type": "hit",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4982,
+  "next": 0.6231788222212344,
+  "target": 3,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 119,
+      "status": {
+        "slow": 80,
+      },
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 105,
+      "status": {
+        "slow": 80,
+      },
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > healing_hand Rang 1 1`] = `
+{
+  "auto": true,
+  "cd": {
+    "healing_hand": 200,
+  },
+  "ev": [
+    {
+      "amount": 300,
+      "to": 1,
+      "type": "healed",
+    },
+  ],
+  "hp": 400,
+  "mana": 4986,
+  "next": 0.7727432732935995,
+  "target": null,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 243,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > lightning Rang 1 1`] = `
+{
+  "auto": false,
+  "cd": {
+    "lightning": 120,
+  },
+  "ev": [
+    {
+      "amount": 323,
+      "attackerId": 1,
+      "crit": false,
+      "skill": "lightning",
+      "targetId": 3,
+      "type": "hit",
+    },
+    {
+      "id": 3,
+      "type": "died",
+    },
+    {
+      "amount": 149,
+      "to": 1,
+      "type": "xp",
+    },
+    {
+      "amount": 16,
+      "to": 1,
+      "type": "gold",
+    },
+    {
+      "item": {
+        "affixes": [],
+        "armor": undefined,
+        "arrowBonus": undefined,
+        "damage": undefined,
+        "hands": undefined,
+        "heal": 130,
+        "id": 7,
+        "kind": undefined,
+        "mana": undefined,
+        "name": "Heiltrank",
+        "off": undefined,
+        "rarity": "normal",
+        "req": undefined,
+        "reqKraft": 0,
+        "slot": "potion",
+        "speed": undefined,
+        "templateId": "heal_mid",
+        "value": 25,
+        "weight": 0.4,
+      },
+      "type": "loot",
+      "x": 12,
+      "y": 10,
+    },
+  ],
+  "hp": 5000,
+  "mana": 4970,
+  "next": 0.7406128125730902,
+  "target": 3,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 0,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > multishot Rang 1 1`] = `
+{
+  "auto": false,
+  "cd": {
+    "multishot": 70,
+  },
+  "ev": [
+    {
+      "amount": 90,
+      "attackerId": 1,
+      "crit": false,
+      "skill": "multishot",
+      "targetId": 4,
+      "type": "hit",
+    },
+    {
+      "amount": 87,
+      "attackerId": 1,
+      "crit": false,
+      "skill": "multishot",
+      "targetId": 6,
+      "type": "hit",
+    },
+    {
+      "amount": 102,
+      "attackerId": 1,
+      "crit": false,
+      "skill": "multishot",
+      "targetId": 5,
+      "type": "hit",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4986,
+  "next": 0.9056215002201498,
+  "target": 4,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 153,
+      "status": {},
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 73,
+      "status": {},
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 126,
+      "status": {},
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > poison_shot Rang 1 1`] = `
+{
+  "auto": false,
+  "cd": {
+    "poison_shot": 60,
+  },
+  "ev": [
+    {
+      "amount": 78,
+      "attackerId": 1,
+      "crit": false,
+      "dt": "poison",
+      "skill": "poison_shot",
+      "targetId": 4,
+      "type": "hit",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4991,
+  "next": 0.08513720124028623,
+  "target": 4,
+  "victims": [
+    {
+      "burn": null,
+      "dot": {
+        "perSec": 16,
+        "srcId": 1,
+        "until": 160,
+      },
+      "hp": 165,
+      "status": {},
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > power_strike Rang 1 1`] = `
+{
+  "auto": true,
+  "cd": {},
+  "ev": [
+    {
+      "reason": "Ziel außer Reichweite.",
+      "to": 1,
+      "type": "fail",
+    },
+  ],
+  "hp": 5000,
+  "mana": 5000,
+  "next": 0.7727432732935995,
+  "target": null,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 243,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > quick_shot Rang 1 1`] = `
+{
+  "auto": false,
+  "cd": {
+    "quick_shot": 20,
+  },
+  "ev": [
+    {
+      "amount": 81,
+      "attackerId": 1,
+      "crit": false,
+      "skill": "quick_shot",
+      "targetId": 4,
+      "type": "hit",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4996,
+  "next": 0.08513720124028623,
+  "target": 4,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 162,
+      "status": {},
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > skull_split Rang 1 1`] = `
+{
+  "auto": true,
+  "cd": {},
+  "ev": [
+    {
+      "reason": "Ziel außer Reichweite.",
+      "to": 1,
+      "type": "fail",
+    },
+  ],
+  "hp": 5000,
+  "mana": 5000,
+  "next": 0.7727432732935995,
+  "target": null,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 243,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;
+
+exports[`Skills golden > whirlwind Rang 1 1`] = `
+{
+  "auto": true,
+  "cd": {
+    "whirlwind": 100,
+  },
+  "ev": [
+    {
+      "amount": 37,
+      "attackerId": 1,
+      "crit": false,
+      "skill": "whirlwind",
+      "targetId": 3,
+      "type": "hit",
+    },
+  ],
+  "hp": 5000,
+  "mana": 4984,
+  "next": 0.6231788222212344,
+  "target": 3,
+  "victims": [
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 206,
+      "status": {},
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 175,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 213,
+      "status": {},
+      "target": null,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 942,
+      "status": {},
+      "target": null,
+    },
+  ],
+}
+`;

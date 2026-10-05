@@ -4,9 +4,10 @@ import { itemReq, itemAffixes, gemTemplateId, handsOf, weaponSpeedOf, rollGem, r
 import {
   ATTR_KEYS, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
   monsterKind, npcKeyOf, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
-  FAMILY_RES, MAX_RES, SLOW_FACTOR, type DmgType, type StatusId,
+  FAMILY_RES, MAX_RES, SLOW_FACTOR, STATUS_IDS, type DmgType, type StatusId, type SkillDef,
   ATTR_THRESHOLD, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, WILL_STATUS_PER_POINT, WILL_STATUS_CAP, GEM_MIN_LEVEL, GEM_DROP, GEM_SOCKET_COST, WORLD_BOSS_LOOT, type QuestDef,
 } from './data';
+import { EFFECTS, controlDr, mergeStatus } from './effects';
 
 export const TICK_RATE = 20;
 export const NPC_RANGE = 3;
@@ -120,6 +121,10 @@ export interface Actor {
   dot: { perSec: number; until: number; srcId: number } | null;
   /** Statuseffekte: Ende (Tick) je Effekt; Brand-Schaden pro Sekunde und Verursacher in `burn` */
   status: Partial<Record<StatusId, number>>;
+  /** Stärke eines Effekts (nur Effekte mit Stärke, z. B. Schutz; optional, wird nicht gespeichert) */
+  statusMag?: Partial<Record<StatusId, number>>;
+  /** Kontroll-Verkürzung: letzter Treffer und Wiederholungszähler je Effekt */
+  ccDr?: Partial<Record<StatusId, { at: number; n: number }>>;
   burn: { perSec: number; srcId: number } | null;
   /** Schadensart der normalen Angriffe (Monster) */
   dmgType: DmgType;
@@ -222,7 +227,9 @@ type GameEventBase =
   | { type: 'summon'; id: number }
   | { type: 'mheal'; id: number; targetId: number; amount: number }
   | { type: 'charge'; id: number }
-  | { type: 'respecced' };
+  | { type: 'respecced' }
+  /** Erklärung einer Regelwirkung (Resistenz, Immunität, Bannung …) für das Kampflog; immer an einen Spieler gerichtet (`to`) */
+  | { type: 'note'; text: string };
 
 /** `to`: nur für diesen Akteur bestimmt (sonst sichtbar für alle in der Nähe). */
 export type GameEvent = GameEventBase & { to?: number };
@@ -388,17 +395,42 @@ export function resistOf(a: Actor, dt: DmgType): number {
   return (a.kindId && FAMILY_RES[monsterKind(a.kindId).family]?.[dt]) || 0;
 }
 
-/** Setzt einen Statuseffekt. Die Resistenz gegen `dt` verkürzt die Dauer (100 % = wirkungslos), Bosse sind nur halb so lange betäubt. */
-export function applyStatus(w: World, t: Actor, id: StatusId, seconds: number, dt: DmgType, burn?: { perSec: number; srcId: number }): void {
+/** Entfernt alle Statuseffekte samt Stärken und Verkürzungszählern (Tod, Wiedererscheinen). */
+function clearStatus(a: Actor): void {
+  a.status = {};
+  a.statusMag = undefined;
+  a.ccDr = undefined;
+}
+
+/** Hinweis für das Kampflog an die beteiligten Spieler (Ziel, sonst der Wirkende des laufenden Befehls). Nur für echte Regelwirkungen, nie je Treffer. */
+export function note(w: World, a: Actor, text: string): void {
+  const to = a.kind === 'player' ? a.id : w.cmdActor;
+  if (to !== null && getActor(w, to)?.kind === 'player') w.events.push({ type: 'note', text, to });
+}
+
+/** Setzt einen Statuseffekt. Die Resistenz gegen `dt` verkürzt die Dauer (100 % = wirkungslos), Bosse sind nur halb so lange betäubt; Stapelregeln und Kontroll-Verkürzung stehen in `effects.ts`. */
+export function applyStatus(w: World, t: Actor, id: StatusId, seconds: number, dt: DmgType, burn?: { perSec: number; srcId: number }, mag?: number): void {
   if (!t.alive) return;
+  const def = EFFECTS[id];
   const res = resistOf(t, dt);
-  if (res >= 100) return;
+  if (res >= 100) {
+    note(w, t, `${t.name} ist immun gegen ${def.label}.`);
+    return;
+  }
   // Willenskraft verkürzt Betäubung und Verlangsamung zusätzlich
   const will = id === 'stun' || id === 'slow' ? 1 - Math.min(WILL_STATUS_CAP, Math.max(0, t.attrs.willenskraft - 10) * WILL_STATUS_PER_POINT) : 1;
-  const secs = seconds * (id === 'stun' && t.boss ? 0.5 : 1) * (1 - Math.max(0, res) / 100) * will;
+  const dr = controlDr(def, t.ccDr?.[id], w.tick);
+  const secs = seconds * (id === 'stun' && t.boss ? 0.5 : 1) * (1 - Math.max(0, res) / 100) * will * dr.factor;
   const until = w.tick + Math.round(secs * TICK_RATE);
   if (until <= w.tick) return;
-  if ((t.status[id] ?? 0) < until) t.status[id] = until;
+  if (def.dr) (t.ccDr ??= {})[id] = dr.state;
+  if (dr.factor < 1) note(w, t, `${def.label} auf ${t.name} wirkt nur noch verkürzt (wiederholte Kontrolle).`);
+  else if (res > 0 && seconds > 0) note(w, t, `${def.label} auf ${t.name} durch Resistenz verkürzt.`);
+  const merged = mergeStatus(def, t.status[id] === undefined ? undefined : { until: t.status[id]!, mag: t.statusMag?.[id] }, { until, mag });
+  if (merged) {
+    t.status[id] = merged.until;
+    if (merged.mag !== undefined) (t.statusMag ??= {})[id] = merged.mag;
+  }
   if (id === 'burn' && burn && (!t.burn || burn.perSec >= t.burn.perSec)) t.burn = burn;
 }
 
@@ -911,25 +943,66 @@ export function craftCost(item: Item, op: 'upgrade' | 'reroll' | 'extend'): numb
   return Math.round(120 + item.value * 1.2);
 }
 
+/** Aktive Fertigkeiten in Lernreihenfolge: nur sie belegen Hotbar-Plätze (1–9); Passive wirken dauerhaft. */
+export function activeSkills(p: Actor): string[] {
+  return p.skills.filter((id) => !skillById(id)?.passive);
+}
+
+/** Selbstheilung (Skills mit `heal`): Basiswert plus Attribut-Skalierung, Stufe und Rang. */
+function castHeal(w: World, a: Actor, s: SkillDef, rank: number, manaCost: number): void {
+  const lvl = 1 + a.level * 0.1;
+  const scale = s.scales ? Math.max(0, a.attrs[s.scales] - 10) * 3 : 0;
+  const amount = Math.round((s.heal! + scale) * lvl * rankDamage(rank));
+  a.mana -= manaCost;
+  a.skillCd[s.id] = Math.round(s.cooldown * rankCooldown(rank));
+  const before = a.hp;
+  a.hp = Math.min(maxHpOf(a), a.hp + amount);
+  w.events.push({ type: 'healed', amount: Math.round(a.hp - before), to: a.id });
+}
+
+/** Alle Gegner, die ein Schadens-Skill trifft (Fläche um den Wirkenden oder das Ziel, Mehrfachziel nach Entfernung, sonst nur das Ziel). */
+function skillVictims(w: World, a: Actor, s: SkillDef, first: Actor | undefined): Actor[] {
+  const enemy = (x: Actor) => x.alive && x.id !== a.id && (x.kind !== a.kind || canPvp(w, a, x));
+  if (s.aoeSelf) return w.actors.filter((x) => enemy(x) && Math.hypot(x.x - a.x, x.y - a.y) <= s.aoe!);
+  if (s.aoe) return w.actors.filter((x) => enemy(x) && Math.hypot(x.x - first!.x, x.y - first!.y) <= s.aoe!);
+  if (s.targets) {
+    return [first!, ...w.actors.filter((x) => enemy(x) && x.id !== first!.id && Math.hypot(x.x - a.x, x.y - a.y) <= s.range).sort((p, q) => Math.hypot(p.x - a.x, p.y - a.y) - Math.hypot(q.x - a.x, q.y - a.y))].slice(0, s.targets);
+  }
+  return [first!];
+}
+
+/** Rohschaden eines Treffers (würfelt genau einmal): Nahkampf-Skills über Waffenschaden, sonst Basisbereich plus Attribut, passende Waffe und Pfeile. */
+function skillRawDamage(w: World, a: Actor, s: SkillDef, rank: number, arrows: Item | undefined): number {
+  if (s.mult) {
+    const [lo, hi] = damageRange(a);
+    return Math.round(w.rng.int(lo, hi) * s.mult * rankDamage(rank));
+  }
+  const lvl = 1 + a.level * 0.1;
+  const [lo, hi] = s.base!;
+  const scale = s.scales ? Math.max(0, a.attrs[s.scales] - 10) * (1 + a.level * 0.08) : 0;
+  const wp = a.equipment.weapon;
+  const matches = wp?.damage && ((s.area === 'Fernkampf' && wp.kind === 'bow') || (s.area === 'Magie' && wp.kind === 'staff'));
+  const weaponBonus = matches ? ((wp!.damage![0] + wp!.damage![1]) / 2) * 0.9 : 0;
+  const spell = s.area === 'Magie' ? 1 + attrBonus(a, 'verstand') / 100 : 1;
+  return Math.round((w.rng.int(lo, hi) * lvl + scale + weaponBonus + (arrows?.arrowBonus ?? 0)) * rankDamage(rank) * spell);
+}
+
+/** Nebenwirkungen eines Treffers: Statuseffekt (Brand: 10 % des Treffers pro Sekunde) und Gift über Zeit. */
+function skillRiders(w: World, a: Actor, s: SkillDef, v: Actor, amount: number, dt: DmgType): void {
+  if (s.status) applyStatus(w, v, s.status.id, s.status.seconds, s.status.id === 'stun' ? 'physical' : dt, s.status.id === 'burn' ? { perSec: Math.max(1, Math.round(amount * 0.1)), srcId: a.id } : undefined);
+  if (s.dot && resistOf(v, dt) < 100) v.dot = { perSec: Math.max(1, Math.round((amount * s.dot.factor) / s.dot.seconds)), until: w.tick + s.dot.seconds * TICK_RATE, srcId: a.id };
+}
+
 function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void {
   const s = skillById(skillId);
   if (!s || !a.skills.includes(s.id)) return fail(w, 'Fertigkeit nicht gelernt.');
+  if (s.passive) return fail(w, 'Passive Fertigkeiten wirken von selbst.');
   if ((a.skillCd[s.id] ?? 0) > 0) return;
   if (a.status.stun) return fail(w, 'Du bist betäubt.');
   const rank = a.skillRanks[s.id] ?? 1;
   const manaCost = Math.round(s.mana * rankMana(rank));
   if (a.mana < manaCost) return fail(w, 'Nicht genug Mana.');
-  const lvl = 1 + a.level * 0.1;
-  if (s.heal !== undefined) {
-    const scale = s.scales ? Math.max(0, a.attrs[s.scales] - 10) * 3 : 0;
-    const amount = Math.round((s.heal + scale) * lvl * rankDamage(rank));
-    a.mana -= manaCost;
-    a.skillCd[s.id] = Math.round(s.cooldown * rankCooldown(rank));
-    const before = a.hp;
-    a.hp = Math.min(maxHpOf(a), a.hp + amount);
-    w.events.push({ type: 'healed', amount: Math.round(a.hp - before), to: a.id });
-    return;
-  }
+  if (s.heal !== undefined) return castHeal(w, a, s, rank, manaCost);
   if (a.kind === 'player' && inSafeZone(w, a.x, a.y)) return fail(w, 'In der Stadt ist Kämpfen verboten.');
   const bowShot = s.area === 'Fernkampf' && a.kind === 'player';
   if (bowShot) {
@@ -938,16 +1011,9 @@ function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void 
   }
   const first = getActor(w, targetId ?? a.targetId ?? -1);
   if (!s.aoeSelf && (!first || !first.alive || first.id === a.id)) return fail(w, 'Kein Ziel.');
-  const range = s.range;
-  if (first && !s.aoeSelf && Math.hypot(a.x - first.x, a.y - first.y) > range) return fail(w, 'Ziel außer Reichweite.');
+  if (first && !s.aoeSelf && Math.hypot(a.x - first.x, a.y - first.y) > s.range) return fail(w, 'Ziel außer Reichweite.');
   if (first && first.kind === 'player' && !canPvp(w, a, first)) return fail(w, 'Hier ist kein Kampf gegen Spieler erlaubt.');
-  const enemy = (x: Actor) => x.alive && x.id !== a.id && (x.kind !== a.kind || canPvp(w, a, x));
-  let victims: Actor[];
-  if (s.aoeSelf) victims = w.actors.filter((x) => enemy(x) && Math.hypot(x.x - a.x, x.y - a.y) <= s.aoe!);
-  else if (s.aoe) victims = w.actors.filter((x) => enemy(x) && Math.hypot(x.x - first!.x, x.y - first!.y) <= s.aoe!);
-  else if (s.targets) {
-    victims = [first!, ...w.actors.filter((x) => enemy(x) && x.id !== first!.id && Math.hypot(x.x - a.x, x.y - a.y) <= range).sort((p, q) => Math.hypot(p.x - a.x, p.y - a.y) - Math.hypot(q.x - a.x, q.y - a.y))].slice(0, s.targets);
-  } else victims = [first!];
+  const victims = skillVictims(w, a, s, first);
   if (!victims.length) return fail(w, 'Kein Ziel.');
   a.mana -= manaCost;
   a.skillCd[s.id] = Math.round(s.cooldown * rankCooldown(rank));
@@ -959,25 +1025,12 @@ function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void 
     a.targetId = first.id;
   }
   a.path = [];
+  const dt = s.dmgType ?? 'physical';
   for (const v of victims) {
-    let amount: number;
-    if (s.mult) {
-      const [lo, hi] = damageRange(a);
-      amount = Math.round(w.rng.int(lo, hi) * s.mult * rankDamage(rank));
-    } else {
-      const [lo, hi] = s.base!;
-      const scale = s.scales ? Math.max(0, a.attrs[s.scales] - 10) * (1 + a.level * 0.08) : 0;
-      const wp = a.equipment.weapon;
-      const matches = wp?.damage && ((s.area === 'Fernkampf' && wp.kind === 'bow') || (s.area === 'Magie' && wp.kind === 'staff'));
-      const weaponBonus = matches ? ((wp!.damage![0] + wp!.damage![1]) / 2) * 0.9 : 0;
-      const spell = s.area === 'Magie' ? 1 + attrBonus(a, 'verstand') / 100 : 1;
-      amount = Math.round((w.rng.int(lo, hi) * lvl + scale + weaponBonus + (arrows?.arrowBonus ?? 0)) * rankDamage(rank) * spell);
-    }
-    const dt = s.dmgType ?? 'physical';
+    const amount = skillRawDamage(w, a, s, rank, arrows);
     const dealt = dealDamage(w, a, v, amount, s.ignoresArmor, s.id, false, !s.ignoresArmor, dt);
     if (dealt < 0 || !v.alive) continue;
-    if (s.status) applyStatus(w, v, s.status.id, s.status.seconds, s.status.id === 'stun' ? 'physical' : dt, s.status.id === 'burn' ? { perSec: Math.max(1, Math.round(amount * 0.1)), srcId: a.id } : undefined);
-    if (s.dot && resistOf(v, dt) < 100) v.dot = { perSec: Math.max(1, Math.round((amount * s.dot.factor) / s.dot.seconds)), until: w.tick + s.dot.seconds * TICK_RATE, srcId: a.id };
+    skillRiders(w, a, s, v, amount, dt);
   }
 }
 
@@ -1219,7 +1272,7 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
   t.path = [];
   t.targetId = null;
   t.dot = null;
-  t.status = {};
+  clearStatus(t);
   t.burn = null;
   if (t.abilities.includes('raise')) dismissSummons(w, t);
   t.diedAt = w.tick;
@@ -1352,7 +1405,7 @@ function onPlayerDeath(w: World, p: Actor): void {
   p.path = [];
   p.targetId = null;
   p.pickupId = null;
-  p.status = {};
+  clearStatus(p);
   p.burn = null;
   p.dot = null;
   for (const m of w.actors) if (m.kind === 'monster' && m.targetId === p.id) m.targetId = null;
@@ -1395,7 +1448,10 @@ export function tick(w: World): void {
         if (!a.alive) continue;
       } else if (w.tick >= a.dot.until) a.dot = null;
     }
-    for (const id of ['slow', 'stun', 'burn'] as const) if (a.status[id] !== undefined && a.status[id]! <= w.tick) delete a.status[id];
+    for (const id of STATUS_IDS) if (a.status[id] !== undefined && a.status[id]! <= w.tick) {
+      delete a.status[id];
+      if (a.statusMag) delete a.statusMag[id];
+    }
     if (a.burn) {
       if (!a.status.burn) a.burn = null;
       else if (w.tick % TICK_RATE === 0) {
@@ -1498,7 +1554,7 @@ function reviveMonster(w: World, m: Actor): void {
   m.targetId = null;
   m.path = [];
   m.dot = null;
-  m.status = {};
+  clearStatus(m);
   m.burn = null;
   m.damagers = {};
   m.summoned = false;

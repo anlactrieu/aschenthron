@@ -1,4 +1,4 @@
-import { ATTR_KEYS } from './data';
+import { ATTR_KEYS, STATUS_IDS, type StatusId } from './data';
 import { EQUIP_SLOT_LIST } from './items';
 import { isWalkable } from './path';
 import type { Actor, Command, GameEvent, GroundItem, World } from './world';
@@ -76,7 +76,7 @@ export interface ActorLite {
   champ?: string;
   unique?: string;
   /** Statuseffekte (Verlangsamung, Betäubung, Brand, Gift) für Farbton und Symbole */
-  st?: ('slow' | 'stun' | 'burn' | 'poison')[];
+  st?: (StatusId | 'poison')[];
   /** nur Spieler: angelegte Ausrüstung für die Optik */
   equipment?: Actor['equipment'];
 }
@@ -95,7 +95,7 @@ export interface Snapshot {
 
 const statusList = (a: Actor): ActorLite['st'] => {
   const st: NonNullable<ActorLite['st']> = [];
-  for (const id of ['slow', 'stun', 'burn'] as const) if (a.status[id]) st.push(id);
+  for (const id of STATUS_IDS) if (a.status[id]) st.push(id);
   if (a.dot) st.push('poison');
   return st.length ? st : undefined;
 };

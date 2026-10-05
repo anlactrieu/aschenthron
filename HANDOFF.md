@@ -1,6 +1,23 @@
 # HANDOFF – Aschenthron
 
-## Überblick (Stand: alle Solo-Pakete P1–P4 + Animation-Fix committet und online)
+## AKTUELL: Stufe 6 (Build-Tiefe) – Phase 1 (Fundament) umgesetzt und committet, Phase 2/3 offen
+- Phase 1: `effects.ts` (EFFECTS-Tabelle, mergeStatus, controlDr, cleanse/dispel), `STATUS_IDS` in `data.ts`, `SkillDef.school/target/passive/info` + `schoolOf`, `useSkill` zerlegt (Golden-Test `skills.golden.test.ts` + Snapshot beweist identische Werte), Event `note` (Kampflog, immer mit `to`), `activeSkills(p)` für Hotbar/Slots. 223 Tests, Lint, Build grün. NICHT gepusht (Push auf main deployt Pages).
+- Offen aus Phase 1: Blitzschlag-Fix (kein passender DmgType; eigener Commit/Entscheidung), Gratis-Respec-Merker kommt mit Phase 2 (`save.ts` KEYS).
+- Nächster Schritt: Phase 2 (neue Skills/Zauber).
+- Stand: Analysebericht geliefert, Entscheidungen in `SPEC.md` ("Stufe 6") festgehalten (ungecommittet). Kein Code geändert.
+- **Nächster Schritt:** `/clear`, frische Session, Phase 1 aus `SPEC.md` umsetzen (Fundament), Advisor zu Beginn.
+- **Letzte 3 Entscheidungen:**
+  1. Erste Runde nur Phase 1–3 (Fundament, Skills/Zauber, Items): Diff überschaubar, UI/Benchmark danach.
+  2. Einmal gratis Respec per neuem Spielstand-Merker (`save.ts` `KEYS`): Spieler mit 31 verteilten Punkten sollen neue Skills testen können.
+  3. Solo-Support = Selbsterhalt/Schutz/Debuffs, Fremdheilung nur Mehrspieler: es gibt keine Verbündeten, keine Begleiter-Systeme.
+- **Offene TODOs:** Phase 1–3 umsetzen; Item-Abschnitt der Ursprungsanfrage war abgeschnitten (User nach Rest fragen); Wahrnehmung/Objektinteraktion später.
+- **Relevante Stellen:** `world.ts` `useSkill`, `dealDamage` (9 Positionsparameter), `applyStatus`, `resistOf`, `affixSum`, `powerOf`; `data.ts` `SkillDef`/`SKILLS`/`StatusId`; `items.ts` `Stat`/`AFFIXES`/`base`/`Power`; `net.ts` `ActorLite.st`/`actorFromLite`; `ui.ts` `renderSkills`/`skillCard`/Hotbar (`p.skills`), `GameScene.ts` `useSkillSlot` + hartkodierte Skill-ID-Listen.
+- **Learnings (neu):** Blitzschlag (`lightning`) hat kein `dmgType` → zählt physisch, umgeht Elementarresistenz (Bug). Pace-Bot nutzt keine Skills → Skill-Änderungen verschieben Pace nicht, Gear-Änderungen schon. Hotbar-Slot = Index in `p.skills` (Lernreihenfolge), Passive dürfen dort nicht auftauchen. Tooltip zeigt negative Affixe als "+-5". Neue RNG-Würfe in bestehenden Pfaden brechen Seed-Tests/Pace.
+
+---
+## Frühere Stände (Stand: alle Solo-Pakete P1–P4 + Animation-Fix committet und online)
+
+## Überblick
 - Dark-Fantasy-ARPG im T4C-Geist (Phaser 4 + TypeScript, Vite). Sim in `src/sim` ist Autorität (online-fähig), Render in `src/render`. Karte `src/data/aschenthron.json` (MAP_VERSION 4, aus `scripts/gen_map.py`).
 - **Online-Test:** https://anlactrieu.github.io/aschenthron/ (GitHub Pages, Workflow `.github/workflows/pages.yml`, baut bei jedem Push auf `main` nach Tests; `BASE_PATH=/aschenthron/`). Repo: https://github.com/anlactrieu/aschenthron (öffentlich). Mehrspieler-Server ist NICHT online (nur lokal: `npm run server`).
 - Befehle: `npm run dev | server | test | lint | build | pace`; URL-Parameter `?neu`, `?fps`, `?slowfx`, `?stunde=22`, `?wetter=regen|nebel|asche|klar`, `?server=…&name=…`.

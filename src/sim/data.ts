@@ -73,6 +73,8 @@ export const MAX_RES = 75;
 
 /** Statuseffekte (Dauer in Ticks im Actor-Feld `status`). */
 export type StatusId = 'slow' | 'stun' | 'burn';
+/** Alle Statuseffekte an einer Stelle (Ablauf, Netz, HUD): neue Effekte hier und in `effects.ts` eintragen. */
+export const STATUS_IDS: readonly StatusId[] = ['slow', 'stun', 'burn'];
 export const STATUS_NAME: Record<StatusId, string> = { slow: 'Verlangsamt', stun: 'Betäubt', burn: 'Brennt' };
 export const STATUS_COLOR: Record<StatusId, string> = { slow: '#8fd0ff', stun: '#ffe45a', burn: '#ff9a3a' };
 /** Verlangsamung: Tempo und Angriffstempo auf diesen Faktor */
@@ -284,6 +286,23 @@ export function monsterKind(id: string): MonsterKind {
   return k;
 }
 
+/** Funktionsgruppe eines Skills/Zaubers (Taktik, nicht Schadensart). */
+export type SkillSchool = 'direct' | 'dot' | 'heal' | 'protect' | 'buff' | 'debuff' | 'control' | 'dispel' | 'resource' | 'utility';
+export const SCHOOL_NAME: Record<SkillSchool, string> = {
+  direct: 'Direktschaden', dot: 'Schaden über Zeit', heal: 'Heilung', protect: 'Schutz', buff: 'Verstärkung', debuff: 'Schwächung', control: 'Kontrolle', dispel: 'Bannung', resource: 'Ressource/Bewegung', utility: 'Hilfsfertigkeit',
+};
+/** Wen ein Skill trifft: Gegner, den Wirkenden selbst oder (nur Mehrspieler) einen verbündeten Spieler. */
+export type SkillTarget = 'enemy' | 'self' | 'ally';
+
+/** Erklärung für die UI: Was ändert der Skill, für wen lohnt er, womit kombiniert er, was kostet die Entscheidung, was kann er nicht. */
+export interface SkillInfo {
+  role: string;
+  build: string;
+  synergy: string;
+  decision: string;
+  limit: string;
+}
+
 export interface SkillDef {
   id: string;
   name: string;
@@ -315,6 +334,21 @@ export interface SkillDef {
   /** Lehrer-Stufe: 1 = Aschenhafen, 2 = Felsenwacht */
   tier: number;
   desc: string;
+  /** Funktionsgruppe (ohne Angabe: aus den übrigen Feldern abgeleitet, siehe `schoolOf`) */
+  school?: SkillSchool;
+  target?: SkillTarget;
+  /** Passiv: wirkt dauerhaft, belegt keinen Hotbar-Platz, wird nicht gewirkt */
+  passive?: boolean;
+  info?: SkillInfo;
+}
+
+/** Funktionsgruppe eines Skills: explizit gesetzt oder aus den Wirkfeldern abgeleitet. */
+export function schoolOf(s: SkillDef): SkillSchool {
+  if (s.school) return s.school;
+  if (s.heal !== undefined) return 'heal';
+  if (s.dot) return 'dot';
+  if (s.status && (s.status.id === 'stun' || s.status.id === 'slow') && !s.base && !s.mult) return 'control';
+  return 'direct';
 }
 
 export const SKILLS: SkillDef[] = [

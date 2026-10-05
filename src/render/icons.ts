@@ -1,6 +1,6 @@
 import type { Item } from '../sim/items';
 import { GEM_COLOR, templateById } from '../sim/items';
-import type { SkillDef } from '../sim/data';
+import type { SkillDef, StatusId } from '../sim/data';
 import { sprite } from './sprites';
 import { ITEM_SPRITES, POTION_QUICK, SKILL_SPRITES } from './spriteMap';
 
@@ -328,7 +328,7 @@ export function potionIcon(kind: 'heal' | 'mana'): string {
 
 const statusCache = new Map<string, string>();
 /** Kleine Symbole für die Status-Chips im HUD (selbst gezeichnet; die DCSS-Pakete enthalten keine Statussymbole). */
-export function statusIcon(id: 'slow' | 'stun' | 'burn' | 'poison'): string {
+export function statusIcon(id: StatusId | 'poison'): string {
   const hit = statusCache.get(id);
   if (hit) return hit;
   const url = make((c) => {

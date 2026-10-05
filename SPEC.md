@@ -166,3 +166,19 @@ Ausgenommen (nur Mehrspieler): Chat, Gruppen, Spieler-Handel, Gilden, Kopfgeld/D
 - **P2 Ausrüstung & Loot:** Gürtel/Umhang/Beine, Zweihänder vs. Einhänder+Schild, Waffenfamilien, Attribut-Tiefe (Willenskraft, Schwellen), Affix-Stufen + Prefix/Suffix-Namen, Sockel/Gems.
 - **P3 Welt & Endgame:** Tag/Nacht + Wetter, Lore-NPCs + Questketten, Goblin-/Spinnen-Dungeon, Elite-Zone + Weltbosse (Respawn), Level-Kurve bleibt (Bot ≈ 8 h).
 - **P4 Grafik:** CC0-Pack (Dungeon Crawl 32x32) einbauen, `ASSETS.md` + Credits, prozeduraler Fallback.
+
+## Stufe 6: Build-Tiefe für Skills, Zauber und Items (entschieden, noch NICHT umgesetzt)
+Ziel: freie Builds statt Itemleiter, nur Prinzipien klassischer freier MMORPGs, eigene Namen. Bestehende IDs, Speicherformate und Balance bleiben. Zauber = `SkillDef` mit `area: 'Magie'` (kein Parallelsystem), Skillpunkte bleiben die einzige Währung. Umsetzung in frischer Session, je Phase ein Commit mit Tests/Lint/Build.
+
+**Entscheidungen (User):**
+- Umfang erste Runde: Phase 1–3 (Fundament, Skills/Zauber, Items). UI-Politur (Buildprofil) und Balance-Benchmark danach.
+- Respec: einmal gratis nach dem Update (neuer Merker im Spielstand, `save.ts` `KEYS`; Altstände ohne Merker bekommen ihn).
+- Support im Solo: Selbsterhalt, Schutz, Debuffs auf Gegner. Fremdheilung nur im Mehrspielermodus (`target: 'ally'`). Keine Begleiter.
+- Utility jetzt nur Schleichen, Erste Hilfe, Überleben. Wahrnehmung/Objektinteraktion später (bräuchte neue Spielobjekte).
+
+**Phase 1 Fundament:** `effects.ts` (Tabelle je Status: Art Buff/Debuff/Kontrolle, Schule, Stapelregel ersetzen/erneuern/stapeln, entfernbar, Kontroll-Verkürzung bei Wiederholung), `applyStatus` zieht ein, `dispel`/`cleanse`; optionales `Actor.statusMag`. `SkillDef`: optional `school`, `target`, `passive`, `info {Wirkung, Build, Synergie, Entscheidung, Grenze}`. `useSkill` in Effekt-Handler zerlegen; Golden-Test (fester Seed) beweist: 12 Alt-Skills liefern identische Werte. Ereignis `note` für Combat-Log-Erklärungen. Hotbar nur aktive Skills. Blitzschlag-Fix (Schadensart fehlte). Neue RNG-Würfe nur bei aktivem Feature (Seed-Stabilität).
+**Phase 2 Skills (~14 neu, Alte unverändert):** Passiv: Parieren, Ausweichtraining, Präzision, Rüstungsbrecher, Schildbeherrschung. Magie: Elementarschild, Steinhaut, Schwäche/Fluch, Stille (unterbricht Zauber), Entzaubern, Läuterung, Manafluss. Utility: Erste Hilfe, Schleichen (Aggro-Radius), Überleben. Alle Boni gedeckelt. Gegenmaßnahmen: Entzauberer-Monster (Knochenakolyth), Kontrollresistenz Boss/Familie.
+**Phase 3 Items (neue Vorlagen, Alt-Werte bleiben):** neue Stats (`spellFire`, `spellFrost`, `healPower`, `manaCost`, `ctrl`, Bewegung), Nachteile als negative `base`-Werte, Besonderheiten über `Power`; je Build 2–3 Vorlagen (Elementarstab, Paradeschwert, Bollwerk-Schild mit Tempo-Abzug, Heilring mit Manakosten, Kontroll-Amulett). Tooltip mit Vorzeichen, `gearScore` mit Nachteilen, `POWER_TEXT`-Guard.
+**Phase 4/5 (später):** Skillkarte mit Info-Zeilen, Buildprofil/Archetyp-Empfehlung, Statusicons, Interaktionstests, Build-Benchmark (Zeit bis Sieg Level 10/20/30, 5 Builds), Pace-Kontrolle.
+
+**Risiken:** IDs nie entfernen/umbenennen; unbekannte Stats/Powers tolerant laden; Snapshot-Felder optional + Defaults in `actorFromLite`; `ActorLite.st` erweitern; Tests mit festen Skill-Listen (`stage2.test.ts`) prüfen.

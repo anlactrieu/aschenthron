@@ -1,8 +1,9 @@
-import { ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, uniqueDef, NPC_LORE, type QuestDef, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
+import { ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, STATUS_IDS, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, uniqueDef, NPC_LORE, type QuestDef, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
 import { POWER_TEXT, TIER_COLOR, GEM_COLOR, affixRange, gemAffix, gemName, handsOf, itemAffixes, itemReq, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
 import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
   bulkSellable, sellPrice, critChance, attrBonus, equipSlotFor, socketCost, maxHpOf, maxManaOf, missingReq, nearNpc, powerOf, resistOf, type Actor, type Command, type Npc, type World,
+  activeSkills,
 } from '../sim/world';
 import { itemIcon, potionIcon, skillIcon, statusIcon } from './icons';
 import { giverLocation, questAvailable, questChains, questWhere, targetName } from '../sim/quests';
@@ -319,7 +320,8 @@ export class Ui {
     this.xpText.textContent = `Stufe ${p.level} · ${p.level >= MAX_LEVEL ? 'Maximum' : `${into} / ${span} XP`} · ${p.gold} Gold${p.statPoints ? ` · ${p.statPoints} Attributpunkte (C)` : ''}${p.skillPoints ? ` · ${p.skillPoints} Skillpunkte` : ''}`;
 
     // Schnellleiste: Tränke (Q/E) und Skills (1–9); Elemente bleiben bestehen, nur Zustand wird aktualisiert
-    const hk = p.skills.join(',');
+    const act = activeSkills(p);
+    const hk = act.join(',');
     if (hk !== this.hotKey || !this.potionBtns) {
       this.hotKey = hk;
       this.hotbar.replaceChildren();
@@ -332,7 +334,7 @@ export class Ui {
       };
       this.potionBtns = { heal: mkPotion('heal', 'Q'), mana: mkPotion('mana', 'E') };
       this.hotbar.append(this.potionBtns.heal);
-      this.hotButtons = p.skills.map((id, i) => {
+      this.hotButtons = act.map((id, i) => {
         const s = SKILLS.find((x) => x.id === id)!;
         const b = el('div', 'hb');
         b.title = `${s.name} – ${s.desc}`;
@@ -352,7 +354,7 @@ export class Ui {
       if (cnt.textContent !== String(n)) cnt.textContent = String(n);
       this.potionBtns![k].style.opacity = n ? '1' : '.45';
     }
-    p.skills.forEach((id, i) => {
+    act.forEach((id, i) => {
       const s = SKILLS.find((x) => x.id === id)!;
       const cd = p.skillCd[id] ?? 0;
       const hb = this.hotButtons[i]!;
@@ -365,8 +367,8 @@ export class Ui {
 
     // Statusanzeige des Spielers: Name und Restzeit, nur bei Änderung neu aufgebaut
     const now = this.lastW?.tick ?? 0;
-    const chips: [string, string, number, 'slow' | 'stun' | 'burn' | 'poison'][] = [];
-    for (const id of ['slow', 'stun', 'burn'] as StatusId[]) if (p.status?.[id] && p.status[id]! > now) chips.push([STATUS_NAME[id], STATUS_COLOR[id], Math.ceil((p.status[id]! - now) / TICK_RATE), id]);
+    const chips: [string, string, number, StatusId | 'poison'][] = [];
+    for (const id of STATUS_IDS) if (p.status?.[id] && p.status[id]! > now) chips.push([STATUS_NAME[id], STATUS_COLOR[id], Math.ceil((p.status[id]! - now) / TICK_RATE), id]);
     if (p.dot && p.dot.until > now) chips.push(['Gift', DMG_COLOR.poison, Math.ceil((p.dot.until - now) / TICK_RATE), 'poison']);
     const ck = JSON.stringify(chips);
     if (ck !== this.statusKey) {
@@ -837,12 +839,14 @@ export class Ui {
   private renderSkills(body: HTMLElement, p: Actor): void {
     body.append(el('div', 'a-sec', `Gelernte Fertigkeiten – ${p.skillPoints} Skillpunkte übrig`));
     if (!p.skills.length) body.append(el('div', 'a-note', 'Noch keine – Lehrer in den Städten bringen dir Fertigkeiten bei.'));
-    p.skills.forEach((id, i) => {
+    const act = activeSkills(p);
+    p.skills.forEach((id) => {
       const s = SKILLS.find((x) => x.id === id)!;
+      const i = act.indexOf(id);
       const c = el('div', 'a-card');
       c.append(Object.assign(el('img'), { src: skillIcon(s) }));
       const t = el('div');
-      t.append(el('div', '', `${s.name}${i < 9 ? ` [${i + 1}]` : ''} · ${s.area} · Rang ${p.skillRanks[s.id] ?? 1}`), el('div', 'a-note', `${s.mana} Mana · ${Math.round(s.cooldown / TICK_RATE)} s Abklingzeit`), el('div', 'a-note', s.desc));
+      t.append(el('div', '', `${s.name}${i >= 0 && i < 9 ? ` [${i + 1}]` : ''}${s.passive ? ' (passiv)' : ''} · ${s.area} · Rang ${p.skillRanks[s.id] ?? 1}`), el('div', 'a-note', `${s.mana} Mana · ${Math.round(s.cooldown / TICK_RATE)} s Abklingzeit`), el('div', 'a-note', s.desc));
       c.append(t);
       body.append(c);
     });
