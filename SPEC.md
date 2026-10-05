@@ -159,3 +159,10 @@ Umsetzung in frischer Session, je Paket als eigener Commit; nach jedem Paket Tes
 - Lizenz + Quelle in `ASSETS.md`, Credits-Seite im Spiel. Prozedurale Grafik als Fallback behalten. Ladezeit/Bundle-Größe beachten.
 
 **Nicht in diesem Paket (bewusst offen):** Soziales/PvP-Rahmen (Chat, Gruppen, Handel, Gilden, Kopfgeld, Login), Loot-Chase (Affix-Stufen, Sockel).
+
+## Stufe 5: Solo-Ausbau (Auftrag des Users: alles aus dem T4C-Review, was für Solo-Spiel zählt)
+Ausgenommen (nur Mehrspieler): Chat, Gruppen, Spieler-Handel, Gilden, Kopfgeld/Duelle, Login. Umsetzung in 4 Paketen nacheinander, je Paket Commit, Tests/Lint/Build, Pace-Messung:
+- **P1 Kampftiefe:** Schadensarten + Resistenzen, Statuseffekte, Monster-Rollen (Heiler, Gift-Spinne, Bogenschütze, Untote beschwören).
+- **P2 Ausrüstung & Loot:** Gürtel/Umhang/Beine, Zweihänder vs. Einhänder+Schild, Waffenfamilien, Attribut-Tiefe (Willenskraft, Schwellen), Affix-Stufen + Prefix/Suffix-Namen, Sockel/Gems.
+- **P3 Welt & Endgame:** Tag/Nacht + Wetter, Lore-NPCs + Questketten, Goblin-/Spinnen-Dungeon, Elite-Zone + Weltbosse (Respawn), Level-Kurve bleibt (Bot ≈ 8 h).
+- **P4 Grafik:** CC0-Pack (Dungeon Crawl 32x32) einbauen, `ASSETS.md` + Credits, prozeduraler Fallback.
