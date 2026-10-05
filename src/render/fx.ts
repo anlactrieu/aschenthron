@@ -6,7 +6,7 @@ import Phaser from 'phaser';
  */
 
 interface Effect {
-  kind: 'zone' | 'projectile' | 'arrow' | 'ring' | 'bolt' | 'slash' | 'sparkle' | 'column' | 'burst' | 'beamRing';
+  kind: 'zone' | 'swing' | 'projectile' | 'arrow' | 'ring' | 'bolt' | 'slash' | 'sparkle' | 'column' | 'burst' | 'beamRing';
   start: number;
   dur: number;
   x: number;
@@ -109,6 +109,10 @@ export class Fx {
   }
   slash(x: number, y: number, color: number, angle = 0): void {
     this.add({ kind: 'slash', x, y, r: angle, dur: 220, color });
+  }
+  /** Schwungbogen eines Nahkampfschlags: Sichel zwischen Angreifer und Ziel (`angle` = Bildschirmrichtung zum Angreifer). */
+  swing(x: number, y: number, color: number, angle: number): void {
+    this.add({ kind: 'swing', x, y, r: angle, dur: 200, color });
   }
   sparkle(x: number, y: number, color: number, dur = 700): void {
     this.add({ kind: 'sparkle', x, y, dur, color });
@@ -274,6 +278,24 @@ export class Fx {
         g.beginPath();
         g.arc(e.x, e.y - 8, 20, -2.2 + e.r! + k * 1.2, -0.6 + e.r! + k * 1.2, false);
         g.strokePath();
+        break;
+      }
+      case 'swing': {
+        // Sichel: Kopf läuft von einer Seite zur anderen, der Schweif folgt; Ellipse passt zur Iso-Ansicht
+        const head = -1.1 + k * 2.2;
+        const tail = Math.max(-1.1, head - 1.1);
+        for (const [w, rad, col, al] of [[6, 26, 0xffffff, 0.9], [3, 21, e.color, 0.8]] as const) {
+          g.lineStyle(w * fade + 1, col, al * fade);
+          g.beginPath();
+          for (let i = 0; i <= 10; i++) {
+            const a = e.r! + tail + ((head - tail) * i) / 10;
+            const px = e.x + Math.cos(a) * rad * 0.9;
+            const py = e.y - 4 + Math.sin(a) * rad * 0.6;
+            if (i === 0) g.moveTo(px, py);
+            else g.lineTo(px, py);
+          }
+          g.strokePath();
+        }
         break;
       }
       case 'sparkle': {

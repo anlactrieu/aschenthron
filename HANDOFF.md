@@ -85,6 +85,14 @@ Fazit: starkes technisches Fundament und Breite, aber als Spiel noch Prototyp: w
 Plan Juice (nur Render, Events existieren): schwebende Kampfzahlen, Skill-VFX (Projektile/Ringe/Blitz), Treffergefühl (Lunge, Flash, Hit-Stop, Shake), Loot-Momente (Namen am Boden in Seltenheitsfarbe, Bogenflug, Legendär-Sound/Banner, Item-Vergleich-Tooltip), Lesbarkeit (HP-Balken nur bei Schaden/Ziel, Cursor-Highlight, Level-Up-Effekt), Atmosphäre (Kachelkante weg, Dithering, Wasser/Lava-Animation, Partikel, Vignette).
 Plan Tiefe: Fernkampf-/Zaubermonster, Boss-Mechaniken (Bodenmarker, Adds, Ansturm), Champion-Packs, mehr Affixe, Bögen/Stäbe. Entscheidungen des Users nötig: Skill-Ränge/Punkte ja/nein; Monsterdichte (Gruppen 1–5 mit weniger Spawnpunkten vs. jetzt).
 
+## Animation-Fix (nach Stand P4)
+- Problem: DCSS-Sprites wirkten beim Laufen schwebend, Schlag/Schuss kaum sichtbar. Lösung rein im Render (`art.ts`, `GameScene.ts`, `fx.ts`), keine neuen Assets.
+- Frames: 0 Stand, 1/4 Schritt links/rechts, 2 Ausholen/Anlegen, 3 Schlag/Schuss; Laufzyklus 1,0,4,0 (110 ms je Bild, Wippe `bob` synchron, Schatten fest). Prozeduraler Fallback mappt 4 auf 1.
+- Spieler: Beine+Stiefel+Unterkörper der Basis links/rechts getrennt versetzt (Hüfte y=20), Oberkörper ±2,5° gegenneigt. Waffenpivot aus Alphakanal (`weaponGeo`: Griff unten am Heft, nicht (21,17)); Nahkampf ±1,2 rad, Körper -8°/+10°. Bogen: nach vorn gestreckt, Sehne gespannt + Pfeil (Frame 2), entspannt + Rückstoß (Frame 3), `fx.arrow` startet am Bogen. Stab: Stoß mit Leuchtspitze.
+- Monster: Neigung ±4° + Squash je Schritt, Hüpfen im Bob; Ausholen -8°, Lunge +10° mit Squash; Bosse/große Sprites gedämpft (damp 0,5/0,7). Idle: Atmen.
+- `fx.swing` (neue Sichel in Angriffsrichtung) ersetzt `slash` beim Basisangriff.
+- Offen: Pfeil-Anlegen/Sehne nur für Bogenträger (Monsterschützen nutzen Monster-Lunge); Feinabstimmung der Optik auf dem Mac.
+
 ## Offene TODOs
 - Mehrspieler im echten Netz/mit 3+ Spielern nur per Test und kurzem Live-Check geprüft; Chat, Gruppen, Gilden, Handel fehlen
 - Framerate im Browser-Pane nicht belastbar messbar (unsichtbar); auf dem Mac prüfen, ggf. `?fps`-Anzeige ergänzen

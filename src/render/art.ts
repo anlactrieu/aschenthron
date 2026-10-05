@@ -156,15 +156,125 @@ function spriteCanvas(key: string, draw: (x: Ctx) => void, scale: number, origin
   return out;
 }
 
-/** Bewegungsphase einer Figur um den Fußpunkt: 0 Stand, 1 Schritt, 2 Ausholen (zurück), 3 Schlag (vor). */
-function pose(x: Ctx, frame: number): void {
-  x.translate(SP / 2, SP);
-  if (frame === 1) x.scale(1.02, 0.95);
-  else if (frame === 2) {
-    x.translate(-2, 0);
-    x.scale(1, 0.97);
-  } else if (frame === 3) x.translate(3, -1);
+/**
+ * Bewegungsphasen einer Figur: 0 Stand, 1 linker Schritt, 2 Ausholen/Anlegen, 3 Schlag/Schuss, 4 rechter Schritt.
+ * Laufzyklus in GameScene: 1, 0, 4, 0.
+ */
+export const FRAME_STEP_L = 1;
+export const FRAME_WIND = 2;
+export const FRAME_STRIKE = 3;
+export const FRAME_STEP_R = 4;
+
+type AttackKind = 'melee' | 'bow' | 'staff';
+
+interface BodyPose {
+  /** Neigung in Grad (positiv = nach vorn, Blick nach rechts) um den Fußpunkt */
+  rot: number;
+  dx: number;
+  dy: number;
+  sx: number;
+  sy: number;
+}
+
+/** Körperhaltung der ganzen Figur um den Fußpunkt; `damp` schwächt große Figuren/Bosse ab. */
+function bodyPose(frame: number, kind: AttackKind, damp = 1): BodyPose {
+  const p: BodyPose = { rot: 0, dx: 0, dy: 0, sx: 1, sy: 1 };
+  if (frame === FRAME_STEP_L || frame === FRAME_STEP_R) {
+    const side = frame === FRAME_STEP_L ? -1 : 1;
+    p.rot = side * 4 * damp;
+    p.sy = 1 - 0.04 * damp;
+    p.sx = 1 + 0.02 * damp;
+    p.dx = side * 0.5 * damp;
+  } else if (frame === FRAME_WIND) {
+    if (kind === 'bow') Object.assign(p, { rot: 2, dx: 0 });
+    else if (kind === 'staff') Object.assign(p, { rot: -5 * damp, dx: -1 * damp, dy: 1 });
+    else Object.assign(p, { rot: -8 * damp, dx: -2 * damp, sy: 1 - 0.04 * damp, sx: 1 + 0.02 * damp });
+  } else if (frame === FRAME_STRIKE) {
+    if (kind === 'bow') Object.assign(p, { rot: -6 * damp, dx: -2 * damp, sy: 1 + 0.02 });
+    else if (kind === 'staff') Object.assign(p, { rot: 9 * damp, dx: 3 * damp, dy: -1 });
+    else Object.assign(p, { rot: 10 * damp, dx: 4 * damp, dy: -1, sx: 1 + 0.07 * damp, sy: 1 - 0.06 * damp });
+  }
+  return p;
+}
+
+/** Wendet eine Körperhaltung an (Drehpunkt: Fußmitte). */
+function applyBodyPose(x: Ctx, p: BodyPose): void {
+  x.translate(SP / 2 + p.dx, SP + p.dy);
+  x.rotate((p.rot * Math.PI) / 180);
+  x.scale(p.sx, p.sy);
   x.translate(-SP / 2, -SP);
+}
+
+/** Einteilige Figur (Monster): Haltung um den Fußpunkt. */
+function pose(x: Ctx, frame: number, damp = 1): void {
+  applyBodyPose(x, bodyPose(frame, 'melee', damp));
+}
+
+interface WeaponGeo {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  /** Griff (Drehpunkt der Hand) */
+  gripX: number;
+  gripY: number;
+  /** Spitze (oben) bzw. Bogenenden */
+  topX: number;
+  topY: number;
+  botX: number;
+  botY: number;
+  /** Bogenbauch: -1 links, +1 rechts (aus der Lage der Bogenmitte gegenüber den Enden) */
+  belly: number;
+}
+
+const geoCache = new Map<HTMLImageElement, WeaponGeo>();
+
+/** Misst Lage und Griffpunkt einer Waffenebene aus den deckenden Pixeln. */
+function weaponGeo(img: HTMLImageElement): WeaponGeo {
+  const hit = geoCache.get(img);
+  if (hit) return hit;
+  const c = mkCanvas(SP, SP);
+  const cc = ctxOf(c);
+  cc.drawImage(img, 0, 0);
+  const d = cc.getImageData(0, 0, SP, SP).data;
+  const rowAvg = (y0: number, y1: number): { x: number; n: number } => {
+    let sum = 0;
+    let n = 0;
+    for (let y = Math.max(0, y0); y <= Math.min(SP - 1, y1); y++) {
+      for (let xx = 0; xx < SP; xx++) {
+        if (d[(y * SP + xx) * 4 + 3]! > 0) {
+          sum += xx;
+          n++;
+        }
+      }
+    }
+    return { x: n ? sum / n : SP / 2, n };
+  };
+  let minX = SP;
+  let maxX = 0;
+  let minY = SP;
+  let maxY = 0;
+  for (let y = 0; y < SP; y++) {
+    for (let xx = 0; xx < SP; xx++) {
+      if (d[(y * SP + xx) * 4 + 3]! > 0) {
+        minX = Math.min(minX, xx);
+        maxX = Math.max(maxX, xx);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+      }
+    }
+  }
+  const top = rowAvg(minY, minY + 1);
+  const bot = rowAvg(maxY - 1, maxY);
+  const mid = rowAvg(Math.round((minY + maxY) / 2) - 2, Math.round((minY + maxY) / 2) + 2);
+  const geo: WeaponGeo = {
+    minX, maxX, minY, maxY,
+    gripX: rowAvg(maxY - 4, maxY).x, gripY: maxY - 2,
+    topX: top.x, topY: minY, botX: bot.x, botY: maxY,
+    belly: mid.x < (top.x + bot.x) / 2 - 0.3 ? -1 : 1,
+  };
+  geoCache.set(img, geo);
+  return geo;
 }
 
 /* ---------------------------------------------------------------- Kacheln */
@@ -581,7 +691,7 @@ function spriteMonster(id: string, boss: boolean, frame: number): HTMLCanvasElem
   if (!def || !img) return null;
   const scale = boss ? Math.max(SPRITE_SCALE.boss, def.scale ?? 0) : def.scale ?? SPRITE_SCALE.normal;
   return spriteCanvas(`smon_${id}_${frame}${boss ? 'B' : ''}`, (x) => {
-    pose(x, frame);
+    pose(x, frame, boss ? 0.5 : scale > SPRITE_SCALE.normal ? 0.7 : 1);
     drawSprite(x, img, def.tint);
   }, scale, FEET_ORIGIN_Y, boss ? '#c8801c' : undefined);
 }
@@ -589,11 +699,12 @@ function spriteMonster(id: string, boss: boolean, frame: number): HTMLCanvasElem
 export function monsterCanvas(id: string, family: MonsterFamily, color: number, boss: boolean, frame: number, back = false): HTMLCanvasElement {
   const sp = spriteMonster(id, boss, frame);
   if (sp) return sp;
-  return actorCanvas(`mon_${id}_${frame}${back ? 'b' : ''}`, (x) => {
+  const fb = frame === FRAME_STEP_R ? FRAME_STEP_L : frame; // prozedurale Figur kennt nur einen Schrittwechsel
+  return actorCanvas(`mon_${id}_${fb}${back ? 'b' : ''}`, (x) => {
     BACK = back && ['humanoid', 'undead', 'ghoul', 'demon'].includes(family);
-    POSE = frame === 2 ? 'wind' : frame === 3 ? 'strike' : 'idle';
+    POSE = fb === 2 ? 'wind' : fb === 3 ? 'strike' : 'idle';
     const r = rng(id.length * 91 + id.charCodeAt(0));
-    FAMILY[family](x, frame, color, r);
+    FAMILY[family](x, fb, color, r);
     if (boss) {
       rect(x, 4, 0, 8, 1, 0xe8c040);
       rect(x, 4, 0, 1, 2, 0xe8c040);
@@ -668,28 +779,136 @@ function spritePlayer(look: Look, frame: number, scale: number = SPRITE_SCALE.no
   const hair = i.head && look.head >= 1 ? null : sprite(PLAYER_HAIR);
   const shield = layer(i.offhand);
   const wpn = layer(i.weapon);
+  const kind: AttackKind = look.weaponKind === 1 ? 'bow' : look.weaponKind === 2 ? 'staff' : 'melee';
   return spriteCanvas(`${lookKey(look, frame, false)}_x${scale}`, (x) => {
-    pose(x, frame);
-    // Umhang hinter dem Körper, damit die Rüstung sichtbar bleibt
-    for (const l of [cloak, base, legs, boots, body, gloves, hair, head, shield]) if (l) x.drawImage(l, 0, 0);
-    if (wpn) {
-      // Waffe um die Hand drehen: Ausholen nach hinten, Schlag nach vorn (Bogen/Stab nur leicht)
-      x.save();
-      const swing = look.weaponKind === 0;
-      if (frame === 2) {
-        x.translate(21, 17);
-        x.rotate(swing ? -0.7 : -0.2);
-        x.translate(-21, -17);
-      } else if (frame === 3) {
-        x.translate(21, 17);
-        x.rotate(swing ? 0.75 : 0.25);
-        x.translate(-21 + (look.weaponKind === 1 ? 1 : 2), -17);
+    const walking = frame === FRAME_STEP_L || frame === FRAME_STEP_R;
+    const attacking = frame === FRAME_WIND || frame === FRAME_STRIKE;
+    const side = frame === FRAME_STEP_L ? -1 : 1;
+    applyBodyPose(x, bodyPose(frame, kind));
+    const HIP = 20;
+    // Beine/Stiefel: linkes und rechtes Bein getrennt versetzt (Schrittzyklus bzw. breiter Stand beim Schlag)
+    const legOff = (left: boolean): [number, number] => {
+      if (walking) {
+        const fwd = left === (side < 0); // vorderes (angehobenes) Bein
+        return fwd ? [left ? -1 : 1, -2] : [left ? 1 : -1, 0];
       }
-      x.drawImage(wpn, 0, 0);
+      if (frame === FRAME_STRIKE && kind === 'melee') return left ? [-2, 0] : [2, 0];
+      if (frame === FRAME_WIND && kind === 'melee') return left ? [1, 0] : [-1, 0];
+      return [0, 0];
+    };
+    const lowerHalf = (left: boolean, layers: (HTMLImageElement | null)[]): void => {
+      const [ox, oy] = legOff(left);
+      x.save();
+      x.translate(ox, oy);
+      x.beginPath();
+      x.rect(left ? 0 : SP / 2, HIP, SP / 2, SP - HIP);
+      x.clip();
+      for (const l of layers) if (l) x.drawImage(l, 0, 0);
       x.restore();
+    };
+    // Umhang hinter dem Körper, damit die Rüstung sichtbar bleibt
+    if (cloak) x.drawImage(cloak, 0, 0);
+    lowerHalf(true, [base, legs, boots]);
+    lowerHalf(false, [base, legs, boots]);
+    // Oberkörper: beim Gehen leichte Gegenneigung um die Hüfte und tiefer im Schritt
+    x.save();
+    if (walking) {
+      x.translate(SP / 2, HIP);
+      x.rotate(((-side * 2.5 * Math.PI) / 180));
+      x.translate(-SP / 2, -HIP + 1);
     }
+    x.save();
+    x.beginPath();
+    x.rect(0, 0, SP, HIP + 2);
+    x.clip();
+    x.drawImage(base, 0, 0);
+    x.restore();
+    for (const l of [body, gloves, hair, head, shield]) if (l) x.drawImage(l, 0, 0);
+    if (wpn) drawPlayerWeapon(x, wpn, look, frame, attacking, walking ? side : 0);
+    x.restore();
   }, scale, FEET_ORIGIN_Y);
 }
+
+/** Waffe um den Griff drehen (Nahkampf), Bogen spannen/entspannen, Stab vorstoßen. */
+function drawPlayerWeapon(x: Ctx, wpn: HTMLImageElement, look: Look, frame: number, attacking: boolean, walkSide: number): void {
+  const g = weaponGeo(wpn);
+  x.save();
+  if (look.weaponKind === 0) {
+    // Hand sitzt am unteren Ende der DCSS-Waffenebene (Heft), nicht an der Körpermitte
+    x.translate(g.gripX, g.gripY);
+    if (frame === FRAME_WIND) x.rotate(-1.2);
+    else if (frame === FRAME_STRIKE) {
+      x.translate(2, 0);
+      x.rotate(1.2);
+    } else x.rotate(walkSide * 0.12);
+    x.translate(-g.gripX, -g.gripY);
+    x.drawImage(wpn, 0, 0);
+  } else if (look.weaponKind === 1) {
+    if (attacking) {
+      // Bogen nach vorn gestreckt, Bauch zum Ziel; Sehne gespannt (Ausholen) oder entspannt (Schuss)
+      const mx = (g.minX + g.maxX) / 2;
+      const my = (g.minY + g.maxY) / 2;
+      x.translate(10, 0);
+      x.translate(mx, my);
+      x.rotate(frame === FRAME_WIND ? 0.04 : -0.1);
+      if (g.belly < 0) x.scale(-1, 1);
+      x.translate(-mx, -my);
+      x.drawImage(wpn, 0, 0);
+      const dir = g.belly; // Richtung zum Ziel in den Quellkoordinaten
+      const bx = (g.topX + g.botX) / 2;
+      const pull = frame === FRAME_WIND ? 5 : 0;
+      const nx = bx - dir * pull;
+      x.fillStyle = '#e8e0d0';
+      const line = (x0: number, y0: number, x1: number, y1: number): void => {
+        const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+        for (let i = 0; i <= n; i++) x.fillRect(Math.round(x0 + ((x1 - x0) * i) / (n || 1)), Math.round(y0 + ((y1 - y0) * i) / (n || 1)), 1, 1);
+      };
+      line(g.topX + dir * 0, g.topY, nx, my);
+      line(nx, my, g.botX + dir * 0, g.botY);
+      if (frame === FRAME_WIND) {
+        // Pfeil angelegt: Schaft, Spitze, Befiederung
+        x.fillStyle = '#a07848';
+        line(nx, my, nx + dir * 14, my);
+        x.fillStyle = '#d8d8e0';
+        line(nx + dir * 14, my - 1, nx + dir * 14, my + 1);
+        line(nx + dir * 15, my, nx + dir * 15, my);
+        x.fillStyle = '#c04a3a';
+        line(nx, my - 1, nx + dir * 2, my - 1);
+        line(nx, my + 1, nx + dir * 2, my + 1);
+      }
+    } else {
+      x.drawImage(wpn, 0, 0);
+    }
+  } else {
+    if (attacking) {
+      // Stab: beim Ausholen angehoben, beim Schuss nach vorn gestoßen (waagerecht) mit leuchtender Spitze
+      const px = g.gripX;
+      const py = Math.min(g.maxY - 2, 18);
+      x.translate(px, py);
+      if (frame === FRAME_WIND) x.rotate(-0.35);
+      else {
+        x.translate(4, 0);
+        x.rotate(1.25);
+      }
+      x.translate(-px, -py);
+      x.drawImage(wpn, 0, 0);
+      const orb = ORB_COLORS[look.weapon] ?? 0x90c0ff;
+      const r = frame === FRAME_STRIKE ? 3 : 2;
+      x.fillStyle = css(orb);
+      x.globalAlpha = 0.55;
+      x.fillRect(g.topX - r, g.topY + 1 - r, r * 2 + 1, r * 2 + 1);
+      x.globalAlpha = 1;
+      x.fillRect(g.topX - 1, g.topY, 3, 3);
+      x.fillStyle = '#ffffff';
+      x.fillRect(g.topX, g.topY + 1, 1, 1);
+    } else {
+      x.drawImage(wpn, 0, 0);
+    }
+  }
+  x.restore();
+}
+
+const ORB_COLORS = [0x90c0ff, 0x80d0ff, 0xb090ff, 0x70e0e0, 0xff9a40, 0xc060ff];
 
 /** Große Figur für das Inventarfenster: Bild und CSS-Breite (Sprite 1:1, prozedural wie bisher 104 px). */
 export function playerPortrait(look: Look): { canvas: HTMLCanvasElement; width: number } {
@@ -701,11 +920,12 @@ export function playerPortrait(look: Look): { canvas: HTMLCanvasElement; width: 
 export function playerCanvas(look: Look, frame: number, back = false): HTMLCanvasElement {
   const sp = spritePlayer(look, frame);
   if (sp) return sp;
-  return actorCanvas(lookKey(look, frame, back), (x) => {
+  const fb = frame === FRAME_STEP_R ? FRAME_STEP_L : frame;
+  return actorCanvas(lookKey(look, fb, back), (x) => {
     BACK = back;
-    POSE = frame === 2 ? 'wind' : frame === 3 ? 'strike' : 'idle';
+    POSE = fb === 2 ? 'wind' : fb === 3 ? 'strike' : 'idle';
     const body = look.chest >= 0 ? TIER_COL[look.chest]! : 0x4a68a0;
-    humanoidBase(x, frame, { skin: SKIN, body, legs: look.chest >= 0 ? shade(body, 0.6) : 0x3a3a52, hair: 0x4a3020, arms: look.hands >= 0 ? TIER_COL[look.hands]! : body });
+    humanoidBase(x, fb, { skin: SKIN, body, legs: look.chest >= 0 ? shade(body, 0.6) : 0x3a3a52, hair: 0x4a3020, arms: look.hands >= 0 ? TIER_COL[look.hands]! : body });
     if (look.chest >= 2) {
       rect(x, 3, 7, 2, 2, shade(body, 1.3));
       rect(x, 11, 7, 2, 2, shade(body, 1.3));

@@ -16,7 +16,7 @@ import { Atmosphere, isDungeon } from './atmosphere';
 import { Fx } from './fx';
 import type { RemoteSession } from '../net/client';
 import {
-  ensureTexture, tileBase, FEET_ORIGIN_Y, lookKey, lookOf, npcTextureKey, monsterCanvas, playerCanvas, registerStaticArt, tileCanvas, TILE_H, TILE_VARIANTS, TILE_W, WALL_VARIANTS,
+  ensureTexture, tileBase, FEET_ORIGIN_Y, FRAME_STEP_L, FRAME_STEP_R, FRAME_WIND, FRAME_STRIKE, lookKey, lookOf, npcTextureKey, monsterCanvas, playerCanvas, registerStaticArt, tileCanvas, TILE_H, TILE_VARIANTS, TILE_W, WALL_VARIANTS,
 } from './art';
 
 const SAVE_KEY = 'aschenthron.save.v1';
@@ -26,6 +26,8 @@ const PROP_GIDS = new Set([2, 10, 11, 13, 14]);
 const OVERLAY_DEPTH = 1e7;
 /** Dauer eines Hiebs/Wurfs in ms (Ausholen 40 %, Schlag 60 %) */
 const SWING_MS = 240;
+const STEP_MS = 110;
+const WALK_FRAMES = [FRAME_STEP_L, 0, FRAME_STEP_R, 0];
 
 function safeStorage(): Storage | null {
   try {
@@ -407,7 +409,7 @@ export class GameScene extends Phaser.Scene {
             this.later(delay, () => {
               const to = this.bodyPos(tg);
               const f = this.bodyPos(at);
-              if (to && f && at) this.fx.slash(to.x, to.y, at.kind === 'player' ? 0xf0f0ff : 0xffb0a0, (f.x <= to.x ? 0 : Math.PI) + (at.kind === 'player' ? 0 : 0.5));
+              if (to && f && at) this.fx.swing(to.x, to.y, at.kind === 'player' ? 0xf0f0ff : 0xffb0a0, Math.atan2(f.y - to.y, f.x - to.x));
               impact();
             });
           } else if (projectile && from) {
@@ -438,7 +440,12 @@ export class GameScene extends Phaser.Scene {
                 const to = this.bodyPos(tg);
                 if (!f || !to) return impact();
                 const col = e.skill === 'ember_bolt' && e.dt === 'frost' ? 0x8fd0ff : e.skill === 'ember_bolt' && e.dt === 'poison' ? 0x7fe060 : { quick_shot: 0xe8d8a0, multishot: 0xe8d8a0, poison_shot: 0x7fe060, ember_bolt: 0xff8a2a }[e.skill as 'quick_shot'];
-                if (arrowSkill) this.fx.arrow(f.x, f.y, to.x, to.y, col, 170, impact);
+                if (arrowSkill) {
+                  // Pfeil startet am vorgestreckten Bogen, nicht in der Körpermitte
+                  const dl = Math.hypot(to.x - f.x, to.y - f.y) || 1;
+                  const k0 = Math.min(16, dl * 0.4) / dl;
+                  this.fx.arrow(f.x + (to.x - f.x) * k0, f.y + (to.y - f.y) * k0, to.x, to.y, col, 170, impact);
+                }
                 else this.fx.projectile(f.x, f.y, to.x, to.y, col, 200, impact);
               });
             }
@@ -1051,7 +1058,9 @@ export class GameScene extends Phaser.Scene {
       view.lastY = pos.y;
       const swinging = !!view.swingUntil && view.swingUntil > time && a.alive;
       const swingK = swinging ? (time - view.swingStart!) / (view.swingUntil! - view.swingStart!) : -1;
-      const frame = swinging ? (swingK < 0.4 ? 2 : 3) : time < view.movingUntil ? Math.floor(time / 140) % 2 : 0;
+      // Laufzyklus: Schritt links, Stand (Wippe oben), Schritt rechts, Stand; Phase = ein Bild pro STEP_MS (~9 Wechsel/s)
+      const stepPhase = time / STEP_MS;
+      const frame = swinging ? (swingK < 0.4 ? FRAME_WIND : FRAME_STRIKE) : time < view.movingUntil ? WALK_FRAMES[Math.floor(stepPhase) % 4]! : 0;
       const img = view.img;
       if (a.kind === 'player') {
         const look = lookOf(a);
@@ -1074,7 +1083,8 @@ export class GameScene extends Phaser.Scene {
       }
       // Schritt-Wippen beim Gehen, Bodenschatten bleibt fest unter den Füßen
       const walking = time < view.movingUntil && a.alive;
-      const bob = walking ? -Math.abs(Math.sin(time / 140 * Math.PI * 0.5)) * 2.4 : 0;
+      // Wippe: im Schritt (Fuß setzt auf) unten, im Durchgang (Stand-Bild) oben; Monster hüpfen stärker, Bosse weniger
+      const bob = walking && !swinging ? -Math.abs(Math.sin(stepPhase * Math.PI * 0.5)) * (a.boss ? 1.5 : a.kind === 'monster' ? 3.4 : 3) : 0;
       if (a.alive) {
         const wide = a.boss ? 46 : a.kind === 'monster' && (monsterKind(a.kindId!).family === 'beast' || monsterKind(a.kindId!).family === 'spider') ? 30 : a.kind === 'monster' && monsterKind(a.kindId!).family === 'golem' ? 34 : 22;
         this.gfxGround.fillStyle(0x000000, 0.18);
@@ -1089,8 +1099,9 @@ export class GameScene extends Phaser.Scene {
         img.setDepth(sy);
         continue;
       }
-      // leichtes Atmen, wenn sie stehen
-      img.setAngle(0).setAlpha(1).setScale(1, 1);
+      // leichtes Atmen, wenn sie stehen (Skalierung um die Füße)
+      const breath = !walking && !swinging ? 1 + Math.sin(time / 420 + a.id * 1.7) * 0.014 : 1;
+      img.setAngle(0).setAlpha(1).setScale(1 / breath ** 0.5, breath);
       if ((this.flash.get(a.id) ?? 0) > time) img.setTint(0xffffff);
       else if (a.status.stun) img.setTint(0xfff0a0);
       else if (a.status.burn) img.setTint(0xffa060);
