@@ -253,10 +253,17 @@ export function spawnPlayer(w: World, x: number, y: number, name = 'Held'): Acto
   return a;
 }
 
+/** Startausrüstung für frische Charaktere: drei kleine Heiltränke gegen frühe Tode (Spielstände überschreiben das Inventar). */
+export function giveStarterKit(w: World, p: Actor): void {
+  for (let i = 0; i < 3; i++) p.inventory.push(generateItem(w.rng, w.nextId++, 'heal_small', 'normal'));
+}
+
 /** Neuer Spieler am Startpunkt (erste Stadt); für Mehrspieler. */
 export function addPlayer(w: World, name: string): Actor {
   const at = w.towns[0] ?? w.start;
-  return spawnPlayer(w, at.x, at.y, name);
+  const p = spawnPlayer(w, at.x, at.y, name);
+  giveStarterKit(w, p);
+  return p;
 }
 
 export function removePlayer(w: World, id: number): void {

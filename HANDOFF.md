@@ -23,7 +23,8 @@ Offene Ideen (nach Wert): Fremd-Sprites einbauen (nur mit Freigabe des Users, si
 ## Stand Level-Kurve (umgesetzt)
 - `xpToNext` (`data.ts`): Stufenfaktor `1 + (l/30)^1.5 * 0.8`. Bot-Messung (2 Seeds, Bot startet jetzt in der Stadt): L5 ≈ 17–21 min, L10 ≈ 50–57 min, L20 ≈ 2,8–3,3 h, L30 ≈ 7,9–8,5 h (vorher 4,8–5,4 h). Tode 13–22 je Lauf, überwiegend L2–7 und L16–18 (Bot-Artefakt: läuft in gemischte Rudel).
 - Verworfen: Faktor 1,2 (L30 9–10 h, aber Todesspirale bei L18–19 mit 72 Toden). Pace: `PACE_SEED=… npm run pace`, `PACE_DEATHS=1` loggt Todesursachen.
-- Offen: frühe Tode (L2–7) prüfen, evtl. Starttränke oder sanftere Rudel am Zonenanfang.
+- Starttränke: `giveStarterKit` (`world.ts`, 3 kleine Heiltränke) in `tiled.ts` und `addPlayer` → Tode auf L1–3 weg (Bot 0 statt 6–9). Restliche frühe Tode L4–8 am Goblinlager (Goblinkönig Grix + Wölfe/Spinnen kommen dazu, Rudel-Alarm), L16 Sumpf. Messung danach: 9,0 h bis L30, 18 Tode.
+- Offen: Goblinlager-Eingang entschärfen (Rudel-Alarm-Radius oder Mini-Boss weiter weg), Sumpf L16.
 
 ## Letzte 3 Entscheidungen (aktuell)
 0. **Level-Kurve per Stufenfaktor 0,8 statt global skalieren.** Grund: frühe Level bleiben flüssig, Endgame streckt sich; 1,2 erzeugte Todesspiralen.

@@ -1,5 +1,5 @@
 import type { Grid } from './path';
-import { addNpc, createWorld, spawnMonster, spawnPlayer, type NpcKind, type Rect, type World } from './world';
+import { addNpc, createWorld, giveStarterKit, spawnMonster, spawnPlayer, type NpcKind, type Rect, type World } from './world';
 
 interface TiledProp {
   name: string;
@@ -80,5 +80,6 @@ export function buildWorld(seed: number, map: TiledMap, opts: { player?: boolean
   world.start = { x: start.x / ts, y: start.y / ts };
   if (opts.player === false) return { world, tiles, playerId: -1 };
   const player = spawnPlayer(world, start.x / ts, start.y / ts);
+  giveStarterKit(world, player);
   return { world, tiles, playerId: player.id };
 }
