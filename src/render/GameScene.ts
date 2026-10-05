@@ -240,13 +240,21 @@ export class GameScene extends Phaser.Scene {
       if (!v || !v.img.visible) continue;
       if (v.img.getBounds().contains(wx, wy) && (!best || v.img.depth > best.depth)) best = { depth: v.img.depth, actor: a };
     }
+    // NPCs: zuerst die Figur selbst, erst danach die erweiterte Fläche (Namensschild/Marker); bei Überlappung gewinnt der nächste
+    let npcBest: { score: number; npc: Npc } | null = null;
     for (const n of this.world.npcs) {
       const img = this.npcViews.get(n.id);
       if (!img) continue;
       const b = img.getBounds();
-      // Box nach oben und seitlich erweitern: Namensschild und Marker gehören zum Anklickbaren
+      const body = b.contains(wx, wy);
       const box = new Phaser.Geom.Rectangle(b.centerX - 55, b.top - 64, 110, b.height + 64);
-      if (box.contains(wx, wy) && (!best || img.depth > best.depth)) best = { depth: img.depth, npc: n };
+      if (!body && !box.contains(wx, wy)) continue;
+      const score = (body ? 0 : 1000) + Math.hypot(wx - b.centerX, wy - b.centerY);
+      if (!npcBest || score < npcBest.score) npcBest = { score, npc: n };
+    }
+    if (npcBest) {
+      const img = this.npcViews.get(npcBest.npc.id)!;
+      if (!best || img.depth > best.depth || npcBest.score < 1000) best = { depth: img.depth, npc: npcBest.npc };
     }
     return best;
   }
