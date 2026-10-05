@@ -1,6 +1,8 @@
 import type { Rng } from './rng';
 
-export type Slot = 'weapon' | 'head' | 'chest' | 'hands' | 'feet' | 'ring' | 'quiver';
+export type Slot = 'weapon' | 'head' | 'chest' | 'hands' | 'feet' | 'ring' | 'amulet' | 'quiver';
+/** Ausrüstungsfelder: wie Slot, dazu das zweite Ringfeld (Gegenstände selbst haben immer `ring`). */
+export type EquipSlot = Slot | 'ring2';
 /** Verbrauchsgegenstände belegen keinen Ausrüstungsslot */
 export type ItemSlot = Slot | 'potion' | 'ammo';
 export type Rarity = 'normal' | 'magic' | 'rare' | 'set' | 'legendary';
@@ -125,6 +127,15 @@ export const TEMPLATES: ItemTemplate[] = [
   { id: 'moon_ring', name: 'Mondsteinring', slot: 'ring', weight: 0.5, reqKraft: 0, value: 300, minLevel: 16 },
   { id: 'blood_ring', name: 'Blutring', slot: 'ring', weight: 0.5, reqKraft: 0, value: 600, minLevel: 21 },
   { id: 'ash_band', name: 'Aschenreif', slot: 'ring', weight: 0.5, reqKraft: 0, value: 1100, minLevel: 27 },
+  { id: 'bone_charm', name: 'Knochenanhänger', slot: 'amulet', weight: 0.5, reqKraft: 0, base: [{ stat: 'maxHp', value: 12 }], value: 40, minLevel: 1 },
+  { id: 'copper_amulet', name: 'Kupferamulett', slot: 'amulet', weight: 0.5, reqKraft: 0, base: [{ stat: 'armor', value: 2 }], value: 70, minLevel: 6 },
+  { id: 'wisdom_amulet', name: 'Weisheitsamulett', slot: 'amulet', weight: 0.5, reqKraft: 0, base: [{ stat: 'maxMana', value: 30 }], value: 150, minLevel: 11 },
+  { id: 'hunter_talisman', name: 'Jägertalisman', slot: 'amulet', weight: 0.5, reqKraft: 0, base: [{ stat: 'accuracy', value: 12 }, { stat: 'evasion', value: 8 }], value: 150, minLevel: 11 },
+  { id: 'ember_pendant', name: 'Glutanhänger', slot: 'amulet', weight: 0.5, reqKraft: 0, base: [{ stat: 'damage', value: 5 }, { stat: 'maxHp', value: 30 }], value: 310, minLevel: 16 },
+  { id: 'moon_amulet', name: 'Mondamulett', slot: 'amulet', weight: 0.5, reqKraft: 0, base: [{ stat: 'maxMana', value: 60 }, { stat: 'regen', value: 1 }], value: 320, minLevel: 16 },
+  { id: 'blood_pendant', name: 'Blutanhänger', slot: 'amulet', weight: 0.5, reqKraft: 0, base: [{ stat: 'maxHp', value: 90 }, { stat: 'damage', value: 8 }], value: 620, minLevel: 21 },
+  { id: 'dread_talisman', name: 'Schreckenstalisman', slot: 'amulet', weight: 0.5, reqKraft: 0, base: [{ stat: 'crit', value: 3 }, { stat: 'haste', value: 4 }, { stat: 'maxHp', value: 60 }], value: 640, minLevel: 21 },
+  { id: 'ash_amulet', name: 'Aschenamulett', slot: 'amulet', weight: 0.5, reqKraft: 0, base: [{ stat: 'damage', value: 14 }, { stat: 'maxHp', value: 140 }, { stat: 'armor', value: 6 }], value: 1150, minLevel: 27 },
   { id: 'heal_huge', name: 'Riesiger Heiltrank', slot: 'potion', weight: 0.6, heal: 600, reqKraft: 0, value: 160, minLevel: 21 },
   { id: 'mana_huge', name: 'Riesiger Manatrank', slot: 'potion', weight: 0.6, mana: 300, reqKraft: 0, value: 160, minLevel: 21 },
   { id: 'heal_max', name: 'Elixier des Lebens', slot: 'potion', weight: 0.7, heal: 1100, reqKraft: 0, value: 320, minLevel: 27 },
@@ -195,7 +206,7 @@ const RARITY_AFFIXES: Record<Rarity, [number, number]> = { normal: [0, 0], magic
 export function reqOfTemplate(t: ItemTemplate): Req {
   const r: Req = { level: Math.max(1, t.minLevel - 1), ...t.req };
   if (t.reqKraft > 0) r.kraft = t.reqKraft;
-  if (t.slot !== 'potion' && t.slot !== 'ring' && t.reqKraft >= 14) {
+  if (t.slot !== 'potion' && t.slot !== 'ring' && t.slot !== 'amulet' && t.reqKraft >= 14) {
     if (t.slot === 'weapon' && r.gewandtheit === undefined) r.gewandtheit = Math.round(t.reqKraft * 0.4);
     else if (t.slot !== 'weapon' && r.ausdauer === undefined) r.ausdauer = Math.round(t.reqKraft * 0.55);
   }

@@ -41,7 +41,7 @@ export function totalXpFor(level: number): number {
 
 export type MonsterFamily = 'beast' | 'humanoid' | 'undead' | 'spider' | 'ghoul' | 'golem' | 'demon' | 'worm' | 'elemental';
 
-export type Ability = 'slam' | 'summon' | 'charge';
+export type Ability = 'slam' | 'summon' | 'charge' | 'cast';
 
 export interface MonsterKind {
   id: string;
@@ -113,7 +113,7 @@ export const MONSTERS: MonsterKind[] = [
   mk('goblin', 'Goblin', 2, 'humanoid', 0x6a9a4a, { hp: 0.9 }),
   mk('goblin_scout', 'Goblinkundschafter', 4, 'humanoid', 0x7ab05a, { speed: 0.115, hp: 0.9 }),
   mk('goblin_warrior', 'Goblinkrieger', 8, 'humanoid', 0x5a8a3a, { hp: 1.25, dmg: 1.1 }),
-  mk('goblin_shaman', 'Goblinschamane', 10, 'humanoid', 0x8ac06a, { hp: 0.85, dmg: 1.25 }),
+  mk('goblin_shaman', 'Goblinschamane', 10, 'humanoid', 0x8ac06a, { hp: 0.85, dmg: 1.25, abil: ['cast'] }),
   mk('goblin_chief', 'Goblinhäuptling', 13, 'humanoid', 0x4a7a2a, { hp: 1.8, dmg: 1.2, cd: 22 }),
   // Banditen
   mk('bandit_novice', 'Räuberlehrling', 3, 'humanoid', 0xb06a4a),
@@ -128,7 +128,7 @@ export const MONSTERS: MonsterKind[] = [
   // Sumpf
   mk('bog_ghoul', 'Sumpfghul', 6, 'ghoul', 0x5a8a5a, { speed: 0.085, hp: 1.15 }),
   mk('marsh_corpse', 'Moorleiche', 9, 'ghoul', 0x6a7a52, { speed: 0.08, hp: 1.35 }),
-  mk('bog_witch', 'Sumpfhexe', 11, 'humanoid', 0x7a4a8a, { hp: 0.85, dmg: 1.3 }),
+  mk('bog_witch', 'Sumpfhexe', 11, 'humanoid', 0x7a4a8a, { hp: 0.85, dmg: 1.3, abil: ['cast'] }),
   mk('ghoul_alpha', 'Ghulalpha', 15, 'ghoul', 0x4a6a3a, { speed: 0.09, hp: 1.6, dmg: 1.2 }),
   // Untote
   mk('skeleton', 'Skelett', 8, 'undead', 0xdcd4bc, { hp: 0.9, dmg: 1.05 }),
@@ -149,7 +149,7 @@ export const MONSTERS: MonsterKind[] = [
   mk('ash_walker', 'Aschenwandler', 23, 'humanoid', 0x6a5a52, { hp: 1.1 }),
   mk('cinder_wisp', 'Lavageist', 25, 'elemental', 0xe0702a, { speed: 0.105, hp: 0.9, dmg: 1.35 }),
   mk('ember_elemental', 'Glutelementar', 27, 'elemental', 0xff5a1a, { speed: 0.1, hp: 1.5, dmg: 1.3 }),
-  mk('imp', 'Imp', 24, 'demon', 0xd05a3a, { speed: 0.125, hp: 0.8, dmg: 1.3, cd: 16 }),
+  mk('imp', 'Imp', 24, 'demon', 0xd05a3a, { speed: 0.125, hp: 0.8, dmg: 1.3, cd: 16, abil: ['cast'] }),
   mk('hell_spawn', 'Höllenbrut', 29, 'demon', 0xc0402a, { speed: 0.1, hp: 1.3, dmg: 1.25 }),
   // Bosse
   mk('goblin_king', 'Goblinkönig Grix', 10, 'humanoid', 0x3a6a1a, { boss: true, speed: 0.1, abil: ['slam', 'summon'], summon: 'goblin_scout' }),
@@ -185,11 +185,11 @@ export interface UniqueDef {
 export const UNIQUES: UniqueDef[] = [
   { id: 'rat_king', name: 'Rattenkönig Knabber', base: 'giant_rat', hp: 6, dmg: 1.5, abilities: ['summon'], summon: 'field_rat', respawnMin: 15 },
   { id: 'spotted_beast', name: 'Fleckenbiest', base: 'feral_hound', hp: 6, dmg: 1.5, abilities: ['charge'], respawnMin: 15 },
-  { id: 'goblin_shaman_brakk', name: 'Schamane Brakk', base: 'goblin_shaman', hp: 5, dmg: 1.4, abilities: ['summon', 'slam'], summon: 'goblin', respawnMin: 18 },
+  { id: 'goblin_shaman_brakk', name: 'Schamane Brakk', base: 'goblin_shaman', hp: 5, dmg: 1.4, abilities: ['summon', 'slam', 'cast'], summon: 'goblin', respawnMin: 18 },
   { id: 'venom_mother', name: 'Giftmutter Zischel', base: 'venom_spider', hp: 5, dmg: 1.4, abilities: ['summon', 'charge'], summon: 'forest_spider', respawnMin: 18 },
   { id: 'captain_kolm', name: 'Hauptmann Kolm', base: 'bandit_captain', hp: 4, dmg: 1.4, abilities: ['slam', 'charge'], respawnMin: 20 },
   { id: 'bog_brute', name: 'Moorbestie Gluck', base: 'ghoul_alpha', hp: 5, dmg: 1.4, abilities: ['slam'], respawnMin: 20 },
-  { id: 'hexmaster_irva', name: 'Hexenmeisterin Irva', base: 'bog_witch', hp: 6, dmg: 1.5, abilities: ['summon', 'slam'], summon: 'bog_ghoul', respawnMin: 20 },
+  { id: 'hexmaster_irva', name: 'Hexenmeisterin Irva', base: 'bog_witch', hp: 6, dmg: 1.5, abilities: ['summon', 'slam', 'cast'], summon: 'bog_ghoul', respawnMin: 20 },
   { id: 'crypt_ormund', name: 'Gruftwächter Ormund', base: 'crypt_guard', hp: 4.5, dmg: 1.4, abilities: ['slam', 'charge'], respawnMin: 22 },
   { id: 'ghost_lord_sael', name: 'Geistfürst Sael', base: 'wraith', hp: 7, dmg: 1.6, abilities: ['summon', 'slam'], summon: 'skeleton', respawnMin: 22 },
   { id: 'troll_chief_drogg', name: 'Trollhäuptling Drogg', base: 'rock_troll', hp: 4.5, dmg: 1.4, abilities: ['slam', 'charge'], respawnMin: 22 },

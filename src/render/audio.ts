@@ -8,6 +8,8 @@ export class Sfx {
   private muted = false;
   private last: Record<string, number> = {};
   private noiseBuf: AudioBuffer | null = null;
+  private bed: { noise: GainNode; lp: BiquadFilterNode; drone: GainNode; osc: OscillatorNode } | null = null;
+  private bedKind: 'wind' | 'embers' | 'cave' | null = null;
 
   constructor() {
     const start = () => this.ensure();
@@ -52,6 +54,43 @@ export class Sfx {
     this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
     const d = this.noiseBuf.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    this.startBed();
+  }
+
+  /** Dauerhafter Zonenton: gefiltertes Rauschen plus tiefer Brummton, Pegel und Klangfarbe folgen der Zone. */
+  private startBed(): void {
+    const c = this.ctx!;
+    const src = c.createBufferSource();
+    src.buffer = this.noiseBuf;
+    src.loop = true;
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 300;
+    const noise = c.createGain();
+    noise.gain.value = 0;
+    src.connect(lp).connect(noise).connect(this.master!);
+    src.start();
+    const osc = c.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = 55;
+    const drone = c.createGain();
+    drone.gain.value = 0;
+    osc.connect(drone).connect(this.master!);
+    osc.start();
+    this.bed = { noise, lp, drone, osc };
+    this.ambient(this.bedKind);
+  }
+
+  /** Umgebungston der Zone: Wind (Moor), Glut (Aschenöde), Höhle (Dungeons) oder Stille. */
+  ambient(kind: 'wind' | 'embers' | 'cave' | null): void {
+    this.bedKind = kind;
+    if (!this.bed || !this.ctx) return;
+    const t = this.ctx.currentTime;
+    const p = { wind: [520, 0.05, 0, 55], embers: [220, 0.045, 0.05, 41], cave: [140, 0.03, 0.06, 49], none: [300, 0, 0, 55] }[kind ?? 'none']!;
+    this.bed.lp.frequency.setTargetAtTime(p[0]!, t, 1.2);
+    this.bed.noise.gain.setTargetAtTime(p[1]!, t, 1.2);
+    this.bed.drone.gain.setTargetAtTime(p[2]!, t, 1.2);
+    this.bed.osc.frequency.setTargetAtTime(p[3]!, t, 1.2);
   }
 
   private gate(name: string, ms: number): boolean {

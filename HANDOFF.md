@@ -14,7 +14,18 @@ Offene Ideen (nach Wert): Fremd-Sprites einbauen (nur mit Freigabe des Users, si
 - Echte Mausklicks nur auf das DOM-UI (Panel, Hotbar); auf dem Canvas keine, weil das Browser-Pane nicht sichtbar war.
 - Framerate: im Browser-Pane der App (auf dem Mac, Pane sichtbar) 59–61 FPS gemessen mit `?fps`; im Pane unsichtbar sind Werte nicht aussagekräftig. In einem normalen Browser-Tab nicht gemessen. Mehrspieler nur lokal geprüft.
 
-## Letzte 3 Entscheidungen
+## Stand T4C-Quick-Wins (ungecommittet, 107 Tests grün, Lint/Build ok)
+- Amulett + 2. Ring: `EquipSlot` (`items.ts`), `equipSlotFor` (`world.ts`), Befehl `equip` mit optionalem `to`, 9 Amulett-Vorlagen, Icon in `icons.ts`, Doll-Positionen in `ui.ts`. Nicht im Händlersortiment (Pace-Balance).
+- Zaubernde Monster: Ability `cast` (Goblinschamane, Sumpfhexe, Imp, Brakk, Irva), `castAi`/`clearLine` in `world.ts` (Reichweite 6, Abstand 2,5, Skill `ember_bolt` für VFX).
+- Zonenton: `Sfx.ambient()` in `audio.ts`, aufgerufen aus `updateRegion` (GameScene). Zonen-Titel existierte schon.
+- Offen: `npm run pace` nach Zauberer-Änderung neu messen; Commit.
+
+## Letzte 3 Entscheidungen (aktuell)
+1. **Ringe: Gegenstand bleibt `slot:'ring'`, zweites Feld nur als `ring2` im Equipment.** Grund: keine Item-/Save-Migration, alte Spielstände gültig.
+2. **Zauberer nutzen vorhandenen Skill-Namen `ember_bolt` als Hit-Skill.** Grund: Projektil-VFX/Ton ohne Render-Änderung.
+3. **Amulette nicht im Shop.** Grund: Pace-Bot kauft Shop-Ausrüstung, Balance sollte unverändert bleiben.
+
+## Frühere Entscheidungen
 1. **Code-Review-Fixes:** Kämpfen in der Safe-Zone verboten, Händlersortiment in der Sim (`SHOP_ITEMS`), Drop-Pool deckt alle Slots ab. Grund: Safe-Zone ermöglichte risikoloses Farmen; Sim soll Autorität sein (online-fähig).
 2. **XP-Kurve `150*(l-1)*l`:** Bot erreicht Level 20 in ~56 Min. Grund: Spec verlangt lange Kurve; Bot ist idealisiert, Wert noch nicht durch echtes Spielen geprüft.
 3. **Pace-Messung als `npm run pace`** statt im Standard-Test. Grund: lange Laufzeit, keine Assertions.
@@ -44,3 +55,5 @@ Plan Tiefe: Fernkampf-/Zaubermonster, Boss-Mechaniken (Bodenmarker, Adds, Anstur
 - DOM-UI nie pro Frame neu aufbauen (`replaceChildren`), sonst gehen Mausklicks verloren.
 - macOS: `sed -i` braucht `''`, für Edits lieber python.
 - `AskUserQuestion`: max. 4 Fragen und max. 4 Optionen pro Frage.
+- Neue Slots: `Object.keys(equipment)`-Schleifen müssen `EquipSlot` nutzen; `net.ts`-Validierung und `save.ts` `EQUIP_SLOTS` führen die Slotliste separat (beim Erweitern alle drei anpassen).
+- Drop-Pool-Test verlangt pro Slot für Stufe 2–16 eine Vorlage mit minLevel ≤ Stufe (neue Slots brauchen eine Stufe-1-Vorlage).

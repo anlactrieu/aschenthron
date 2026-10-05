@@ -691,6 +691,7 @@ export class GameScene extends Phaser.Scene {
         ? 'radial-gradient(ellipse at center,rgba(8,6,20,.15) 30%,rgba(2,0,10,.82) 100%)'
         : 'radial-gradient(ellipse at center,rgba(0,0,0,0) 58%,rgba(0,0,0,.45) 100%)';
       this.ambientKind = name === 'Aschenöde' || name === 'Thron der Asche' ? 'embers' : name === 'Moorlande' || name === 'Gruft der Moorhexe' ? 'mist' : null;
+      this.sfx.ambient(name === 'Moorlande' || name === 'Gruft der Moorhexe' ? 'wind' : name === 'Aschenöde' || name === 'Thron der Asche' ? 'embers' : dungeon ? 'cave' : null);
       if (hit) this.ui.banner(`${hit.name}${hit.levels && hit.levels !== 'Stadt' ? ` · Stufe ${hit.levels}` : ''}`);
     }
   }

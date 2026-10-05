@@ -1,14 +1,14 @@
 import { ATTR_KEYS, ATTR_NAME, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, type SkillDef } from '../sim/data';
-import { POWER_TEXT, affixRange, itemReq, setById, templateById, type Item, type Slot } from '../sim/items';
+import { POWER_TEXT, affixRange, itemReq, setById, templateById, type EquipSlot, type Item } from '../sim/items';
 import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
-  critChance, maxHpOf, maxManaOf, missingReq, nearNpc, powerOf, type Actor, type Command, type Npc, type World,
+  critChance, equipSlotFor, maxHpOf, maxManaOf, missingReq, nearNpc, powerOf, type Actor, type Command, type Npc, type World,
 } from '../sim/world';
 import { arrowIcon, itemIcon, potionIcon, skillIcon } from './icons';
 import { lookOf, playerCanvas } from './art';
 
 const RARITY_COLOR: Record<Item['rarity'], string> = { normal: '#c9c4bd', magic: '#7f9fff', rare: '#f2c94c', set: '#5fd070', legendary: '#ff8a2a' };
-const SLOT_NAME: Record<Slot, string> = { weapon: 'Waffe', head: 'Kopf', chest: 'Brust', hands: 'Hände', feet: 'Füße', ring: 'Ring', quiver: 'Köcher' };
+const SLOT_NAME: Record<EquipSlot, string> = { weapon: 'Waffe', head: 'Kopf', chest: 'Brust', hands: 'Hände', feet: 'Füße', ring: 'Ring', ring2: 'Ring', amulet: 'Amulett', quiver: 'Köcher' };
 
 /** Affixzeile: Prozent-Werte als "+3 % Angriffstempo", sonst "+3 Schaden". */
 function affixText(a: { stat: keyof typeof STAT_NAME; value: number }): string {
@@ -30,14 +30,14 @@ function gearScore(i: Item): number {
 
 function isUpgrade(p: Actor, it: Item): boolean {
   if (it.slot === 'potion' || it.slot === 'ammo' || it.slot === 'quiver') return false;
-  if (missingReq(p, it, p.equipment[it.slot]).length) return false;
-  const cur = p.equipment[it.slot];
+  const cur = p.equipment[equipSlotFor(p, it)];
+  if (missingReq(p, it, cur).length) return false;
   return !cur || gearScore(it) > gearScore(cur) * 1.05;
 }
 
 /** Das angelegte Stück im selben Slot (Tränke und Pfeilbündel haben keins). */
 function equippedFor(p: Actor, it: Item): Item | undefined {
-  return it.slot === 'potion' || it.slot === 'ammo' ? undefined : p.equipment[it.slot];
+  return it.slot === 'potion' || it.slot === 'ammo' ? undefined : p.equipment[equipSlotFor(p, it)];
 }
 const STAT_NAME = {
   damage: 'Schaden', armor: 'Rüstung', maxHp: 'Leben', kraft: 'Kraft', maxMana: 'Mana', haste: '% Angriffstempo', crit: '% Kritisch', regen: 'Leben/s',
@@ -130,7 +130,7 @@ type Tab = 'inv' | 'char' | 'skills' | 'quests';
 interface Drag {
   item: Item;
   from: 'bag' | 'equip' | 'stash' | 'shop';
-  slot?: Slot;
+  slot?: EquipSlot;
   templateId?: string;
 }
 
@@ -430,7 +430,7 @@ export class Ui {
 
   private canDrop(d: Drag, zone: string): boolean {
     if (zone === 'equip:quiver' && d.item.slot === 'ammo') return d.from === 'bag';
-    if (zone.startsWith('equip:')) return d.from === 'bag' && d.item.slot === zone.slice(6);
+    if (zone.startsWith('equip:')) return d.from === 'bag' && (zone === 'equip:ring2' ? d.item.slot === 'ring' : d.item.slot === zone.slice(6));
     if (zone === 'bag') return d.from === 'equip' || d.from === 'stash' || d.from === 'shop';
     if (zone === 'stash') return d.from === 'bag' && !!this.lastW && !!this.lastP && !!nearNpc(this.lastW, this.lastP, 'stash');
     if (zone === 'sell') return d.from === 'bag' && !!this.lastW && !!this.lastP && !!nearNpc(this.lastW, this.lastP, 'merchant');
@@ -451,7 +451,7 @@ export class Ui {
       return;
     }
     if (zone === 'equip:quiver' && d.item.slot === 'ammo') this.send({ type: 'refillQuiver', itemId: d.item.id });
-    else if (zone.startsWith('equip:')) this.send({ type: 'equip', itemId: d.item.id });
+    else if (zone.startsWith('equip:')) this.send({ type: 'equip', itemId: d.item.id, ...(d.item.slot === 'ring' ? { to: zone.slice(6) as 'ring' | 'ring2' } : {}) });
     else if (zone === 'bag') {
       if (d.from === 'equip') this.send({ type: 'unequip', slot: d.slot! });
       else if (d.from === 'stash') this.send({ type: 'stashTake', itemId: d.item.id });
@@ -576,8 +576,8 @@ export class Ui {
     const doll = el('div', 'a-doll');
     doll.dataset.drop = 'bag';
     doll.append(Object.assign(el('img', 'me'), { src: this.dollImage(p) }));
-    const pos: Record<Slot, [number, number]> = { head: [95, 6], chest: [95, 100], weapon: [10, 100], hands: [180, 100], feet: [95, 214], ring: [10, 214], quiver: [180, 214] };
-    for (const slot of Object.keys(pos) as Slot[]) {
+    const pos: Record<EquipSlot, [number, number]> = { head: [95, 6], amulet: [10, 6], chest: [95, 100], weapon: [10, 100], hands: [180, 100], feet: [95, 214], ring: [10, 214], ring2: [180, 6], quiver: [180, 214] };
+    for (const slot of Object.keys(pos) as EquipSlot[]) {
       const it = p.equipment[slot] ?? null;
       const s = this.slotEl(it, it ? '' : SLOT_NAME[slot]);
       s.dataset.drop = `equip:${slot}`;
@@ -807,7 +807,7 @@ export class Ui {
         if (it.rarity === 'rare' && it.affixes.length < 5) add(`Affix + ${craftCost(it, 'extend')}g`, 'extend');
         t.append(row);
         c.append(t);
-        c.onmouseenter = (ev) => this.showTip(it, p.equipment[it.slot as Slot], ev);
+        c.onmouseenter = (ev) => this.showTip(it, equippedFor(p, it), ev);
         c.onmousemove = (ev) => this.moveTip(ev);
         c.onmouseleave = () => (this.tip.style.display = 'none');
         body.append(c);

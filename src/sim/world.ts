@@ -1,6 +1,6 @@
 import { Rng } from './rng';
 import { findPath, isWalkable, type Grid, type Pt } from './path';
-import { itemReq, rollUniqueSpecial, rollArrows, rollDrop, rollPotion, rollSpecial, templateById, generateItem, rerollAffixes, extendAffixes, SETS, type Item, type PowerId, type SetBonus, type Slot, type Stat } from './items';
+import { itemReq, rollUniqueSpecial, rollArrows, rollDrop, rollPotion, rollSpecial, templateById, generateItem, rerollAffixes, extendAffixes, SETS, type Item, type PowerId, type SetBonus, type EquipSlot, type Stat } from './items';
 import {
   ATTR_KEYS, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
   monsterKind, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
@@ -9,6 +9,9 @@ import {
 export const TICK_RATE = 20;
 export const NPC_RANGE = 3;
 const MELEE_RANGE = 1.5;
+/** Zaubernde Monster halten diesen Abstand und schießen aus bis zu CAST_RANGE Feldern. */
+const CAST_RANGE = 6;
+const CAST_KEEP = 2.5;
 const MONSTER_RESPAWN_TICKS = 20 * 45;
 const MONSTER_LOOT_TTL = 20 * 180;
 const CORPSE_LOOT_TTL = 20 * 300;
@@ -21,8 +24,8 @@ export type Command =
   | { type: 'moveTo'; x: number; y: number }
   | { type: 'attack'; targetId: number }
   | { type: 'pickup'; groundId: number }
-  | { type: 'equip'; itemId: number }
-  | { type: 'unequip'; slot: Slot }
+  | { type: 'equip'; itemId: number; to?: 'ring' | 'ring2' }
+  | { type: 'unequip'; slot: EquipSlot }
   | { type: 'drop'; itemId: number }
   | { type: 'usePotion'; itemId: number }
   | { type: 'spendStat'; attr: AttrKey }
@@ -77,7 +80,7 @@ export interface Actor {
   potionCd: number;
   quests: Record<string, { state: 'active' | 'done' | 'turned'; progress: number }>;
   inventory: Item[];
-  equipment: Partial<Record<Slot, Item>>;
+  equipment: Partial<Record<EquipSlot, Item>>;
   stash: Item[];
   pickupId: number | null;
   chestId: number | null;
@@ -307,6 +310,13 @@ export const MAX_REGEN_PER_SEC = 10;
 export const BASE_CARRY = 30;
 export const CARRY_PER_KRAFT = 2;
 
+/** Zielfeld beim Anlegen: Ringe füllen erst das freie Feld, sonst ersetzt der erste Ring (oder das gewünschte Feld). */
+export function equipSlotFor(a: Actor, it: Item, to?: 'ring' | 'ring2'): EquipSlot {
+  if (it.slot !== 'ring') return it.slot === 'potion' || it.slot === 'ammo' ? 'weapon' : it.slot;
+  if (to) return to;
+  return a.equipment.ring && !a.equipment.ring2 ? 'ring2' : 'ring';
+}
+
 export function equippedItems(a: Actor): Item[] {
   return Object.values(a.equipment).filter((i): i is Item => !!i);
 }
@@ -504,16 +514,17 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
     case 'equip': {
       const it = a.inventory.find((i) => i.id === cmd.itemId);
       if (!it || it.slot === 'potion' || it.slot === 'ammo') return;
-      const replaced = a.equipment[it.slot];
+      const target = equipSlotFor(a, it, cmd.to);
+      const replaced = a.equipment[target];
       const missing = missingReq(a, it, replaced);
       if (missing.length) {
         w.events.push({ type: 'cannotEquip', item: it, reason: `Benötigt ${missing.join(', ')}`, to: a.id });
         return;
       }
-      const old = a.equipment[it.slot];
+      const old = a.equipment[target];
       a.inventory = a.inventory.filter((i) => i.id !== it.id);
       if (old) a.inventory.push(old);
-      a.equipment[it.slot] = it;
+      a.equipment[target] = it;
       a.hp = Math.min(a.hp, maxHpOf(a));
       break;
     }
@@ -588,7 +599,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       a.skillCd = {};
       a.skillPoints = SKILL_POINTS_START + SKILL_POINTS_PER_LEVEL * (a.level - 1);
       // Ausrüstung, die nun die Anforderungen verfehlt, wandert in den Rucksack
-      for (const slot of Object.keys(a.equipment) as Slot[]) {
+      for (const slot of Object.keys(a.equipment) as EquipSlot[]) {
         const it = a.equipment[slot];
         if (it && slot !== 'quiver' && missingReq(a, it).length) {
           delete a.equipment[slot];
@@ -846,6 +857,36 @@ function chase(w: World, a: Actor, t: Actor): void {
   }
 }
 
+function clearLine(w: World, a: Actor, t: Actor): boolean {
+  const d = dist(a, t);
+  for (let s = 0.5; s < d; s += 0.5) {
+    if (!isWalkable(w.grid, Math.round(a.x + ((t.x - a.x) * s) / d), Math.round(a.y + ((t.y - a.y) * s) / d))) return false;
+  }
+  return true;
+}
+
+/** Zaubernde Monster: im Bereich stehen bleiben und schießen, zu nahen Zielen ausweichen. Gibt true zurück, wenn es gehandelt hat. */
+function castAi(w: World, m: Actor, t: Actor): boolean {
+  const d = dist(m, t);
+  if (d > CAST_RANGE || !clearLine(w, m, t)) return false;
+  if (d < CAST_KEEP) {
+    const spd = speedOf(m, w.tick);
+    const nx = m.x - ((t.x - m.x) / (d || 1)) * spd;
+    const ny = m.y - ((t.y - m.y) / (d || 1)) * spd;
+    if (!isWalkable(w.grid, Math.round(nx), Math.round(ny))) return false;
+    m.path = [];
+    m.x = nx;
+    m.y = ny;
+    return true;
+  }
+  m.path = [];
+  if (m.cooldownLeft > 0) return true;
+  m.cooldownLeft = attackCooldownOf(m) + 6;
+  const [lo, hi] = damageRange(m);
+  dealDamage(w, m, t, Math.max(1, Math.round(w.rng.int(lo, hi) * 0.9)), false, 'ember_bolt', false, true);
+  return true;
+}
+
 function fight(w: World, a: Actor, t: Actor): void {
   if (a.cooldownLeft > 0) return;
   if (a.kind === 'player' && inSafeZone(w, a.x, a.y)) return;
@@ -1010,7 +1051,7 @@ function onPlayerDeath(w: World, p: Actor): void {
     const it = pool[w.rng.int(0, pool.length - 1)]!;
     dropped.push(it);
     p.inventory = p.inventory.filter((x) => x.id !== it.id);
-    for (const s of Object.keys(p.equipment) as Slot[]) if (p.equipment[s]?.id === it.id) delete p.equipment[s];
+    for (const s of Object.keys(p.equipment) as EquipSlot[]) if (p.equipment[s]?.id === it.id) delete p.equipment[s];
   }
   const x = Math.round(p.x);
   const y = Math.round(p.y);
@@ -1084,7 +1125,9 @@ export function tick(w: World): void {
       a.path = [];
     }
     if (t && t.alive && a.autoAttack && a.targetId !== null) {
-      if (dist(a, t) <= MELEE_RANGE) {
+      if (a.kind === 'monster' && a.abilities.includes('cast') && castAi(w, a, t)) {
+        // Zauberer: schießt aus der Distanz oder weicht zurück
+      } else if (dist(a, t) <= MELEE_RANGE) {
         a.path = [];
         a.stuck = 0;
         fight(w, a, t);

@@ -407,3 +407,17 @@ describe('Speichern: Kartenversion', () => {
     expect([p.x, p.y]).toEqual([9, 9]);
   });
 });
+
+describe('Zaubernde Monster', () => {
+  it('Schamane schießt aus der Distanz und hält Abstand', () => {
+    const { w, p } = fresh();
+    p.x = 8;
+    p.y = 8;
+    const m = spawnMonster(w, 13, 8, 'goblin_shaman');
+    m.targetId = p.id;
+    const hp0 = p.hp;
+    for (let i = 0; i < TICK_RATE * 3; i++) tick(w);
+    expect(p.hp).toBeLessThan(hp0);
+    expect(Math.hypot(m.x - p.x, m.y - p.y)).toBeGreaterThan(2);
+  });
+});

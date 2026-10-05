@@ -7,7 +7,7 @@ const KEYS = [
   'x', 'y', 'hp', 'mana', 'level', 'xp', 'statPoints', 'attrs', 'gold', 'skills', 'inventory', 'equipment', 'stash', 'maxHp', 'quests', 'skillRanks', 'skillPoints',
 ] as const;
 
-const EQUIP_SLOTS = ['weapon', 'head', 'chest', 'hands', 'feet', 'ring', 'quiver'];
+const EQUIP_SLOTS = ['weapon', 'head', 'chest', 'hands', 'feet', 'ring', 'ring2', 'amulet', 'quiver'];
 
 /** Serialisiert nur den Spieler; die Welt wird beim Laden neu aufgebaut. */
 export function exportPlayer(p: Actor): string {

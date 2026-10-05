@@ -73,6 +73,15 @@ export function itemIcon(it: Item): string {
       r(c, x0 + 1, 8, w - 2, 1, shade(liquid, 1.5));
       r(c, x0 + 1, 7, 1, 7, 0xffffff);
     });
+  } else if (it.slot === 'amulet') {
+    url = make((c) => {
+      for (let i = 0; i < 5; i++) { r(c, 3 + i, 1 + i, 1, 1, 0xb0a890); r(c, 12 - i, 1 + i, 1, 1, 0xb0a890); }
+      r(c, 6, 6, 4, 1, 0xb0a890);
+      r(c, 6, 7, 4, 5, shade(col, 0.7));
+      r(c, 7, 8, 2, 3, col);
+      r(c, 7, 8, 1, 1, 0xffffff);
+      r(c, 7, 12, 2, 1, shade(col, 0.7));
+    });
   } else if (it.slot === 'quiver') {
     url = make((c) => {
       r(c, 5, 4, 6, 11, 0x7a5230);

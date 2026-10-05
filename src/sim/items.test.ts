@@ -50,6 +50,27 @@ describe('Items', () => {
     expect(p.inventory).toHaveLength(0);
   });
 
+  it('zwei Ringe und ein Amulett lassen sich gleichzeitig tragen', () => {
+    const w = createWorld(1, grid());
+    const p = spawnPlayer(w, 1, 1);
+    const { it: r1 } = giveItem(w, 'iron_ring');
+    const { it: r2 } = giveItem(w, 'iron_ring');
+    const { it: r3 } = giveItem(w, 'iron_ring');
+    const { it: am } = giveItem(w, 'bone_charm');
+    applyCommand(w, p.id, { type: 'equip', itemId: r1.id });
+    applyCommand(w, p.id, { type: 'equip', itemId: r2.id });
+    applyCommand(w, p.id, { type: 'equip', itemId: am.id });
+    expect(p.equipment.ring?.id).toBe(r1.id);
+    expect(p.equipment.ring2?.id).toBe(r2.id);
+    expect(p.equipment.amulet?.id).toBe(am.id);
+    // dritter Ring ersetzt das erste Feld, der alte Ring kommt in den Rucksack
+    applyCommand(w, p.id, { type: 'equip', itemId: r3.id });
+    expect(p.equipment.ring?.id).toBe(r3.id);
+    expect(p.inventory.map((i) => i.id)).toContain(r1.id);
+    applyCommand(w, p.id, { type: 'unequip', slot: 'ring2' });
+    expect(p.equipment.ring2).toBeUndefined();
+  });
+
   it('Anforderung verhindert Ausrüsten', () => {
     const w = createWorld(1, grid());
     const p = spawnPlayer(w, 1, 1);
@@ -108,7 +129,7 @@ describe('Items', () => {
 describe('Drop-Pool', () => {
   it('jeder Slot hat für jede Monsterstufe passende Drops', async () => {
     const { TEMPLATES } = await import('./items');
-    const slots = ['weapon', 'head', 'chest', 'hands', 'feet', 'ring'];
+    const slots = ['weapon', 'head', 'chest', 'hands', 'feet', 'ring', 'amulet'];
     for (let lvl = 2; lvl <= 16; lvl++) {
       for (const slot of slots) {
         const ok = TEMPLATES.some((t) => t.slot === slot && t.minLevel <= lvl && t.minLevel >= lvl - 8);

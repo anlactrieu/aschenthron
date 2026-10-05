@@ -22,10 +22,12 @@ export function validateCommand(w: World, c: unknown): Command | null {
       return int(o.chestId) ? { type: 'openChest', chestId: o.chestId } : null;
     case 'pickup':
       return int(o.groundId) ? { type: 'pickup', groundId: o.groundId } : null;
-    case 'equip': case 'drop': case 'usePotion': case 'sell': case 'stashPut': case 'stashTake':
+    case 'equip':
+      return int(o.itemId) ? { type: 'equip', itemId: o.itemId, ...(o.to === 'ring' || o.to === 'ring2' ? { to: o.to } : {}) } : null;
+    case 'drop': case 'usePotion': case 'sell': case 'stashPut': case 'stashTake':
       return int(o.itemId) ? ({ type: o.type, itemId: o.itemId } as Command) : null;
     case 'unequip':
-      return ['weapon', 'head', 'chest', 'hands', 'feet', 'ring', 'quiver'].includes(o.slot as string) ? { type: 'unequip', slot: o.slot as 'weapon' } : null;
+      return ['weapon', 'head', 'chest', 'hands', 'feet', 'ring', 'ring2', 'amulet', 'quiver'].includes(o.slot as string) ? { type: 'unequip', slot: o.slot as 'weapon' } : null;
     case 'spendStat':
       return ATTR_KEYS.includes(o.attr as never) ? { type: 'spendStat', attr: o.attr as never } : null;
     case 'learnSkill': case 'trainSkill':
