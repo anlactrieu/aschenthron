@@ -557,6 +557,49 @@ for pid, (tag, f) in PACK_META.items():
             objs.remove(o); trim += 1
 print("Düsterwald: %d Rudelmitglieder im Eingangsbereich gekürzt" % trim, file=sys.stderr)
 
+# ------------------------------------------------------------------ Moosbrück (Stadt Nr. 3, nur auf Wasserfläche südlich von Aschenhafen)
+# Entsteht nach allem Alten, ohne Zufall und nur auf zuvor leeren Wasserkacheln: Spielstände bleiben gültig (MAP_VERSION unverändert).
+# Jeder NPC wohnt in einem eigenen Haus mit Tür; die Häuser liegen an einer Straße, der Platz davor ist die Stadtmitte.
+TOWN3 = (14, 155, 47, 180)
+t3x, t3y = TOWN3[0], TOWN3[1]
+assert all(g[y][x] == 6 for y in range(t3y - 1, TOWN3[3] + 2) for x in range(t3x - 1, TOWN3[2] + 2)), "Moosbrück: Fläche nicht frei"
+fill(TOWN3, 1)
+for x in range(TOWN3[0], TOWN3[2] + 1): g[TOWN3[1]][x] = g[TOWN3[3]][x] = 2
+for y in range(TOWN3[1], TOWN3[3] + 1): g[y][TOWN3[0]] = g[y][TOWN3[2]] = 2
+T3_E = (TOWN3[2], t3y + 13)
+for d in range(-1, 2): g[T3_E[1] + d][T3_E[0]] = 1          # Osttor
+
+def house(ox, oy, door_south):
+    """Haus 9x7 (Außenmaß) in Stadtkoordinaten: Wand außen, innen Stadtstein, Tür mittig zur Straße. Liefert (Innenmitte, Tür)."""
+    x0, y0 = t3x + ox, t3y + oy
+    for x in range(x0, x0 + 9):
+        g[y0][x] = g[y0 + 6][x] = 2
+    for y in range(y0, y0 + 7):
+        g[y][x0] = g[y][x0 + 8] = 2
+    for y in range(y0 + 1, y0 + 6):
+        for x in range(x0 + 1, x0 + 8): g[y][x] = 1
+    door = (x0 + 4, y0 + 6 if door_south else y0)
+    g[door[1]][door[0]] = 1
+    return (x0 + 4, y0 + 3), door
+
+HOUSES = {}
+HOUSES['lehrer'] = house(3, 3, True)          # oben links, Tür zur Straße (Süden)
+HOUSES['haendler'] = house(14, 3, True)
+HOUSES['schmied'] = house(3, 15, False)       # unten links, Tür zur Straße (Norden)
+HOUSES['lager'] = house(14, 15, False)
+for tx_, ty_ in [(27, 5), (30, 8), (28, 19), (31, 21), (26, 22)]:     # ein paar Bäume am Ostrand
+    g[t3y + ty_][t3x + tx_] = 10
+# Brücke zum Festland (Roggenfelder-Ufer) und Anschluss an die Ostroute von Aschenhafen
+road([T3_E, (56, T3_E[1]), (56, 141)])
+obj("Moosbrück", "townstart", t3x + 28, t3y + 13)
+obj("Moosbrück", "safezone", TOWN3[0] - 1, TOWN3[1] - 1, TOWN3[2] - TOWN3[0] + 3, TOWN3[3] - TOWN3[1] + 3)
+obj("Moosbrück", "region", TOWN3[0] - 1, TOWN3[1] - 1, TOWN3[2] - TOWN3[0] + 3, TOWN3[3] - TOWN3[1] + 3, levels="Stadt")
+npc_h = lambda name, house_key, **props: obj(name, "npc", *HOUSES[house_key][0], **props)
+npc_h("Lehrmeisterin Selka", 'lehrer', kind="trainer", tier=2)
+npc_h("Händler Wenzel", 'haendler', kind="merchant", shop="artisan")
+npc_h("Schmied Brenn", 'schmied', kind="smith")
+npc_h("Lagerverwalter Ottmar", 'lager', kind="stash")
+
 # ------------------------------------------------------------------ Prüfung
 sx, sy = START
 seen = {(sx, sy)}; q = collections.deque([(sx, sy)])
