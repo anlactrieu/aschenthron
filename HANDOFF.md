@@ -16,6 +16,11 @@
 6. Nicht umgesetzt (nur Mehrspieler): Chat, Gruppen, Spieler-Handel, Gilden, Kopfgeld/Duelle, Login; Delta-Schnappschüsse; Server-Hosting.
 7. Technik: UI-Panel serialisiert pro Frame JSON (Dirty-Flag), A* in `chase` fast jeden Tick pro Monster (drosseln).
 
+## Stand Fernkampf-Gefühl (nach User-Test)
+- Bogen-Reichweite 9 (Skills quick/poison/multishot und `BOW_RANGE`), Monster-Aggro höchstens 5 (`AGGRO_MAX`), Monstertempo ×0,85 (schnelle Jäger ab 0,12 nur ×0,93; `MOVE_SLOW/MOVE_FAST` in `data.ts`), Kamera-Zoom Standard 0,75 mit Mausrad 0,55–1,1 (localStorage `aschenthron.zoom`).
+- Bug „Ratten schweben": `spriteCanvas` (art.ts) ließ kleine Sprites oberhalb des Fußankers stehen (Canvas mind. so hoch wie das skalierte Bild) → jetzt nach unten geschoben (`drop`), gilt für alle kleinen Monster/Truhen. Spieler: Fußpunkt aus Basis+Stiefel (`opaqueBottom`).
+- Pace danach: Seed 2024 9,3 h/13 Tode, Seed 7 9,1 h/10 Tode.
+
 ## Letzte 3 Entscheidungen
 1. **GitHub Pages statt eigener Server** (öffentliches Repo): kostenlos, Einzelspieler läuft komplett im Browser (Spielstand in localStorage). Mehrspieler bräuchte einen eigenen Host.
 2. **Sprite-Animation rein im Render** (kein Neu-Download): Schrittframes 1/4, stärkere Posen, Waffenpivot aus Alphakanal. Grund: DCSS-Sprites sind statische Einzelbilder.

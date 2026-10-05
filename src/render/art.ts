@@ -169,7 +169,9 @@ function spriteCanvas(key: string, draw: (x: Ctx) => void, scale: number, origin
   const up = upscale(o, scale);
   const h = Math.max(up.height, Math.ceil(((bottom + 1) * scale) / originY));
   const out = mkCanvas(up.width, h);
-  ctxOf(out).drawImage(up, 0, 0);
+  // Kleine Sprites (Ratten, Imps …) stehen im Bild höher als der Fußanker: nach unten schieben, damit die Füße auf dem Boden stehen
+  const drop = Math.max(0, Math.round(originY * h - (bottom + 1) * scale));
+  ctxOf(out).drawImage(up, 0, drop);
   actorCache.set(key, out);
   return out;
 }

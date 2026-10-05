@@ -21,6 +21,11 @@ import {
 
 const SAVE_KEY = 'aschenthron.save.v1';
 const VIEW = 30;
+/** Kamera-Zoom: Standard etwas weiter draußen als 1, per Mausrad zwischen ZOOM_MIN und ZOOM_MAX */
+const ZOOM_DEFAULT = 0.75;
+const ZOOM_MIN = 0.55;
+const ZOOM_MAX = 1.1;
+const ZOOM_KEY = 'aschenthron.zoom';
 const CHUNK = 16;
 const PROP_GIDS = new Set([2, 10, 11, 13, 14]);
 const OVERLAY_DEPTH = 1e7;
@@ -143,6 +148,9 @@ export class GameScene extends Phaser.Scene {
     }
     this.cameras.main.setBackgroundColor('#0b0a0d');
     this.input.on('pointerdown', (ptr: Phaser.Input.Pointer) => this.onClick(ptr));
+    // Kamera-Zoom per Mausrad (weiter heraus = mehr Welt sichtbar), Wert bleibt im Browser gespeichert
+    this.setZoom(Number(safeStorage()?.getItem(ZOOM_KEY)) || ZOOM_DEFAULT);
+    this.input.on('wheel', (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => this.setZoom(this.cameras.main.zoom * (dy > 0 ? 0.92 : 1.08)));
     this.input.mouse?.disableContextMenu();
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') this.setArmed(null);
@@ -190,6 +198,16 @@ export class GameScene extends Phaser.Scene {
     if (this.armedSkill === id) return this.setArmed(null);
     this.setArmed(id);
     this.ui.say(`${s.name} gewählt – Ziel anklicken (Rechtsklick oder Esc: abbrechen).`);
+  }
+
+  private setZoom(z: number): void {
+    const zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
+    this.cameras.main.setZoom(zoom);
+    try {
+      safeStorage()?.setItem(ZOOM_KEY, String(zoom));
+    } catch {
+      /* ohne Speicher: Zoom gilt nur für diese Sitzung */
+    }
   }
 
   private setArmed(id: string | null): void {

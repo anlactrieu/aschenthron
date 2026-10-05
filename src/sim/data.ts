@@ -119,6 +119,12 @@ export const SCALE = {
   bossXp: 15,
 };
 
+/** Monstertempo: Nahkämpfer 15 % langsamer als früher, schnelle Jäger (Wölfe, Hunde ab Tempo 0,12) nur 7 % – der Spieler (0,15) ist so klar schneller und kann zurückweichen. */
+const MOVE_SLOW = 0.85;
+const MOVE_FAST = 0.93;
+/** Aggro-Radius normaler Monster höchstens so groß, damit Bogenschützen (Reichweite 9) zuerst schießen. */
+const AGGRO_MAX = 5;
+
 function mk(
   id: string, name: string, level: number, family: MonsterFamily, color: number,
   o: { speed?: number; cd?: number; aggro?: number; hp?: number; dmg?: number; boss?: boolean; drop?: number; abil?: Ability[]; summon?: string; dt?: DmgType } = {},
@@ -130,9 +136,9 @@ function mk(
     id, name, level, family, color,
     hp: Math.round(SCALE.hp(level) * hpM),
     damage: [Math.max(1, Math.round(avg * 0.7)), Math.max(2, Math.round(avg * 1.3))],
-    speed: o.speed ?? 0.1,
+    speed: Math.round((o.speed ?? 0.1) * ((o.speed ?? 0.1) >= 0.12 ? MOVE_FAST : MOVE_SLOW) * 10000) / 10000,
     attackCooldown: o.cd ?? 20,
-    aggroRange: o.aggro ?? Math.min(7, 4 + Math.floor(level / 10)),
+    aggroRange: o.aggro ?? Math.min(AGGRO_MAX, 4 + Math.floor(level / 10)),
     xp: Math.round(SCALE.xp(level) * (o.boss ? SCALE.bossXp : 1)),
     gold: [Math.round(level * 1.5 + 1), Math.round(level * 3 + 3)],
     dropChance: o.boss ? 1 : (o.drop ?? 0.5),
@@ -313,13 +319,13 @@ export interface SkillDef {
 
 export const SKILLS: SkillDef[] = [
   { id: 'power_strike', name: 'Wuchtschlag', area: 'Nahkampf', levelReq: 2, price: 50, mana: 8, cooldown: 60, range: 1.5, mult: 2, ignoresArmor: false, status: { id: 'stun', seconds: 0.8 }, tier: 1, desc: 'Doppelter Waffenschaden im Nahkampf, betäubt kurz (0,8 s).' },
-  { id: 'quick_shot', name: 'Schnellschuss', area: 'Fernkampf', levelReq: 1, price: 20, mana: 4, cooldown: 20, range: 6, base: [6, 12], scales: 'gewandtheit', ignoresArmor: false, tier: 1, desc: 'Schneller Schuss auf Distanz (Bogen und Pfeile in der Nebenhand nötig), skaliert mit Gewandtheit.' },
+  { id: 'quick_shot', name: 'Schnellschuss', area: 'Fernkampf', levelReq: 1, price: 20, mana: 4, cooldown: 20, range: 9, base: [6, 12], scales: 'gewandtheit', ignoresArmor: false, tier: 1, desc: 'Schneller Schuss auf Distanz (Bogen und Pfeile in der Nebenhand nötig), skaliert mit Gewandtheit.' },
   { id: 'ember_bolt', name: 'Glutblitz', area: 'Magie', levelReq: 3, price: 80, mana: 10, cooldown: 30, range: 7, base: [10, 18], scales: 'verstand', ignoresArmor: true, dmgType: 'fire', status: { id: 'burn', seconds: 3 }, tier: 1, desc: 'Feuerschaden, ignoriert Rüstung, skaliert mit Verstand; setzt in Brand.' },
   { id: 'healing_hand', name: 'Heilende Hand', area: 'Magie', levelReq: 4, price: 120, mana: 14, cooldown: 200, range: 0, heal: 40, scales: 'verstand', ignoresArmor: true, tier: 1, desc: 'Heilt dich selbst, stärker mit Verstand und Level.' },
-  { id: 'poison_shot', name: 'Giftpfeil', area: 'Fernkampf', levelReq: 6, price: 220, mana: 9, cooldown: 60, range: 6, base: [5, 9], scales: 'gewandtheit', ignoresArmor: false, dot: { seconds: 8, factor: 1.6 }, dmgType: 'poison', tier: 2, desc: 'Schuss (Bogen und Pfeile in der Nebenhand nötig), der das Ziel zusätzlich 8 Sekunden mit Gift schädigt.' },
+  { id: 'poison_shot', name: 'Giftpfeil', area: 'Fernkampf', levelReq: 6, price: 220, mana: 9, cooldown: 60, range: 9, base: [5, 9], scales: 'gewandtheit', ignoresArmor: false, dot: { seconds: 8, factor: 1.6 }, dmgType: 'poison', tier: 2, desc: 'Schuss (Bogen und Pfeile in der Nebenhand nötig), der das Ziel zusätzlich 8 Sekunden mit Gift schädigt.' },
   { id: 'whirlwind', name: 'Wirbelhieb', area: 'Nahkampf', levelReq: 10, price: 500, mana: 16, cooldown: 100, range: 1.6, mult: 1.2, aoe: 2.2, aoeSelf: true, ignoresArmor: false, tier: 2, desc: 'Trifft alle Gegner um dich herum.' },
   { id: 'frost_nova', name: 'Frostnova', area: 'Magie', levelReq: 11, price: 650, mana: 18, cooldown: 140, range: 1.6, base: [14, 22], scales: 'verstand', aoe: 3, aoeSelf: true, ignoresArmor: true, dmgType: 'frost', status: { id: 'slow', seconds: 4 }, tier: 2, desc: 'Frostschaden rund um dich herum, verlangsamt Getroffene 4 s.' },
-  { id: 'multishot', name: 'Salve', area: 'Fernkampf', levelReq: 13, price: 800, mana: 14, cooldown: 70, range: 6, base: [9, 15], scales: 'gewandtheit', targets: 3, ignoresArmor: false, tier: 2, desc: 'Schießt (Bogen und Pfeile in der Nebenhand nötig) auf bis zu drei Gegner gleichzeitig; verbraucht einen Pfeil.' },
+  { id: 'multishot', name: 'Salve', area: 'Fernkampf', levelReq: 13, price: 800, mana: 14, cooldown: 70, range: 9, base: [9, 15], scales: 'gewandtheit', targets: 3, ignoresArmor: false, tier: 2, desc: 'Schießt (Bogen und Pfeile in der Nebenhand nötig) auf bis zu drei Gegner gleichzeitig; verbraucht einen Pfeil.' },
   { id: 'fireball', name: 'Feuerball', area: 'Magie', levelReq: 16, price: 1200, mana: 24, cooldown: 90, range: 7, base: [28, 42], scales: 'verstand', aoe: 2, ignoresArmor: true, dmgType: 'fire', status: { id: 'burn', seconds: 3 }, tier: 2, desc: 'Feuerschaden, explodiert am Ziel und trifft Gegner in der Nähe; setzt in Brand.' },
   { id: 'skull_split', name: 'Schädelspalter', area: 'Nahkampf', levelReq: 18, price: 1500, mana: 22, cooldown: 160, range: 1.5, mult: 3.2, ignoresArmor: false, status: { id: 'stun', seconds: 1.5 }, tier: 2, desc: 'Gewaltiger Hieb mit mehr als dreifachem Waffenschaden, betäubt 1,5 s.' },
   { id: 'lightning', name: 'Blitzschlag', area: 'Magie', levelReq: 22, price: 2400, mana: 30, cooldown: 120, range: 8, base: [60, 90], scales: 'verstand', ignoresArmor: true, tier: 2, desc: 'Zerschmetternder Blitz auf ein Ziel.' },

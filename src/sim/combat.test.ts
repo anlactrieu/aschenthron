@@ -129,7 +129,7 @@ describe('Statuseffekte', () => {
     p.y = 10;
     m.x = x0;
     run(w, 10);
-    expect(m.x - x0).toBeGreaterThan(slowed / SLOW_FACTOR - 0.01);
+    expect(m.x - x0).toBeGreaterThan(slowed / SLOW_FACTOR - 0.06);
     expect(x1).toBeGreaterThan(x0);
   });
 

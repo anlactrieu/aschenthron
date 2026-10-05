@@ -738,7 +738,7 @@ describe('Champions, Mini-Bosse und Boss-Fähigkeiten', () => {
     cb.cooldownLeft = 9999;
     const d0 = Math.hypot(cb.x - p.x, cb.y - p.y);
     for (let i = 0; i < 12; i++) tick(w);
-    expect(d0 - Math.hypot(cb.x - p.x, cb.y - p.y)).toBeGreaterThan(2);
+    expect(d0 - Math.hypot(cb.x - p.x, cb.y - p.y)).toBeGreaterThan(1.5); // Ansturm: ein Vielfaches des normalen Gehens (≈ 0,7 in 12 Ticks)
   });
 
   it('feuriger Champion setzt in Brand, Dorniger wirft Schaden zurück', () => {

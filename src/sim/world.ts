@@ -17,7 +17,7 @@ const MELEE_RANGE = 1.5;
 const CAST_RANGE = 6;
 const CAST_KEEP = 2.5;
 /** Bogenschützen schießen den normalen Angriff aus bis zu BOW_RANGE Feldern, statt in den Nahkampf zu laufen. */
-const BOW_RANGE = 6;
+const BOW_RANGE = 9;
 /** Monster-Schützen: Reichweite und Mindestabstand */
 const ARCHER_RANGE = 7;
 const ARCHER_KEEP = 3.5;
