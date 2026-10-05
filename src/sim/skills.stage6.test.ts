@@ -310,6 +310,13 @@ describe('Stufe 6: Skills und Zauber (Phase 2)', () => {
     expect(drainEvents(w).some((e) => e.type === 'fail')).toBe(true);
   });
 
+  it('Neuer Charakter bekommt keinen Gratis-Respec (auch nicht nach Export und Import)', () => {
+    const { w, p } = fresh();
+    expect(p.freeRespec).toBe(false);
+    expect(importPlayer(w, p, exportPlayer(p))).toBe(true);
+    expect(p.freeRespec).toBe(false);
+  });
+
   it('Neue Statusse sind überall bekannt (Ablauf, Netz, Anzeige)', () => {
     expect(STATUS_IDS).toEqual(expect.arrayContaining(['ward', 'stoneskin', 'bandage', 'weaken', 'curse', 'silence']));
     expect(attackCooldownOf(fresh().p)).toBeGreaterThan(0);

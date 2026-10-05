@@ -288,7 +288,7 @@ function baseActor(w: World, kind: Actor['kind'], name: string, x: number, y: nu
 
 export function spawnPlayer(w: World, x: number, y: number, name = 'Held'): Actor {
   const a = baseActor(w, 'player', name, x, y);
-  Object.assign(a, { damage: [4, 7] as [number, number], speed: 0.15, attackCooldown: 14, statPoints: START_STAT_POINTS, gold: START_GOLD, skillPoints: SKILL_POINTS_START });
+  Object.assign(a, { damage: [4, 7] as [number, number], speed: 0.15, attackCooldown: 14, statPoints: START_STAT_POINTS, gold: START_GOLD, skillPoints: SKILL_POINTS_START, freeRespec: false });
   a.hp = maxHpOf(a);
   a.mana = maxManaOf(a);
   if (w.towns.length === 0) w.start = { x, y };
