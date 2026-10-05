@@ -1,0 +1,53 @@
+# ASSETS – Fremd-Grafiken und Lizenzen
+
+## Dungeon Crawl 32x32 Tiles (Dungeon Crawl Stone Soup)
+- **Quelle:** https://opengameart.org/content/dungeon-crawl-32x32-tiles (Original: https://github.com/crawl/crawl, `crawl-ref/source/rltiles`; ältere Sammlung https://code.google.com/p/crawl-tiles/, http://rltiles.sourceforge.net/)
+- **Heruntergeladene Datei:** `Dungeon Crawl Stone Soup Full.zip` (5 717 663 Bytes, ca. 5,7 MB) von der OpenGameArt-Seite, geladen am **2026-10-05** mit ausdrücklicher Freigabe des Projektinhabers.
+- **Lizenz:** **CC0 1.0** (Public Domain Dedication, https://creativecommons.org/publicdomain/zero/1.0/). Geprüft an zwei Stellen: Lizenzfeld der OpenGameArt-Seite („CC0“) und `LICENSE.txt` im Archiv (Volltext der CC0, „No Copyright“). Eine Namensnennung ist nicht erforderlich, wird aber als Dank gegeben (Hinweis der Autoren in `README.txt`); beide Dateien liegen als `public/assets/dcss/LICENSE.txt` und `README.txt` bei.
+- **Autoren:** Dungeon Crawl Stone Soup community (viele Pixel-Künstler, siehe Liste im Original-Paket `crawl-tiles Oct-5-2010/utility/FilteredList.txt`); Paket gepflegt von Chris Hamons, auf OpenGameArt eingestellt von MedicineStorm.
+- **Nicht übernommen:** Terrain, Wände, Dungeon-Kacheln (bleiben prozedural), kein zweites Paket (z. B. Isometric Stone Soup, Supplemental).
+- **Verwendung im Spiel:** Monster, NPCs, Spielerfigur-Ebenen, Truhen (Welt), Item-Icons (Waffen, Rüstungen, Ringe, Amulette, Tränke, Pfeile, Schilde, Stäbe) und Skill-Icons. Zuordnung: `src/render/spriteMap.ts`; Lader: `src/render/sprites.ts`; Import: `python3 scripts/import_dcss.py "<entpacktes Paket>"` (kopiert genau die in `spriteMap.ts` genannten Dateien nach `public/assets/dcss/`, gleiche Ordnerstruktur).
+- **Fallback:** Fehlt ein Sprite oder lädt es nicht, zeichnet das Spiel die prozedurale Grafik aus `icons.ts`/`art.ts` (Gürtel, Beinlinge und Edelsteine haben im Paket kein passendes Bild und sind prozedural).
+- **Im Spiel:** Credits-Seite mit F1 oder Knopf „Credits (F1)“ im Charakterfenster (C), schließt mit Esc.
+- **Umfang:** 277 PNG-Dateien, ca. 160 KB.
+
+### Verwendete Dateien (Pfad relativ zu `public/assets/dcss/`, ohne `.png`)
+- `dungeon/` (3): chest, chest_2_closed, chest_2_open
+- `gui/invocations/` (1): elyvilon_heal_other
+- `gui/skills/` (5): axes, bows, crossbows, long_blades, maces_flails
+- `gui/spells/air/` (1): lightning_bolt_new
+- `gui/spells/fire/` (2): fireball_new, throw_flame_new
+- `gui/spells/ice/` (1): ozocubus_refrigeration_new
+- `gui/spells/poison/` (1): poison_arrow_new
+- `item/amulet/` (9): bone_gray, cameo_blue, cameo_orange, celtic_red, crystal_red, crystal_white, eye_green, face_1_gold, face_2
+- `item/armor/back/` (4): cloak_1_leather, cloak_2, cloak_3, cloak_4
+- `item/armor/feet/` (6): boots_1_brown_new, boots_2_jackboots, boots_3_stripe_new, boots_4_green, boots_iron_2, low_boots
+- `item/armor/hands/` (6): gauntlet_1, glove_1_new, glove_3_new, glove_4_gauntlets, glove_4_new, glove_5
+- `item/armor/headgear/` (6): cap_1, helmet_1, helmet_2, helmet_4, helmet_4_visor, plumed_helmet
+- `item/armor/shields/` (6): buckler_1_new, large_shield_1_new, large_shield_2_new, large_shield_3_new, lshield_dd_dk, shield_2_new
+- `item/armor/torso/` (15): banded_mail_1, leather_armor_1, leather_armor_2, leather_armor_3, plate_mail_1, plate_mail_2, ring_mail_1_new, robe_1_new, robe_2_new, robe_3, robe_art_1, robe_ego_1, splint_mail_1, studded_leather_armor, troll_leather_armor
+- `item/potion/` (10): brilliant_blue_new, cyan_new, golden, magenta_new, pink, purple_red, ruby_new, silver, sky_blue, white_new
+- `item/ring/` (6): iron, moonstone, plain_black, ring_ruby, ruby, silver
+- `item/staff/` (6): staff_0, staff_1, staff_2, staff_3, staff_4, staff_5
+- `item/weapon/` (19): axe, battle_axe_1, broad_axe_1, claymore, club_new, dagger_7, dagger_new, demon_blade, elven_dagger, executioner_axe_2_new, falchion_1_new, greatsword_1_new, hammer_3, long_sword_1_new, orcish_dagger, sabre_2, short_sword_1_new, war_axe_1, war_hammer
+- `item/weapon/ranged/` (11): bow_1, bow_2, elven_arrow, longbow_1, longbow_2, longbow_3, needle-c, orcish_arrow, shortbow_1, silver_arrow, sling_bullet_1_new
+- `monster/` (21): death_knight, deep_dwarf_berserker, deep_elf_master_archer, dwarf_new, elf_new, enchantress_human, goblin_new, hell_knight_new, hobgoblin_new, human_new, human_old, necromancer_new, ogre_new, orc_knight_new, orc_warlord, orc_warrior_new, orc_wizard_new, rock_troll, stone_giant_new, troll, wizard
+- `monster/animals/` (18): giant_centipede, green_rat, grey_rat, hell_hound_new, hound, jackal_new, jumping_spider_new, orange_rat, orb_spider, redback_new, rock_worm, spider, tarantella_new, trapdoor_spider_new, war_dog, warg, wolf, wolf_spider_new
+- `monster/demons/` (3): balrug_new, imp, pit_fiend
+- `monster/demonspawn/` (1): infernal
+- `monster/holy/` (1): paladin
+- `monster/nonliving/` (4): fire_elemental_new, iron_golem, orb_of_fire_new, stone_golem
+- `monster/undead/` (8): bog_body, ghoul, guardian_mummy, lich, mummy_priest, rotting_hulk_new, skeletal_warrior_new, wraith
+- `monster/undead/skeletons/` (1): skeleton_humanoid_small_new
+- `monster/undead/zombies/` (1): zombie_small
+- `monster/unique/` (16): agnes_new, blork_the_orc_new, donald_new, edmund_new, erica_new, erolcha_new, frederick_new, harold, jessica_new, joseph_new, josephine_new, margery_new, maud_new, maurice_new, psyche_new, sigmund_new
+- `player/base/` (1): human_male
+- `player/body/` (16): banded_2, half_plate, leather_armor, leather_armor_2, leather_heavy, leather_metal, leather_stud, plate, plate_black, ringmail, robe_black_red, robe_blue, robe_brown, robe_gray_2, robe_purple, shirt_white_1
+- `player/boots/` (7): long_red, long_white, middle_brown, middle_gold, middle_gray, middle_purple, short_brown
+- `player/cloak/` (6): black, brown, gray, green, red, white
+- `player/gloves/` (6): gauntlet_blue, glove_black, glove_brown, glove_purple, glove_red, glove_white
+- `player/hair/` (1): brown_2
+- `player/hand_left/` (6): buckler_round_2, shield_kite_1, shield_large_dd_dk, shield_long_red, shield_round_2, shield_skull
+- `player/hand_right/` (30): axe, axe_executioner_new, battleaxe, bow, bow_2, bow_3, bow_blue, club, dagger_new, dagger_slant_new, falchion_new, great_axe, great_bow, great_sword, hammer_2_new, hammer_new, hand_axe_new, heavy_sword, knife, long_sword, sabre, short_sword, staff_evil, staff_mage, staff_plain, staff_ring_blue, staff_ruby, staff_skull, sword_black, sword_thief
+- `player/head/` (6): cap_black_1, fhelm_horn_2, full_black, helm_plume, iron_1, iron_2
+- `player/legs/` (6): leg_armor_1, leg_armor_3, leg_armor_5, metal_gray, pants_black, pants_brown

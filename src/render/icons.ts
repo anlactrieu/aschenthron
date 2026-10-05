@@ -1,6 +1,8 @@
 import type { Item } from '../sim/items';
 import { GEM_COLOR, templateById } from '../sim/items';
 import type { SkillDef } from '../sim/data';
+import { sprite } from './sprites';
+import { ITEM_SPRITES, POTION_QUICK, SKILL_SPRITES } from './spriteMap';
 
 /** Prozedurale Item- und Skill-Icons (16×16 logisch, mit Umriss, ×3 hochskaliert) als Data-URLs. */
 
@@ -41,6 +43,35 @@ function make(draw: (c: CanvasRenderingContext2D) => void, scale = 3): string {
   return out.toDataURL();
 }
 
+/** Sprite-Icon (32×32 aus Dungeon Crawl Stone Soup, CC0) mit dunklem Umriss, ×2 hochskaliert; null = Fallback. */
+function spriteIcon(path: string | undefined): string | null {
+  const img = path ? sprite(path) : null;
+  if (!img) return null;
+  const n = 32;
+  const base = document.createElement('canvas');
+  base.width = n + 2;
+  base.height = n + 2;
+  const x = base.getContext('2d')!;
+  x.imageSmoothingEnabled = false;
+  x.drawImage(img, 1, 1);
+  const d = x.getImageData(0, 0, n + 2, n + 2).data;
+  const a = (px: number, py: number) => (px < 0 || py < 0 || px > n + 1 || py > n + 1 ? 0 : d[(py * (n + 2) + px) * 4 + 3]!);
+  const out = document.createElement('canvas');
+  out.width = (n + 2) * 2;
+  out.height = (n + 2) * 2;
+  const oc = out.getContext('2d')!;
+  oc.imageSmoothingEnabled = false;
+  const o2 = document.createElement('canvas');
+  o2.width = n + 2;
+  o2.height = n + 2;
+  const o2c = o2.getContext('2d')!;
+  o2c.fillStyle = '#120e12';
+  for (let py = 0; py < n + 2; py++) for (let px = 0; px < n + 2; px++) if (!a(px, py) && (a(px - 1, py) || a(px + 1, py) || a(px, py - 1) || a(px, py + 1))) o2c.fillRect(px, py, 1, 1);
+  o2c.drawImage(base, 0, 0);
+  oc.drawImage(o2, 0, 0, out.width, out.height);
+  return out.toDataURL();
+}
+
 const r = (c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, col: number | string) => {
   c.fillStyle = typeof col === 'number' ? css(col) : col;
   c.fillRect(x, y, w, h);
@@ -56,6 +87,11 @@ export function itemIcon(it: Item): string {
   const key = `${it.templateId}`;
   const hit = cache.get(key);
   if (hit) return hit;
+  const spriteUrl = spriteIcon(ITEM_SPRITES[it.templateId]);
+  if (spriteUrl) {
+    cache.set(key, spriteUrl);
+    return spriteUrl;
+  }
   const t = templateById(it.templateId);
   const tier = tierOf(t.minLevel);
   const col = TIER_COL[tier]!;
@@ -245,7 +281,7 @@ const skillCache = new Map<string, string>();
 export function skillIcon(s: SkillDef): string {
   const hit = skillCache.get(s.id);
   if (hit) return hit;
-  const url = make((c) => {
+  const url = spriteIcon(SKILL_SPRITES[s.id]) ?? make((c) => {
     if (s.heal !== undefined) {
       r(c, 6, 2, 4, 12, 0x60e890);
       r(c, 2, 6, 12, 4, 0x60e890);
@@ -278,7 +314,7 @@ export function potionIcon(kind: 'heal' | 'mana'): string {
   const hit = potionCache.get(kind);
   if (hit) return hit;
   const liquid = kind === 'heal' ? 0xd83a4a : 0x3a6ae0;
-  const url = make((c) => {
+  const url = spriteIcon(POTION_QUICK[kind]) ?? make((c) => {
     r(c, 6, 1, 4, 2, 0x8a6a42);
     r(c, 7, 3, 2, 2, 0xcfe8f0);
     r(c, 4, 6, 8, 9, 0xcfe8f0);

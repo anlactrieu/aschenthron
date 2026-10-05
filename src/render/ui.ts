@@ -6,7 +6,8 @@ import {
 } from '../sim/world';
 import { itemIcon, potionIcon, skillIcon } from './icons';
 import { giverLocation, questAvailable, questChains, questWhere, targetName } from '../sim/quests';
-import { lookOf, playerCanvas } from './art';
+import { lookKey, lookOf, playerPortrait } from './art';
+import { initCredits, toggleCredits } from './credits';
 
 const RARITY_COLOR: Record<Item['rarity'], string> = { normal: '#c9c4bd', magic: '#7f9fff', rare: '#f2c94c', set: '#5fd070', legendary: '#ff8a2a' };
 const SLOT_NAME: Record<EquipSlot, string> = { weapon: 'Waffe', head: 'Kopf', chest: 'Brust', hands: 'Hände', feet: 'Füße', ring: 'Ring', ring2: 'Ring', amulet: 'Amulett', offhand: 'Nebenhand', belt: 'Gürtel', cloak: 'Umhang', legs: 'Beine' };
@@ -190,6 +191,7 @@ export class Ui {
   private lastW: World | null = null;
   private dollKey = '';
   private dollUrl = '';
+  private dollWidth = 104;
 
   constructor(
     private send: (c: Command) => void,
@@ -223,6 +225,7 @@ export class Ui {
     this.tip.style.cssText = 'position:fixed;z-index:50;max-width:270px;background:rgba(10,8,14,.97);border:1px solid #8a7258;color:#d4c4a8;font:12px/1.45 Georgia,serif;padding:8px 10px;pointer-events:none;display:none;box-shadow:0 4px 16px #000';
     document.body.append(this.main, this.side, this.hud, this.target, this.toast, this.bannerEl, this.tip);
 
+    initCredits();
     window.addEventListener('keydown', (e) => {
       const k = e.key.toLowerCase();
       if (k === 'i') this.toggleTab('inv');
@@ -620,21 +623,26 @@ export class Ui {
     this.main.replaceChildren(title, tabs, body);
   }
 
-  private dollImage(p: Actor): string {
+  private dollImage(p: Actor): { url: string; width: number } {
     const look = lookOf(p);
-    const key = `${look.chest}_${look.head}_${look.weapon}_${look.hands}_${look.weaponKind}_${look.robe}_${look.quiver}_${look.shield}`;
+    const key = lookKey(look, 0, false);
     if (key !== this.dollKey) {
       this.dollKey = key;
-      this.dollUrl = playerCanvas(look, 0).toDataURL();
+      const portrait = playerPortrait(look);
+      this.dollUrl = portrait.canvas.toDataURL();
+      this.dollWidth = portrait.width;
     }
-    return this.dollUrl;
+    return { url: this.dollUrl, width: this.dollWidth };
   }
 
   private renderInventory(body: HTMLElement, p: Actor): void {
     // Figur mit Ausrüstungsfeldern
     const doll = el('div', 'a-doll');
     doll.dataset.drop = 'bag';
-    doll.append(Object.assign(el('img', 'me'), { src: this.dollImage(p) }));
+    const portrait = this.dollImage(p);
+    const me = Object.assign(el('img', 'me'), { src: portrait.url });
+    me.style.width = `${portrait.width}px`;
+    doll.append(me);
     // 12 Felder in zwei Spalten links und zwei rechts, die Figur steht frei in der Mitte:
     // links außen Amulett/Waffe/Hände, links innen Kopf/Brust/Beine, rechts innen Umhang/Gürtel/Füße, rechts außen Ring/Nebenhand/Ring
     const pos: Record<EquipSlot, [number, number]> = {
@@ -768,7 +776,10 @@ export class Ui {
     nb.onclick = () => {
       if (confirm('Spielstand wirklich löschen und neu beginnen?')) this.newGame();
     };
-    body.append(nb);
+    const cb = el('button', 'a-btn', 'Credits (F1)');
+    cb.style.margin = '14px 0 0 8px';
+    cb.onclick = () => toggleCredits();
+    body.append(nb, cb);
   }
 
   private renderSkills(body: HTMLElement, p: Actor): void {

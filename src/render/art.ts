@@ -2,9 +2,13 @@ import type Phaser from 'phaser';
 import type { MonsterFamily } from '../sim/data';
 import type { Actor } from '../sim/world';
 import { templateById } from '../sim/items';
+import { sprite } from './sprites';
+import { CHEST_SPRITES, MONSTER_SPRITES, PLAYER_BASE, PLAYER_DEFAULTS, PLAYER_HAIR, PLAYER_LAYERS, SPRITE_SCALE, NPC_NAME_SPRITES, npcSpriteFile } from './spriteMap';
 
 /**
- * Prozedurale Pixel-Art: alles wird beim Start im Code gezeichnet (keine Fremd-Assets, keine Lizenzen).
+ * Prozedurale Pixel-Art: Terrain, Wände, Bäume usw. werden beim Start im Code gezeichnet.
+ * Figuren, Truhen und Items nutzen, wo vorhanden, die CC0-Sprites von Dungeon Crawl Stone Soup (siehe sprites.ts,
+ * spriteMap.ts, ASSETS.md); fehlt ein Sprite, greift die prozedurale Zeichnung unverändert als Fallback.
  * Sprites werden klein (logische Pixel) gemalt, mit Umriss versehen und dann hart (nearest) hochskaliert.
  */
 
@@ -102,6 +106,65 @@ function upscale(src: HTMLCanvasElement, k: number): HTMLCanvasElement {
   const c = ctxOf(out);
   c.drawImage(src, 0, 0, out.width, out.height);
   return out;
+}
+
+
+/* ------------------------------------------------ Sprite-Figuren (DCSS, CC0) */
+
+/** Sprite-Kantenlänge und Rand (für Ausholen/Sprünge) in logischen Pixeln */
+const SP = 32;
+const SP_PAD = 4;
+const SP_SIZE = SP + SP_PAD * 2;
+
+/** Zeichnet ein Sprite, optional mit multiplikativer Färbung (Alpha bleibt erhalten). */
+function drawSprite(x: Ctx, img: HTMLImageElement, tint?: number): void {
+  if (tint === undefined) {
+    x.drawImage(img, 0, 0);
+    return;
+  }
+  const t = mkCanvas(SP, SP);
+  const tc = ctxOf(t);
+  tc.drawImage(img, 0, 0);
+  tc.globalCompositeOperation = 'multiply';
+  tc.fillStyle = css(tint);
+  tc.fillRect(0, 0, SP, SP);
+  tc.globalCompositeOperation = 'destination-in';
+  tc.drawImage(img, 0, 0);
+  x.drawImage(t, 0, 0);
+}
+
+/**
+ * Baut aus gezeichneten Sprite-Ebenen eine Figurentextur: Umriss, Hochskalierung und eine Bildhöhe, bei der die
+ * unterste deckende Zeile genau auf `originY` liegt (so passt `setOrigin(0.5, originY)` für beliebige Sprites).
+ */
+function spriteCanvas(key: string, draw: (x: Ctx) => void, scale: number, originY: number, rim?: string): HTMLCanvasElement {
+  const hit = actorCache.get(key);
+  if (hit) return hit;
+  const c = mkCanvas(SP_SIZE, SP_SIZE);
+  const x = ctxOf(c);
+  x.translate(SP_PAD, SP_PAD);
+  draw(x);
+  const o = outline(c, rim);
+  const d = ctxOf(o).getImageData(0, 0, SP_SIZE, SP_SIZE).data;
+  let bottom = SP_SIZE - 1;
+  while (bottom > 0 && !d.subarray(bottom * SP_SIZE * 4, (bottom + 1) * SP_SIZE * 4).some((v, i) => i % 4 === 3 && v > 0)) bottom--;
+  const up = upscale(o, scale);
+  const h = Math.max(up.height, Math.ceil(((bottom + 1) * scale) / originY));
+  const out = mkCanvas(up.width, h);
+  ctxOf(out).drawImage(up, 0, 0);
+  actorCache.set(key, out);
+  return out;
+}
+
+/** Bewegungsphase einer Figur um den Fußpunkt: 0 Stand, 1 Schritt, 2 Ausholen (zurück), 3 Schlag (vor). */
+function pose(x: Ctx, frame: number): void {
+  x.translate(SP / 2, SP);
+  if (frame === 1) x.scale(1.02, 0.95);
+  else if (frame === 2) {
+    x.translate(-2, 0);
+    x.scale(1, 0.97);
+  } else if (frame === 3) x.translate(3, -1);
+  x.translate(-SP / 2, -SP);
 }
 
 /* ---------------------------------------------------------------- Kacheln */
@@ -512,7 +575,20 @@ function actorCanvas(key: string, build: (x: Ctx) => void, scale: number): HTMLC
   return out;
 }
 
+function spriteMonster(id: string, boss: boolean, frame: number): HTMLCanvasElement | null {
+  const def = MONSTER_SPRITES[id];
+  const img = def ? sprite(def.file) : null;
+  if (!def || !img) return null;
+  const scale = boss ? Math.max(SPRITE_SCALE.boss, def.scale ?? 0) : def.scale ?? SPRITE_SCALE.normal;
+  return spriteCanvas(`smon_${id}_${frame}${boss ? 'B' : ''}`, (x) => {
+    pose(x, frame);
+    drawSprite(x, img, def.tint);
+  }, scale, FEET_ORIGIN_Y, boss ? '#c8801c' : undefined);
+}
+
 export function monsterCanvas(id: string, family: MonsterFamily, color: number, boss: boolean, frame: number, back = false): HTMLCanvasElement {
+  const sp = spriteMonster(id, boss, frame);
+  if (sp) return sp;
   return actorCanvas(`mon_${id}_${frame}${back ? 'b' : ''}`, (x) => {
     BACK = back && ['humanoid', 'undead', 'ghoul', 'demon'].includes(family);
     POSE = frame === 2 ? 'wind' : frame === 3 ? 'strike' : 'idle';
@@ -544,6 +620,8 @@ export interface Look {
   quiver: boolean;
   /** Schild in der Nebenhand: Stufe (-1 = keins) */
   shield: number;
+  /** Vorlagen-IDs der sichtbaren Ausrüstung (für die Sprite-Ebenen), leer = nichts angelegt */
+  ids: { chest: string; legs: string; feet: string; hands: string; head: string; cloak: string; weapon: string; offhand: string };
 }
 
 export function lookOf(a: Actor): Look {
@@ -558,12 +636,72 @@ export function lookOf(a: Actor): Look {
     robe: !!a.equipment.chest && a.equipment.chest.templateId.includes('robe'),
     quiver: a.equipment.offhand?.off === 'arrows',
     shield: a.equipment.offhand?.off === 'shield' ? tierOf(templateById(a.equipment.offhand.templateId).minLevel) : -1,
+    ids: {
+      chest: a.equipment.chest?.templateId ?? '', legs: a.equipment.legs?.templateId ?? '', feet: a.equipment.feet?.templateId ?? '',
+      hands: a.equipment.hands?.templateId ?? '', head: a.equipment.head?.templateId ?? '', cloak: a.equipment.cloak?.templateId ?? '',
+      weapon: a.equipment.weapon?.templateId ?? '', offhand: a.equipment.offhand?.off === 'shield' ? a.equipment.offhand.templateId : '',
+    },
   };
 }
 
+/** Cache-/Texturschlüssel einer Spielerfigur (Aussehen + Bewegungsphase + Blickrichtung). */
+export function lookKey(look: Look, frame: number, back: boolean): string {
+  const i = look.ids;
+  return `pl_${look.chest}_${look.head}_${look.weapon}_${look.hands}_${look.weaponKind}_${look.robe ? 1 : 0}_${look.quiver ? 1 : 0}_${look.shield}_${i.chest}.${i.legs}.${i.feet}.${i.hands}.${i.head}.${i.cloak}.${i.weapon}.${i.offhand}_${frame}${back ? 'b' : ''}`;
+}
+
+/** Spielerfigur aus DCSS-Ebenen (Körper, Beine, Stiefel, Rüstung, Umhang, Handschuhe, Kopf, Schild, Waffe). Null = Fallback. */
+function spritePlayer(look: Look, frame: number, scale: number = SPRITE_SCALE.normal): HTMLCanvasElement | null {
+  const base = sprite(PLAYER_BASE);
+  if (!base) return null;
+  const i = look.ids;
+  const layer = (id: string, dflt?: string): HTMLImageElement | null => {
+    const path = (id && PLAYER_LAYERS[id]) || dflt;
+    return path ? sprite(path) : null;
+  };
+  const legs = layer(i.legs, PLAYER_DEFAULTS.legs);
+  const boots = layer(i.feet, PLAYER_DEFAULTS.boots);
+  const body = layer(i.chest, PLAYER_DEFAULTS.body);
+  const cloak = layer(i.cloak);
+  const gloves = layer(i.hands);
+  const head = layer(i.head);
+  const hair = i.head && look.head >= 1 ? null : sprite(PLAYER_HAIR);
+  const shield = layer(i.offhand);
+  const wpn = layer(i.weapon);
+  return spriteCanvas(`${lookKey(look, frame, false)}_x${scale}`, (x) => {
+    pose(x, frame);
+    // Umhang hinter dem Körper, damit die Rüstung sichtbar bleibt
+    for (const l of [cloak, base, legs, boots, body, gloves, hair, head, shield]) if (l) x.drawImage(l, 0, 0);
+    if (wpn) {
+      // Waffe um die Hand drehen: Ausholen nach hinten, Schlag nach vorn (Bogen/Stab nur leicht)
+      x.save();
+      const swing = look.weaponKind === 0;
+      if (frame === 2) {
+        x.translate(21, 17);
+        x.rotate(swing ? -0.7 : -0.2);
+        x.translate(-21, -17);
+      } else if (frame === 3) {
+        x.translate(21, 17);
+        x.rotate(swing ? 0.75 : 0.25);
+        x.translate(-21 + (look.weaponKind === 1 ? 1 : 2), -17);
+      }
+      x.drawImage(wpn, 0, 0);
+      x.restore();
+    }
+  }, scale, FEET_ORIGIN_Y);
+}
+
+/** Große Figur für das Inventarfenster: Bild und CSS-Breite (Sprite 1:1, prozedural wie bisher 104 px). */
+export function playerPortrait(look: Look): { canvas: HTMLCanvasElement; width: number } {
+  const sp = spritePlayer(look, 0, 4);
+  if (sp) return { canvas: sp, width: sp.width };
+  return { canvas: playerCanvas(look, 0), width: 104 };
+}
+
 export function playerCanvas(look: Look, frame: number, back = false): HTMLCanvasElement {
-  const key = `pl_${look.chest}_${look.head}_${look.weapon}_${look.hands}_${look.weaponKind}_${look.robe ? 1 : 0}_${look.quiver ? 1 : 0}_${look.shield}_${frame}${back ? 'b' : ''}`;
-  return actorCanvas(key, (x) => {
+  const sp = spritePlayer(look, frame);
+  if (sp) return sp;
+  return actorCanvas(lookKey(look, frame, back), (x) => {
     BACK = back;
     POSE = frame === 2 ? 'wind' : frame === 3 ? 'strike' : 'idle';
     const body = look.chest >= 0 ? TIER_COL[look.chest]! : 0x4a68a0;
@@ -628,7 +766,18 @@ export function playerCanvas(look: Look, frame: number, back = false): HTMLCanva
   }, 3);
 }
 
-export function npcCanvas(kind: string): HTMLCanvasElement {
+/** Texturschlüssel eines NPCs: benannte NPCs mit eigenem Sprite bekommen eine eigene Textur. */
+export function npcTextureKey(kind: string, name?: string): string {
+  const f = name ? NPC_NAME_SPRITES[name] : undefined;
+  return name && f && sprite(f) ? `npc_n_${name}` : `npc_${kind}`;
+}
+
+export function npcCanvas(kind: string, name?: string): HTMLCanvasElement {
+  const file = npcSpriteFile(kind, name);
+  const img = file ? sprite(file) : null;
+  if (img) {
+    return spriteCanvas(`snpc_${kind}_${name ?? ''}`, (x) => drawSprite(x, img), SPRITE_SCALE.normal, FEET_ORIGIN_Y);
+  }
   return actorCanvas(`npc_${kind}`, (x) => {
     BACK = false;
     POSE = 'idle';
@@ -681,6 +830,9 @@ export function lootCanvas(rarity: 'normal' | 'magic' | 'rare' | 'set' | 'legend
 }
 
 export function chestCanvas(tier: 'wood' | 'iron' | 'gold', open: boolean): HTMLCanvasElement {
+  const def = CHEST_SPRITES[tier];
+  const img = sprite(open ? def.open : def.closed);
+  if (img) return spriteCanvas(`schest_${tier}_${open ? 1 : 0}`, (x) => drawSprite(x, img, def.tint), SPRITE_SCALE.chest, 0.9);
   const body = { wood: 0x7a5230, iron: 0x5a6070, gold: 0x8a6a28 }[tier];
   const trim = { wood: 0x4a3018, iron: 0x9aa4b4, gold: 0xf0cc50 }[tier];
   const c = mkCanvas(16, 14);
@@ -727,6 +879,7 @@ export function registerStaticArt(scene: Phaser.Scene): void {
   add('pillar', pillarCanvas());
   for (const r of ['normal', 'magic', 'rare', 'set', 'legendary'] as const) add(`loot_${r}`, lootCanvas(r));
   for (const k of ['trainer', 'merchant', 'stash', 'quest', 'smith']) add(`npc_${k}`, npcCanvas(k));
+  for (const [name, f] of Object.entries(NPC_NAME_SPRITES)) if (sprite(f)) add(`npc_n_${name}`, npcCanvas('quest', name));
   for (const t of ['wood', 'iron', 'gold'] as const) for (const o of [false, true]) add(`chest_${t}_${o ? 1 : 0}`, chestCanvas(t, o));
 }
 

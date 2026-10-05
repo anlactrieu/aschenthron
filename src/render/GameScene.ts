@@ -16,7 +16,7 @@ import { Atmosphere, isDungeon } from './atmosphere';
 import { Fx } from './fx';
 import type { RemoteSession } from '../net/client';
 import {
-  ensureTexture, tileBase, FEET_ORIGIN_Y, lookOf, monsterCanvas, playerCanvas, registerStaticArt, tileCanvas, TILE_H, TILE_VARIANTS, TILE_W, WALL_VARIANTS,
+  ensureTexture, tileBase, FEET_ORIGIN_Y, lookKey, lookOf, npcTextureKey, monsterCanvas, playerCanvas, registerStaticArt, tileCanvas, TILE_H, TILE_VARIANTS, TILE_W, WALL_VARIANTS,
 } from './art';
 
 const SAVE_KEY = 'aschenthron.save.v1';
@@ -900,7 +900,7 @@ export class GameScene extends Phaser.Scene {
       let img = this.npcViews.get(n.id);
       const { sx, sy } = toScreen(n.x, n.y);
       if (!img) {
-        img = this.add.image(sx, sy + 8, `npc_${n.kind}`).setOrigin(0.5, FEET_ORIGIN_Y);
+        img = this.add.image(sx, sy + 8, npcTextureKey(n.kind, n.name)).setOrigin(0.5, FEET_ORIGIN_Y);
         this.npcViews.set(n.id, img);
       }
       this.gfxGround.fillStyle(0x000000, 0.2);
@@ -1055,8 +1055,7 @@ export class GameScene extends Phaser.Scene {
       const img = view.img;
       if (a.kind === 'player') {
         const look = lookOf(a);
-        const key = `pl_${look.chest}_${look.head}_${look.weapon}_${look.hands}_${look.weaponKind}_${look.robe ? 1 : 0}_${look.quiver ? 1 : 0}_${look.shield}_${frame}${view.up ? 'b' : ''}`;
-        img.setTexture(ensureTexture(this, key, () => playerCanvas(look, frame, !!view.up)));
+        img.setTexture(ensureTexture(this, lookKey(look, frame, !!view.up), () => playerCanvas(look, frame, !!view.up)));
       } else {
         const k = monsterKind(a.kindId!);
         const key = `mon_${k.id}_${frame}${view.up ? 'b' : ''}`;
