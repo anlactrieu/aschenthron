@@ -362,7 +362,7 @@ export const SKILLS: SkillDef[] = [
   { id: 'multishot', name: 'Salve', area: 'Fernkampf', levelReq: 13, price: 800, mana: 14, cooldown: 70, range: 9, base: [9, 15], scales: 'gewandtheit', targets: 3, ignoresArmor: false, tier: 2, desc: 'Schießt (Bogen und Pfeile in der Nebenhand nötig) auf bis zu drei Gegner gleichzeitig; verbraucht einen Pfeil.' },
   { id: 'fireball', name: 'Feuerball', area: 'Magie', levelReq: 16, price: 1200, mana: 24, cooldown: 90, range: 7, base: [28, 42], scales: 'verstand', aoe: 2, ignoresArmor: true, dmgType: 'fire', status: { id: 'burn', seconds: 3 }, tier: 2, desc: 'Feuerschaden, explodiert am Ziel und trifft Gegner in der Nähe; setzt in Brand.' },
   { id: 'skull_split', name: 'Schädelspalter', area: 'Nahkampf', levelReq: 18, price: 1500, mana: 22, cooldown: 160, range: 1.5, mult: 3.2, ignoresArmor: false, status: { id: 'stun', seconds: 1.5 }, tier: 2, desc: 'Gewaltiger Hieb mit mehr als dreifachem Waffenschaden, betäubt 1,5 s.' },
-  { id: 'lightning', name: 'Blitzschlag', area: 'Magie', levelReq: 22, price: 2400, mana: 30, cooldown: 120, range: 8, base: [60, 90], scales: 'verstand', ignoresArmor: true, tier: 2, desc: 'Zerschmetternder Blitz auf ein Ziel.' },
+  { id: 'lightning', name: 'Blitzschlag', area: 'Magie', levelReq: 22, price: 2400, mana: 30, cooldown: 120, range: 8, base: [60, 90], scales: 'verstand', ignoresArmor: true, tier: 2, desc: 'Zerschmetternder Blitz auf ein Ziel; ignoriert Rüstung und Elementarresistenzen (hohe Manakosten, lange Abklingzeit).' },
 ];
 
 export function skillById(id: string): SkillDef | undefined {

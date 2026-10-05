@@ -34,6 +34,7 @@ const MONSTER_LOOT_TTL = 20 * 180;
 const CORPSE_LOOT_TTL = 20 * 300;
 const LEASH = 14;
 /** Rudel-Alarm: nur Rudelmitglieder in diesem Umkreis (Felder) eilen dem Angegriffenen zu Hilfe (kleiner = Lager lassen sich einzeln abziehen) */
+const NOTE_DEBOUNCE = 100;
 const PACK_ALERT_RANGE = 8;
 /** Monster schlafen (kein Tick), wenn kein Spieler näher ist als dies */
 const SLEEP_DIST = 32;
@@ -255,6 +256,8 @@ export interface World {
   telegraphs: { id: number; x: number; y: number; r: number; at: number; dmg: number; src: number }[];
   /** Akteur des gerade ausgeführten Befehls (für `fail`-Ereignisse) */
   cmdActor: number | null;
+  /** Kampflog-Entprellung: letzter Tick je Empfänger und Text (nur Laufzeit) */
+  noteSeen?: Map<string, number>;
 }
 
 export function createWorld(seed: number, grid: Grid, safe: Rect[] = []): World {
@@ -405,7 +408,15 @@ function clearStatus(a: Actor): void {
 /** Hinweis für das Kampflog an die beteiligten Spieler (Ziel, sonst der Wirkende des laufenden Befehls). Nur für echte Regelwirkungen, nie je Treffer. */
 export function note(w: World, a: Actor, text: string): void {
   const to = a.kind === 'player' ? a.id : w.cmdActor;
-  if (to !== null && getActor(w, to)?.kind === 'player') w.events.push({ type: 'note', text, to });
+  if (to === null || getActor(w, to)?.kind !== 'player') return;
+  // gleiche Meldung höchstens alle NOTE_DEBOUNCE Ticks (Spinnenbisse, Brand-Champions würden sonst jeden Treffer melden)
+  const seen = (w.noteSeen ??= new Map());
+  const key = `${to}|${text}`;
+  const last = seen.get(key);
+  if (last !== undefined && w.tick - last < NOTE_DEBOUNCE) return;
+  if (seen.size > 64) for (const [k, t] of seen) if (w.tick - t >= NOTE_DEBOUNCE) seen.delete(k);
+  seen.set(key, w.tick);
+  w.events.push({ type: 'note', text, to });
 }
 
 /** Setzt einen Statuseffekt. Die Resistenz gegen `dt` verkürzt die Dauer (100 % = wirkungslos), Bosse sind nur halb so lange betäubt; Stapelregeln und Kontroll-Verkürzung stehen in `effects.ts`. */

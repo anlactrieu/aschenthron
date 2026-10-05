@@ -3,6 +3,7 @@ import { EFFECTS, cleanse, controlDr, dispel, mergeStatus } from './effects';
 import { STATUS_IDS, SKILLS, schoolOf, type StatusId } from './data';
 import { applyCommand, applyStatus, activeSkills, createWorld, drainEvents, spawnMonster, spawnPlayer, tick, TICK_RATE } from './world';
 import { actorFromLite, makeSnapshot } from './net';
+import { generateItem } from './items';
 import type { Grid } from './path';
 
 const open = (): Grid => ({ w: 40, h: 40, walkable: new Array(1600).fill(true) });
@@ -57,6 +58,22 @@ describe('Effekte (Stufe 6, Phase 1)', () => {
     w.cmdActor = null;
     applyStatus(w, skel, 'burn', 3, 'poison');
     expect(drainEvents(w).filter((e) => e.type === 'note')).toHaveLength(0);
+  });
+
+  it('Log-Notizen werden entprellt: 10 Spinnenbisse in 2 s melden die Resistenz nur einmal', () => {
+    const { w, p } = fresh();
+    p.equipment.ring = Object.assign(generateItem(w.rng, w.nextId++, 'iron_ring', 'normal'), { affixes: [{ stat: 'resPoison' as const, value: 30 }] });
+    const spider = spawnMonster(w, 11, 10, 'venom_spider');
+    drainEvents(w);
+    for (let i = 0; i < 10; i++) {
+      applyStatus(w, p, 'slow', 2, 'poison');
+      w.tick += 4;
+    }
+    expect(drainEvents(w).filter((e) => e.type === 'note')).toHaveLength(1);
+    w.tick += 200;
+    applyStatus(w, p, 'slow', 2, 'poison');
+    expect(drainEvents(w).filter((e) => e.type === 'note')).toHaveLength(1);
+    void spider;
   });
 
   it('Läuterung entfernt Debuffs, Kontrolle und Gift; Bannung lässt sie unberührt', () => {
