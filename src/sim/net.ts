@@ -25,6 +25,8 @@ export function validateCommand(w: World, c: unknown): Command | null {
       return int(o.itemId) ? { type: 'equip', itemId: o.itemId, ...(o.to === 'ring' || o.to === 'ring2' ? { to: o.to } : {}) } : null;
     case 'drop': case 'usePotion': case 'sell': case 'stashPut': case 'stashTake':
       return int(o.itemId) ? ({ type: o.type, itemId: o.itemId } as Command) : null;
+    case 'sellBulk':
+      return o.upTo === 'normal' || o.upTo === 'magic' || o.upTo === 'rare' ? { type: 'sellBulk', upTo: o.upTo } : null;
     case 'unequip':
       return EQUIP_SLOT_LIST.includes(o.slot as never) ? { type: 'unequip', slot: o.slot as 'weapon' } : null;
     case 'spendStat':

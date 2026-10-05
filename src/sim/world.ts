@@ -54,6 +54,7 @@ export type Command =
   | { type: 'useSkill'; skillId: string; targetId?: number }
   | { type: 'buy'; templateId: string }
   | { type: 'sell'; itemId: number }
+  | { type: 'sellBulk'; upTo: 'normal' | 'magic' | 'rare' }
   | { type: 'stashPut'; itemId: number }
   | { type: 'stashTake'; itemId: number }
   | { type: 'openChest'; chestId: number }
@@ -528,6 +529,13 @@ export function nearNpc(w: World, a: Actor, kind: NpcKind): Npc | undefined {
   return w.npcs.find((n) => n.kind === kind && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
 }
 
+const SELL_RANK: Record<string, number> = { normal: 0, magic: 1, rare: 2 };
+
+/** Rucksack-Gegenstände, die der Sammelverkauf bis zu dieser Seltenheit mitnimmt (nie Tränke, Edelsteine, Set- und Unikat-Teile). */
+export function bulkSellable(a: Actor, upTo: 'normal' | 'magic' | 'rare'): Item[] {
+  return a.inventory.filter((i) => i.slot !== 'potion' && i.slot !== 'gem' && (SELL_RANK[i.rarity] ?? 99) <= SELL_RANK[upTo]!);
+}
+
 export function sellPrice(i: Item): number {
   // gesockelte Edelsteine zählen mit
   const gems = (i.sockets ?? []).reduce((n, g) => n + (g ? templateById(gemTemplateId(g)).value : 0), 0);
@@ -761,6 +769,17 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       const price = sellPrice(it);
       a.gold += price;
       w.events.push({ type: 'gold', amount: price, to: a.id });
+      break;
+    }
+    case 'sellBulk': {
+      if (!nearNpc(w, a, 'merchant')) return fail(w, 'Kein Händler in der Nähe.');
+      const items = bulkSellable(a, cmd.upTo);
+      if (!items.length) return fail(w, 'Nichts zu verkaufen.');
+      const ids = new Set(items.map((i) => i.id));
+      const total = items.reduce((n, i) => n + sellPrice(i), 0);
+      a.inventory = a.inventory.filter((i) => !ids.has(i.id));
+      a.gold += total;
+      w.events.push({ type: 'gold', amount: total, to: a.id });
       break;
     }
     case 'openChest': {

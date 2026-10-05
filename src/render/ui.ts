@@ -2,7 +2,7 @@ import { ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_BONUS, WILL_RES_PE
 import { POWER_TEXT, TIER_COLOR, GEM_COLOR, affixRange, gemAffix, gemName, handsOf, itemAffixes, itemReq, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
 import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
-  critChance, attrBonus, equipSlotFor, socketCost, maxHpOf, maxManaOf, missingReq, nearNpc, powerOf, resistOf, type Actor, type Command, type Npc, type World,
+  bulkSellable, sellPrice, critChance, attrBonus, equipSlotFor, socketCost, maxHpOf, maxManaOf, missingReq, nearNpc, powerOf, resistOf, type Actor, type Command, type Npc, type World,
 } from '../sim/world';
 import { itemIcon, potionIcon, skillIcon, statusIcon } from './icons';
 import { giverLocation, questAvailable, questChains, questWhere, targetName } from '../sim/quests';
@@ -908,6 +908,22 @@ export class Ui {
       sell.style.cssText += ';justify-content:center;height:46px;border-style:dashed;color:#ffd84a';
       sell.textContent = 'Zum Verkaufen Gegenstand hierher ziehen';
       body.append(sell);
+      const bulk = el('div', 'a-note');
+      bulk.style.cssText += ';display:flex;gap:6px;flex-wrap:wrap;align-items:center';
+      bulk.append('Alles auf einmal:');
+      for (const [upTo, label] of [['normal', 'Normale'], ['magic', 'Bis magisch'], ['rare', 'Bis selten']] as const) {
+        const items = bulkSellable(p, upTo);
+        const gold = items.reduce((n, i) => n + sellPrice(i), 0);
+        const b = el('button', 'a-btn' + (items.length ? '' : ' off'), `${label} (${items.length} · ${gold}g)`);
+        b.title = 'Verkauft alle passenden Gegenstände im Rucksack. Tränke, Edelsteine, Set- und Unikat-Teile bleiben.';
+        b.onclick = () => {
+          if (!items.length) return;
+          if (upTo === 'rare' && !confirm(`${items.length} Gegenstände (auch seltene) für ${gold} Gold verkaufen?`)) return;
+          this.send({ type: 'sellBulk', upTo });
+        };
+        bulk.append(b);
+      }
+      body.append(bulk);
     }
     if (stash) {
       body.append(el('div', 'a-sec', 'Truhe (sicher, auch beim Tod)'));

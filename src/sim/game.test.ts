@@ -472,3 +472,33 @@ describe('Bogenschützen und Todesstrafe', () => {
     }
   });
 });
+
+describe('Sammelverkauf', () => {
+  it('verkauft alles bis zur gewählten Seltenheit, behält Tränke und Seltenere, braucht einen Händler', () => {
+    const { w, p } = fresh();
+    const mk = (id: string, r: 'normal' | 'magic' | 'rare') => {
+      const it = generateItem(w.rng, w.nextId++, id, r);
+      p.inventory.push(it);
+      return it;
+    };
+    const a = mk('rusty_sword', 'normal');
+    const b = mk('leather_cap', 'magic');
+    const c = mk('iron_helm', 'rare');
+    const potion = mk('heal_small', 'normal');
+    p.inventory = p.inventory.filter((i) => i.slot !== 'potion' || i.id === potion.id);
+    applyCommand(w, p.id, { type: 'sellBulk', upTo: 'magic' });
+    expect(p.inventory.map((i) => i.id)).toContain(a.id); // kein Händler in der Nähe
+    addNpc(w, 'merchant', 'Händler', 2, 2);
+    const g0 = p.gold;
+    applyCommand(w, p.id, { type: 'sellBulk', upTo: 'magic' });
+    const ids = p.inventory.map((i) => i.id);
+    expect(ids).not.toContain(a.id);
+    expect(ids).not.toContain(b.id);
+    expect(ids).toContain(c.id);
+    expect(ids).toContain(potion.id);
+    expect(p.gold).toBeGreaterThan(g0);
+    applyCommand(w, p.id, { type: 'sellBulk', upTo: 'rare' });
+    expect(p.inventory.map((i) => i.id)).not.toContain(c.id);
+    expect(p.inventory.map((i) => i.id)).toContain(potion.id);
+  });
+});
