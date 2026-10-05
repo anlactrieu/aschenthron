@@ -286,8 +286,8 @@ zone_packs(ZONES['farm'], T1_E, [
 # Düsterwald L3-10: Goblins in Stufen, Spinnen, Banditen-Späher
 zone_packs(ZONES['forest'], P(50, 80), [
     (0.25, [('goblin', 4), ('feral_hound', 2), ('forest_spider', 2)], 'goblin_scout'),
-    (0.55, [('goblin_scout', 4), ('forest_spider', 3), ('bandit_novice', 2)], 'goblin_warrior'),
-    (0.80, [('goblin_warrior', 3), ('wolf', 2), ('venom_spider', 2), ('highwayman', 2)], 'goblin_shaman'),
+    (0.55, [('goblin_scout', 3), ('goblin_archer', 1), ('forest_spider', 3), ('bandit_novice', 2)], 'goblin_warrior'),
+    (0.80, [('goblin_warrior', 3), ('wolf', 2), ('venom_spider', 2), ('highwayman', 1), ('bandit_archer', 1)], 'goblin_shaman'),
     (1.00, [('goblin_warrior', 3), ('goblin_shaman', 2), ('venom_spider', 2), ('wolf', 2)], 'goblin_chief')], 30, (4,))
 # Goblinkönig im Düsterwald (tief im Wald)
 gk = (sc(22), sc(50))
@@ -297,8 +297,8 @@ for _ in range(200):
         fill((gx - 2, gy - 2, gx + 2, gy + 2), 4); obj("Goblinkönig Grix", "monster", gx, gy, kind="goblin_king", pack=0); taken.append((gx, gy)); break
 # Räuberlager L7-13
 zone_packs(ZONES['camp'], P(30, 44), [
-    (0.45, [('highwayman', 3), ('bandit', 3), ('bandit_novice', 1)], 'bandit'),
-    (1.00, [('bandit', 4), ('highwayman', 2), ('goblin_shaman', 1)], 'bandit_captain')], 12, (7, 4))
+    (0.45, [('highwayman', 2), ('bandit_archer', 1), ('bandit', 3), ('bandit_novice', 1)], 'bandit'),
+    (1.00, [('bandit', 3), ('bandit_archer', 1), ('highwayman', 2), ('goblin_shaman', 1)], 'bandit_captain')], 12, (7, 4))
 bl = (sc(30), sc(28))
 fill((bl[0] - 3, bl[1] - 3, bl[0] + 3, bl[1] + 3), 7); obj("Räuberfürst Harkon", "monster", bl[0], bl[1], kind="bandit_lord", pack=0); taken.append(bl)
 # Moorlande L6-15
@@ -309,8 +309,8 @@ zone_packs(ZONES['swamp'], P(78, 62), [
 # Totenacker L8-18
 zone_packs(ZONES['grave'], P(90, 98), [
     (0.30, [('skeleton', 4), ('wraith', 2)], 'zombie'),
-    (0.60, [('skeleton', 3), ('zombie', 3), ('wraith', 2)], 'bone_knight'),
-    (1.00, [('zombie', 3), ('bone_knight', 3), ('crypt_guard', 1)], 'crypt_guard')], 22, (4,))
+    (0.60, [('skeleton', 3), ('zombie', 2), ('bone_acolyte', 1), ('wraith', 2)], 'bone_knight'),
+    (1.00, [('zombie', 2), ('necromancer', 1), ('bone_knight', 3), ('crypt_guard', 1)], 'crypt_guard')], 22, (4,))
 # Hochland L11-22
 zone_packs(ZONES['hills'], P(92, 49), [
     (0.30, [('wolf', 3), ('dire_wolf', 3), ('hill_troll', 1)], 'dire_wolf'),
@@ -348,7 +348,7 @@ def dungeon_spawns(name, bands, boss_kind, guards=None, per_room=(1, 2)):
     return room_center(rooms[boss])
 
 dungeon_spawns('sumpf', [(0.4, [('marsh_corpse', 3), ('bog_witch', 1), ('wraith', 1)], 'bog_witch'), (1.0, [('bog_witch', 2), ('ghoul_alpha', 3), ('wraith', 2)], 'ghoul_alpha')], 'bog_queen', ['bog_witch'])
-dungeon_spawns('kata', [(0.4, [('skeleton', 3), ('zombie', 2), ('wraith', 1)], 'bone_knight'), (1.0, [('bone_knight', 3), ('crypt_guard', 3), ('zombie', 1)], 'crypt_guard')], 'bone_lord', ['bone_knight'])
+dungeon_spawns('kata', [(0.4, [('skeleton', 3), ('zombie', 2), ('wraith', 1)], 'bone_knight'), (1.0, [('bone_knight', 3), ('crypt_guard', 3), ('necromancer', 1)], 'crypt_guard')], 'bone_lord', ['bone_knight'])
 dungeon_spawns('mine', [(0.35, [('cave_spider', 3), ('pit_worm', 2), ('stone_golem', 1)], 'pit_worm'), (0.7, [('pit_worm', 3), ('rock_troll', 2), ('iron_golem', 2), ('cave_spider', 2)], 'iron_golem'), (1.0, [('iron_golem', 3), ('acid_worm', 3), ('rock_troll', 2)], 'acid_worm')], 'stone_colossus', ['iron_golem'])
 dungeon_spawns('thron', [(0.4, [('imp', 3), ('death_knight', 2), ('ember_elemental', 1)], 'death_knight'), (1.0, [('death_knight', 3), ('ember_elemental', 2), ('hell_spawn', 3), ('imp', 2)], 'hell_spawn')], 'ash_king', ['hell_spawn'])
 

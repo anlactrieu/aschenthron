@@ -750,7 +750,8 @@ describe('Champions, Mini-Bosse und Boss-Fähigkeiten', () => {
     const fire = spawnMonster(w, 13, 10, 'wolf', { champ: 'fiery' });
     fire.targetId = p.id;
     run(w, 60);
-    expect(p.dot).not.toBeNull();
+    expect(p.status.burn).toBeGreaterThan(0);
+    expect(p.burn).not.toBeNull();
     const w2 = createWorld(9, open());
     const p2 = spawnPlayer(w2, 10, 10);
     p2.damage = [50, 50];

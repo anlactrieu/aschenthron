@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import mapJson from '../data/aschenthron.json';
 import { buildWorld, type TiledMap } from '../sim/tiled';
-import { monsterKind, questById, SKILLS } from '../sim/data';
+import { DMG_COLOR, STATUS_COLOR, monsterKind, questById, SKILLS, type StatusId } from '../sim/data';
 import { exportPlayer, importPlayer } from '../sim/save';
 import {
   applyCommand, drainEvents, getActor, maxHpOf, maxManaOf, tick, TICK_RATE, type Actor, type Chest, type Command, type Npc, type World,
@@ -354,10 +354,11 @@ export class GameScene extends Phaser.Scene {
             const pos = this.bodyPos(tg);
             if (pos) {
               const poison = e.skill === 'dot' && !e.crit;
-              const txt = e.crit ? `${e.amount}!` : String(e.amount);
-              if (toPlayer) this.fx.floatText(pos.x, pos.y - 30, txt, '#ff6a5a', 18);
-              else if (fromPlayer) this.fx.floatText(pos.x, pos.y - 26, txt, e.crit ? '#ffe45a' : poison ? '#8fe070' : '#ffffff', e.crit ? 22 : 15);
-              else this.fx.floatText(pos.x, pos.y - 26, txt, '#cfcfcf', 12);
+              const txt = e.amount === 0 ? 'immun' : e.crit ? `${e.amount}!` : String(e.amount);
+              const dcol = e.dt ? DMG_COLOR[e.dt] : undefined;
+              if (toPlayer) this.fx.floatText(pos.x, pos.y - 30, txt, dcol ?? '#ff6a5a', 18);
+              else if (fromPlayer) this.fx.floatText(pos.x, pos.y - 26, txt, e.crit ? '#ffe45a' : poison ? '#8fe070' : dcol ?? '#ffffff', e.crit ? 22 : 15);
+              else this.fx.floatText(pos.x, pos.y - 26, txt, dcol ?? '#cfcfcf', 12);
               this.fx.burst(pos.x, pos.y, toPlayer ? 0xff5a4a : e.crit ? 0xffe45a : 0xffffff, 260);
             }
             if (at && tg && at.id !== tg.id) {
@@ -377,7 +378,7 @@ export class GameScene extends Phaser.Scene {
           };
           // Der Angreifer holt sichtbar aus (Ausholen → Schlag/Wurf), erst dann trifft es; Gift/Brand/Bodenschlag nicht
           let delay = 0;
-          const ambient = e.skill === 'dot' || e.skill === 'slam';
+          const ambient = e.skill === 'dot' || e.skill === 'burn' || e.skill === 'slam';
           if (at && tg && at.id !== tg.id && !ambient) {
             const a = this.dispPos(at);
             const t = this.dispPos(tg);
@@ -431,7 +432,7 @@ export class GameScene extends Phaser.Scene {
                 const f = this.bodyPos(at);
                 const to = this.bodyPos(tg);
                 if (!f || !to) return impact();
-                const col = { quick_shot: 0xe8d8a0, multishot: 0xe8d8a0, poison_shot: 0x7fe060, ember_bolt: 0xff8a2a }[e.skill as 'quick_shot'];
+                const col = e.skill === 'ember_bolt' && e.dt === 'frost' ? 0x8fd0ff : e.skill === 'ember_bolt' && e.dt === 'poison' ? 0x7fe060 : { quick_shot: 0xe8d8a0, multishot: 0xe8d8a0, poison_shot: 0x7fe060, ember_bolt: 0xff8a2a }[e.skill as 'quick_shot'];
                 if (arrowSkill) this.fx.arrow(f.x, f.y, to.x, to.y, col, 170, impact);
                 else this.fx.projectile(f.x, f.y, to.x, to.y, col, 200, impact);
               });
@@ -457,9 +458,19 @@ export class GameScene extends Phaser.Scene {
             this.fx.ring(pos.x, pos.y + 20, 160, 0xb060ff, 600);
             this.fx.burst(pos.x, pos.y, 0xb060ff, 700);
           }
-          this.cameras.main.shake(180, 0.004);
-          say(`${boss?.name} ruft Verstärkung!`);
-          this.sfx.boss();
+          if (boss?.boss) {
+            this.cameras.main.shake(180, 0.004);
+            say(`${boss.name} ruft Verstärkung!`);
+            this.sfx.boss();
+          }
+          break;
+        }
+        case 'mheal': {
+          const pos = this.bodyPos(getActor(w, e.targetId));
+          if (pos) {
+            this.fx.floatText(pos.x, pos.y - 26, `+${e.amount}`, '#7fe070', 13);
+            this.fx.ring(pos.x, pos.y + 14, 70, 0x7fe070, 400);
+          }
           break;
         }
         case 'charge': {
@@ -1049,6 +1060,9 @@ export class GameScene extends Phaser.Scene {
       // leichtes Atmen, wenn sie stehen
       img.setAngle(0).setAlpha(1).setScale(1, 1);
       if ((this.flash.get(a.id) ?? 0) > time) img.setTint(0xffffff);
+      else if (a.status.stun) img.setTint(0xfff0a0);
+      else if (a.status.burn) img.setTint(0xffa060);
+      else if (a.status.slow) img.setTint(0x9ac8ff);
       else if (a.dot) img.setTint(0x9aff9a);
       else if (a.enraged) img.setTint(0xff9a8a);
       else img.clearTint();
@@ -1080,6 +1094,14 @@ export class GameScene extends Phaser.Scene {
           g.fillStyle(a.boss ? 0xe8832a : 0xd44a3a, 1);
           g.fillRect(sx - big / 2, top, big * Math.max(0, a.hp / a.maxHp), 5);
         }
+        // Statussymbole: kleine Punkte neben dem Balken (Verlangsamung, Betäubung, Brand), Gift grün
+        const pips = [...(['slow', 'stun', 'burn'] as StatusId[]).filter((id) => a.status[id]).map((id) => parseInt(STATUS_COLOR[id].slice(1), 16)), ...(a.dot ? [0x7fe060] : [])];
+        pips.forEach((c, i) => {
+          g.fillStyle(0x000000, 0.8);
+          g.fillCircle(sx + big / 2 + 7 + i * 9, top + 2, 4);
+          g.fillStyle(c, 1);
+          g.fillCircle(sx + big / 2 + 7 + i * 9, top + 2, 3);
+        });
         if (a.boss || a.champ || a.unique || a.id === p.targetId || hovered) this.label(`a${a.id}`, a.name, sx, top - 10, a.unique ? '#ff9a2a' : a.boss ? '#ff9a4a' : a.champ ? '#ffe45a' : '#e6cfcf', seen);
         if (a.champ || a.unique) {
           g.fillStyle(0x200000, 0.9);

@@ -1,8 +1,8 @@
-import { ATTR_KEYS, ATTR_NAME, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, type SkillDef } from '../sim/data';
+import { ATTR_KEYS, ATTR_NAME, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
 import { POWER_TEXT, affixRange, itemReq, setById, templateById, type EquipSlot, type Item } from '../sim/items';
 import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
-  critChance, equipSlotFor, maxHpOf, maxManaOf, missingReq, nearNpc, powerOf, type Actor, type Command, type Npc, type World,
+  critChance, equipSlotFor, maxHpOf, maxManaOf, missingReq, nearNpc, powerOf, resistOf, type Actor, type Command, type Npc, type World,
 } from '../sim/world';
 import { itemIcon, potionIcon, skillIcon } from './icons';
 import { lookOf, playerCanvas } from './art';
@@ -15,7 +15,7 @@ function affixText(a: { stat: keyof typeof STAT_NAME; value: number }): string {
   return `+${a.value} ${STAT_NAME[a.stat]}`;
 }
 
-const AFFIX_WEIGHT: Record<string, number> = { damage: 3, armor: 2, maxHp: 0.25, kraft: 2.5, maxMana: 0.2, haste: 4, crit: 5, regen: 6, accuracy: 0.8, evasion: 0.8 };
+const AFFIX_WEIGHT: Record<string, number> = { damage: 3, armor: 2, maxHp: 0.25, kraft: 2.5, maxMana: 0.2, haste: 4, crit: 5, regen: 6, accuracy: 0.8, evasion: 0.8, resFire: 0.8, resFrost: 0.8, resPoison: 0.8 };
 
 /** Grobe Gesamtwertung eines Ausrüstungsstücks (für den ▲-Hinweis auf Verbesserungen). */
 function gearScore(i: Item): number {
@@ -41,7 +41,7 @@ function equippedFor(p: Actor, it: Item): Item | undefined {
 }
 const STAT_NAME = {
   damage: 'Schaden', armor: 'Rüstung', maxHp: 'Leben', kraft: 'Kraft', maxMana: 'Mana', haste: '% Angriffstempo', crit: '% Kritisch', regen: 'Leben/s',
-  accuracy: 'Treffsicherheit', evasion: 'Ausweichen',
+  accuracy: 'Treffsicherheit', evasion: 'Ausweichen', resFire: '% Feuerwiderstand', resFrost: '% Frostwiderstand', resPoison: '% Giftwiderstand',
 } as const;
 const BAG_COLS = 8;
 
@@ -70,6 +70,17 @@ export function reqLabels(i: Item): string[] {
   if (r.verstand) out.push(`Verstand ${r.verstand}`);
   if (r.willenskraft) out.push(`Willenskraft ${r.willenskraft}`);
   return out;
+}
+
+/** Starke Resistenzen/Schwächen einer Monsterfamilie für die Zielanzeige. */
+export function resNote(family: MonsterFamily): string {
+  const parts: string[] = [];
+  for (const [dt, v] of Object.entries(FAMILY_RES[family] ?? {}) as [DmgType, number][]) {
+    if (v <= -30) parts.push(`Schwach gegen ${DMG_NAME[dt]}`);
+    else if (v >= 100) parts.push(`Immun gegen ${DMG_NAME[dt]}`);
+    else if (v >= 50) parts.push(`Resistent gegen ${DMG_NAME[dt]}`);
+  }
+  return parts.length ? ` – ${parts.join(', ')}` : '';
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''): HTMLElementTagNameMap[K] {
@@ -148,6 +159,8 @@ export class Ui {
   private xpFill = el('div');
   private xpText = el('div');
   private target = el('div');
+  private statusBar = el('div');
+  private statusKey = '';
   private toast = el('div');
   private bannerEl = el('div');
   private bannerTimer = 0;
@@ -186,7 +199,8 @@ export class Ui {
     this.xpFill.style.cssText = 'background:linear-gradient(180deg,#d8b84a,#8a7220)';
     this.xpText.style.cssText = 'position:absolute;inset:-3px 0 0;text-align:center;font:10px system-ui;color:#fff;text-shadow:0 0 3px #000;line-height:14px';
     this.xpBar.append(this.xpFill, this.xpText);
-    mid.append(this.hotbar, this.xpBar);
+    this.statusBar.style.cssText = 'display:flex;gap:4px;min-height:20px;pointer-events:none';
+    mid.append(this.statusBar, this.hotbar, this.xpBar);
     this.buildOrbs();
     this.hud.append(this.orbHp, mid, this.orbMp);
 
@@ -332,11 +346,26 @@ export class Ui {
       hb.el.classList.toggle('armed', this.armedId === id);
     });
 
+    // Statusanzeige des Spielers: Name und Restzeit, nur bei Änderung neu aufgebaut
+    const now = this.lastW?.tick ?? 0;
+    const chips: [string, string, number][] = [];
+    for (const id of ['slow', 'stun', 'burn'] as StatusId[]) if (p.status?.[id] && p.status[id]! > now) chips.push([STATUS_NAME[id], STATUS_COLOR[id], Math.ceil((p.status[id]! - now) / TICK_RATE)]);
+    if (p.dot && p.dot.until > now) chips.push(['Gift', DMG_COLOR.poison, Math.ceil((p.dot.until - now) / TICK_RATE)]);
+    const ck = JSON.stringify(chips);
+    if (ck !== this.statusKey) {
+      this.statusKey = ck;
+      this.statusBar.replaceChildren(...chips.map(([n, c, sec]) => {
+        const d = el('div', '', `${n} ${sec}`);
+        d.style.cssText = `font:bold 11px system-ui;padding:1px 6px;border:1px solid ${c};color:${c};background:rgba(10,8,14,.85);border-radius:3px`;
+        return d;
+      }));
+    }
+
     if (t && t.alive && t.kind === 'monster') {
       this.target.style.display = 'block';
       const k = monsterKind(t.kindId!);
       const mod = t.champ ? { swift: 'sehr schnell', armored: 'sehr zäh', fiery: 'setzt in Brand', vampiric: 'heilt sich durch Treffer', thorned: 'wirft Schaden zurück' }[t.champ] : '';
-      this.target.textContent = `${t.name} (Stufe ${k.level}) ${Math.ceil(t.hp)}/${t.maxHp}${mod ? ` – ${mod}` : t.unique ? ' – Mini-Boss' : ''}`;
+      this.target.textContent = `${t.name} (Stufe ${k.level}) ${Math.ceil(t.hp)}/${t.maxHp}${mod ? ` – ${mod}` : t.unique ? ' – Mini-Boss' : ''}${resNote(k.family)}`;
     } else this.target.style.display = 'none';
   }
 
@@ -651,6 +680,7 @@ export class Ui {
       ['Leben', `${Math.ceil(p.hp)} / ${maxHpOf(p)}`], ['Mana', `${Math.floor(p.mana)} / ${maxManaOf(p)}`], ['Schaden pro Hieb', `${lo}–${hi}`],
       ['Rüstung', String(armorOf(p))], ['Angriffstempo', `${(TICK_RATE / attackCooldownOf(p)).toFixed(2)} Hiebe/s`],
       ['Tragkraft', `${carriedWeight(p).toFixed(1)} / ${carryCapacity(p)}`],
+      ['Feuerwiderstand', `${resistOf(p, 'fire')} %`], ['Frostwiderstand', `${resistOf(p, 'frost')} %`], ['Giftwiderstand', `${resistOf(p, 'poison')} %`],
       ['Kritisch', `${critChance(p)} %`], ['Lebensraub', `${powerOf(p, 'lifesteal')} %`], ['Dornen', `${powerOf(p, 'thorns')} %`],
     ];
     for (const [a, b] of rows) {

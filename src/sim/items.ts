@@ -6,7 +6,7 @@ export type EquipSlot = Slot | 'ring2';
 /** Verbrauchsgegenstände belegen keinen Ausrüstungsslot */
 export type ItemSlot = Slot | 'potion';
 export type Rarity = 'normal' | 'magic' | 'rare' | 'set' | 'legendary';
-export type Stat = 'damage' | 'armor' | 'maxHp' | 'kraft' | 'maxMana' | 'haste' | 'crit' | 'regen' | 'accuracy' | 'evasion';
+export type Stat = 'damage' | 'armor' | 'maxHp' | 'kraft' | 'maxMana' | 'haste' | 'crit' | 'regen' | 'accuracy' | 'evasion' | 'resFire' | 'resFrost' | 'resPoison';
 /** Besondere Effekte legendärer Gegenstände und Set-Boni */
 export type PowerId = 'lifesteal' | 'crit' | 'thorns' | 'manaKill' | 'xpBonus' | 'goldBonus';
 export interface Power {
@@ -197,6 +197,9 @@ const AFFIXES: AffixDef[] = [
   { stat: 'regen', name: 'der Erneuerung', min: 1, max: 2 },
   { stat: 'accuracy', name: 'des Treffers', min: 3, max: 8 },
   { stat: 'evasion', name: 'der Behändigkeit', min: 3, max: 8 },
+  { stat: 'resFire', name: 'des Feuerschutzes', min: 4, max: 9 },
+  { stat: 'resFrost', name: 'des Frostschutzes', min: 4, max: 9 },
+  { stat: 'resPoison', name: 'des Giftschutzes', min: 4, max: 9 },
 ];
 
 const RARITY_VALUE: Record<Rarity, number> = { normal: 1, magic: 3, rare: 8, set: 14, legendary: 25 };
@@ -228,7 +231,7 @@ export function templateById(id: string): ItemTemplate {
 
 /** Stufenskalierung je Affixart: Tempo/Kritisch/Regeneration wachsen nur sanft (sonst wären Vollausrüstungen unverwundbar). */
 function affixScale(stat: Stat, minLevel: number): number {
-  if (stat === 'haste' || stat === 'crit' || stat === 'regen') return 1 + minLevel / 30;
+  if (stat === 'haste' || stat === 'crit' || stat === 'regen' || stat === 'resFire' || stat === 'resFrost' || stat === 'resPoison') return 1 + minLevel / 30;
   if (stat === 'kraft') return 1 + minLevel / 20;
   return 1 + minLevel / 8;
 }

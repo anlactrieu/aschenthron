@@ -66,6 +66,8 @@ export interface ActorLite {
   pk: boolean;
   champ?: string;
   unique?: string;
+  /** Statuseffekte (Verlangsamung, Betäubung, Brand, Gift) für Farbton und Symbole */
+  st?: ('slow' | 'stun' | 'burn' | 'poison')[];
   /** nur Spieler: angelegte Ausrüstung für die Optik */
   equipment?: Actor['equipment'];
 }
@@ -82,6 +84,13 @@ export interface Snapshot {
   chests: { id: number; opened: boolean }[];
 }
 
+const statusList = (a: Actor): ActorLite['st'] => {
+  const st: NonNullable<ActorLite['st']> = [];
+  for (const id of ['slow', 'stun', 'burn'] as const) if (a.status[id]) st.push(id);
+  if (a.dot) st.push('poison');
+  return st.length ? st : undefined;
+};
+
 const near = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.abs(a.x - b.x) <= NET_RADIUS && Math.abs(a.y - b.y) <= NET_RADIUS;
 
 export function makeSnapshot(w: World, you: Actor, events: GameEvent[]): Snapshot {
@@ -94,7 +103,7 @@ export function makeSnapshot(w: World, you: Actor, events: GameEvent[]): Snapsho
     if (!a.alive && a.kind === 'monster' && w.tick - a.diedAt > 20 * 4) continue;
     actors.push({
       id: a.id, kind: a.kind, kindId: a.kindId, name: a.name, x: a.x, y: a.y, hp: a.hp, maxHp: a.maxHp, alive: a.alive,
-      boss: a.boss, enraged: a.enraged, level: a.level, targetId: a.targetId, diedAt: a.diedAt, pk: a.pkUntil > w.tick, champ: a.champ, unique: a.unique,
+      boss: a.boss, enraged: a.enraged, level: a.level, targetId: a.targetId, diedAt: a.diedAt, pk: a.pkUntil > w.tick, champ: a.champ, unique: a.unique, st: statusList(a),
       equipment: a.kind === 'player' ? a.equipment : undefined,
     });
   }
@@ -107,6 +116,7 @@ export function makeSnapshot(w: World, you: Actor, events: GameEvent[]): Snapsho
       case 'telegraph': return near({ x: e.x, y: e.y }, you);
       case 'miss': return byId.has(e.targetId) || e.targetId === you.id || e.attackerId === you.id;
       case 'summon': case 'charge': return byId.has(e.id) || e.id === you.id;
+      case 'mheal': return byId.has(e.targetId);
       case 'chestOpened': return true;
       default: return false;
     }
@@ -121,7 +131,7 @@ export function actorFromLite(l: ActorLite, tick: number): Actor {
     attackCooldown: 20, cooldownLeft: 0, path: [], targetId: l.targetId, aggroRange: 0, alive: l.alive, level: l.level, xp: 0,
     statPoints: 0, attrs: { kraft: 10, gewandtheit: 10, ausdauer: 10, verstand: 10, willenskraft: 10 }, mana: 0, gold: 0, skills: [], skillRanks: {}, skillPoints: 0,
     skillCd: {}, potionCd: 0, quests: {}, inventory: [], equipment: l.equipment ?? {}, stash: [], pickupId: null, chestId: null, resting: false, stuck: 0, diedAt: l.diedAt,
-    boss: l.boss, enraged: l.enraged, autoAttack: true, repathAt: 0, dot: null, lastHitAt: -9999, packId: 0, abilities: [], abilityAt: 0, chargeAt: 0, chargeUntil: 0, summoned: false, respawnTicks: 0, rewardMult: 1, champ: l.champ, unique: l.unique, pkUntil: l.pk ? tick + 1e6 : 0,
+    boss: l.boss, enraged: l.enraged, autoAttack: true, repathAt: 0, dot: l.st?.includes('poison') ? { perSec: 1, until: tick + 1e6, srcId: 0 } : null, status: Object.fromEntries((l.st ?? []).filter((x) => x !== 'poison').map((x) => [x, tick + 1e6])), burn: null, dmgType: 'physical', healAt: 0, raiseAt: 0, lastHitAt: -9999, packId: 0, abilities: [], abilityAt: 0, chargeAt: 0, chargeUntil: 0, summoned: false, respawnTicks: 0, rewardMult: 1, champ: l.champ, unique: l.unique, pkUntil: l.pk ? tick + 1e6 : 0,
     attackedBy: null, damagers: {},
   };
 }

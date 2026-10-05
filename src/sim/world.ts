@@ -4,6 +4,7 @@ import { itemReq, rollUniqueSpecial, rollDrop, rollPotion, rollSpecial, template
 import {
   ATTR_KEYS, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
   monsterKind, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
+  FAMILY_RES, MAX_RES, SLOW_FACTOR, type DmgType, type StatusId,
 } from './data';
 
 export const TICK_RATE = 20;
@@ -16,6 +17,16 @@ const CAST_RANGE = 6;
 const CAST_KEEP = 2.5;
 /** Bogenschützen schießen den normalen Angriff aus bis zu BOW_RANGE Feldern, statt in den Nahkampf zu laufen. */
 const BOW_RANGE = 6;
+/** Monster-Schützen: Reichweite und Mindestabstand */
+const ARCHER_RANGE = 7;
+const ARCHER_KEEP = 3.5;
+/** Heiler: Radius, Pause (Sekunden), Anteil der Lebenspunkte; Beschwörer: Pause und Höchstzahl */
+const HEAL_RANGE = 6;
+const HEAL_EVERY = 4;
+const HEAL_FRACTION = 0.12;
+const RAISE_EVERY = 12;
+const RAISE_MAX = 3;
+const RES_STAT = { fire: 'resFire', frost: 'resFrost', poison: 'resPoison' } as const;
 const MONSTER_RESPAWN_TICKS = 20 * 45;
 const MONSTER_LOOT_TTL = 20 * 180;
 const CORPSE_LOOT_TTL = 20 * 300;
@@ -101,6 +112,13 @@ export interface Actor {
   repathAt: number;
   /** Gift: Schaden pro Sekunde bis Tick `until` */
   dot: { perSec: number; until: number; srcId: number } | null;
+  /** Statuseffekte: Ende (Tick) je Effekt; Brand-Schaden pro Sekunde und Verursacher in `burn` */
+  status: Partial<Record<StatusId, number>>;
+  burn: { perSec: number; srcId: number } | null;
+  /** Schadensart der normalen Angriffe (Monster) */
+  dmgType: DmgType;
+  healAt: number;
+  raiseAt: number;
   /** letzter erlittener Treffer (Monster regenerieren erst nach Ruhe) */
   lastHitAt: number;
   /** Rudel-Kennung (0 = Einzelgänger): Rudelmitglieder greifen gemeinsam an */
@@ -168,7 +186,7 @@ export interface Npc {
 }
 
 type GameEventBase =
-  | { type: 'hit'; attackerId: number; targetId: number; amount: number; skill?: string; crit?: boolean }
+  | { type: 'hit'; attackerId: number; targetId: number; amount: number; skill?: string; crit?: boolean; dt?: DmgType }
   | { type: 'healed'; amount: number }
   | { type: 'crafted'; item: Item; op: string }
   | { type: 'died'; id: number }
@@ -193,6 +211,7 @@ type GameEventBase =
   | { type: 'miss'; attackerId: number; targetId: number }
   | { type: 'telegraph'; x: number; y: number; r: number; ms: number }
   | { type: 'summon'; id: number }
+  | { type: 'mheal'; id: number; targetId: number; amount: number }
   | { type: 'charge'; id: number }
   | { type: 'respecced' };
 
@@ -238,7 +257,7 @@ function baseActor(w: World, kind: Actor['kind'], name: string, x: number, y: nu
     cooldownLeft: 0, path: [], targetId: null, aggroRange: 0, alive: true, level: 1, xp: 0, statPoints: 0,
     attrs: { kraft: 10, gewandtheit: 10, ausdauer: 10, verstand: 10, willenskraft: 10 },
     mana: 20, gold: 0, skills: [], skillRanks: {}, skillPoints: 0, skillCd: {}, potionCd: 0, quests: {}, inventory: [], equipment: {}, stash: [], pickupId: null, chestId: null, resting: false, stuck: 0,
-    diedAt: -1, boss: false, enraged: false, autoAttack: true, repathAt: 0, dot: null, lastHitAt: -9999, packId: 0, abilities: [], abilityAt: 0, chargeAt: 0, chargeUntil: 0, summoned: false, respawnTicks: MONSTER_RESPAWN_TICKS, rewardMult: 1, pkUntil: 0, attackedBy: null, damagers: {},
+    diedAt: -1, boss: false, enraged: false, autoAttack: true, repathAt: 0, dot: null, status: {}, burn: null, dmgType: 'physical', healAt: 0, raiseAt: 0, lastHitAt: -9999, packId: 0, abilities: [], abilityAt: 0, chargeAt: 0, chargeUntil: 0, summoned: false, respawnTicks: MONSTER_RESPAWN_TICKS, rewardMult: 1, pkUntil: 0, attackedBy: null, damagers: {},
   };
   w.actors.push(a);
   return a;
@@ -280,7 +299,7 @@ export function spawnMonster(w: World, x: number, y: number, kindId = 'field_rat
   Object.assign(a, {
     kindId, level: k.level, hp: k.hp, maxHp: k.hp, damage: k.damage, speed: k.speed,
     attackCooldown: k.attackCooldown, aggroRange: k.aggroRange, home: { x, y }, boss: !!k.boss,
-    abilities: [...(k.abilities ?? [])], summonKind: k.summonKind,
+    abilities: [...(k.abilities ?? [])], summonKind: k.summonKind, dmgType: k.dmgType ?? 'physical',
   });
   const scaleDmg = (m: number) => {
     a.damage = [Math.max(1, Math.round(a.damage[0] * m)), Math.max(2, Math.round(a.damage[1] * m))];
@@ -294,6 +313,7 @@ export function spawnMonster(w: World, x: number, y: number, kindId = 'field_rat
     a.speed = k.speed * mod.speed;
     a.attackCooldown = Math.round(k.attackCooldown / Math.sqrt(mod.speed));
     a.rewardMult = CHAMPION_REWARD;
+    if (opts.champ === 'fiery') a.dmgType = 'fire';
   }
   const u = opts.unique ? uniqueDef(opts.unique) : undefined;
   if (u) {
@@ -347,6 +367,25 @@ function affixSum(a: Actor, stat: Stat): number {
   return sum;
 }
 
+/** Resistenz in Prozent gegen eine Schadensart: Spieler über Affixe (höchstens 75), Monster über ihre Familie (negativ = Schwäche, 100 = immun). */
+export function resistOf(a: Actor, dt: DmgType): number {
+  if (dt === 'physical') return 0;
+  if (a.kind === 'player') return Math.min(MAX_RES, affixSum(a, RES_STAT[dt]));
+  return (a.kindId && FAMILY_RES[monsterKind(a.kindId).family]?.[dt]) || 0;
+}
+
+/** Setzt einen Statuseffekt. Die Resistenz gegen `dt` verkürzt die Dauer (100 % = wirkungslos), Bosse sind nur halb so lange betäubt. */
+export function applyStatus(w: World, t: Actor, id: StatusId, seconds: number, dt: DmgType, burn?: { perSec: number; srcId: number }): void {
+  if (!t.alive) return;
+  const res = resistOf(t, dt);
+  if (res >= 100) return;
+  const secs = seconds * (id === 'stun' && t.boss ? 0.5 : 1) * (1 - Math.max(0, res) / 100);
+  const until = w.tick + Math.round(secs * TICK_RATE);
+  if (until <= w.tick) return;
+  if ((t.status[id] ?? 0) < until) t.status[id] = until;
+  if (id === 'burn' && burn && (!t.burn || burn.perSec >= t.burn.perSec)) t.burn = burn;
+}
+
 /** Kritische Trefferchance in Prozent: Unikate, Sets und Affixe zusammen, höchstens 50 %. */
 export function critChance(a: Actor): number {
   return Math.min(MAX_CRIT_PERCENT, powerOf(a, 'crit') + affixSum(a, 'crit'));
@@ -394,7 +433,8 @@ export function maxManaOf(a: Actor): number {
 export function attackCooldownOf(a: Actor): number {
   const base = a.attackCooldown - Math.floor((a.attrs.gewandtheit - 10) / 2);
   // Eile (Affix): bis zu 40 % schneller
-  return Math.max(6, Math.round(base * (1 - Math.min(0.4, affixSum(a, 'haste') / 100))));
+  const cd = Math.max(6, Math.round(base * (1 - Math.min(0.4, affixSum(a, 'haste') / 100))));
+  return a.status.slow ? Math.round(cd / SLOW_FACTOR) : cd;
 }
 
 /** Fehlende Anforderungen für einen Gegenstand (leer = anlegbar). `replaced`: ersetztes Stück, dessen Kraft-Bonus nicht zählt. */
@@ -737,6 +777,7 @@ function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void 
   const s = skillById(skillId);
   if (!s || !a.skills.includes(s.id)) return fail(w, 'Fertigkeit nicht gelernt.');
   if ((a.skillCd[s.id] ?? 0) > 0) return;
+  if (a.status.stun) return fail(w, 'Du bist betäubt.');
   const rank = a.skillRanks[s.id] ?? 1;
   const manaCost = Math.round(s.mana * rankMana(rank));
   if (a.mana < manaCost) return fail(w, 'Nicht genug Mana.');
@@ -793,8 +834,11 @@ function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void 
       const weaponBonus = matches ? ((wp!.damage![0] + wp!.damage![1]) / 2) * 0.9 : 0;
       amount = Math.round((w.rng.int(lo, hi) * lvl + scale + weaponBonus + (arrows?.arrowBonus ?? 0)) * rankDamage(rank));
     }
-    dealDamage(w, a, v, amount, s.ignoresArmor, s.id, false, !s.ignoresArmor);
-    if (s.dot && v.alive) v.dot = { perSec: Math.max(1, Math.round((amount * s.dot.factor) / s.dot.seconds)), until: w.tick + s.dot.seconds * TICK_RATE, srcId: a.id };
+    const dt = s.dmgType ?? 'physical';
+    const dealt = dealDamage(w, a, v, amount, s.ignoresArmor, s.id, false, !s.ignoresArmor, dt);
+    if (dealt < 0 || !v.alive) continue;
+    if (s.status) applyStatus(w, v, s.status.id, s.status.seconds, s.status.id === 'stun' ? 'physical' : dt, s.status.id === 'burn' ? { perSec: Math.max(1, Math.round(amount * 0.1)), srcId: a.id } : undefined);
+    if (s.dot && resistOf(v, dt) < 100) v.dot = { perSec: Math.max(1, Math.round((amount * s.dot.factor) / s.dot.seconds)), until: w.tick + s.dot.seconds * TICK_RATE, srcId: a.id };
   }
 }
 
@@ -805,7 +849,7 @@ function dist(a: Actor, b: Actor): number {
 }
 
 function speedOf(a: Actor, tickNow: number): number {
-  return a.chargeUntil > tickNow ? a.speed * 3 : a.speed;
+  return (a.chargeUntil > tickNow ? a.speed * 3 : a.speed) * (a.status.slow ? SLOW_FACTOR : 1);
 }
 
 function stepAlong(a: Actor, tickNow = 0): void {
@@ -856,11 +900,12 @@ function clearLine(w: World, a: Actor, t: Actor): boolean {
   return true;
 }
 
-/** Zaubernde Monster: im Bereich stehen bleiben und schießen, zu nahen Zielen ausweichen. Gibt true zurück, wenn es gehandelt hat. */
+/** Zaubernde Monster und Schützen: im Bereich stehen bleiben und schießen, zu nahen Zielen ausweichen. Gibt true zurück, wenn es gehandelt hat. */
 function castAi(w: World, m: Actor, t: Actor): boolean {
+  const archer = m.abilities.includes('archer');
   const d = dist(m, t);
-  if (d > CAST_RANGE || !clearLine(w, m, t)) return false;
-  if (d < CAST_KEEP) {
+  if (d > (archer ? ARCHER_RANGE : CAST_RANGE) || !clearLine(w, m, t)) return false;
+  if (d < (archer ? ARCHER_KEEP : CAST_KEEP)) {
     const spd = speedOf(m, w.tick);
     const nx = m.x - ((t.x - m.x) / (d || 1)) * spd;
     const ny = m.y - ((t.y - m.y) / (d || 1)) * spd;
@@ -872,9 +917,14 @@ function castAi(w: World, m: Actor, t: Actor): boolean {
   }
   m.path = [];
   if (m.cooldownLeft > 0) return true;
-  m.cooldownLeft = attackCooldownOf(m) + 6;
   const [lo, hi] = damageRange(m);
-  dealDamage(w, m, t, Math.max(1, Math.round(w.rng.int(lo, hi) * 0.9)), false, 'ember_bolt', false, true);
+  if (archer) {
+    m.cooldownLeft = attackCooldownOf(m);
+    dealDamage(w, m, t, w.rng.int(lo, hi), false, 'quick_shot', false, true);
+    return true;
+  }
+  m.cooldownLeft = attackCooldownOf(m) + 6;
+  dealDamage(w, m, t, Math.max(1, Math.round(w.rng.int(lo, hi) * 0.9)), false, 'ember_bolt', false, true, m.dmgType);
   return true;
 }
 
@@ -902,11 +952,62 @@ function fight(w: World, a: Actor, t: Actor): void {
   if (a.kind === 'player' && inSafeZone(w, a.x, a.y)) return;
   a.cooldownLeft = attackCooldownOf(a);
   const [lo, hi] = damageRange(a);
-  dealDamage(w, a, t, w.rng.int(lo, hi), false, undefined, false, true);
+  dealDamage(w, a, t, w.rng.int(lo, hi), false, undefined, false, true, a.dmgType);
 }
 
-function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: boolean, skill?: string, noReflect = false, canMiss = false): void {
-  if (t.kind === 'player' && inSafeZone(w, t.x, t.y) && t.pkUntil <= w.tick) return;
+/** Heiler-Monster: verletzte Verbündete im Umkreis heilen (hat Vorrang vor dem Angriff). */
+function healAi(w: World, m: Actor): boolean {
+  if (m.targetId === null || w.tick < m.healAt) return false;
+  let best: Actor | undefined;
+  for (const x of w.actors) {
+    if (x.kind !== 'monster' || !x.alive || x.id === m.id || x.hp >= x.maxHp * 0.75 || dist(m, x) > HEAL_RANGE) continue;
+    if (!best || x.hp / x.maxHp < best.hp / best.maxHp) best = x;
+  }
+  if (!best) return false;
+  m.healAt = w.tick + TICK_RATE * HEAL_EVERY;
+  m.cooldownLeft = Math.max(m.cooldownLeft, 12);
+  m.path = [];
+  const amount = Math.round(best.maxHp * HEAL_FRACTION);
+  best.hp = Math.min(best.maxHp, best.hp + amount);
+  w.events.push({ type: 'mheal', id: m.id, targetId: best.id, amount });
+  return true;
+}
+
+/** Totenbeschwörer: ruft alle RAISE_EVERY Sekunden ein Skelett (höchstens RAISE_MAX gleichzeitig; gibt weder Beute noch XP). */
+function raiseAi(w: World, m: Actor): boolean {
+  if (m.targetId === null || w.tick < m.raiseAt || !m.summonKind) return false;
+  m.raiseAt = w.tick + TICK_RATE * RAISE_EVERY;
+  if (w.actors.filter((x) => x.summonedBy === m.id && x.alive).length >= RAISE_MAX) return false;
+  const spots: [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1]];
+  const spot = spots.map(([dx, dy]) => [Math.round(m.x) + dx, Math.round(m.y) + dy] as const).find(([x, y]) => isWalkable(w.grid, x, y));
+  if (!spot) return false;
+  const minion = spawnMonster(w, spot[0], spot[1], m.summonKind);
+  minion.packId = m.packId;
+  minion.summonedBy = m.id;
+  minion.targetId = m.targetId;
+  minion.respawnTicks = 1e9;
+  minion.rewardMult = 0;
+  m.cooldownLeft = Math.max(m.cooldownLeft, 20);
+  m.path = [];
+  w.events.push({ type: 'summon', id: m.id });
+  return true;
+}
+
+/** Entfernt die Helfer eines Beschwörers (Tod oder Wiedererscheinen). */
+function dismissSummons(w: World, m: Actor): void {
+  for (const x of w.actors) {
+    if (x.summonedBy === m.id && x.alive) {
+      x.alive = false;
+      x.hp = 0;
+      x.targetId = null;
+      x.diedAt = w.tick - TICK_RATE * 7; // wird vom nächsten Aufräumen entfernt
+    }
+  }
+}
+
+/** Liefert den verursachten Schaden, bei Fehlschlag oder wirkungslosem Treffer −1. */
+function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: boolean, skill?: string, noReflect = false, canMiss = false, dt: DmgType = 'physical'): number {
+  if (t.kind === 'player' && inSafeZone(w, t.x, t.y) && t.pkUntil <= w.tick) return -1;
   if (canMiss && !noReflect && w.rng.next() > hitChance(a, t)) {
     t.lastHitAt = w.tick;
     t.resting = false;
@@ -916,7 +1017,7 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
       alertPack(w, t, a.id);
     }
     w.events.push({ type: 'miss', attackerId: a.id, targetId: t.id });
-    return;
+    return -1;
   }
   let raw = rawIn;
   let crit = false;
@@ -927,7 +1028,8 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
       crit = true;
     }
   }
-  const amount = Math.max(1, Math.round(ignoreArmor ? raw : (raw * ARMOR_K) / (ARMOR_K + armorOf(t))));
+  const res = resistOf(t, dt);
+  const amount = res >= 100 ? 0 : Math.max(1, Math.round((ignoreArmor ? raw : (raw * ARMOR_K) / (ARMOR_K + armorOf(t))) * (1 - res / 100)));
   t.hp = Math.max(0, t.hp - amount);
   t.lastHitAt = w.tick;
   t.resting = false;
@@ -937,11 +1039,16 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
     t.autoAttack = true;
     alertPack(w, t, a.id);
   }
-  w.events.push({ type: 'hit', attackerId: a.id, targetId: t.id, amount, skill, crit });
+  w.events.push({ type: 'hit', attackerId: a.id, targetId: t.id, amount, skill, crit, ...(dt !== 'physical' ? { dt } : {}) });
   if (a.kind === 'player' && t.kind === 'monster') t.damagers[a.id] = w.tick;
   if (a.kind === 'monster' && a.champ && t.kind === 'player' && t.alive) {
-    if (a.champ === 'fiery') t.dot = { perSec: Math.max(2, Math.round(3 + a.level * 0.6)), until: w.tick + TICK_RATE * 4, srcId: a.id };
+    if (a.champ === 'fiery') applyStatus(w, t, 'burn', 4, 'fire', { perSec: Math.max(2, Math.round(3 + a.level * 0.6)), srcId: a.id });
     if (a.champ === 'vampiric') a.hp = Math.min(a.maxHp, a.hp + Math.round(amount * 0.4));
+  }
+  if (a.kind === 'monster' && t.kind === 'player' && t.alive && !skill && a.abilities.includes('poisonBite')) {
+    applyStatus(w, t, 'slow', 2, 'poison');
+    const secs = 3 * (1 - resistOf(t, 'poison') / 100);
+    if (a.dmgType === 'poison' && amount > 0 && secs > 0 && (!t.dot || t.dot.until < w.tick + secs * TICK_RATE)) t.dot = { perSec: Math.max(1, Math.round((amount * 0.3) / 3)), until: w.tick + Math.round(secs * TICK_RATE), srcId: a.id };
   }
   if (a.kind === 'player' && t.kind === 'monster' && t.champ === 'thorned' && !noReflect && a.alive) {
     dealDamage(w, t, a, Math.max(1, Math.round(amount * 0.15)), true, undefined, true);
@@ -968,18 +1075,23 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
     t.damage = [Math.round(t.damage[0] * 1.5), Math.round(t.damage[1] * 1.5)];
     w.events.push({ type: 'enraged', id: t.id });
   }
-  if (t.hp > 0) return;
+  if (t.hp > 0) return amount;
   t.alive = false;
   t.path = [];
   t.targetId = null;
   t.dot = null;
+  t.status = {};
+  t.burn = null;
+  if (t.abilities.includes('raise')) dismissSummons(w, t);
   t.diedAt = w.tick;
   w.events.push({ type: 'died', id: t.id });
   if (t.kind === 'monster') onMonsterDeath(w, a, t);
   else onPlayerDeath(w, t);
+  return amount;
 }
 
 function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
+  if (m.rewardMult <= 0) return;
   const k = monsterKind(m.kindId!);
   // Alle Spieler, die zuletzt (30 s) Schaden gemacht haben und in der Nähe sind, bekommen XP, Gold und Questfortschritt
   const credited = new Map<number, Actor>();
@@ -1076,6 +1188,9 @@ function onPlayerDeath(w: World, p: Actor): void {
   p.path = [];
   p.targetId = null;
   p.pickupId = null;
+  p.status = {};
+  p.burn = null;
+  p.dot = null;
   for (const m of w.actors) if (m.kind === 'monster' && m.targetId === p.id) m.targetId = null;
   w.events.push({ type: 'respawned', to: p.id });
 }
@@ -1111,11 +1226,24 @@ export function tick(w: World): void {
         const src = getActor(w, a.dot.srcId) ?? a;
         const d = a.dot;
         if (w.tick >= d.until) a.dot = null;
-        dealDamage(w, src, a, d.perSec, true, 'dot');
+        dealDamage(w, src, a, d.perSec, true, 'dot', false, false, 'poison');
         if (!a.alive) continue;
       } else if (w.tick >= a.dot.until) a.dot = null;
     }
+    for (const id of ['slow', 'stun', 'burn'] as const) if (a.status[id] !== undefined && a.status[id]! <= w.tick) delete a.status[id];
+    if (a.burn) {
+      if (!a.status.burn) a.burn = null;
+      else if (w.tick % TICK_RATE === 0) {
+        dealDamage(w, getActor(w, a.burn.srcId) ?? a, a, a.burn.perSec, true, 'burn', false, false, 'fire');
+        if (!a.alive) continue;
+      }
+    }
     for (const id of Object.keys(a.skillCd)) if ((a.skillCd[id] ?? 0) > 0) a.skillCd[id]!--;
+    if (a.status.stun) {
+      if (a.kind === 'player') regen(w, a);
+      continue;
+    }
+    if (a.kind === 'monster' && a.abilities.length && ((a.abilities.includes('heal') && healAi(w, a)) || (a.abilities.includes('raise') && raiseAi(w, a)))) continue;
     if (a.kind === 'player') regen(w, a);
     else monsterAi(w, a, players);
     if (a.kind === 'monster' && a.targetId === null && a.path.length === 0 && w.tick - a.lastHitAt > TICK_RATE * 6) {
@@ -1132,7 +1260,7 @@ export function tick(w: World): void {
       a.path = [];
     }
     if (t && t.alive && a.autoAttack && a.targetId !== null) {
-      if (a.kind === 'monster' && a.abilities.includes('cast') && castAi(w, a, t)) {
+      if (a.kind === 'monster' && (a.abilities.includes('cast') || a.abilities.includes('archer')) && castAi(w, a, t)) {
         // Zauberer: schießt aus der Distanz oder weicht zurück
       } else if (a.kind === 'player' && bowAi(w, a, t)) {
         // Bogenschütze: schießt aus der Distanz
@@ -1183,16 +1311,7 @@ function regen(w: World, p: Actor): void {
 
 function reviveMonster(w: World, m: Actor): void {
   // Helfer vom letzten Mal verschwinden, sonst häufen sie sich über Respawns
-  if (m.abilities.includes('summon')) {
-    for (const x of w.actors) {
-      if (x.summonedBy === m.id && x.alive) {
-        x.alive = false;
-        x.hp = 0;
-        x.targetId = null;
-        x.diedAt = w.tick - TICK_RATE * 7; // wird vom nächsten Aufräumen entfernt
-      }
-    }
-  }
+  if (m.abilities.includes('summon')) dismissSummons(w, m);
   m.alive = true;
   m.hp = m.maxHp;
   m.x = m.home!.x;
@@ -1200,6 +1319,8 @@ function reviveMonster(w: World, m: Actor): void {
   m.targetId = null;
   m.path = [];
   m.dot = null;
+  m.status = {};
+  m.burn = null;
   m.damagers = {};
   m.summoned = false;
   m.chargeUntil = 0;

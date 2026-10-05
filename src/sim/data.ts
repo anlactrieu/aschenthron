@@ -44,7 +44,28 @@ export function totalXpFor(level: number): number {
 
 export type MonsterFamily = 'beast' | 'humanoid' | 'undead' | 'spider' | 'ghoul' | 'golem' | 'demon' | 'worm' | 'elemental';
 
-export type Ability = 'slam' | 'summon' | 'charge' | 'cast';
+export type Ability = 'slam' | 'summon' | 'charge' | 'cast' | 'heal' | 'poisonBite' | 'archer' | 'raise';
+
+/** Schadensarten; Resistenz in Prozent (negativ = Schwäche, 100 = immun). */
+export type DmgType = 'physical' | 'fire' | 'frost' | 'poison';
+export const DMG_NAME: Record<DmgType, string> = { physical: 'Physisch', fire: 'Feuer', frost: 'Frost', poison: 'Gift' };
+export const DMG_COLOR: Record<DmgType, string> = { physical: '#ffffff', fire: '#ff9a3a', frost: '#8fd0ff', poison: '#8fe070' };
+export const MAX_RES = 75;
+
+/** Statuseffekte (Dauer in Ticks im Actor-Feld `status`). */
+export type StatusId = 'slow' | 'stun' | 'burn';
+export const STATUS_NAME: Record<StatusId, string> = { slow: 'Verlangsamt', stun: 'Betäubt', burn: 'Brennt' };
+export const STATUS_COLOR: Record<StatusId, string> = { slow: '#8fd0ff', stun: '#ffe45a', burn: '#ff9a3a' };
+/** Verlangsamung: Tempo und Angriffstempo auf diesen Faktor */
+export const SLOW_FACTOR = 0.6;
+
+export const FAMILY_RES: Partial<Record<MonsterFamily, Partial<Record<DmgType, number>>>> = {
+  undead: { fire: -40, poison: 100 },
+  golem: { poison: 100, frost: 30 },
+  spider: { poison: 60 },
+  demon: { fire: 60, frost: -30 },
+  elemental: { fire: 80, frost: -50 },
+};
 
 export interface MonsterKind {
   id: string;
@@ -65,6 +86,8 @@ export interface MonsterKind {
   /** Fähigkeiten (Bosse und Mini-Bosse) */
   abilities?: Ability[];
   summonKind?: string;
+  /** Schadensart der Angriffe (Standard physisch) */
+  dmgType?: DmgType;
 }
 
 /** Zentrale Skalierung: alle Monsterwerte folgen diesen Formeln (Balancing-Regler). */
@@ -79,7 +102,7 @@ export const SCALE = {
 
 function mk(
   id: string, name: string, level: number, family: MonsterFamily, color: number,
-  o: { speed?: number; cd?: number; aggro?: number; hp?: number; dmg?: number; boss?: boolean; drop?: number; abil?: Ability[]; summon?: string } = {},
+  o: { speed?: number; cd?: number; aggro?: number; hp?: number; dmg?: number; boss?: boolean; drop?: number; abil?: Ability[]; summon?: string; dt?: DmgType } = {},
 ): MonsterKind {
   const hpM = (o.hp ?? 1) * (o.boss ? SCALE.bossHp : 1);
   const dmgM = (o.dmg ?? 1) * (o.boss ? SCALE.bossDmg : 1);
@@ -97,6 +120,7 @@ function mk(
     boss: o.boss,
     abilities: o.abil,
     summonKind: o.summon,
+    dmgType: o.dt,
   };
 }
 
@@ -116,28 +140,32 @@ export const MONSTERS: MonsterKind[] = [
   mk('goblin', 'Goblin', 2, 'humanoid', 0x6a9a4a, { hp: 0.9 }),
   mk('goblin_scout', 'Goblinkundschafter', 4, 'humanoid', 0x7ab05a, { speed: 0.115, hp: 0.9 }),
   mk('goblin_warrior', 'Goblinkrieger', 8, 'humanoid', 0x5a8a3a, { hp: 1.25, dmg: 1.1 }),
-  mk('goblin_shaman', 'Goblinschamane', 10, 'humanoid', 0x8ac06a, { hp: 0.85, dmg: 1.25, abil: ['cast'] }),
+  mk('goblin_shaman', 'Goblinschamane', 10, 'humanoid', 0x8ac06a, { hp: 0.85, dmg: 1.25, abil: ['cast', 'heal'], dt: 'fire' }),
+  mk('goblin_archer', 'Goblinschütze', 5, 'humanoid', 0x7ab05a, { hp: 0.8, dmg: 0.9, cd: 24, abil: ['archer'] }),
   mk('goblin_chief', 'Goblinhäuptling', 13, 'humanoid', 0x4a7a2a, { hp: 1.8, dmg: 1.2, cd: 22 }),
   // Banditen
   mk('bandit_novice', 'Räuberlehrling', 3, 'humanoid', 0xb06a4a),
   mk('highwayman', 'Wegelagerer', 7, 'humanoid', 0xa05a3a, { dmg: 1.1 }),
+  mk('bandit_archer', 'Räuberschütze', 6, 'humanoid', 0xa07a4a, { hp: 0.8, dmg: 0.95, cd: 24, abil: ['archer'] }),
   mk('bandit', 'Räuber', 10, 'humanoid', 0x905030, { hp: 1.15, dmg: 1.15 }),
   mk('bandit_captain', 'Räuberhauptmann', 13, 'humanoid', 0x7a3a2a, { hp: 1.7, dmg: 1.25 }),
   // Spinnen
-  mk('forest_spider', 'Waldspinne', 4, 'spider', 0x3a3a48, { speed: 0.115, hp: 0.9 }),
-  mk('venom_spider', 'Giftspinne', 9, 'spider', 0x3a5a3a, { speed: 0.115, hp: 0.95, dmg: 1.15 }),
-  mk('giant_spider', 'Riesenspinne', 14, 'spider', 0x4a3a58, { speed: 0.11, hp: 1.4, dmg: 1.15 }),
-  mk('cave_spider', 'Höhlenspinne', 20, 'spider', 0x5a4a38, { speed: 0.115, hp: 1.3, dmg: 1.2 }),
+  mk('forest_spider', 'Waldspinne', 4, 'spider', 0x3a3a48, { speed: 0.115, hp: 0.9, abil: ['poisonBite'] }),
+  mk('venom_spider', 'Giftspinne', 9, 'spider', 0x3a5a3a, { speed: 0.115, hp: 0.95, dmg: 1.15, abil: ['poisonBite'], dt: 'poison' }),
+  mk('giant_spider', 'Riesenspinne', 14, 'spider', 0x4a3a58, { speed: 0.11, hp: 1.4, dmg: 1.15, abil: ['poisonBite'] }),
+  mk('cave_spider', 'Höhlenspinne', 20, 'spider', 0x5a4a38, { speed: 0.115, hp: 1.3, dmg: 1.2, abil: ['poisonBite'], dt: 'poison' }),
   // Sumpf
   mk('bog_ghoul', 'Sumpfghul', 6, 'ghoul', 0x5a8a5a, { speed: 0.085, hp: 1.15 }),
   mk('marsh_corpse', 'Moorleiche', 9, 'ghoul', 0x6a7a52, { speed: 0.08, hp: 1.35 }),
-  mk('bog_witch', 'Sumpfhexe', 11, 'humanoid', 0x7a4a8a, { hp: 0.85, dmg: 1.3, abil: ['cast'] }),
+  mk('bog_witch', 'Sumpfhexe', 11, 'humanoid', 0x7a4a8a, { hp: 0.85, dmg: 1.3, abil: ['cast'], dt: 'poison' }),
   mk('ghoul_alpha', 'Ghulalpha', 15, 'ghoul', 0x4a6a3a, { speed: 0.09, hp: 1.6, dmg: 1.2 }),
   // Untote
   mk('skeleton', 'Skelett', 8, 'undead', 0xdcd4bc, { hp: 0.9, dmg: 1.05 }),
   mk('wraith', 'Friedhofsgeist', 9, 'undead', 0x8a9ad8, { speed: 0.095, hp: 0.9, dmg: 1.15 }),
+  mk('bone_acolyte', 'Knochenakolyth', 11, 'undead', 0xb8c8d8, { hp: 0.85, dmg: 1.1, abil: ['cast', 'heal'] }),
   mk('zombie', 'Zombie', 10, 'undead', 0x7a8a62, { speed: 0.075, hp: 1.5 }),
   mk('bone_knight', 'Knochenritter', 13, 'undead', 0xd8d0b8, { speed: 0.085, hp: 1.3 }),
+  mk('necromancer', 'Totenbeschwörer', 14, 'undead', 0x6a4a8a, { hp: 0.9, dmg: 1.15, abil: ['cast', 'raise'], summon: 'skeleton', dt: 'frost' }),
   mk('crypt_guard', 'Gruftwächter', 18, 'undead', 0xb8b0c8, { speed: 0.08, hp: 1.55, dmg: 1.15 }),
   mk('death_knight', 'Todesritter', 27, 'undead', 0x5a5a7a, { hp: 1.4, dmg: 1.2 }),
   // Trolle und Golems
@@ -150,10 +178,10 @@ export const MONSTERS: MonsterKind[] = [
   mk('acid_worm', 'Säurewurm', 25, 'worm', 0x8aa04a, { speed: 0.09, hp: 1.35, dmg: 1.2 }),
   // Asche und Feuer
   mk('ash_walker', 'Aschenwandler', 23, 'humanoid', 0x6a5a52, { hp: 1.1 }),
-  mk('cinder_wisp', 'Lavageist', 25, 'elemental', 0xe0702a, { speed: 0.105, hp: 0.9, dmg: 1.35 }),
-  mk('ember_elemental', 'Glutelementar', 27, 'elemental', 0xff5a1a, { speed: 0.1, hp: 1.5, dmg: 1.3 }),
-  mk('imp', 'Imp', 24, 'demon', 0xd05a3a, { speed: 0.125, hp: 0.8, dmg: 1.3, cd: 16, abil: ['cast'] }),
-  mk('hell_spawn', 'Höllenbrut', 29, 'demon', 0xc0402a, { speed: 0.1, hp: 1.3, dmg: 1.25 }),
+  mk('cinder_wisp', 'Lavageist', 25, 'elemental', 0xe0702a, { speed: 0.105, hp: 0.9, dmg: 1.35, dt: 'fire' }),
+  mk('ember_elemental', 'Glutelementar', 27, 'elemental', 0xff5a1a, { speed: 0.1, hp: 1.5, dmg: 1.3, dt: 'fire' }),
+  mk('imp', 'Imp', 24, 'demon', 0xd05a3a, { speed: 0.125, hp: 0.8, dmg: 1.3, cd: 16, abil: ['cast'], dt: 'fire' }),
+  mk('hell_spawn', 'Höllenbrut', 29, 'demon', 0xc0402a, { speed: 0.1, hp: 1.3, dmg: 1.25, dt: 'fire' }),
   // Bosse
   mk('goblin_king', 'Goblinkönig Grix', 10, 'humanoid', 0x3a6a1a, { boss: true, speed: 0.1, abil: ['slam', 'summon'], summon: 'goblin_scout' }),
   mk('bandit_lord', 'Räuberfürst Harkon', 12, 'humanoid', 0xc07a3a, { boss: true, speed: 0.1, abil: ['slam'] }),
@@ -235,22 +263,26 @@ export interface SkillDef {
   heal?: number;
   /** Gift: Zusatzschaden über `seconds` Sekunden (Faktor auf den Direktschaden) */
   dot?: { seconds: number; factor: number };
+  /** Schadensart (Standard physisch) */
+  dmgType?: DmgType;
+  /** Statuseffekt auf Treffer (Bosse: Betäubung nur halb so lang) */
+  status?: { id: StatusId; seconds: number };
   /** Lehrer-Stufe: 1 = Aschenhafen, 2 = Felsenwacht */
   tier: number;
   desc: string;
 }
 
 export const SKILLS: SkillDef[] = [
-  { id: 'power_strike', name: 'Wuchtschlag', area: 'Nahkampf', levelReq: 2, price: 50, mana: 8, cooldown: 60, range: 1.5, mult: 2, ignoresArmor: false, tier: 1, desc: 'Doppelter Waffenschaden im Nahkampf.' },
+  { id: 'power_strike', name: 'Wuchtschlag', area: 'Nahkampf', levelReq: 2, price: 50, mana: 8, cooldown: 60, range: 1.5, mult: 2, ignoresArmor: false, status: { id: 'stun', seconds: 0.8 }, tier: 1, desc: 'Doppelter Waffenschaden im Nahkampf, betäubt kurz (0,8 s).' },
   { id: 'quick_shot', name: 'Schnellschuss', area: 'Fernkampf', levelReq: 1, price: 20, mana: 4, cooldown: 20, range: 6, base: [6, 12], scales: 'gewandtheit', ignoresArmor: false, tier: 1, desc: 'Schneller Schuss auf Distanz (Bogen und Pfeile in der Nebenhand nötig), skaliert mit Gewandtheit.' },
-  { id: 'ember_bolt', name: 'Glutblitz', area: 'Magie', levelReq: 3, price: 80, mana: 10, cooldown: 30, range: 7, base: [10, 18], scales: 'verstand', ignoresArmor: true, tier: 1, desc: 'Magischer Schaden, ignoriert Rüstung, skaliert mit Verstand.' },
+  { id: 'ember_bolt', name: 'Glutblitz', area: 'Magie', levelReq: 3, price: 80, mana: 10, cooldown: 30, range: 7, base: [10, 18], scales: 'verstand', ignoresArmor: true, dmgType: 'fire', status: { id: 'burn', seconds: 3 }, tier: 1, desc: 'Feuerschaden, ignoriert Rüstung, skaliert mit Verstand; setzt in Brand.' },
   { id: 'healing_hand', name: 'Heilende Hand', area: 'Magie', levelReq: 4, price: 120, mana: 14, cooldown: 200, range: 0, heal: 40, scales: 'verstand', ignoresArmor: true, tier: 1, desc: 'Heilt dich selbst, stärker mit Verstand und Level.' },
-  { id: 'poison_shot', name: 'Giftpfeil', area: 'Fernkampf', levelReq: 6, price: 220, mana: 9, cooldown: 60, range: 6, base: [5, 9], scales: 'gewandtheit', ignoresArmor: false, dot: { seconds: 8, factor: 1.6 }, tier: 2, desc: 'Schuss (Bogen und Pfeile in der Nebenhand nötig), der das Ziel zusätzlich 8 Sekunden vergiftet.' },
+  { id: 'poison_shot', name: 'Giftpfeil', area: 'Fernkampf', levelReq: 6, price: 220, mana: 9, cooldown: 60, range: 6, base: [5, 9], scales: 'gewandtheit', ignoresArmor: false, dot: { seconds: 8, factor: 1.6 }, dmgType: 'poison', tier: 2, desc: 'Schuss (Bogen und Pfeile in der Nebenhand nötig), der das Ziel zusätzlich 8 Sekunden mit Gift schädigt.' },
   { id: 'whirlwind', name: 'Wirbelhieb', area: 'Nahkampf', levelReq: 10, price: 500, mana: 16, cooldown: 100, range: 1.6, mult: 1.2, aoe: 2.2, aoeSelf: true, ignoresArmor: false, tier: 2, desc: 'Trifft alle Gegner um dich herum.' },
-  { id: 'frost_nova', name: 'Frostnova', area: 'Magie', levelReq: 11, price: 650, mana: 18, cooldown: 140, range: 1.6, base: [14, 22], scales: 'verstand', aoe: 3, aoeSelf: true, ignoresArmor: true, tier: 2, desc: 'Magische Druckwelle um dich herum.' },
+  { id: 'frost_nova', name: 'Frostnova', area: 'Magie', levelReq: 11, price: 650, mana: 18, cooldown: 140, range: 1.6, base: [14, 22], scales: 'verstand', aoe: 3, aoeSelf: true, ignoresArmor: true, dmgType: 'frost', status: { id: 'slow', seconds: 4 }, tier: 2, desc: 'Frostschaden rund um dich herum, verlangsamt Getroffene 4 s.' },
   { id: 'multishot', name: 'Salve', area: 'Fernkampf', levelReq: 13, price: 800, mana: 14, cooldown: 70, range: 6, base: [9, 15], scales: 'gewandtheit', targets: 3, ignoresArmor: false, tier: 2, desc: 'Schießt (Bogen und Pfeile in der Nebenhand nötig) auf bis zu drei Gegner gleichzeitig; verbraucht einen Pfeil.' },
-  { id: 'fireball', name: 'Feuerball', area: 'Magie', levelReq: 16, price: 1200, mana: 24, cooldown: 90, range: 7, base: [28, 42], scales: 'verstand', aoe: 2, ignoresArmor: true, tier: 2, desc: 'Explodiert am Ziel und trifft Gegner in der Nähe.' },
-  { id: 'skull_split', name: 'Schädelspalter', area: 'Nahkampf', levelReq: 18, price: 1500, mana: 22, cooldown: 160, range: 1.5, mult: 3.2, ignoresArmor: false, tier: 2, desc: 'Gewaltiger Hieb mit mehr als dreifachem Waffenschaden.' },
+  { id: 'fireball', name: 'Feuerball', area: 'Magie', levelReq: 16, price: 1200, mana: 24, cooldown: 90, range: 7, base: [28, 42], scales: 'verstand', aoe: 2, ignoresArmor: true, dmgType: 'fire', status: { id: 'burn', seconds: 3 }, tier: 2, desc: 'Feuerschaden, explodiert am Ziel und trifft Gegner in der Nähe; setzt in Brand.' },
+  { id: 'skull_split', name: 'Schädelspalter', area: 'Nahkampf', levelReq: 18, price: 1500, mana: 22, cooldown: 160, range: 1.5, mult: 3.2, ignoresArmor: false, status: { id: 'stun', seconds: 1.5 }, tier: 2, desc: 'Gewaltiger Hieb mit mehr als dreifachem Waffenschaden, betäubt 1,5 s.' },
   { id: 'lightning', name: 'Blitzschlag', area: 'Magie', levelReq: 22, price: 2400, mana: 30, cooldown: 120, range: 8, base: [60, 90], scales: 'verstand', ignoresArmor: true, tier: 2, desc: 'Zerschmetternder Blitz auf ein Ziel.' },
 ];
 
