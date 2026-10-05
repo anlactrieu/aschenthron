@@ -1109,7 +1109,7 @@ export class GameScene extends Phaser.Scene {
       // Schritt-Wippen beim Gehen, Bodenschatten bleibt fest unter den Füßen
       const walking = time < view.movingUntil && a.alive;
       // Wippe: im Schritt (Fuß setzt auf) unten, im Durchgang (Stand-Bild) oben; Monster hüpfen stärker, Bosse weniger
-      const bob = walking && !swinging ? -Math.abs(Math.sin(stepPhase * Math.PI * 0.5)) * (a.boss ? 1.5 : a.kind === 'monster' ? 3.4 : 3) : 0;
+      const bob = walking && !swinging ? -Math.abs(Math.sin(stepPhase * Math.PI * 0.5)) * (a.boss ? 0.8 : a.kind === 'monster' ? 1.6 : 1.2) : 0;
       if (a.alive) {
         const wide = a.boss ? 46 : a.kind === 'monster' && (monsterKind(a.kindId!).family === 'beast' || monsterKind(a.kindId!).family === 'spider') ? 30 : a.kind === 'monster' && monsterKind(a.kindId!).family === 'golem' ? 34 : 22;
         this.gfxGround.fillStyle(0x000000, 0.18);

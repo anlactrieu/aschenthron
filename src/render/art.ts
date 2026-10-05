@@ -137,7 +137,24 @@ function drawSprite(x: Ctx, img: HTMLImageElement, tint?: number): void {
  * Baut aus gezeichneten Sprite-Ebenen eine Figurentextur: Umriss, Hochskalierung und eine Bildhöhe, bei der die
  * unterste deckende Zeile genau auf `originY` liegt (so passt `setOrigin(0.5, originY)` für beliebige Sprites).
  */
-function spriteCanvas(key: string, draw: (x: Ctx) => void, scale: number, originY: number, rim?: string): HTMLCanvasElement {
+const footCache = new WeakMap<HTMLImageElement, number>();
+/** Unterste nicht-transparente Pixelzeile eines Sprites (Fußpunkt der Figur, unabhängig von Waffe/Umhang darüber). */
+function opaqueBottom(img: HTMLImageElement): number {
+  const hit = footCache.get(img);
+  if (hit !== undefined) return hit;
+  const w = img.naturalWidth || img.width;
+  const h = img.naturalHeight || img.height;
+  const c = mkCanvas(w, h);
+  const cx = ctxOf(c);
+  cx.drawImage(img, 0, 0);
+  const d = cx.getImageData(0, 0, w, h).data;
+  let b = h - 1;
+  while (b > 0 && !d.subarray(b * w * 4, (b + 1) * w * 4).some((v, i) => i % 4 === 3 && v > 0)) b--;
+  footCache.set(img, b);
+  return b;
+}
+
+function spriteCanvas(key: string, draw: (x: Ctx) => void, scale: number, originY: number, rim?: string, foot?: number): HTMLCanvasElement {
   const hit = actorCache.get(key);
   if (hit) return hit;
   const c = mkCanvas(SP_SIZE, SP_SIZE);
@@ -147,7 +164,8 @@ function spriteCanvas(key: string, draw: (x: Ctx) => void, scale: number, origin
   const o = outline(c, rim);
   const d = ctxOf(o).getImageData(0, 0, SP_SIZE, SP_SIZE).data;
   let bottom = SP_SIZE - 1;
-  while (bottom > 0 && !d.subarray(bottom * SP_SIZE * 4, (bottom + 1) * SP_SIZE * 4).some((v, i) => i % 4 === 3 && v > 0)) bottom--;
+  if (foot !== undefined) bottom = Math.min(SP_SIZE - 1, foot + SP_PAD + 1);
+  else while (bottom > 0 && !d.subarray(bottom * SP_SIZE * 4, (bottom + 1) * SP_SIZE * 4).some((v, i) => i % 4 === 3 && v > 0)) bottom--;
   const up = upscale(o, scale);
   const h = Math.max(up.height, Math.ceil(((bottom + 1) * scale) / originY));
   const out = mkCanvas(up.width, h);
@@ -855,7 +873,7 @@ function spritePlayer(look: Look, frame: number, scale: number = SPRITE_SCALE.no
     for (const l of [gloves, hair, head, shield]) if (l) x.drawImage(l, 0, 0);
     if (wpn) drawPlayerWeapon(x, wpn, look, frame, attacking, walking ? side : 0);
     x.restore();
-  }, scale, FEET_ORIGIN_Y);
+  }, scale, FEET_ORIGIN_Y, undefined, Math.max(opaqueBottom(base), boots ? opaqueBottom(boots) : 0));
 }
 
 /** Waffe um den Griff drehen (Nahkampf), Bogen spannen/entspannen, Stab vorstoßen. */
