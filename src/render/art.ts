@@ -554,7 +554,7 @@ export function lookOf(a: Actor): Look {
     chest: t('chest'), head: t('head'), weapon: t('weapon'), hands: t('hands'),
     weaponKind: kind === 'bow' ? 1 : kind === 'staff' ? 2 : 0,
     robe: !!a.equipment.chest && a.equipment.chest.templateId.includes('robe'),
-    quiver: !!a.equipment.quiver,
+    quiver: a.equipment.offhand?.off === 'arrows',
   };
 }
 

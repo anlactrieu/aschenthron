@@ -1,6 +1,6 @@
 import { Rng } from './rng';
 import { findPath, isWalkable, type Grid, type Pt } from './path';
-import { itemReq, rollUniqueSpecial, rollArrows, rollDrop, rollPotion, rollSpecial, templateById, generateItem, rerollAffixes, extendAffixes, SETS, type Item, type PowerId, type SetBonus, type EquipSlot, type Stat } from './items';
+import { itemReq, rollUniqueSpecial, rollDrop, rollPotion, rollSpecial, templateById, generateItem, rerollAffixes, extendAffixes, SETS, type Item, type PowerId, type SetBonus, type EquipSlot, type Stat } from './items';
 import {
   ATTR_KEYS, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
   monsterKind, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
@@ -8,12 +8,14 @@ import {
 
 export const TICK_RATE = 20;
 export const NPC_RANGE = 3;
-/** Startgold reicht genau für eine Wahl: Bogen-Set (Bogen, Köcher, Pfeile, Schnellschuss) oder Schwert plus etwas Rüstung. */
+/** Startgold reicht genau für eine Wahl: Bogen-Set (Bogen, Holzpfeile, Schnellschuss) oder Schwert plus etwas Rüstung. */
 export const START_GOLD = 100;
 const MELEE_RANGE = 1.5;
 /** Zaubernde Monster halten diesen Abstand und schießen aus bis zu CAST_RANGE Feldern. */
 const CAST_RANGE = 6;
 const CAST_KEEP = 2.5;
+/** Bogenschützen schießen den normalen Angriff aus bis zu BOW_RANGE Feldern, statt in den Nahkampf zu laufen. */
+const BOW_RANGE = 6;
 const MONSTER_RESPAWN_TICKS = 20 * 45;
 const MONSTER_LOOT_TTL = 20 * 180;
 const CORPSE_LOOT_TTL = 20 * 300;
@@ -41,7 +43,6 @@ export type Command =
   | { type: 'stashPut'; itemId: number }
   | { type: 'stashTake'; itemId: number }
   | { type: 'openChest'; chestId: number }
-  | { type: 'refillQuiver'; itemId: number }
   | { type: 'acceptQuest'; questId: string }
   | { type: 'turnInQuest'; questId: string }
   | { type: 'craft'; itemId: number; op: 'upgrade' | 'reroll' | 'extend' };
@@ -193,7 +194,6 @@ type GameEventBase =
   | { type: 'telegraph'; x: number; y: number; r: number; ms: number }
   | { type: 'summon'; id: number }
   | { type: 'charge'; id: number }
-  | { type: 'refilled'; arrows: number }
   | { type: 'respecced' };
 
 /** `to`: nur für diesen Akteur bestimmt (sonst sichtbar für alle in der Nähe). */
@@ -321,7 +321,7 @@ export const CARRY_PER_KRAFT = 2;
 
 /** Zielfeld beim Anlegen: Ringe füllen erst das freie Feld, sonst ersetzt der erste Ring (oder das gewünschte Feld). */
 export function equipSlotFor(a: Actor, it: Item, to?: 'ring' | 'ring2'): EquipSlot {
-  if (it.slot !== 'ring') return it.slot === 'potion' || it.slot === 'ammo' ? 'weapon' : it.slot;
+  if (it.slot !== 'ring') return it.slot === 'potion' ? 'weapon' : it.slot;
   if (to) return to;
   return a.equipment.ring && !a.equipment.ring2 ? 'ring2' : 'ring';
 }
@@ -522,7 +522,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
     }
     case 'equip': {
       const it = a.inventory.find((i) => i.id === cmd.itemId);
-      if (!it || it.slot === 'potion' || it.slot === 'ammo') return;
+      if (!it || it.slot === 'potion') return;
       const target = equipSlotFor(a, it, cmd.to);
       const replaced = a.equipment[target];
       const missing = missingReq(a, it, replaced);
@@ -610,7 +610,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       // Ausrüstung, die nun die Anforderungen verfehlt, wandert in den Rucksack
       for (const slot of Object.keys(a.equipment) as EquipSlot[]) {
         const it = a.equipment[slot];
-        if (it && slot !== 'quiver' && missingReq(a, it).length) {
+        if (it && missingReq(a, it).length) {
           delete a.equipment[slot];
           a.inventory.push(it);
         }
@@ -647,23 +647,6 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       const price = sellPrice(it);
       a.gold += price;
       w.events.push({ type: 'gold', amount: price, to: a.id });
-      break;
-    }
-    case 'refillQuiver': {
-      const bundle = a.inventory.find((i) => i.id === cmd.itemId);
-      const q = a.equipment.quiver;
-      if (!bundle || bundle.slot !== 'ammo') return;
-      if (!q) return fail(w, 'Du trägst keinen Köcher.');
-      const cap = q.capacity ?? 40;
-      const have = q.ammo ?? 0;
-      if (have >= cap) return fail(w, 'Der Köcher ist voll.');
-      if (have > 0 && (q.arrowBonus ?? 0) !== (bundle.arrowBonus ?? 0)) return fail(w, 'Im Köcher stecken andere Pfeile.');
-      const add = Math.min(bundle.ammo ?? 0, cap - have);
-      q.ammo = have + add;
-      q.arrowBonus = bundle.arrowBonus ?? 0;
-      bundle.ammo = (bundle.ammo ?? 0) - add;
-      if ((bundle.ammo ?? 0) <= 0) a.inventory = a.inventory.filter((i) => i.id !== bundle.id);
-      w.events.push({ type: 'refilled', arrows: add, to: a.id });
       break;
     }
     case 'openChest': {
@@ -772,7 +755,7 @@ function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void 
   const bowShot = s.area === 'Fernkampf' && a.kind === 'player';
   if (bowShot) {
     if (a.equipment.weapon?.kind !== 'bow') return fail(w, 'Dafür brauchst du einen Bogen.');
-    if ((a.equipment.quiver?.ammo ?? 0) <= 0) return fail(w, a.equipment.quiver ? 'Der Köcher ist leer.' : 'Dafür brauchst du einen Köcher mit Pfeilen.');
+    if (a.equipment.offhand?.off !== 'arrows') return fail(w, 'Dafür brauchst du Pfeile in der Nebenhand.');
   }
   const first = getActor(w, targetId ?? a.targetId ?? -1);
   if (!s.aoeSelf && (!first || !first.alive || first.id === a.id)) return fail(w, 'Kein Ziel.');
@@ -789,8 +772,7 @@ function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void 
   if (!victims.length) return fail(w, 'Kein Ziel.');
   a.mana -= manaCost;
   a.skillCd[s.id] = Math.round(s.cooldown * rankCooldown(rank));
-  const quiver = bowShot ? a.equipment.quiver : undefined;
-  if (quiver) quiver.ammo = (quiver.ammo ?? 1) - 1;
+  const arrows = bowShot ? a.equipment.offhand : undefined;
   // Fern-/Magie-Skills lösen keine Nahkampf-Verfolgung aus; Nahkampf-Skills schon
   if (first) {
     if (s.mult) a.autoAttack = true;
@@ -809,7 +791,7 @@ function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void 
       const wp = a.equipment.weapon;
       const matches = wp?.damage && ((s.area === 'Fernkampf' && wp.kind === 'bow') || (s.area === 'Magie' && wp.kind === 'staff'));
       const weaponBonus = matches ? ((wp!.damage![0] + wp!.damage![1]) / 2) * 0.9 : 0;
-      amount = Math.round((w.rng.int(lo, hi) * lvl + scale + weaponBonus + (quiver?.arrowBonus ?? 0)) * rankDamage(rank));
+      amount = Math.round((w.rng.int(lo, hi) * lvl + scale + weaponBonus + (arrows?.arrowBonus ?? 0)) * rankDamage(rank));
     }
     dealDamage(w, a, v, amount, s.ignoresArmor, s.id, false, !s.ignoresArmor);
     if (s.dot && v.alive) v.dot = { perSec: Math.max(1, Math.round((amount * s.dot.factor) / s.dot.seconds)), until: w.tick + s.dot.seconds * TICK_RATE, srcId: a.id };
@@ -893,6 +875,25 @@ function castAi(w: World, m: Actor, t: Actor): boolean {
   m.cooldownLeft = attackCooldownOf(m) + 6;
   const [lo, hi] = damageRange(m);
   dealDamage(w, m, t, Math.max(1, Math.round(w.rng.int(lo, hi) * 0.9)), false, 'ember_bolt', false, true);
+  return true;
+}
+
+/** Normaler Angriff mit Bogen und angelegten Pfeilen: aus der Distanz, voller Waffenschaden plus Pfeilbonus. Gibt true zurück, wenn gehandelt wurde. */
+function bowAi(w: World, a: Actor, t: Actor): boolean {
+  const wpn = a.equipment.weapon;
+  if (wpn?.kind !== 'bow' || a.equipment.offhand?.off !== 'arrows') return false;
+  const d = dist(a, t);
+  if (d > BOW_RANGE || !clearLine(w, a, t)) return false;
+  a.path = [];
+  a.stuck = 0;
+  if (a.cooldownLeft > 0) return true;
+  if (inSafeZone(w, a.x, a.y)) return true;
+  a.cooldownLeft = attackCooldownOf(a);
+  const bonus = affixSum(a, 'damage') + Math.floor((a.attrs.gewandtheit - 10) / 2) + (a.equipment.offhand.arrowBonus ?? 0);
+  const [wlo, whi] = wpn.damage ?? [0, 0];
+  const lo = Math.max(1, a.damage[0] + wlo + bonus);
+  const hi = Math.max(1, a.damage[1] + whi + bonus);
+  dealDamage(w, a, t, w.rng.int(lo, hi), false, 'quick_shot', false, true);
   return true;
 }
 
@@ -1025,7 +1026,6 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
     if (sp) drop(sp);
     drop(rollPotion(w.rng, () => w.nextId++, k.level));
   }
-  if (w.rng.next() <= 0.05) drop(rollArrows(w.rng, () => w.nextId++, k.level));
   const special = rollSpecial(w.rng, () => w.nextId++, k.level, k.id, !!k.boss);
   if (special) drop(special);
 }
@@ -1050,17 +1050,15 @@ function onPlayerDeath(w: World, p: Actor): void {
   const floor = totalXpFor(p.level);
   const xpLost = Math.max(0, Math.min(p.xp - floor, Math.floor(span * 0.05)));
   p.xp -= xpLost;
-  // 1–3 Items fallen; Rucksack zuerst, Ausgerüstetes nur wenn der Rucksack nicht reicht
+  // 1–3 Items aus dem Rucksack fallen; Angelegtes geht nie verloren
   const count = w.rng.int(1, 3);
   const dropped: Item[] = [];
   for (let i = 0; i < count; i++) {
-    let pool = p.inventory;
-    if (!pool.length) pool = equippedItems(p);
+    const pool = p.inventory;
     if (!pool.length) break;
     const it = pool[w.rng.int(0, pool.length - 1)]!;
     dropped.push(it);
     p.inventory = p.inventory.filter((x) => x.id !== it.id);
-    for (const s of Object.keys(p.equipment) as EquipSlot[]) if (p.equipment[s]?.id === it.id) delete p.equipment[s];
   }
   const x = Math.round(p.x);
   const y = Math.round(p.y);
@@ -1136,6 +1134,8 @@ export function tick(w: World): void {
     if (t && t.alive && a.autoAttack && a.targetId !== null) {
       if (a.kind === 'monster' && a.abilities.includes('cast') && castAi(w, a, t)) {
         // Zauberer: schießt aus der Distanz oder weicht zurück
+      } else if (a.kind === 'player' && bowAi(w, a, t)) {
+        // Bogenschütze: schießt aus der Distanz
       } else if (dist(a, t) <= MELEE_RANGE) {
         a.path = [];
         a.stuck = 0;

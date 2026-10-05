@@ -82,17 +82,17 @@ export function itemIcon(it: Item): string {
       r(c, 7, 8, 1, 1, 0xffffff);
       r(c, 7, 12, 2, 1, shade(col, 0.7));
     });
-  } else if (it.slot === 'quiver') {
+  } else if (it.slot === 'offhand' && t.off === 'shield') {
     url = make((c) => {
-      r(c, 5, 4, 6, 11, 0x7a5230);
-      r(c, 5, 4, 6, 1, 0x4a3018);
-      r(c, 4, 6, 1, 8, shade(0x7a5230, 0.7));
-      r(c, 6, 1, 1, 4, 0xe8e0d0);
-      r(c, 8, 0, 1, 5, 0xd8c890);
-      r(c, 10, 2, 1, 3, 0xe8e0d0);
-      r(c, 6, 9, 4, 1, col);
+      r(c, 3, 2, 10, 9, shade(col, 0.7));
+      r(c, 4, 3, 8, 7, col);
+      r(c, 5, 11, 6, 2, shade(col, 0.7));
+      r(c, 6, 13, 4, 1, shade(col, 0.7));
+      r(c, 4, 3, 8, 1, shade(col, 1.4));
+      r(c, 7, 4, 2, 8, shade(col, 1.3));
+      r(c, 5, 6, 6, 2, shade(col, 1.3));
     });
-  } else if (it.slot === 'ammo') {
+  } else if (it.slot === 'offhand') {
     url = make((c) => {
       for (let i = 0; i < 3; i++) {
         r(c, 3 + i * 3, 3, 1, 11, 0x8a6a42);
@@ -238,14 +238,4 @@ export function potionIcon(kind: 'heal' | 'mana'): string {
   });
   potionCache.set(kind, url);
   return url;
-}
-
-export function arrowIcon(): string {
-  return make((c) => {
-    for (let i = 0; i < 3; i++) {
-      r(c, 3 + i * 3, 3, 1, 11, 0x8a6a42);
-      r(c, 2 + i * 3, 1, 3, 3, 0xd8d0b8);
-      r(c, 2 + i * 3, 12, 3, 2, 0xe8e0d0);
-    }
-  });
 }

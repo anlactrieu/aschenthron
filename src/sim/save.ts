@@ -7,13 +7,31 @@ const KEYS = [
   'x', 'y', 'hp', 'mana', 'level', 'xp', 'statPoints', 'attrs', 'gold', 'skills', 'inventory', 'equipment', 'stash', 'maxHp', 'quests', 'skillRanks', 'skillPoints',
 ] as const;
 
-const EQUIP_SLOTS = ['weapon', 'head', 'chest', 'hands', 'feet', 'ring', 'ring2', 'amulet', 'quiver'];
+const EQUIP_SLOTS = ['weapon', 'head', 'chest', 'hands', 'feet', 'ring', 'ring2', 'amulet', 'offhand'];
 
 /** Serialisiert nur den Spieler; die Welt wird beim Laden neu aufgebaut. */
 export function exportPlayer(p: Actor): string {
   const o: Record<string, unknown> = {};
   for (const k of KEYS) o[k] = p[k];
   return JSON.stringify({ v: 1, mapV: MAP_VERSION, player: o });
+}
+
+/** Altformat: Köcher werden verworfen, Pfeilbündel (slot 'ammo') werden zu Pfeil-Gegenständen der Nebenhand. */
+function migrateItem(i: unknown): unknown {
+  if (!i || typeof i !== 'object') return i;
+  const it = { ...(i as Record<string, unknown>) };
+  if (it.slot === 'quiver') return null;
+  if (it.slot === 'ammo') {
+    const t = TEMPLATES.find((x) => x.id === it.templateId);
+    if (!t || t.off !== 'arrows') return null;
+    it.slot = 'offhand';
+    it.off = 'arrows';
+    it.name = t.name;
+    it.value = t.value;
+    delete it.ammo;
+    delete it.capacity;
+  }
+  return it;
 }
 
 const isItem = (i: unknown): i is Item => {
@@ -51,13 +69,13 @@ export function importPlayer(w: World, p: Actor, json: string): boolean {
     const earned = SKILL_POINTS_START + SKILL_POINTS_PER_LEVEL * (p.level - 1);
     p.skillPoints = typeof s.skillPoints === 'number' ? Math.max(0, Math.floor(s.skillPoints)) : Math.max(0, earned - spent);
     const rawCount = (Array.isArray(s.inventory) ? s.inventory.length : 0) + (Array.isArray(s.stash) ? s.stash.length : 0);
-    p.inventory = Array.isArray(s.inventory) ? s.inventory.filter(isItem) : [];
-    p.stash = Array.isArray(s.stash) ? s.stash.filter(isItem) : [];
+    p.inventory = Array.isArray(s.inventory) ? (s.inventory.map(migrateItem).filter(isItem) as Item[]) : [];
+    p.stash = Array.isArray(s.stash) ? (s.stash.map(migrateItem).filter(isItem) as Item[]) : [];
     const lost = rawCount - p.inventory.length - p.stash.length;
     if (lost > 0) w.events.push({ type: 'fail', reason: `${lost} Gegenstand/Gegenstände aus dem Spielstand konnten nicht geladen werden (unbekannte Vorlage).`, to: p.id });
     p.equipment = {};
     for (const slot of EQUIP_SLOTS) {
-      const it = (s.equipment as Record<string, unknown> | undefined)?.[slot];
+      const it = migrateItem((s.equipment as Record<string, unknown> | undefined)?.[slot]);
       if (isItem(it)) (p.equipment as Record<string, Item>)[slot] = it;
     }
     const x = Math.round(num(s.x, w.start.x));

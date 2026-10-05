@@ -16,8 +16,6 @@ export function validateCommand(w: World, c: unknown): Command | null {
       return int(o.x) && int(o.y) && isWalkable(w.grid, o.x, o.y) ? { type: 'moveTo', x: o.x, y: o.y } : null;
     case 'attack':
       return int(o.targetId) ? { type: 'attack', targetId: o.targetId } : null;
-    case 'refillQuiver':
-      return int(o.itemId) ? { type: 'refillQuiver', itemId: o.itemId } : null;
     case 'openChest':
       return int(o.chestId) ? { type: 'openChest', chestId: o.chestId } : null;
     case 'pickup':
@@ -27,7 +25,7 @@ export function validateCommand(w: World, c: unknown): Command | null {
     case 'drop': case 'usePotion': case 'sell': case 'stashPut': case 'stashTake':
       return int(o.itemId) ? ({ type: o.type, itemId: o.itemId } as Command) : null;
     case 'unequip':
-      return ['weapon', 'head', 'chest', 'hands', 'feet', 'ring', 'ring2', 'amulet', 'quiver'].includes(o.slot as string) ? { type: 'unequip', slot: o.slot as 'weapon' } : null;
+      return ['weapon', 'head', 'chest', 'hands', 'feet', 'ring', 'ring2', 'amulet', 'offhand'].includes(o.slot as string) ? { type: 'unequip', slot: o.slot as 'weapon' } : null;
     case 'spendStat':
       return ATTR_KEYS.includes(o.attr as never) ? { type: 'spendStat', attr: o.attr as never } : null;
     case 'learnSkill': case 'trainSkill':

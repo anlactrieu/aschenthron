@@ -29,7 +29,7 @@ export const START_STAT_POINTS = 10;
 export const XP_PER_LEVEL_BASE = 190;
 /** Zusatzfaktor `1 + (l/Max)^Exp * Faktor`: frühe Level bleiben flüssig (L10 ≈ 1 h), das Endgame streckt sich (Bot-Messung: L30 nach ≈ 8 h, ein Mensch braucht deutlich länger). */
 const XP_LATE_EXP = 1.5;
-const XP_LATE_FACTOR = 0.8;
+const XP_LATE_FACTOR = 1.0;
 export function xpToNext(level: number): number {
   return Math.round(XP_PER_LEVEL_BASE * Math.pow(level, 1.3) * (1 + level / 6) * (1 + Math.pow(level / MAX_LEVEL, XP_LATE_EXP) * XP_LATE_FACTOR));
 }
@@ -242,13 +242,13 @@ export interface SkillDef {
 
 export const SKILLS: SkillDef[] = [
   { id: 'power_strike', name: 'Wuchtschlag', area: 'Nahkampf', levelReq: 2, price: 50, mana: 8, cooldown: 60, range: 1.5, mult: 2, ignoresArmor: false, tier: 1, desc: 'Doppelter Waffenschaden im Nahkampf.' },
-  { id: 'quick_shot', name: 'Schnellschuss', area: 'Fernkampf', levelReq: 1, price: 20, mana: 4, cooldown: 20, range: 6, base: [6, 12], scales: 'gewandtheit', ignoresArmor: false, tier: 1, desc: 'Schneller Schuss auf Distanz (Bogen und Köcher nötig), skaliert mit Gewandtheit.' },
+  { id: 'quick_shot', name: 'Schnellschuss', area: 'Fernkampf', levelReq: 1, price: 20, mana: 4, cooldown: 20, range: 6, base: [6, 12], scales: 'gewandtheit', ignoresArmor: false, tier: 1, desc: 'Schneller Schuss auf Distanz (Bogen und Pfeile in der Nebenhand nötig), skaliert mit Gewandtheit.' },
   { id: 'ember_bolt', name: 'Glutblitz', area: 'Magie', levelReq: 3, price: 80, mana: 10, cooldown: 30, range: 7, base: [10, 18], scales: 'verstand', ignoresArmor: true, tier: 1, desc: 'Magischer Schaden, ignoriert Rüstung, skaliert mit Verstand.' },
   { id: 'healing_hand', name: 'Heilende Hand', area: 'Magie', levelReq: 4, price: 120, mana: 14, cooldown: 200, range: 0, heal: 40, scales: 'verstand', ignoresArmor: true, tier: 1, desc: 'Heilt dich selbst, stärker mit Verstand und Level.' },
-  { id: 'poison_shot', name: 'Giftpfeil', area: 'Fernkampf', levelReq: 6, price: 220, mana: 9, cooldown: 60, range: 6, base: [5, 9], scales: 'gewandtheit', ignoresArmor: false, dot: { seconds: 8, factor: 1.6 }, tier: 2, desc: 'Schuss (Bogen und Köcher nötig), der das Ziel zusätzlich 8 Sekunden vergiftet.' },
+  { id: 'poison_shot', name: 'Giftpfeil', area: 'Fernkampf', levelReq: 6, price: 220, mana: 9, cooldown: 60, range: 6, base: [5, 9], scales: 'gewandtheit', ignoresArmor: false, dot: { seconds: 8, factor: 1.6 }, tier: 2, desc: 'Schuss (Bogen und Pfeile in der Nebenhand nötig), der das Ziel zusätzlich 8 Sekunden vergiftet.' },
   { id: 'whirlwind', name: 'Wirbelhieb', area: 'Nahkampf', levelReq: 10, price: 500, mana: 16, cooldown: 100, range: 1.6, mult: 1.2, aoe: 2.2, aoeSelf: true, ignoresArmor: false, tier: 2, desc: 'Trifft alle Gegner um dich herum.' },
   { id: 'frost_nova', name: 'Frostnova', area: 'Magie', levelReq: 11, price: 650, mana: 18, cooldown: 140, range: 1.6, base: [14, 22], scales: 'verstand', aoe: 3, aoeSelf: true, ignoresArmor: true, tier: 2, desc: 'Magische Druckwelle um dich herum.' },
-  { id: 'multishot', name: 'Salve', area: 'Fernkampf', levelReq: 13, price: 800, mana: 14, cooldown: 70, range: 6, base: [9, 15], scales: 'gewandtheit', targets: 3, ignoresArmor: false, tier: 2, desc: 'Schießt (Bogen und Köcher nötig) auf bis zu drei Gegner gleichzeitig; verbraucht einen Pfeil.' },
+  { id: 'multishot', name: 'Salve', area: 'Fernkampf', levelReq: 13, price: 800, mana: 14, cooldown: 70, range: 6, base: [9, 15], scales: 'gewandtheit', targets: 3, ignoresArmor: false, tier: 2, desc: 'Schießt (Bogen und Pfeile in der Nebenhand nötig) auf bis zu drei Gegner gleichzeitig; verbraucht einen Pfeil.' },
   { id: 'fireball', name: 'Feuerball', area: 'Magie', levelReq: 16, price: 1200, mana: 24, cooldown: 90, range: 7, base: [28, 42], scales: 'verstand', aoe: 2, ignoresArmor: true, tier: 2, desc: 'Explodiert am Ziel und trifft Gegner in der Nähe.' },
   { id: 'skull_split', name: 'Schädelspalter', area: 'Nahkampf', levelReq: 18, price: 1500, mana: 22, cooldown: 160, range: 1.5, mult: 3.2, ignoresArmor: false, tier: 2, desc: 'Gewaltiger Hieb mit mehr als dreifachem Waffenschaden.' },
   { id: 'lightning', name: 'Blitzschlag', area: 'Magie', levelReq: 22, price: 2400, mana: 30, cooldown: 120, range: 8, base: [60, 90], scales: 'verstand', ignoresArmor: true, tier: 2, desc: 'Zerschmetternder Blitz auf ein Ziel.' },
@@ -262,8 +262,8 @@ export const SAFE_REGEN = 0.5;
 export const FIELD_REGEN = 0.02;
 
 export const SHOPS: Record<string, string[]> = {
-  basic: ['rusty_sword', 'bone_club', 'steel_sword', 'leather_cap', 'iron_helm', 'ash_mail', 'worn_gloves', 'cloth_boots', 'iron_greaves', 'iron_ring', 'heal_small', 'heal_mid', 'mana_small', 'mana_mid', 'hunt_bow', 'twig_staff', 'cloth_robe', 'leather_vest', 'leather_quiver', 'wood_arrows', 'iron_arrows'],
-  advanced: ['steel_sword', 'cinder_axe', 'war_blade', 'iron_helm', 'warden_helm', 'plate_cuirass', 'bone_plate', 'iron_gauntlets', 'ember_gauntlets', 'iron_greaves', 'steel_boots', 'silver_ring', 'heal_mid', 'heal_big', 'mana_mid', 'mana_big', 'yew_bow', 'horn_bow', 'oak_staff', 'bone_staff', 'acolyte_robe', 'hunter_vest', 'bone_leather', 'hunter_quiver', 'ranger_quiver', 'iron_arrows', 'steel_arrows', 'ember_arrows'],
+  basic: ['rusty_sword', 'bone_club', 'steel_sword', 'leather_cap', 'iron_helm', 'ash_mail', 'worn_gloves', 'cloth_boots', 'iron_greaves', 'iron_ring', 'heal_small', 'heal_mid', 'mana_small', 'mana_mid', 'hunt_bow', 'twig_staff', 'cloth_robe', 'leather_vest', 'wood_arrows', 'iron_arrows', 'wood_shield'],
+  advanced: ['steel_sword', 'cinder_axe', 'war_blade', 'iron_helm', 'warden_helm', 'plate_cuirass', 'bone_plate', 'iron_gauntlets', 'ember_gauntlets', 'iron_greaves', 'steel_boots', 'silver_ring', 'heal_mid', 'heal_big', 'mana_mid', 'mana_big', 'yew_bow', 'horn_bow', 'oak_staff', 'bone_staff', 'acolyte_robe', 'hunter_vest', 'bone_leather', 'iron_arrows', 'steel_arrows', 'ember_arrows', 'iron_shield', 'steel_shield'],
 };
 
 /** Gegenstands-Drops: Ausrüstung seltener, Tränke häufiger. Faktor auf die Monster-dropChance. */

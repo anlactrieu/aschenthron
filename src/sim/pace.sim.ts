@@ -39,7 +39,7 @@ function townTrip(w: World, p: Actor): boolean {
     applyCommand(w, p.id, { type: 'buy', templateId: heals[0].id });
   }
   // Ausrüstung: besseres Stück je Slot, solange bezahlbar und anlegbar
-  for (const t of shop.filter((x) => x.slot !== 'potion' && x.slot !== 'ammo' && x.slot !== 'quiver' && x.kind === undefined && !x.req)) {
+  for (const t of shop.filter((x) => x.slot !== 'potion' && x.off !== 'arrows' && x.kind === undefined && !x.req)) {
     const cur = p.equipment[t.slot as keyof typeof p.equipment];
     const val = (t.damage?.[1] ?? 0) * 1.5 + (t.armor ?? 0) * 2;
     if ((!cur || val > score(cur)) && buyPrice(t.id) + 40 <= p.gold && p.attrs.kraft >= t.reqKraft && p.level >= Math.max(1, t.minLevel - 1) && !t.req && t.kind === undefined) {
@@ -77,7 +77,7 @@ describe('Level-Tempo (Messung)', () => {
       if (t % 10 !== 0) continue;
       if (p.statPoints > 0) applyCommand(w, p.id, { type: 'spendStat', attr: (['kraft', 'ausdauer', 'kraft', 'gewandtheit', 'ausdauer'] as const)[p.statPoints % 5]! });
       for (const it of [...p.inventory]) {
-        if (it.slot === 'potion' || it.slot === 'ammo' || it.kind === 'bow' || it.kind === 'staff') continue;
+        if (it.slot === 'potion' || it.off === 'arrows' || it.kind === 'bow' || it.kind === 'staff') continue;
         const cur = p.equipment[it.slot];
         if ((!cur || score(it) > score(cur)) && missingReq(p, it).length === 0) applyCommand(w, p.id, { type: 'equip', itemId: it.id });
       }

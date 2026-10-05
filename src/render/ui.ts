@@ -4,11 +4,11 @@ import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
   critChance, equipSlotFor, maxHpOf, maxManaOf, missingReq, nearNpc, powerOf, type Actor, type Command, type Npc, type World,
 } from '../sim/world';
-import { arrowIcon, itemIcon, potionIcon, skillIcon } from './icons';
+import { itemIcon, potionIcon, skillIcon } from './icons';
 import { lookOf, playerCanvas } from './art';
 
 const RARITY_COLOR: Record<Item['rarity'], string> = { normal: '#c9c4bd', magic: '#7f9fff', rare: '#f2c94c', set: '#5fd070', legendary: '#ff8a2a' };
-const SLOT_NAME: Record<EquipSlot, string> = { weapon: 'Waffe', head: 'Kopf', chest: 'Brust', hands: 'Hände', feet: 'Füße', ring: 'Ring', ring2: 'Ring', amulet: 'Amulett', quiver: 'Köcher' };
+const SLOT_NAME: Record<EquipSlot, string> = { weapon: 'Waffe', head: 'Kopf', chest: 'Brust', hands: 'Hände', feet: 'Füße', ring: 'Ring', ring2: 'Ring', amulet: 'Amulett', offhand: 'Nebenhand' };
 
 /** Affixzeile: Prozent-Werte als "+3 % Angriffstempo", sonst "+3 Schaden". */
 function affixText(a: { stat: keyof typeof STAT_NAME; value: number }): string {
@@ -29,15 +29,15 @@ function gearScore(i: Item): number {
 }
 
 function isUpgrade(p: Actor, it: Item): boolean {
-  if (it.slot === 'potion' || it.slot === 'ammo' || it.slot === 'quiver') return false;
+  if (it.slot === 'potion' || it.off === 'arrows') return false;
   const cur = p.equipment[equipSlotFor(p, it)];
   if (missingReq(p, it, cur).length) return false;
   return !cur || gearScore(it) > gearScore(cur) * 1.05;
 }
 
-/** Das angelegte Stück im selben Slot (Tränke und Pfeilbündel haben keins). */
+/** Das angelegte Stück im selben Slot (Tränke haben keins). */
 function equippedFor(p: Actor, it: Item): Item | undefined {
-  return it.slot === 'potion' || it.slot === 'ammo' ? undefined : p.equipment[equipSlotFor(p, it)];
+  return it.slot === 'potion' ? undefined : p.equipment[equipSlotFor(p, it)];
 }
 const STAT_NAME = {
   damage: 'Schaden', armor: 'Rüstung', maxHp: 'Leben', kraft: 'Kraft', maxMana: 'Mana', haste: '% Angriffstempo', crit: '% Kritisch', regen: 'Leben/s',
@@ -47,8 +47,7 @@ const BAG_COLS = 8;
 
 export function describeItem(i: Item): string {
   const base: string[] = [];
-  if (i.slot === 'quiver') base.push(`${i.ammo ?? 0} / ${i.capacity ?? 0} Pfeile${i.arrowBonus ? ` (+${i.arrowBonus} Schaden)` : ''}`);
-  if (i.slot === 'ammo') base.push(`${i.ammo ?? 0} Pfeile${i.arrowBonus ? ` (+${i.arrowBonus} Schaden)` : ''} – auf den Köcher ziehen`);
+  if (i.off === 'arrows') base.push(`Pfeile (+${i.arrowBonus ?? 0} Schaden bei Fernkampf-Skills)`);
   if (i.heal) base.push(`Heilt ${i.heal} LP`);
   if (i.mana) base.push(`Stellt ${i.mana} MP wieder her`);
   if (i.damage) base.push(`Schaden ${i.damage[0]}-${i.damage[1]}`);
@@ -159,7 +158,6 @@ export class Ui {
   private armedId: string | null = null;
   private hotButtons: { el: HTMLElement; cd: HTMLElement; txt: HTMLElement }[] = [];
   private potionBtns: { heal: HTMLElement; mana: HTMLElement } | null = null;
-  private arrows: HTMLElement | null = null;
   private dragging: Drag | null = null;
   private ghost: HTMLImageElement | null = null;
   private lastP: Actor | null = null;
@@ -315,17 +313,7 @@ export class Ui {
         return { el: b, cd, txt };
       });
       this.hotbar.append(this.potionBtns.mana);
-      this.arrows = el('div', 'hb');
-      this.arrows.title = 'Pfeile im Köcher';
-      this.arrows.append(Object.assign(el('img'), { src: arrowIcon() }), el('div', 'cnt'));
-      this.hotbar.append(this.arrows);
     }
-    const q = p.equipment.quiver;
-    this.arrows!.style.display = q || p.equipment.weapon?.kind === 'bow' ? 'block' : 'none';
-    const ac = this.arrows!.querySelector('.cnt') as HTMLElement;
-    const at = q ? String(q.ammo ?? 0) : '0';
-    if (ac.textContent !== at) ac.textContent = at;
-    this.arrows!.style.opacity = (q?.ammo ?? 0) > 0 ? '1' : '.45';
     const count = (k: 'heal' | 'mana') => p.inventory.filter((i) => i.slot === 'potion' && i[k] !== undefined).length;
     for (const k of ['heal', 'mana'] as const) {
       const cnt = this.potionBtns![k].querySelector('.cnt') as HTMLElement;
@@ -370,14 +358,14 @@ export class Ui {
     head.style.cssText = `font-weight:bold;color:${RARITY_COLOR[it.rarity]}`;
     box.append(head);
     const rar = { normal: 'Normal', magic: 'Magisch', rare: 'Selten', set: 'Set', legendary: 'Legendär' }[it.rarity];
-    const sub = el('div', '', `${rar} · ${it.slot === 'potion' ? 'Trank' : it.slot === 'ammo' ? 'Pfeile' : SLOT_NAME[it.slot]}`);
+    const sub = el('div', '', `${rar} · ${it.slot === 'potion' ? 'Trank' : it.off === 'arrows' ? 'Pfeile' : it.off === 'shield' ? 'Schild' : SLOT_NAME[it.slot]}`);
     sub.style.opacity = '.6';
     box.append(sub);
     for (const part of describeItem(it).split(' · ')) {
       if (part.startsWith('Benötigt ')) continue;
       box.append(el('div', '', part));
     }
-    if (it.affixes.length && it.slot !== 'potion' && it.slot !== 'ammo') {
+    if (it.affixes.length && it.slot !== 'potion') {
       const t = templateById(it.templateId);
       const base = t.base?.length ?? 0;
       const q = el('div');
@@ -436,7 +424,6 @@ export class Ui {
   }
 
   private canDrop(d: Drag, zone: string): boolean {
-    if (zone === 'equip:quiver' && d.item.slot === 'ammo') return d.from === 'bag';
     if (zone.startsWith('equip:')) return d.from === 'bag' && (zone === 'equip:ring2' ? d.item.slot === 'ring' : d.item.slot === zone.slice(6));
     if (zone === 'bag') return d.from === 'equip' || d.from === 'stash' || d.from === 'shop';
     if (zone === 'stash') return d.from === 'bag' && !!this.lastW && !!this.lastP && !!nearNpc(this.lastW, this.lastP, 'stash');
@@ -457,8 +444,7 @@ export class Ui {
       this.say(zone.startsWith('equip:') ? `${d.item.name} passt nicht in diesen Slot.` : 'Das geht hier nicht.');
       return;
     }
-    if (zone === 'equip:quiver' && d.item.slot === 'ammo') this.send({ type: 'refillQuiver', itemId: d.item.id });
-    else if (zone.startsWith('equip:')) this.send({ type: 'equip', itemId: d.item.id, ...(d.item.slot === 'ring' ? { to: zone.slice(6) as 'ring' | 'ring2' } : {}) });
+    if (zone.startsWith('equip:')) this.send({ type: 'equip', itemId: d.item.id, ...(d.item.slot === 'ring' ? { to: zone.slice(6) as 'ring' | 'ring2' } : {}) });
     else if (zone === 'bag') {
       if (d.from === 'equip') this.send({ type: 'unequip', slot: d.slot! });
       else if (d.from === 'stash') this.send({ type: 'stashTake', itemId: d.item.id });
@@ -583,14 +569,13 @@ export class Ui {
     const doll = el('div', 'a-doll');
     doll.dataset.drop = 'bag';
     doll.append(Object.assign(el('img', 'me'), { src: this.dollImage(p) }));
-    const pos: Record<EquipSlot, [number, number]> = { head: [95, 6], amulet: [10, 6], chest: [95, 100], weapon: [10, 100], hands: [180, 100], feet: [95, 214], ring: [10, 214], ring2: [180, 6], quiver: [180, 214] };
+    const pos: Record<EquipSlot, [number, number]> = { head: [95, 6], amulet: [10, 6], chest: [95, 100], weapon: [10, 100], hands: [180, 100], feet: [95, 214], ring: [10, 214], ring2: [180, 6], offhand: [180, 214] };
     for (const slot of Object.keys(pos) as EquipSlot[]) {
       const it = p.equipment[slot] ?? null;
       const s = this.slotEl(it, it ? '' : SLOT_NAME[slot]);
       s.dataset.drop = `equip:${slot}`;
       s.style.left = `${pos[slot][0]}px`;
       s.style.top = `${pos[slot][1]}px`;
-      if (it?.ammo !== undefined && slot === 'quiver') s.append(el('div', 'n', String(it.ammo)));
       if (it) this.makeDraggable(s, { item: it, from: 'equip', slot }, undefined, () => this.send({ type: 'unequip', slot }));
       doll.append(s);
     }
@@ -628,7 +613,7 @@ export class Ui {
           s.append(up);
         }
         this.makeDraggable(s, { item: it, from: 'bag' }, equippedFor(p, it), () =>
-          this.send(it.slot === 'potion' ? { type: 'usePotion', itemId: it.id } : it.slot === 'ammo' ? { type: 'refillQuiver', itemId: it.id } : { type: 'equip', itemId: it.id }),
+          this.send(it.slot === 'potion' ? { type: 'usePotion', itemId: it.id } : { type: 'equip', itemId: it.id }),
         );
       }
       grid.append(s);

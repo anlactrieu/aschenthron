@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
-  LEGENDARIES, SETS, extendAffixes, generateItem, generateLegendary, generateSetPiece, rerollAffixes, rollSpecial,
+  LEGENDARIES, SETS, extendAffixes, generateItem, generateLegendary, generateSetPiece, rerollAffixes, rollDrop, rollSpecial,
 } from './items';
 import { SKILLS, MAX_LEVEL } from './data';
 import {
-  activeSetBonuses, addNpc, applyCommand, craftCost, createWorld, damageRange, drainEvents, gainXp, maxHpOf, maxManaOf,
+  activeSetBonuses, addNpc, applyCommand, armorOf, craftCost, createWorld, damageRange, drainEvents, gainXp, maxHpOf, maxManaOf,
   powerOf, spawnMonster, spawnPlayer, tick, TICK_RATE, type World,
 } from './world';
 import type { Grid } from './path';
 import { totalXpFor } from './data';
+import { importPlayer } from './save';
 
 const open = (): Grid => ({ w: 30, h: 30, walkable: new Array(900).fill(true) });
 const fresh = () => {
@@ -155,7 +156,7 @@ describe('Schmied', () => {
 });
 
 function armBow(w: World, p: ReturnType<typeof fresh>['p']): void {
-  for (const id of ['hunt_bow', 'leather_quiver']) {
+  for (const id of ['hunt_bow', 'wood_arrows']) {
     const it = generateItem(w.rng, w.nextId++, id, 'normal');
     p.inventory.push(it);
     applyCommand(w, p.id, { type: 'equip', itemId: it.id });
@@ -347,7 +348,7 @@ describe('Anforderungen und Waffenarten', () => {
     p.attrs.gewandtheit = 16;
     p.attrs.verstand = 16;
     p.inventory.push(bow, staff);
-    const qv = generateItem(w.rng, w.nextId++, 'leather_quiver', 'normal');
+    const qv = generateItem(w.rng, w.nextId++, 'wood_arrows', 'normal');
     p.inventory.push(qv);
     applyCommand(w, p.id, { type: 'equip', itemId: qv.id });
     applyCommand(w, p.id, { type: 'equip', itemId: bow.id });
@@ -405,7 +406,7 @@ function itemReqLevel(i: { req?: { level?: number } }): number {
   return i.req?.level ?? 1;
 }
 
-describe('Bogen braucht Köcher mit Pfeilen', () => {
+describe('Bogen braucht Pfeile in der Nebenhand', () => {
   const shoot = (w: World, p: ReturnType<typeof fresh>['p'], bonusCheck = false) => {
     const m = spawnMonster(w, 14, 10, 'wild_hound');
     m.aggroRange = 0;
@@ -416,49 +417,35 @@ describe('Bogen braucht Köcher mit Pfeilen', () => {
     applyCommand(w, p.id, { type: 'useSkill', skillId: 'quick_shot', targetId: m.id });
     return bonusCheck ? 99999 - m.hp : m.hp < m.maxHp;
   };
+  const wear = (w: World, p: ReturnType<typeof fresh>['p'], id: string) => {
+    const it = generateItem(w.rng, w.nextId++, id, 'normal');
+    p.inventory.push(it);
+    applyCommand(w, p.id, { type: 'equip', itemId: it.id });
+    return it;
+  };
 
-  it('ohne Bogen, ohne Köcher oder mit leerem Köcher gibt es keinen Schuss', () => {
+  it('ohne Bogen oder ohne Pfeile in der Nebenhand gibt es keinen Schuss', () => {
     const { w, p } = fresh();
     p.skills.push('quick_shot');
     expect(shoot(w, p)).toBe(false);
     expect(drainEvents(w).some((e) => e.type === 'fail' && e.reason.includes('Bogen'))).toBe(true);
-    const bow = generateItem(w.rng, w.nextId++, 'hunt_bow', 'normal');
-    p.inventory.push(bow);
-    applyCommand(w, p.id, { type: 'equip', itemId: bow.id });
+    wear(w, p, 'hunt_bow');
     expect(shoot(w, p)).toBe(false);
-    expect(drainEvents(w).some((e) => e.type === 'fail' && e.reason.includes('Köcher'))).toBe(true);
-    const q = generateItem(w.rng, w.nextId++, 'leather_quiver', 'normal');
-    q.ammo = 0;
-    p.inventory.push(q);
-    applyCommand(w, p.id, { type: 'equip', itemId: q.id });
+    expect(drainEvents(w).some((e) => e.type === 'fail' && e.reason.includes('Pfeile in der Nebenhand'))).toBe(true);
+    wear(w, p, 'wood_shield'); // Schild ist keine Munition
     expect(shoot(w, p)).toBe(false);
-    expect(drainEvents(w).some((e) => e.type === 'fail' && e.reason.includes('leer'))).toBe(true);
+    wear(w, p, 'wood_arrows');
+    expect(shoot(w, p)).toBe(true);
   });
 
-  it('jeder Schuss verbraucht einen Pfeil; Bündel füllen den Köcher auf (nur gleiche Pfeile)', () => {
+  it('Schüsse verbrauchen keine Pfeile (unendlich)', () => {
     const { w, p } = fresh();
     p.skills.push('quick_shot');
     armBow(w, p);
-    const q = p.equipment.quiver!;
-    expect(q.ammo).toBe(40);
-    expect(shoot(w, p)).toBe(true);
-    expect(q.ammo).toBe(39);
-    q.ammo = 30;
-    const wood = generateItem(w.rng, w.nextId++, 'wood_arrows', 'normal');
-    p.inventory.push(wood);
-    applyCommand(w, p.id, { type: 'refillQuiver', itemId: wood.id });
-    expect(q.ammo).toBe(40); // nur 10 passen rein
-    expect(wood.ammo).toBe(10);
-    q.ammo = 5;
-    const iron = generateItem(w.rng, w.nextId++, 'iron_arrows', 'normal');
-    p.inventory.push(iron);
-    applyCommand(w, p.id, { type: 'refillQuiver', itemId: iron.id });
-    expect(q.ammo).toBe(5); // andere Pfeile im Köcher: abgelehnt
-    q.ammo = 0;
-    applyCommand(w, p.id, { type: 'refillQuiver', itemId: iron.id });
-    expect(q.ammo).toBe(20);
-    expect(q.arrowBonus).toBe(4);
-    expect(p.inventory.includes(iron)).toBe(false);
+    const arrows = p.equipment.offhand!;
+    for (let i = 0; i < 15; i++) expect(shoot(w, p)).toBe(true);
+    expect(p.equipment.offhand).toBe(arrows);
+    expect(p.inventory.includes(arrows)).toBe(false);
   });
 
   it('bessere Pfeile erhöhen den Schaden', () => {
@@ -470,10 +457,61 @@ describe('Bogen braucht Köcher mit Pfeilen', () => {
     const b = fresh();
     b.p.skills.push('quick_shot');
     armBow(b.w, b.p);
-    b.p.equipment.quiver!.arrowBonus = 30;
+    b.p.equipment.offhand!.arrowBonus = 30;
     let strong = 0;
     for (let i = 0; i < 30; i++) strong += shoot(b.w, b.p, true) as number;
     expect(strong).toBeGreaterThan(base + 30 * 25);
+  });
+
+  it('Salve funktioniert mit Pfeilen und verbraucht nichts', () => {
+    const { w, p } = fresh();
+    p.skills.push('multishot');
+    p.level = 13;
+    p.mana = 500;
+    armBow(w, p);
+    const ms = [14, 15, 16].map((x) => { const m = spawnMonster(w, x, 10, 'wild_hound'); m.aggroRange = 0; return m; });
+    applyCommand(w, p.id, { type: 'useSkill', skillId: 'multishot', targetId: ms[0]!.id });
+    expect(ms.every((m) => m.hp < m.maxHp)).toBe(true);
+    expect(p.equipment.offhand?.off).toBe('arrows');
+  });
+
+  it('Schild gibt Rüstung; Pfeile und Schild teilen sich die Nebenhand', () => {
+    const { w, p } = fresh();
+    p.attrs.kraft = 30;
+    const before = armorOf(p);
+    const shield = wear(w, p, 'wood_shield');
+    expect(p.equipment.offhand).toBe(shield);
+    expect(armorOf(p)).toBeGreaterThanOrEqual(before + 2);
+    const arrows = wear(w, p, 'wood_arrows');
+    expect(p.equipment.offhand).toBe(arrows);
+    expect(p.inventory.includes(shield)).toBe(true);
+    wear(w, p, 'wood_shield');
+    expect(p.equipment.offhand?.off).toBe('shield');
+    expect(p.inventory.includes(arrows)).toBe(true);
+  });
+
+  it('Pfeile fallen als normale Beute ohne Affixe, Schilde mit Seltenheit', () => {
+    const { w } = fresh();
+    for (let i = 0; i < 400; i++) {
+      const it = rollDrop(w.rng, () => w.nextId++, 8);
+      if (it.off === 'arrows') {
+        expect(it.rarity).toBe('normal');
+        expect(it.affixes).toHaveLength(0);
+      }
+    }
+  });
+
+  it('Alter Spielstand mit Köcher und Pfeilbündeln lässt sich laden', () => {
+    const { w, p } = fresh();
+    const bundle = { ...generateItem(w.rng, w.nextId++, 'iron_arrows', 'normal'), slot: 'ammo', ammo: 20, name: 'Eisenpfeile (20)' };
+    const quiver = { id: 900, templateId: 'leather_quiver', name: 'Lederköcher', slot: 'quiver', rarity: 'normal', weight: 1, reqKraft: 0, value: 20, affixes: [], ammo: 40, capacity: 40 };
+    const legacy = JSON.stringify({ v: 1, mapV: 0, player: { level: 3, inventory: [bundle, quiver], equipment: { quiver, weapon: undefined }, stash: [] } });
+    expect(() => importPlayer(w, p, legacy)).not.toThrow();
+    expect(p.equipment.offhand).toBeUndefined();
+    expect(p.inventory).toHaveLength(1);
+    expect(p.inventory[0]!.slot).toBe('offhand');
+    expect(p.inventory[0]!.off).toBe('arrows');
+    expect(p.inventory[0]!.arrowBonus).toBe(4);
   });
 });
 

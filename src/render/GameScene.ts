@@ -122,7 +122,7 @@ export class GameScene extends Phaser.Scene {
     this.minimap = new Minimap(this.world, this.tiles);
     if (this.remote) this.ui.say(`Verbunden als ${p.name}${this.remote.pvp ? ' – PvP außerhalb der Städte aktiv, Angreifer werden zu Mördern' : ''}. Klick auf Spieler greift an.`);
     else if (saved && importPlayer(this.world, p, saved)) this.ui.say('Spielstand geladen.');
-    else this.ui.say('Willkommen in Aschenthron. Dein Startgold reicht für eine Wahl: Schwert und Rüstung (Händlerin) oder Bogen, Köcher, Pfeile und Schnellschuss (Händlerin + Lehrer). C: Charakter (Attributpunkte verteilen!) · Q/E: Heil-/Manatrank · R: Rasten · N: Karte · M: Ton · Klick: laufen/angreifen/aufheben · Lehrer, Händlerin, Schmiede, Truhe und Aufgaben in der Stadt.');
+    else this.ui.say('Willkommen in Aschenthron. Dein Startgold reicht für eine Wahl: Schwert und Rüstung (Händlerin) oder Bogen, Pfeile und Schnellschuss (Händlerin + Lehrer). C: Charakter (Attributpunkte verteilen!) · Q/E: Heil-/Manatrank · R: Rasten · N: Karte · M: Ton · Klick: laufen/angreifen/aufheben · Lehrer, Händlerin, Schmiede, Truhe und Aufgaben in der Stadt.');
     this.gfx = this.add.graphics().setDepth(OVERLAY_DEPTH);
     this.gfxGround = this.add.graphics().setDepth(-9e5);
     this.gfxShimmer = this.add.graphics().setDepth(-9e5 + 1);
@@ -514,7 +514,6 @@ export class GameScene extends Phaser.Scene {
           break;
         }
         case 'respecced': say('Alles neu verteilt: Attribute und Fertigkeiten sind zurückgesetzt.'); this.sfx.quest(); break;
-        case 'refilled': say(`Köcher aufgefüllt: +${e.arrows} Pfeile`); this.sfx.pickup(); break;
         case 'chestOpened': {
           this.sfx.chest();
           const ch = w.chests.find((c) => c.id === e.chestId);

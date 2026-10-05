@@ -36,7 +36,7 @@ describe('Charakter und Leveln (M3)', () => {
   });
 
   it('Startgold reicht für das Bogen-Set samt Schnellschuss oder für Schwert plus Rüstung, aber nicht für beides', () => {
-    const bow = buyPrice('hunt_bow') + buyPrice('leather_quiver') + buyPrice('wood_arrows') + skillById('quick_shot')!.price;
+    const bow = buyPrice('hunt_bow') + buyPrice('wood_arrows') + skillById('quick_shot')!.price;
     const melee = buyPrice('rusty_sword') + buyPrice('leather_cap') + buyPrice('worn_gloves') + buyPrice('cloth_boots');
     expect(bow).toBeLessThanOrEqual(START_GOLD);
     expect(melee).toBeLessThanOrEqual(START_GOLD);
@@ -247,7 +247,7 @@ describe('Fernkampf', () => {
     p.x = 10;
     p.y = 10;
     p.skills.push('quick_shot');
-    for (const id of ['hunt_bow', 'leather_quiver']) {
+    for (const id of ['hunt_bow', 'wood_arrows']) {
       const it = generateItem(w.rng, w.nextId++, id, 'normal');
       p.inventory.push(it);
       applyCommand(w, p.id, { type: 'equip', itemId: it.id });
@@ -432,5 +432,43 @@ describe('Zaubernde Monster', () => {
     for (let i = 0; i < TICK_RATE * 3; i++) tick(w);
     expect(p.hp).toBeLessThan(hp0);
     expect(Math.hypot(m.x - p.x, m.y - p.y)).toBeGreaterThan(2);
+  });
+});
+
+describe('Bogenschützen und Todesstrafe', () => {
+  it('Normaler Angriff mit Bogen und Pfeilen schießt aus der Distanz, ohne in den Nahkampf zu laufen', () => {
+    const { w, p } = fresh();
+    p.x = 8;
+    p.y = 8;
+    const bow = generateItem(w.rng, w.nextId++, 'hunt_bow', 'normal');
+    const arrows = generateItem(w.rng, w.nextId++, 'wood_arrows', 'normal');
+    p.equipment.weapon = bow;
+    p.equipment.offhand = arrows;
+    const m = spawnMonster(w, 13, 8, 'bog_ghoul');
+    m.aggroRange = 0;
+    m.speed = 0;
+    applyCommand(w, p.id, { type: 'attack', targetId: m.id });
+    run(w, TICK_RATE * 3);
+    expect(m.hp).toBeLessThan(m.maxHp);
+    expect(Math.hypot(m.x - p.x, m.y - p.y)).toBeGreaterThan(3);
+  });
+
+  it('Beim Tod fällt nie etwas Angelegtes', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const w = createWorld(seed, open(), [{ x: 0, y: 0, w: 4, h: 4 }]);
+      const p = spawnPlayer(w, 10, 10);
+      const sword = generateItem(w.rng, w.nextId++, 'rusty_sword', 'normal');
+      const cap = generateItem(w.rng, w.nextId++, 'leather_cap', 'normal');
+      p.equipment.weapon = sword;
+      p.equipment.head = cap;
+      p.hp = 1;
+      const m = spawnMonster(w, 10, 10, 'wolf');
+      m.damage = [500, 500];
+      m.targetId = p.id;
+      run(w, TICK_RATE * 2);
+      expect(p.equipment.weapon?.id).toBe(sword.id);
+      expect(p.equipment.head?.id).toBe(cap.id);
+      expect(w.ground.some((g) => g.item.id === sword.id || g.item.id === cap.id)).toBe(false);
+    }
   });
 });

@@ -1,10 +1,10 @@
 import type { Rng } from './rng';
 
-export type Slot = 'weapon' | 'head' | 'chest' | 'hands' | 'feet' | 'ring' | 'amulet' | 'quiver';
+export type Slot = 'weapon' | 'head' | 'chest' | 'hands' | 'feet' | 'ring' | 'amulet' | 'offhand';
 /** Ausrüstungsfelder: wie Slot, dazu das zweite Ringfeld (Gegenstände selbst haben immer `ring`). */
 export type EquipSlot = Slot | 'ring2';
 /** Verbrauchsgegenstände belegen keinen Ausrüstungsslot */
-export type ItemSlot = Slot | 'potion' | 'ammo';
+export type ItemSlot = Slot | 'potion';
 export type Rarity = 'normal' | 'magic' | 'rare' | 'set' | 'legendary';
 export type Stat = 'damage' | 'armor' | 'maxHp' | 'kraft' | 'maxMana' | 'haste' | 'crit' | 'regen' | 'accuracy' | 'evasion';
 /** Besondere Effekte legendärer Gegenstände und Set-Boni */
@@ -50,9 +50,8 @@ export interface ItemTemplate {
   kind?: WeaponKind;
   /** feste Werte, die der Gegenstand immer mitbringt (z. B. Mana bei Stäben) */
   base?: Affix[];
-  /** Köcher: Fassungsvermögen; Pfeilbündel: Stückzahl */
-  capacity?: number;
-  ammo?: number;
+  /** Nebenhand: Pfeile (unendlich, für Bögen nötig) oder Schild */
+  off?: 'arrows' | 'shield';
   /** Zusatzschaden der Pfeile bei Fernkampf-Skills */
   arrowBonus?: number;
   value: number;
@@ -78,9 +77,8 @@ export interface Item {
   reqKraft: number;
   req?: Req;
   kind?: WeaponKind;
-  /** Köcher: aktuelle Pfeile; Pfeilbündel: Stückzahl */
-  ammo?: number;
-  capacity?: number;
+  /** Nebenhand: Pfeile oder Schild */
+  off?: 'arrows' | 'shield';
   arrowBonus?: number;
   value: number;
   affixes: Affix[];
@@ -162,15 +160,17 @@ export const TEMPLATES: ItemTemplate[] = [
   { id: 'bone_leather', name: 'Knochenleder', slot: 'chest', weight: 10, armor: 10, reqKraft: 0, req: { gewandtheit: 24 }, value: 280, minLevel: 15 },
   { id: 'dread_leather', name: 'Schreckensleder', slot: 'chest', weight: 11, armor: 15, reqKraft: 0, req: { gewandtheit: 30 }, value: 560, minLevel: 21 },
   { id: 'ash_leather', name: 'Aschenleder', slot: 'chest', weight: 12, armor: 20, reqKraft: 0, req: { gewandtheit: 36 }, value: 1000, minLevel: 27 },
-  { id: 'leather_quiver', name: 'Lederköcher', slot: 'quiver', weight: 1, reqKraft: 0, capacity: 40, ammo: 40, arrowBonus: 0, value: 20, minLevel: 1 },
-  { id: 'hunter_quiver', name: 'Jägerköcher', slot: 'quiver', weight: 1.5, reqKraft: 0, capacity: 60, ammo: 60, arrowBonus: 4, value: 90, minLevel: 8 },
-  { id: 'ranger_quiver', name: 'Waldläuferköcher', slot: 'quiver', weight: 2, reqKraft: 0, capacity: 90, ammo: 90, arrowBonus: 9, value: 260, minLevel: 16 },
-  { id: 'ash_quiver', name: 'Aschenköcher', slot: 'quiver', weight: 2.5, reqKraft: 0, capacity: 130, ammo: 130, arrowBonus: 16, value: 700, minLevel: 24 },
-  { id: 'wood_arrows', name: 'Holzpfeile (20)', slot: 'ammo', weight: 0.5, reqKraft: 0, ammo: 20, arrowBonus: 0, value: 8, minLevel: 1 },
-  { id: 'iron_arrows', name: 'Eisenpfeile (20)', slot: 'ammo', weight: 0.6, reqKraft: 0, ammo: 20, arrowBonus: 4, value: 40, minLevel: 6 },
-  { id: 'steel_arrows', name: 'Stahlpfeile (20)', slot: 'ammo', weight: 0.7, reqKraft: 0, ammo: 20, arrowBonus: 9, value: 110, minLevel: 12 },
-  { id: 'ember_arrows', name: 'Glutpfeile (20)', slot: 'ammo', weight: 0.8, reqKraft: 0, ammo: 20, arrowBonus: 16, value: 280, minLevel: 18 },
-  { id: 'ash_arrows', name: 'Aschenpfeile (20)', slot: 'ammo', weight: 0.9, reqKraft: 0, ammo: 20, arrowBonus: 26, value: 600, minLevel: 24 },
+  { id: 'wood_arrows', name: 'Holzpfeile', slot: 'offhand', off: 'arrows', weight: 0.5, reqKraft: 0, arrowBonus: 0, value: 20, minLevel: 1 },
+  { id: 'iron_arrows', name: 'Eisenpfeile', slot: 'offhand', off: 'arrows', weight: 0.6, reqKraft: 0, arrowBonus: 4, value: 90, minLevel: 6 },
+  { id: 'steel_arrows', name: 'Stahlpfeile', slot: 'offhand', off: 'arrows', weight: 0.7, reqKraft: 0, arrowBonus: 9, value: 220, minLevel: 12 },
+  { id: 'ember_arrows', name: 'Glutpfeile', slot: 'offhand', off: 'arrows', weight: 0.8, reqKraft: 0, arrowBonus: 16, value: 450, minLevel: 18 },
+  { id: 'ash_arrows', name: 'Aschenpfeile', slot: 'offhand', off: 'arrows', weight: 0.9, reqKraft: 0, arrowBonus: 26, value: 900, minLevel: 24 },
+  { id: 'wood_shield', name: 'Holzschild', slot: 'offhand', off: 'shield', weight: 3, armor: 2, reqKraft: 8, value: 20, minLevel: 1 },
+  { id: 'iron_shield', name: 'Eisenschild', slot: 'offhand', off: 'shield', weight: 5, armor: 5, reqKraft: 14, value: 70, minLevel: 6 },
+  { id: 'steel_shield', name: 'Stahlschild', slot: 'offhand', off: 'shield', weight: 7, armor: 9, reqKraft: 18, value: 150, minLevel: 11 },
+  { id: 'bone_shield', name: 'Knochenschild', slot: 'offhand', off: 'shield', weight: 9, armor: 13, reqKraft: 24, value: 300, minLevel: 16 },
+  { id: 'dread_shield', name: 'Schreckensschild', slot: 'offhand', off: 'shield', weight: 10, armor: 18, reqKraft: 30, value: 580, minLevel: 21 },
+  { id: 'ash_shield', name: 'Aschenschild', slot: 'offhand', off: 'shield', weight: 12, armor: 24, reqKraft: 36, value: 1000, minLevel: 27 },
   { id: 'heal_small', name: 'Kleiner Heiltrank', slot: 'potion', weight: 0.3, heal: 50, reqKraft: 0, value: 8, minLevel: 1 },
   { id: 'heal_mid', name: 'Heiltrank', slot: 'potion', weight: 0.4, heal: 130, reqKraft: 0, value: 25, minLevel: 6 },
   { id: 'heal_big', name: 'Großer Heiltrank', slot: 'potion', weight: 0.5, heal: 280, reqKraft: 0, value: 70, minLevel: 11 },
@@ -245,7 +245,7 @@ export function rollRarity(rng: Rng): Rarity {
 
 export function generateItem(rng: Rng, id: number, templateId: string, rarityIn: Rarity): Item {
   const t = templateById(templateId);
-  const rarity: Rarity = t.slot === 'potion' || t.slot === 'ammo' || t.slot === 'quiver' ? 'normal' : rarityIn;
+  const rarity: Rarity = t.slot === 'potion' || t.off === 'arrows' ? 'normal' : rarityIn;
   const [lo, hi] = RARITY_AFFIXES[rarity];
   const count = rng.int(lo, hi);
   const pool = [...AFFIXES];
@@ -265,10 +265,9 @@ export function generateItem(rng: Rng, id: number, templateId: string, rarityIn:
     heal: t.heal,
     mana: t.mana,
     reqKraft: t.reqKraft,
-    req: t.slot === 'potion' || t.slot === 'ammo' ? undefined : reqOfTemplate(t),
+    req: t.slot === 'potion' ? undefined : reqOfTemplate(t),
     kind: t.kind,
-    ammo: t.ammo,
-    capacity: t.capacity,
+    off: t.off,
     arrowBonus: t.arrowBonus,
     value: t.value * RARITY_VALUE[rarity] + (affixes.length) * 8,
     affixes,
@@ -276,7 +275,7 @@ export function generateItem(rng: Rng, id: number, templateId: string, rarityIn:
 }
 
 export function rollDrop(rng: Rng, nextId: () => number, monsterLevel: number, forceRarity?: Rarity): Item {
-  const pool = TEMPLATES.filter((t) => t.slot !== 'potion' && t.slot !== 'ammo' && (!forceRarity || t.slot !== 'quiver') && t.minLevel <= monsterLevel && t.minLevel >= monsterLevel - 8);
+  const pool = TEMPLATES.filter((t) => t.slot !== 'potion' && (!forceRarity || t.off !== 'arrows') && t.minLevel <= monsterLevel && t.minLevel >= monsterLevel - 8);
   const t = pool[rng.int(0, pool.length - 1)]!;
   return generateItem(rng, nextId(), t.id, forceRarity ?? rollRarity(rng));
 }
@@ -455,13 +454,6 @@ export function extendAffixes(rng: Rng, item: Item): void {
   if (!pool.length) return;
   item.affixes.push(rollAffix(rng, pool, t.minLevel));
   item.value += 8;
-}
-
-/** Pfeilbündel passend zur Monsterstufe (selten als Beute). */
-export function rollArrows(rng: Rng, nextId: () => number, monsterLevel: number): Item {
-  const tiers = TEMPLATES.filter((t) => t.slot === 'ammo' && t.minLevel <= monsterLevel);
-  const best = tiers.filter((t) => t.minLevel === Math.max(...tiers.map((x) => x.minLevel)));
-  return generateItem(rng, nextId(), best[rng.int(0, best.length - 1)]!.id, 'normal');
 }
 
 /** Mini-Boss-Beute: oft ein Unikat oder Set-Teil passend zur Stufe. */

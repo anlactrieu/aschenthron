@@ -20,7 +20,12 @@ Offene Ideen (nach Wert): Fremd-Sprites einbauen (nur mit Freigabe des Users, si
 - Zonenton: `Sfx.ambient()` in `audio.ts`, aufgerufen aus `updateRegion` (GameScene). Zonen-Titel existierte schon.
 - Offen: `npm run pace` nach Zauberer-Änderung neu messen; Commit.
 
-## Stand Level-Kurve (umgesetzt)
+## Stand Pfeile/Schilde/Bogen (umgesetzt)
+- Köcher + Pfeilbündel entfernt: Pfeile sind unendlich, tragbar im Slot `offhand` ("Nebenhand", teilt sich den Slot mit Schilden; Item-Feld `off: 'arrows' | 'shield'`). Bogen-Skills und normaler Angriff brauchen angelegte Pfeile. Altspielstände: `migrateItem` in `save.ts`.
+- Normaler Bogenangriff schießt aus ≤ 6 Feldern (`bowAi` in `world.ts`), kein Nahkampf mehr. Tod lässt nur noch Rucksack-Items fallen, nie Angelegtes.
+- XP-Spätfaktor jetzt 1,0 (Schilde im Shop machten den Bot schneller): Bot L30 nach 7,4–8,5 h.
+
+## Stand Level-Kurve (umgesetzt, Faktor siehe oben)
 - `xpToNext` (`data.ts`): Stufenfaktor `1 + (l/30)^1.5 * 0.8`. Bot-Messung (2 Seeds, Bot startet jetzt in der Stadt): L5 ≈ 17–21 min, L10 ≈ 50–57 min, L20 ≈ 2,8–3,3 h, L30 ≈ 7,9–8,5 h (vorher 4,8–5,4 h). Tode 13–22 je Lauf, überwiegend L2–7 und L16–18 (Bot-Artefakt: läuft in gemischte Rudel).
 - Verworfen: Faktor 1,2 (L30 9–10 h, aber Todesspirale bei L18–19 mit 72 Toden). Pace: `PACE_SEED=… npm run pace`, `PACE_DEATHS=1` loggt Todesursachen.
 - Starttränke: `giveStarterKit` (`world.ts`, 3 kleine Heiltränke) in `tiled.ts` und `addPlayer` → Tode auf L1–3 weg (Bot 0 statt 6–9). Restliche frühe Tode L4–8 am Goblinlager (Goblinkönig Grix + Wölfe/Spinnen kommen dazu, Rudel-Alarm), L16 Sumpf. Messung danach: 9,0 h bis L30, 18 Tode.
