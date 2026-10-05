@@ -464,7 +464,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 5`] = `
   },
   "ev": [
     {
-      "amount": 33,
+      "amount": 177,
       "attackerId": 1,
       "crit": false,
       "skill": "whirlwind",
@@ -480,7 +480,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 5`] = `
     {
       "burn": null,
       "dot": null,
-      "hp": 210,
+      "hp": 66,
       "status": {},
       "target": 1,
     },
@@ -517,7 +517,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 6`] = `
   },
   "ev": [
     {
-      "amount": 35,
+      "amount": 179,
       "attackerId": 1,
       "crit": false,
       "skill": "whirlwind",
@@ -533,7 +533,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 6`] = `
     {
       "burn": null,
       "dot": null,
-      "hp": 208,
+      "hp": 64,
       "status": {},
       "target": 1,
     },
@@ -2495,7 +2495,7 @@ exports[`Skills golden > whirlwind Rang 1 1`] = `
   },
   "ev": [
     {
-      "amount": 37,
+      "amount": 131,
       "attackerId": 1,
       "crit": false,
       "skill": "whirlwind",
@@ -2511,7 +2511,7 @@ exports[`Skills golden > whirlwind Rang 1 1`] = `
     {
       "burn": null,
       "dot": null,
-      "hp": 206,
+      "hp": 112,
       "status": {},
       "target": 1,
     },

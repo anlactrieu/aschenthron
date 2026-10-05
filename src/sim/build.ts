@@ -1,5 +1,5 @@
-import { handsOf, itemAffixes, type Stat } from './items';
-import { equippedItems, type Actor } from './world';
+import { handsOf, type Stat } from './items';
+import { gearStat as gearSum, type Actor } from './world';
 
 /**
  * Buildprofil (Stufe 6): keine Klassen, sondern eine Einschätzung, welchem Archetyp der Charakter gerade ähnelt.
@@ -43,11 +43,7 @@ export interface BuildResult {
 }
 
 const ranks = (p: Actor, group: string[]): number => group.reduce((n, id) => n + (p.skills.includes(id) ? (p.skillRanks[id] ?? 1) : 0), 0);
-const gearStat = (p: Actor, stat: Stat): number => {
-  let sum = 0;
-  for (const it of equippedItems(p)) for (const a of itemAffixes(it)) if (a.stat === stat) sum += a.value;
-  return sum;
-};
+const gearStat = (p: Actor, stat: Stat): number => gearSum(p, stat);
 
 /** Schätzt aus Attributen (über 10), Skill-Rängen und Ausrüstung, welche Archetypen am besten passen. */
 export function buildProfile(p: Actor): BuildResult {

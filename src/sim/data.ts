@@ -43,6 +43,8 @@ export const rankPrice = (price: number, rank: number): number => (rank <= 1 ? p
 /** Umverteilen: teuer, aber möglich */
 export const respecPrice = (level: number): number => 100 + level * level * 8;
 export const START_STAT_POINTS = 10;
+/** Nahkampf-Skills (mit `mult`) skalieren wie Fern- und Zauber-Skills mit ihrem Attribut: (Kraft − 10) · (1 + Stufe · 0,08) · Faktor, mal `mult` (Stufe-6-Balance, Benchmark `builds.bench.test.ts`). */
+export const MELEE_SKILL_KRAFT_SCALE = 1.5;
 
 /** XP, die von Level `l` auf `l+1` nötig sind. Kill-XP wächst mit L^1.3; der Faktor (1 + l/6) streckt die Kurve nach oben (mehr Kills pro Level im Endgame). */
 export const XP_PER_LEVEL_BASE = 190;
@@ -422,8 +424,8 @@ export const SAFE_REGEN = 0.5;
 export const FIELD_REGEN = 0.02;
 
 export const SHOPS: Record<string, string[]> = {
-  // Moosbrück: Werkstatt für Build-Ausrüstung (Stäbe, Parierwaffen, Schilde, Ringe) und Tränke
-  artisan: ['heal_mid', 'heal_big', 'mana_mid', 'mana_big', 'parry_blade', 'duelist_blade', 'mender_staff', 'healer_rod', 'mender_ring', 'recovery_ring', 'pyre_staff', 'ash_igniter', 'rime_staff', 'glacier_staff', 'ember_cloak', 'rime_cloak', 'bulwark_shield', 'tower_shield', 'bastion_plate', 'windrunner_boots', 'flow_ring', 'tide_ring', 'binding_amulet', 'warlock_amulet'],
+  // Moosbrück: Werkstatt für Build-Ausrüstung bis Stufe 11 (Stäbe, Parierwaffen, Schilde, Ringe) und Tränke; höhere Build-Stücke fallen nur als Beute
+  artisan: ['heal_mid', 'heal_big', 'mana_mid', 'mana_big', 'parry_blade', 'mender_staff', 'mender_ring', 'pyre_staff', 'rime_staff', 'bulwark_shield', 'windrunner_boots', 'flow_ring', 'binding_amulet'],
   basic: ['rusty_sword', 'bone_club', 'steel_sword', 'leather_cap', 'iron_helm', 'ash_mail', 'worn_gloves', 'cloth_boots', 'iron_greaves', 'iron_ring', 'heal_small', 'heal_mid', 'mana_small', 'mana_mid', 'hunt_bow', 'twig_staff', 'cloth_robe', 'leather_vest', 'wood_arrows', 'iron_arrows', 'wood_shield', 'cloth_belt', 'leather_belt', 'rag_cloak', 'wool_cloak', 'cloth_pants', 'leather_pants', 'iron_dagger', 'woodcutter_axe'],
   advanced: ['steel_sword', 'cinder_axe', 'war_blade', 'iron_helm', 'warden_helm', 'plate_cuirass', 'bone_plate', 'iron_gauntlets', 'ember_gauntlets', 'iron_greaves', 'steel_boots', 'silver_ring', 'heal_mid', 'heal_big', 'mana_mid', 'mana_big', 'yew_bow', 'horn_bow', 'oak_staff', 'bone_staff', 'acolyte_robe', 'hunter_vest', 'bone_leather', 'iron_arrows', 'steel_arrows', 'ember_arrows', 'iron_shield', 'steel_shield', 'leather_belt', 'iron_belt', 'wool_cloak', 'hunter_cloak', 'leather_pants', 'chain_legs', 'steel_dagger', 'battle_axe', 'claymore', 'parry_blade', 'mender_staff', 'mender_ring', 'pyre_staff', 'rime_staff', 'bulwark_shield', 'windrunner_boots', 'flow_ring', 'binding_amulet'],
 };

@@ -4,7 +4,7 @@ import { itemReq, itemAffixes, gemTemplateId, handsOf, weaponSpeedOf, rollGem, r
 import {
   ATTR_KEYS, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
   monsterKind, npcKeyOf, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
-  FAMILY_RES, MAX_RES, SLOW_FACTOR, STATUS_IDS, PASSIVE_CAP, DMG_NAME, type DmgType, type StatusId, type SkillDef, type PassiveKey,
+  FAMILY_RES, MELEE_SKILL_KRAFT_SCALE, MAX_RES, SLOW_FACTOR, STATUS_IDS, PASSIVE_CAP, DMG_NAME, type DmgType, type StatusId, type SkillDef, type PassiveKey,
   ATTR_THRESHOLD, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, WILL_STATUS_PER_POINT, WILL_STATUS_CAP, GEM_MIN_LEVEL, GEM_DROP, GEM_SOCKET_COST, WORLD_BOSS_LOOT, type QuestDef,
 } from './data';
 import { EFFECTS, cleanse, controlDr, dispel, mergeStatus } from './effects';
@@ -395,6 +395,11 @@ function affixSum(a: Actor, stat: Stat): number {
   return sum;
 }
 
+/** Summe eines Item-Werts über Ausrüstung, Sockel und Set-Boni (für die Anzeige und das Buildprofil). */
+export function gearStat(a: Actor, stat: Stat): number {
+  return affixSum(a, stat);
+}
+
 /** Summe einer passiven Skill-Wirkung (Wert je Rang mal Rang, gedeckelt durch `PASSIVE_CAP`). */
 export function passiveSum(a: Actor, key: PassiveKey): number {
   let sum = 0;
@@ -408,7 +413,7 @@ export function passiveSum(a: Actor, key: PassiveKey): number {
 }
 
 /** Paradechance in Prozent: Skill (gedeckelt) plus Gegenstände, insgesamt höchstens 25. */
-function parryChance(a: Actor): number {
+export function parryChance(a: Actor): number {
   return Math.min(25, passiveSum(a, 'parry') + affixSum(a, 'parry'));
 }
 
@@ -1022,7 +1027,8 @@ function skillVictims(w: World, a: Actor, s: SkillDef, first: Actor | undefined)
 function skillRawDamage(w: World, a: Actor, s: SkillDef, rank: number, arrows: Item | undefined): number {
   if (s.mult) {
     const [lo, hi] = damageRange(a);
-    return Math.round(w.rng.int(lo, hi) * s.mult * rankDamage(rank));
+    const kraft = Math.max(0, a.attrs.kraft - 10) * (1 + a.level * 0.08) * MELEE_SKILL_KRAFT_SCALE;
+    return Math.round((w.rng.int(lo, hi) + kraft) * s.mult * rankDamage(rank));
   }
   const lvl = 1 + a.level * 0.1;
   const [lo, hi] = s.base!;

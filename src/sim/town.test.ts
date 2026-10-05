@@ -23,9 +23,20 @@ describe('Moosbrück (dritte Stadt)', () => {
   it('Lehrer, Händler, Schmied und Lager: je ein NPC, mit Lehrer der alle Fertigkeiten lehrt', () => {
     expect(inTown.map((n) => n.kind).sort()).toEqual(['merchant', 'smith', 'stash', 'trainer']);
     const trainer = inTown.find((n) => n.kind === 'trainer')!;
-    expect(Math.max(...SKILLS.map((s) => s.tier))).toBeLessThanOrEqual(trainer.tier ?? 1);
+    // Stufe 1 wie in Aschenhafen: die zweite Lehrerstufe bleibt in Felsenwacht (Fortschritt über die Städte)
+    expect(trainer.tier).toBe(1);
+    expect(SKILLS.some((s) => s.tier === 1)).toBe(true);
     const shop = SHOPS[inTown.find((n) => n.kind === 'merchant')!.shop!]!;
-    for (const id of shop) expect(TEMPLATES.some((t) => t.id === id), id).toBe(true);
+    for (const id of shop) {
+      const t = TEMPLATES.find((x) => x.id === id);
+      expect(t, id).toBeDefined();
+      expect(t!.minLevel, `${id} ist zu hoch für den Laden`).toBeLessThanOrEqual(11);
+    }
+    // Build-Stücke ab Stufe 16 gibt es in keinem Laden
+    for (const ids of Object.values(SHOPS)) for (const id of ids) {
+      const t = TEMPLATES.find((x) => x.id === id)!;
+      if (t.hint) expect(t.minLevel, id).toBeLessThanOrEqual(11);
+    }
   });
 
   it('jeder NPC steht in einem eigenen, umschlossenen Haus mit Tür zur Straße', () => {

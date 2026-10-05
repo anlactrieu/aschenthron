@@ -3,7 +3,7 @@ import { POWER_TEXT, TEMPLATES, TIER_COLOR, GEM_COLOR, affixRange, gemAffix, gem
 import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
   bulkSellable, sellPrice, critChance, attrBonus, equipSlotFor, socketCost, maxHpOf, maxManaOf, missingReq, nearNpc, powerOf, resistOf, type Actor, type Command, type Npc, type World,
-  activeSkills,
+  activeSkills, gearStat, parryChance, passiveSum,
 } from '../sim/world';
 import { buildProfile } from '../sim/build';
 import { itemIcon, potionIcon, skillIcon, statusIcon } from './icons';
@@ -783,6 +783,13 @@ export class Ui {
       ['Feuerwiderstand', `${resistOf(p, 'fire')} %`], ['Frostwiderstand', `${resistOf(p, 'frost')} %`], ['Giftwiderstand', `${resistOf(p, 'poison')} %`],
       ['Kritisch', `${critChance(p)} %`], ['Lebensraub', `${powerOf(p, 'lifesteal')} %`], ['Dornen', `${powerOf(p, 'thorns')} %`],
     ];
+    // Build-Werte aus Ausrüstung und Fertigkeiten: nur anzeigen, wenn sie wirken
+    const signed = (v: number, unit = '%') => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(Math.round(v * 10) / 10)} ${unit}`;
+    const buildRows: [string, number][] = [
+      ['Parieren', parryChance(p)], ['Feuerzauber', gearStat(p, 'spellFire')], ['Frostzauber', gearStat(p, 'spellFrost')], ['Heilkraft', gearStat(p, 'healPower')],
+      ['Manakosten', gearStat(p, 'manaCost') - passiveSum(p, 'manaCost')], ['Kontrolldauer', gearStat(p, 'ctrl')], ['Bewegung', gearStat(p, 'move')],
+    ];
+    for (const [label, v] of buildRows) if (v !== 0) rows.push([label, signed(v)]);
     for (const [a, b] of rows) {
       const r = el('div', 'a-row');
       r.append(el('span', '', a), el('span', '', b));
