@@ -136,3 +136,26 @@ Grassland Tileset (CC-BY-SA) wird wegen ShareAlike nicht empfohlen. Bäume, Fels
 - Trefferchance: ATK/(ATK + 0,2·DEF), 35–97 %; Fehlschläge werden als „Verfehlt/Ausgewichen“ angezeigt. Zauber treffen immer.
 - Neue Affixe: Angriffstempo, Kritisch, Regeneration, Treffsicherheit, Ausweichen. Rasten mit R (5× Erholung außerhalb der Stadt, endet bei Aktion/Treffer).
 - Grafik: weiterhin prozedural; Recherche zu Fremd-Assets steht oben, nichts heruntergeladen (Freigabe nötig).
+
+## Stufe 4: Kampftiefe, Welt/Endgame, echte Grafik (vom User gewählt, noch NICHT umgesetzt)
+Auslöser: T4C-Profi-Review (Subagent). Bereits umgesetzt: Amulett + 2. Ring, zaubernde Monster (Schamane/Hexe/Imp), Zonenton, Skill-Auswahl vor Zielklick, Startgold 100.
+Umsetzung in frischer Session, je Paket als eigener Commit; nach jedem Paket Tests/Lint/Build + `npm run pace`.
+
+**A) Kampftiefe**
+1. Schadensarten (physisch, Feuer, Frost, Gift) auf Skills/Waffen/Monstern; Resistenz-Affix und Monster-Familien mit Schwächen (Untote: Feuer schwach; Golems: Gift immun; …). Champion „feurig“ verursacht echtes Feuer.
+2. Statuseffekte: Verlangsamen, Betäuben, Brennen (Gift-DoT existiert). Sim-autoritativ, im Schnappschuss/`net.ts` filtern, Icons im HUD.
+3. Monster-Rollen: Heiler (Schamane heilt Verbündete), Gift-Spinne (verlangsamt), Bogenschütze (Abstand, nutzt `castAi`-Muster), Untote beschwören. Familien-Fähigkeiten über `Ability`.
+4. Schild + Zweitwaffe: Slots `offhand`; Zweihänder (kein Schild) vs. Einhänder+Schild; Waffenfamilien schnell/schwer. Gürtel/Umhang später.
+5. Attribut-Tiefe: Willenskraft als Konzentration/Resistenz, Schwellen-Boni, Gewichts-Behinderung statt hartem Limit (zu klären).
+
+**B) Welt & Endgame**
+1. Tag/Nacht + Wetter als Render-Layer (Sim unberührt; Nacht evtl. mehr Gefahr später).
+2. Lore-NPCs, Dialoge, Questketten (Wegbeschreibung/Bring/Eskorte), zusätzlich zu Töten/Truhe/Champion/Mini-Boss.
+3. Goblin- und Spinnen-Dungeon als neue Zonen (`scripts/gen_map.py`, MAP_VERSION erhöhen, Spielstand-Kompatibilität prüfen).
+4. Endgame: Elite-Zone, Weltbosse mit Respawn-Rotation, Level-Kurve strecken (Ziel ~20–40 h, Wert mit dem User abstimmen, Pace-Bot nachmessen).
+
+**C) Echte Grafik (Download vom User freigegeben)**
+- Quelle: Dungeon Crawl 32x32 Tiles (CC0, OpenGameArt) für Items, Monster, Icons; ggf. Isometric Stone Soup für Boden/Wände. Vor dem Download Dateiname/Größe nennen.
+- Lizenz + Quelle in `ASSETS.md`, Credits-Seite im Spiel. Prozedurale Grafik als Fallback behalten. Ladezeit/Bundle-Größe beachten.
+
+**Nicht in diesem Paket (bewusst offen):** Soziales/PvP-Rahmen (Chat, Gruppen, Handel, Gilden, Kopfgeld, Login), Loot-Chase (Affix-Stufen, Sockel).
