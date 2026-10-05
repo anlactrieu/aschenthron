@@ -27,8 +27,11 @@ export const START_STAT_POINTS = 10;
 
 /** XP, die von Level `l` auf `l+1` nötig sind. Kill-XP wächst mit L^1.3; der Faktor (1 + l/6) streckt die Kurve nach oben (mehr Kills pro Level im Endgame). */
 export const XP_PER_LEVEL_BASE = 190;
+/** Zusatzfaktor `1 + (l/Max)^Exp * Faktor`: frühe Level bleiben flüssig (L10 ≈ 1 h), das Endgame streckt sich (Bot-Messung: L30 nach ≈ 8 h, ein Mensch braucht deutlich länger). */
+const XP_LATE_EXP = 1.5;
+const XP_LATE_FACTOR = 0.8;
 export function xpToNext(level: number): number {
-  return Math.round(XP_PER_LEVEL_BASE * Math.pow(level, 1.3) * (1 + level / 6));
+  return Math.round(XP_PER_LEVEL_BASE * Math.pow(level, 1.3) * (1 + level / 6) * (1 + Math.pow(level / MAX_LEVEL, XP_LATE_EXP) * XP_LATE_FACTOR));
 }
 
 const XP_TABLE: number[] = [0, 0];

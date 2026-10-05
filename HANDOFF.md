@@ -20,7 +20,13 @@ Offene Ideen (nach Wert): Fremd-Sprites einbauen (nur mit Freigabe des Users, si
 - Zonenton: `Sfx.ambient()` in `audio.ts`, aufgerufen aus `updateRegion` (GameScene). Zonen-Titel existierte schon.
 - Offen: `npm run pace` nach Zauberer-Änderung neu messen; Commit.
 
+## Stand Level-Kurve (umgesetzt)
+- `xpToNext` (`data.ts`): Stufenfaktor `1 + (l/30)^1.5 * 0.8`. Bot-Messung (2 Seeds, Bot startet jetzt in der Stadt): L5 ≈ 17–21 min, L10 ≈ 50–57 min, L20 ≈ 2,8–3,3 h, L30 ≈ 7,9–8,5 h (vorher 4,8–5,4 h). Tode 13–22 je Lauf, überwiegend L2–7 und L16–18 (Bot-Artefakt: läuft in gemischte Rudel).
+- Verworfen: Faktor 1,2 (L30 9–10 h, aber Todesspirale bei L18–19 mit 72 Toden). Pace: `PACE_SEED=… npm run pace`, `PACE_DEATHS=1` loggt Todesursachen.
+- Offen: frühe Tode (L2–7) prüfen, evtl. Starttränke oder sanftere Rudel am Zonenanfang.
+
 ## Letzte 3 Entscheidungen (aktuell)
+0. **Level-Kurve per Stufenfaktor 0,8 statt global skalieren.** Grund: frühe Level bleiben flüssig, Endgame streckt sich; 1,2 erzeugte Todesspiralen.
 1. **Ringe: Gegenstand bleibt `slot:'ring'`, zweites Feld nur als `ring2` im Equipment.** Grund: keine Item-/Save-Migration, alte Spielstände gültig.
 2. **Zauberer nutzen vorhandenen Skill-Namen `ember_bolt` als Hit-Skill.** Grund: Projektil-VFX/Ton ohne Render-Änderung.
 3. **Amulette nicht im Shop.** Grund: Pace-Bot kauft Shop-Ausrüstung, Balance sollte unverändert bleiben.
@@ -57,3 +63,4 @@ Plan Tiefe: Fernkampf-/Zaubermonster, Boss-Mechaniken (Bodenmarker, Adds, Anstur
 - `AskUserQuestion`: max. 4 Fragen und max. 4 Optionen pro Frage.
 - Neue Slots: `Object.keys(equipment)`-Schleifen müssen `EquipSlot` nutzen; `net.ts`-Validierung und `save.ts` `EQUIP_SLOTS` führen die Slotliste separat (beim Erweitern alle drei anpassen).
 - Drop-Pool-Test verlangt pro Slot für Stufe 2–16 eine Vorlage mit minLevel ≤ Stufe (neue Slots brauchen eine Stufe-1-Vorlage).
+- Pace-Bot-Tode sind teils Bot-Artefakte (Fallback „far“ läuft zu hochstufigen Rudeln, Todesspirale am Leichenort); nicht eins zu eins als Spieler-Frust werten.

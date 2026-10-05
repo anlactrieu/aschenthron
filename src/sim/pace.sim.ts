@@ -4,7 +4,7 @@ import { buildWorld, type TiledMap } from './tiled';
 import { MAX_LEVEL, SHOPS, totalXpFor } from './data';
 import { templateById, type Item } from './items';
 import {
-  missingReq, applyCommand, buyPrice, carryCapacity, drainEvents, getActor, inSafeZone, maxHpOf, tick, TICK_RATE,
+  missingReq, applyCommand, buyPrice, armorOf, carryCapacity, drainEvents, getActor, inSafeZone, maxHpOf, tick, TICK_RATE,
   type Actor, type World,
 } from './world';
 
@@ -59,14 +59,17 @@ describe('Level-Tempo (Messung)', () => {
     let deaths = 0;
     const deathLevels: Record<number, number> = {};
     let trips = 0;
-    let mode: 'hunt' | 'town' = 'hunt';
+    const lastHits: string[] = [];
+    let mode: 'hunt' | 'town' = 'town'; // wie ein echter Spieler: erst mit dem Startgold einkaufen
     const maxTicks = TICK_RATE * 3600 * 12;
     for (let t = 0; t < maxTicks; t++) {
       tick(w);
       for (const e of drainEvents(w)) {
+        if (e.type === 'hit' && e.targetId === p.id) lastHits.push(getActor(w, e.attackerId)?.name ?? '?');
         if (e.type === 'levelUp') reached[e.level] ??= w.tick;
         if (e.type === 'deathPenalty') {
           deaths++;
+          if (process.env.PACE_DEATHS) { const nm = w.actors.filter((a) => a.kind === 'monster' && a.alive).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0]; console.log(`DEATH L${p.level} bei ${nm?.name} (${nm?.champ ?? '-'}) killer ${[...new Set(lastHits.slice(-12))].join('/')} hp max ${maxHpOf(p)} armor ${armorOf(p)}`); }
           deathLevels[p.level] = (deathLevels[p.level] ?? 0) + 1;
         }
       }
