@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import mapJson from '../data/aschenthron.json';
 import { buildWorld, type TiledMap } from './tiled';
-import { MAP_VERSION, NPC_LORE, QUESTS, UNIQUES, WORLD_BOSS_LOOT, questById, uniqueDef } from './data';
+import { MAP_VERSION, NPC_KEYS, NPC_LORE, QUESTS, UNIQUES, WORLD_BOSS_LOOT, questById, uniqueDef } from './data';
 import { findPath, isWalkable, type Grid } from './path';
 import { exportPlayer, importPlayer } from './save';
 import { validateCommand } from './net';
@@ -50,8 +50,9 @@ describe('P3: Aufgabenketten', () => {
       const givers = w.npcs.filter((n) => n.quests?.includes(q.id));
       expect(givers.length, q.id).toBe(1);
       if (q.kind === 'talk') {
-        expect(w.npcs.some((n) => n.name === q.target), q.id).toBe(true);
-        expect(NPC_LORE[q.target], q.id).toBeDefined();
+        expect(NPC_KEYS[q.target], q.id).toBeDefined();
+        expect(w.npcs.some((n) => n.name === NPC_KEYS[q.target]), q.id).toBe(true);
+        expect(NPC_LORE[NPC_KEYS[q.target]!], q.id).toBeDefined();
       }
       if (q.kind === 'visit') expect(w.regions.some((r) => r.name === q.place), q.id).toBe(true);
       if (q.kind === 'bring') expect(q.monsters?.length || q.chestRegion, q.id).toBeTruthy();
@@ -147,6 +148,28 @@ describe('P3: Aufgabenketten', () => {
     applyCommand(w, p.id, { type: 'turnInQuest', questId: 'c_gob4' });
     expect(p.inventory.length).toBe(before + 1);
     expect(['rare', 'legendary', 'set']).toContain(p.inventory[p.inventory.length - 1]!.rarity);
+  });
+
+  it('Belohnung bei vollem Rucksack: nie verloren, liegt als Bodenbeute am Spieler', () => {
+    const { w, p } = build();
+    const ysa = w.npcs.find((n) => n.name === 'Jägerin Ysa')!;
+    p.level = 12;
+    p.x = ysa.x; p.y = ysa.y;
+    p.quests.c_gob3 = { state: 'turned', progress: 1 };
+    p.quests.c_gob4 = { state: 'done', progress: 1 };
+    const ballast = rollDrop(new Rng(1), () => w.nextId++, 5, 'rare');
+    ballast.weight = 1e6;
+    p.inventory.push(ballast);
+    const n = p.inventory.length;
+    const ground = w.ground.length;
+    drainEvents(w);
+    applyCommand(w, p.id, { type: 'turnInQuest', questId: 'c_gob4' });
+    expect(p.quests.c_gob4?.state).toBe('turned');
+    expect(p.inventory.length).toBe(n);
+    expect(w.ground.length).toBe(ground + 1);
+    const ev = drainEvents(w);
+    expect(ev.some((e) => e.type === 'fail' && /Belohnung liegt am Boden/.test(e.reason))).toBe(true);
+    expect(ev.some((e) => e.type === 'questTurned' && !!e.item)).toBe(true);
   });
 
   it('Sammelaufgabe (Monster): Quest-Gegenstand wird gezählt, nie im Rucksack, nicht verkaufbar', () => {

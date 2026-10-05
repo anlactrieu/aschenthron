@@ -9,9 +9,9 @@
 
 ## Offene TODOs (nach Wert)
 1. **User-Testfeedback abwarten** (Online-Test): Animation (Laufen/Schlag/Bogen), Balance, Optik.
-2. Aus Code-Review P3 offen: Quest-Belohnungen umgehen das Gewichtslimit; Talk-Aufgaben werden über den NPC-Anzeigenamen zugeordnet (besser über ID); `gen_map.py` hat doppelte Spawn-Funktionen (`dungeon_spawns2`, `dungeon_chests`).
-3. P4 offen: Esc in den Credits schließt auch das Hauptfenster; Bodenbeute bleibt prozeduraler Beutel; Treffer-Blitz (`setTint(0xffffff)`) kaum sichtbar (Phaser-Tint multipliziert → `setTintFill`); Statuseffekt-Chips ohne DCSS-Icons; Robe/Umhang bewegen sich nicht mit den Beinen; Gürtel/Beine/Edelsteine ohne Sprite; nur eine männliche Basisfigur; Köcher am Avatar entfällt; Monsterschützen ohne Anlege-Animation.
-4. Weltboss: Banner erscheint auch bei weiter Entfernung; Tod ohne Effekt/Ton; Edelstein-Drop ohne Sound/Banner.
+2. (erledigt) Quest-Belohnung bei zu schwerem Rucksack liegt am Boden; Talk-Aufgaben über NPC-Schlüssel (`NPC_KEYS`/`npcKeyOf` in `data.ts`); `gen_map.py` nur noch ein `dungeon_spawns` (Karte byte-identisch; `dungeon_chests` bleibt, andere Logik als die Inline-Truhenschleife der Alt-Dungeons).
+3. P4 offen: Bodenbeute bleibt prozeduraler Beutel; Gürtel/Beine/Edelsteine ohne Sprite; nur eine männliche Basisfigur; Köcher am Avatar entfällt; Monsterschützen ohne Anlege-Animation.
+4. (erledigt) Weltboss-Banner nur ≤ 60 Felder, Tod mit Fanfare/Effekt in Sichtweite, Edelstein-Sparkle/Ton; Treffer-Blitz per `TintModes.FILL` (Phaser 4: `setTintFill` entfernt); Esc in Credits; Status-Icons (selbstgezeichnet, DCSS hat keine); Robe/Umhang-Saum schwingt im Schritt.
 5. Entscheidungen offen: weiche Gewichtsstrafe (aktuell hartes Limit beim Aufheben/Kaufen); Bot-Todesspiralen (Seed 99: 10,5 h, 27 Tode, frühe Schleifen Stufe 3) sind Bot-Artefakte.
 6. Nicht umgesetzt (nur Mehrspieler): Chat, Gruppen, Spieler-Handel, Gilden, Kopfgeld/Duelle, Login; Delta-Schnappschüsse; Server-Hosting.
 7. Technik: UI-Panel serialisiert pro Frame JSON (Dirty-Flag), A* in `chase` fast jeden Tick pro Monster (drosseln).

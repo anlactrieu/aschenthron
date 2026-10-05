@@ -325,3 +325,42 @@ export function potionIcon(kind: 'heal' | 'mana'): string {
   potionCache.set(kind, url);
   return url;
 }
+
+const statusCache = new Map<string, string>();
+/** Kleine Symbole für die Status-Chips im HUD (selbst gezeichnet; die DCSS-Pakete enthalten keine Statussymbole). */
+export function statusIcon(id: 'slow' | 'stun' | 'burn' | 'poison'): string {
+  const hit = statusCache.get(id);
+  if (hit) return hit;
+  const url = make((c) => {
+    if (id === 'slow') {
+      // Schneeflocke
+      r(c, 7, 1, 2, 14, 0x9fd8ff);
+      r(c, 1, 7, 14, 2, 0x9fd8ff);
+      diag(c, 2, 13, 12, 0xd8f0ff, 1);
+      for (let i = 0; i < 12; i++) r(c, 2 + i, 2 + i, 1, 1, 0xd8f0ff);
+    } else if (id === 'stun') {
+      // Sterne um den Kopf
+      r(c, 2, 8, 4, 1, 0xffe45a); r(c, 3, 7, 2, 3, 0xffe45a);
+      r(c, 10, 3, 4, 1, 0xffe45a); r(c, 11, 2, 2, 3, 0xffe45a);
+      r(c, 8, 11, 5, 1, 0xfff0a0); r(c, 9, 10, 3, 3, 0xfff0a0);
+      r(c, 1, 3, 2, 2, 0xffc040);
+    } else if (id === 'burn') {
+      // Flamme
+      r(c, 6, 1, 3, 3, 0xff7a2a);
+      r(c, 4, 4, 8, 4, 0xff7a2a);
+      r(c, 3, 7, 10, 6, 0xff9a3a);
+      r(c, 5, 12, 6, 3, 0xff9a3a);
+      r(c, 6, 8, 4, 6, 0xffd23a);
+      r(c, 7, 11, 2, 3, 0xfff4b0);
+    } else {
+      // Gifttropfen
+      r(c, 7, 1, 2, 3, 0x7fe060);
+      r(c, 6, 4, 4, 3, 0x7fe060);
+      r(c, 4, 7, 8, 6, 0x6ad050);
+      r(c, 5, 13, 6, 1, 0x6ad050);
+      r(c, 5, 8, 2, 3, 0xd8ffc8);
+    }
+  });
+  statusCache.set(id, url);
+  return url;
+}

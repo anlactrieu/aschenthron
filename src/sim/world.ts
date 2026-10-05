@@ -3,7 +3,7 @@ import { findPath, isWalkable, type Grid, type Pt } from './path';
 import { itemReq, itemAffixes, gemTemplateId, handsOf, weaponSpeedOf, rollGem, rollUniqueSpecial, rollWorldDrop, rollWorldSpecial, rollDrop, rollPotion, rollSpecial, templateById, generateItem, rerollAffixes, extendAffixes, SETS, type GemInfo, type Item, type PowerId, type SetBonus, type EquipSlot, type Stat } from './items';
 import {
   ATTR_KEYS, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
-  monsterKind, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
+  monsterKind, npcKeyOf, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
   FAMILY_RES, MAX_RES, SLOW_FACTOR, type DmgType, type StatusId,
   ATTR_THRESHOLD, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, WILL_STATUS_PER_POINT, WILL_STATUS_CAP, GEM_MIN_LEVEL, GEM_DROP, GEM_SOCKET_COST, WORLD_BOSS_LOOT, type QuestDef,
 } from './data';
@@ -557,7 +557,11 @@ function finishQuest(w: World, a: Actor, def: QuestDef): void {
     let special: Item | null = null;
     if (def.reward === 'unique') for (let i = 0; i < 8 && !special; i++) special = i % 2 ? rollWorldSpecial(w.rng, ids, lv) : rollUniqueSpecial(w.rng, ids, lv);
     item = special ?? rollDrop(w.rng, ids, lv, 'rare');
-    a.inventory.push(item);
+    if (carriedWeight(a) + item.weight > carryCapacity(a)) {
+      // Belohnung nie verlieren: zu schwer → als Bodenbeute neben den Spieler legen
+      w.ground.push({ id: w.nextId++, x: Math.round(a.x), y: Math.round(a.y), item, expiresAt: null });
+      w.events.push({ type: 'fail', reason: 'Rucksack zu schwer – Belohnung liegt am Boden.', to: a.id });
+    } else a.inventory.push(item);
   }
   w.events.push({ type: 'questTurned', questId: def.id, xp: def.xp, gold: def.gold, ...(item ? { item } : {}), to: a.id });
   gainXp(w, a, def.xp);
@@ -799,7 +803,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       // Gesprächsaufgaben mit diesem NPC als Ziel sind sofort erfüllt und abgegeben
       for (const def of QUESTS) {
         const st = a.quests[def.id];
-        if (def.kind === 'talk' && def.target === n.name && st?.state === 'active') {
+        if (def.kind === 'talk' && def.target === npcKeyOf(n.name) && st?.state === 'active') {
           st.progress = def.count;
           st.state = 'done';
           finishQuest(w, a, def);

@@ -67,6 +67,8 @@ export function initCredits(): void {
       toggleCredits();
     } else if (e.key === 'Escape' && creditsOpen()) {
       setCredits(false);
+      // nur die Credits schließen: spätere Esc-Handler (Hauptfenster, Fertigkeit abwählen) laufen nicht mehr
+      e.stopImmediatePropagation();
     }
   });
 }

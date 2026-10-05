@@ -235,4 +235,16 @@ export class Sfx {
     this.tone(80, 0.9, 'sawtooth', 0.3, 50);
     this.tone(120, 0.9, 'square', 0.15, 70);
   }
+  /** Edelstein aufgehoben: heller, kurzer Glockenton. */
+  gem(): void {
+    if (!this.gate('gem', 150)) return;
+    [1318, 1760, 2093].forEach((f, i) => this.tone(f, 0.22, 'sine', 0.12, undefined, i * 0.06));
+  }
+  /** Weltboss gefallen: Fanfare aus aufsteigenden Dreiklängen. */
+  fanfare(): void {
+    if (!this.gate('fanfare', 2000)) return;
+    [262, 330, 392, 523, 659, 784].forEach((f, i) => this.tone(f, 0.55, 'triangle', 0.22, undefined, i * 0.11));
+    [131, 196].forEach((f, i) => this.tone(f, 1.2, 'sawtooth', 0.12, undefined, 0.3 + i * 0.2));
+    this.noise(0.5, 0.1, 5000, 0.5);
+  }
 }

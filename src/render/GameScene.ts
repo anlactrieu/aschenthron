@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import mapJson from '../data/aschenthron.json';
 import { buildWorld, type TiledMap } from '../sim/tiled';
-import { DMG_COLOR, STATUS_COLOR, monsterKind, questById, SKILLS, type StatusId } from '../sim/data';
+import { DMG_COLOR, STATUS_COLOR, monsterKind, npcKeyOf, questById, SKILLS, type StatusId } from '../sim/data';
 import { questAvailable, questMarks, type QuestMark } from '../sim/quests';
 import { exportPlayer, importPlayer } from '../sim/save';
 import {
@@ -547,7 +547,15 @@ export class GameScene extends Phaser.Scene {
           }
           break;
         }
-        case 'pickedUp': say(`Erhalten: ${e.item.name} (${describeItem(e.item)})`); this.sfx.pickup(); break;
+        case 'pickedUp':
+          if (e.item.slot === 'gem') {
+            say(`Edelstein: ${e.item.name}`);
+            this.sfx.gem();
+          } else {
+            say(`Erhalten: ${e.item.name} (${describeItem(e.item)})`);
+            this.sfx.pickup();
+          }
+          break;
         case 'tooHeavy': say(`Zu schwer: ${e.item.name}`); break;
         case 'cannotEquip': say(`${e.item.name}: ${e.reason}`); break;
         case 'xp': {
@@ -612,13 +620,29 @@ export class GameScene extends Phaser.Scene {
         case 'questItem': say(`${e.item} gefunden (${e.progress}/${e.count})`); this.sfx.pickup(); break;
         case 'talk': this.sfx.quest(); break;
         case 'worldBoss': {
+          // Banner/Ton nur in der Nähe (Entfernung zum Boss), sonst nur eine dezente Chatzeile
+          const wb = getActor(w, e.id);
+          const pl = this.player();
+          const dist = wb ? Math.hypot(wb.x - pl.x, wb.y - pl.y) : Infinity;
           if (e.state === 'spawn') {
-            this.ui.banner(`${e.name} erwacht ${e.where}!`, '#c77fff');
             say(`Weltboss erwacht: ${e.name} ${e.where}.`);
-            this.sfx.boss();
+            if (dist <= 60) {
+              this.ui.banner(`${e.name} erwacht ${e.where}!`, '#c77fff');
+              this.sfx.boss();
+            }
           } else {
-            this.ui.banner(`${e.name} ist gefallen!`, '#ffd23a');
             say(`Weltboss besiegt: ${e.name}. Beute liegt am Boden.`);
+            if (dist <= 60) this.ui.banner(`${e.name} ist gefallen!`, '#ffd23a');
+            const pos = dist <= 24 ? this.bodyPos(wb) : null;
+            if (pos) {
+              // Sichtweite: Effekt und Fanfare (Boss-Flag-Gegner haben Ring/Shake schon im 'died'-Ereignis)
+              if (!wb?.boss) {
+                this.fx.burst(pos.x, pos.y, 0xffd23a, 900);
+                this.fx.ring(pos.x, pos.y + 20, 200, 0xffd23a, 700);
+                this.cameras.main.shake(350, 0.008);
+              }
+              this.sfx.fanfare();
+            }
           }
           break;
         }
@@ -961,7 +985,7 @@ export class GameScene extends Phaser.Scene {
     // Gesprächsziel einer offenen Aufgabe: Sprechblase
     for (const [id, st] of Object.entries(p.quests)) {
       const def = questById(id);
-      if (st.state === 'active' && def?.kind === 'talk' && def.target === n.name) return '…';
+      if (st.state === 'active' && def?.kind === 'talk' && def.target === npcKeyOf(n.name)) return '…';
     }
     return avail ? '!' : '';
   }
@@ -1000,6 +1024,7 @@ export class GameScene extends Phaser.Scene {
         g.fillRect(sx - wide / 2, sy - tall, wide, tall);
         if ((r === 'legendary' || r === 'set') && (this.frame + gi.id) % 40 === 0) this.fx.sparkle(sx, sy - 10, col, 900);
       }
+      if (gi.item.slot === 'gem' && (this.frame + gi.id) % 36 === 0) this.fx.sparkle(sx, sy - 8, 0x9fe8ff, 800);
       // Beutenamen in Seltenheitsfarbe: magisch und besser immer in der Nähe, Normales nur nah oder unter dem Mauszeiger
       const near = Math.hypot(gi.x - p.x, gi.y - p.y);
       const hov = hoverTile && Math.hypot(gi.x - hoverTile.x, gi.y - hoverTile.y) < 0.9;
@@ -1095,14 +1120,18 @@ export class GameScene extends Phaser.Scene {
       img.setVisible(true).setPosition(sx + ox, sy + 8 + oy + bob).setDepth(sy + 8).setFlipX(view.flip);
       if (!a.alive) {
         const age = a.kind === 'monster' ? (this.world.tick - a.diedAt) / (TICK_RATE * 4) : 0;
-        img.setAngle(view.flip ? -90 : 90).setAlpha(Math.max(0, 0.6 - age * 0.6)).setTint(0x664444).setScale(1);
+        img.setAngle(view.flip ? -90 : 90).setAlpha(Math.max(0, 0.6 - age * 0.6)).setTintMode(Phaser.TintModes.MULTIPLY).setTint(0x664444).setScale(1);
         img.setDepth(sy);
         continue;
       }
       // leichtes Atmen, wenn sie stehen (Skalierung um die Füße)
       const breath = !walking && !swinging ? 1 + Math.sin(time / 420 + a.id * 1.7) * 0.014 : 1;
       img.setAngle(0).setAlpha(1).setScale(1 / breath ** 0.5, breath);
-      if ((this.flash.get(a.id) ?? 0) > time) img.setTint(0xffffff);
+      // Treffer-Blitz: Phaser-Tint multipliziert (Weiß = unsichtbar) → echter Blitz über den Füllmodus; sonst Modus immer zurücksetzen
+      const flashing = (this.flash.get(a.id) ?? 0) > time;
+      if (flashing) img.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
+      else if (img.tintMode !== Phaser.TintModes.MULTIPLY) img.setTintMode(Phaser.TintModes.MULTIPLY);
+      if (flashing) { /* Blitz läuft */ }
       else if (a.status.stun) img.setTint(0xfff0a0);
       else if (a.status.burn) img.setTint(0xffa060);
       else if (a.status.slow) img.setTint(0x9ac8ff);

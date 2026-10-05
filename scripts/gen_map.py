@@ -327,6 +327,8 @@ zone_packs(ZONES['ash'], P(114, 76), [
     (1.00, [('cinder_wisp', 3), ('death_knight', 2), ('ember_elemental', 3), ('hell_spawn', 2), ('imp', 2)], 'hell_spawn')], 26, (9,))
 
 def dungeon_spawns(name, bands, boss_kind, guards=None, per_room=(1, 2)):
+    """Rudel je Raum nach Entfernungs-Bändern. Bänder mit 4. Eintrag (lo, hi) legen die Rudelgröße fest und
+    begrenzen Räume neben dem Eingang auf höchstens 2 (P3-Dungeons, ohne Wächter im Bossraum); sonst 1–4."""
     rooms, ent, boss, dist = dg[name]
     maxd = max(dist.values()) or 1
     for k, r in rooms.items():
@@ -344,11 +346,13 @@ def dungeon_spawns(name, bands, boss_kind, guards=None, per_room=(1, 2)):
         f = dist.get(k, maxd) / maxd
         band = next((b for b in bands if f <= b[0]), bands[-1])
         kinds = [kk for kk, w in band[1] for _ in range(w)]
+        lo, hi = band[3] if len(band) > 3 else (1, 4)
+        if len(band) > 3 and dist.get(k, maxd) <= 1: hi = min(hi, 2)
         for _ in range(random.randint(*per_room)):
             for _t in range(40):
                 x, y = random.randint(r[0] + 1, r[2] - 1), random.randint(r[1] + 1, r[3] - 1)
                 if place_ok(x, y, (5,), 0, 3):
-                    spawn_pack(kinds, x, y, (5,), random.randint(1, 4), band[2]); break
+                    spawn_pack(kinds, x, y, (5,), random.randint(lo, hi), band[2]); break
     return room_center(rooms[boss])
 
 dungeon_spawns('sumpf', [(0.4, [('marsh_corpse', 3), ('bog_witch', 1), ('wraith', 1)], 'bog_witch'), (1.0, [('bog_witch', 2), ('ghoul_alpha', 3), ('wraith', 2)], 'ghoul_alpha')], 'bog_queen', ['bog_witch'])
@@ -470,32 +474,11 @@ road([(222, 114), (244, 114)], width=3, gid=9)
 for nm, r, lv in [("Goblinbau", NEW_DUNGEONS['goblin']['box'], "8-12"), ("Spinnennest", NEW_DUNGEONS['nest']['box'], "13-18"), ("Aschengrund", GRUND, "28-32")]:
     obj(nm, "region", r[0], r[1], r[2] - r[0] + 1, r[3] - r[1] + 1, levels=lv)
 
-def dungeon_spawns2(name, bands, boss_kind, per_room=(1, 2)):
-    """Wie dungeon_spawns, aber ohne Wächter im Bossraum; Rudelgröße je Band, Räume neben dem Eingang höchstens 2."""
-    rooms, ent, boss, dist = dg[name]
-    maxd = max(dist.values()) or 1
-    for k, r in rooms.items():
-        if k == ent: continue
-        if k == boss:
-            cx, cy = room_center(r)
-            obj(boss_kind, "monster", cx, cy, kind=boss_kind, pack=0); taken.append((cx, cy))
-            continue
-        f = dist.get(k, maxd) / maxd
-        band = next((b for b in bands if f <= b[0]), bands[-1])
-        kinds = [kk for kk, w in band[1] for _ in range(w)]
-        lo, hi = band[3]
-        if dist.get(k, maxd) <= 1: hi = min(hi, 2)
-        for _ in range(random.randint(*per_room)):
-            for _t in range(40):
-                x, y = random.randint(r[0] + 1, r[2] - 1), random.randint(r[1] + 1, r[3] - 1)
-                if place_ok(x, y, (5,), 0, 3):
-                    spawn_pack(kinds, x, y, (5,), random.randint(lo, hi), band[2]); break
-
-dungeon_spawns2('goblin', [
+dungeon_spawns('goblin', [
     (0.34, [('goblin_warrior', 3), ('goblin_archer', 1), ('goblin_scout', 1)], 'goblin_warrior', (1, 2)),
     (0.67, [('goblin_warrior', 3), ('goblin_shaman', 1), ('goblin_brute', 2), ('goblin_archer', 1)], 'goblin_brute', (1, 3)),
     (1.00, [('goblin_brute', 3), ('goblin_shaman', 1), ('goblin_warlord', 2)], 'goblin_warlord', (2, 3))], 'goblin_king')
-dungeon_spawns2('nest', [
+dungeon_spawns('nest', [
     (0.34, [('giant_spider', 3), ('brood_spider', 3)], 'giant_spider', (1, 2)),
     (0.67, [('web_stalker', 3), ('giant_spider', 2), ('brood_spider', 2)], 'web_stalker', (1, 3)),
     (1.00, [('nest_matron', 3), ('web_stalker', 3), ('brood_spider', 1)], 'nest_matron', (2, 3))], 'spider_queen')

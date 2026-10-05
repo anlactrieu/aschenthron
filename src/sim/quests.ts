@@ -1,4 +1,4 @@
-import { QUESTS, monsterKind, type QuestDef } from './data';
+import { QUESTS, NPC_KEYS, npcKeyOf, monsterKind, type QuestDef } from './data';
 import { regionAt, type Actor, type World } from './world';
 
 /** Kann der Spieler die Aufgabe jetzt annehmen? (Stufe, Vorgänger der Kette abgegeben, noch nicht angenommen) */
@@ -56,7 +56,7 @@ export function questTarget(w: World, p: Actor, def: QuestDef, done: boolean): {
       return r ? center(r) : undefined;
     }
     case 'talk': {
-      const n = w.npcs.find((x) => x.name === def.target);
+      const n = w.npcs.find((x) => npcKeyOf(x.name) === def.target);
       return n ? { x: n.x, y: n.y } : undefined;
     }
     case 'kill': return nearest((a) => a.kindId === def.target);
@@ -96,7 +96,7 @@ export function questWhere(w: World, def: QuestDef, done = false): string {
   const names = new Set<string>();
   if (def.kind === 'visit' && def.place) names.add(def.place);
   else if (def.kind === 'talk') {
-    const n = w.npcs.find((x) => x.name === def.target);
+    const n = w.npcs.find((x) => npcKeyOf(x.name) === def.target);
     if (n) return `${n.name} (${regionAt(w, n.x, n.y)?.name ?? '?'})`;
   } else if (def.kind === 'bring' && def.chestRegion) names.add(def.chestRegion);
   else {
@@ -115,5 +115,6 @@ export function questWhere(w: World, def: QuestDef, done = false): string {
 /** Name des Quest-Monsters für Anzeigen (z. B. „Sumpfhexe“). */
 export function targetName(def: QuestDef): string {
   if (def.kind === 'kill') return monsterKind(def.target).name;
+  if (def.kind === 'talk') return NPC_KEYS[def.target] ?? def.target;
   return def.item ?? def.target;
 }

@@ -4,7 +4,7 @@ import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
   critChance, attrBonus, equipSlotFor, socketCost, maxHpOf, maxManaOf, missingReq, nearNpc, powerOf, resistOf, type Actor, type Command, type Npc, type World,
 } from '../sim/world';
-import { itemIcon, potionIcon, skillIcon } from './icons';
+import { itemIcon, potionIcon, skillIcon, statusIcon } from './icons';
 import { giverLocation, questAvailable, questChains, questWhere, targetName } from '../sim/quests';
 import { lookKey, lookOf, playerPortrait } from './art';
 import { initCredits, toggleCredits } from './credits';
@@ -364,15 +364,20 @@ export class Ui {
 
     // Statusanzeige des Spielers: Name und Restzeit, nur bei Änderung neu aufgebaut
     const now = this.lastW?.tick ?? 0;
-    const chips: [string, string, number][] = [];
-    for (const id of ['slow', 'stun', 'burn'] as StatusId[]) if (p.status?.[id] && p.status[id]! > now) chips.push([STATUS_NAME[id], STATUS_COLOR[id], Math.ceil((p.status[id]! - now) / TICK_RATE)]);
-    if (p.dot && p.dot.until > now) chips.push(['Gift', DMG_COLOR.poison, Math.ceil((p.dot.until - now) / TICK_RATE)]);
+    const chips: [string, string, number, 'slow' | 'stun' | 'burn' | 'poison'][] = [];
+    for (const id of ['slow', 'stun', 'burn'] as StatusId[]) if (p.status?.[id] && p.status[id]! > now) chips.push([STATUS_NAME[id], STATUS_COLOR[id], Math.ceil((p.status[id]! - now) / TICK_RATE), id]);
+    if (p.dot && p.dot.until > now) chips.push(['Gift', DMG_COLOR.poison, Math.ceil((p.dot.until - now) / TICK_RATE), 'poison']);
     const ck = JSON.stringify(chips);
     if (ck !== this.statusKey) {
       this.statusKey = ck;
-      this.statusBar.replaceChildren(...chips.map(([n, c, sec]) => {
-        const d = el('div', '', `${n} ${sec}`);
-        d.style.cssText = `font:bold 11px system-ui;padding:1px 6px;border:1px solid ${c};color:${c};background:rgba(10,8,14,.85);border-radius:3px`;
+      this.statusBar.replaceChildren(...chips.map(([n, c, sec, id]) => {
+        const d = el('div');
+        d.style.cssText = `font:bold 11px system-ui;padding:1px 6px 1px 3px;border:1px solid ${c};color:${c};background:rgba(10,8,14,.85);border-radius:3px;display:flex;align-items:center;gap:3px`;
+        const ic = document.createElement('img');
+        ic.src = statusIcon(id);
+        ic.alt = '';
+        ic.style.cssText = 'width:14px;height:14px;image-rendering:pixelated';
+        d.append(ic, document.createTextNode(`${n} ${sec}`));
         return d;
       }));
     }
@@ -804,7 +809,7 @@ export class Ui {
       case 'kill': return `Töte ${def.count > 1 ? `${def.count}× ` : ''}${targetName(def)} (${prog})`;
       case 'bring': return `Sammle ${def.item} (${prog})`;
       case 'visit': return `Betritt: ${def.place}`;
-      case 'talk': return `Sprich mit ${def.target}`;
+      case 'talk': return `Sprich mit ${targetName(def)}`;
       case 'chest': return `Öffne Truhen (${prog})`;
       case 'champion': return `Besiege Champions (${prog})`;
       case 'unique': return def.target ? `Besiege den Weltboss (${prog})` : `Besiege benannte Gegner (${prog})`;

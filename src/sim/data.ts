@@ -436,17 +436,17 @@ export const CHAIN_MINE = 'Pells Fund';
 export const CHAIN_WEB = 'Netze der Königin';
 
 QUESTS.push(
-  chainQ(CHAIN_GOBLIN, 2, { id: 'c_gob1', kind: 'talk', name: 'Ein Wort mit der Jägerin', text: 'Chronistin Maren schickt dich zu Jägerin Ysa am Räuberlager: Sie hat die Spuren des Goblinkönigs gelesen.', minLevel: 5, target: 'Jägerin Ysa', outro: 'Ysa nickt knapp: „Dann hör gut zu. Es gibt Arbeit.“' }),
+  chainQ(CHAIN_GOBLIN, 2, { id: 'c_gob1', kind: 'talk', name: 'Ein Wort mit der Jägerin', text: 'Chronistin Maren schickt dich zu Jägerin Ysa am Räuberlager: Sie hat die Spuren des Goblinkönigs gelesen.', minLevel: 5, target: 'ysa', outro: 'Ysa nickt knapp: „Dann hör gut zu. Es gibt Arbeit.“' }),
   chainQ(CHAIN_GOBLIN, 2, { id: 'c_gob2', kind: 'bring', name: 'Goblinzeichen', text: 'Sammle 4 Goblinzeichen: abgenagte Knochenstücke, die Goblins bei sich tragen. Ysa liest daraus, wohin sie ziehen.', minLevel: 6, requires: 'c_gob1', item: 'Goblinzeichen', monsters: ['goblin', 'goblin_scout', 'goblin_archer', 'goblin_warrior', 'goblin_shaman'], chance: 0.5, count: 4, outro: 'Ysa ordnet die Zeichen in den Staub. „Ein Bau. Tief unter dem Lager.“' }),
   chainQ(CHAIN_GOBLIN, 2, { id: 'c_gob3', kind: 'visit', name: 'Der Eingang des Baus', text: 'Finde den Goblinbau im Norden des Räuberlagers und betritt ihn. Nur einen Blick, mehr nicht.', minLevel: 8, requires: 'c_gob2', place: 'Goblinbau', outro: 'Ysa: „Du lebst. Gut. Dann weißt du jetzt, womit wir es zu tun haben.“' }),
   chainQ(CHAIN_GOBLIN, 3, { id: 'c_gob4', kind: 'kill', name: 'Das Ende des Goblinkönigs', text: 'Grix hat sich in seinem Bau verschanzt. Erschlage ihn, bevor sein Heer die Höfe überrennt.', minLevel: 10, requires: 'c_gob3', target: 'goblin_king', reward: 'rare', outro: 'Ysa spuckt in die Asche: „Der Wald atmet wieder.“' }),
 
-  chainQ(CHAIN_MOOR, 2, { id: 'c_moor1', kind: 'talk', name: 'Der Eremit im Moor', text: 'Torwache Haldor erzählt von einem Einsiedler in den Moorlanden, der die Hexe kennt. Sprich mit Eremit Olm.', minLevel: 6, target: 'Eremit Olm', outro: 'Olm blinzelt aus tiefen Höhlen der Augen. „Setz dich, Fremder. Das Moor flüstert.“' }),
+  chainQ(CHAIN_MOOR, 2, { id: 'c_moor1', kind: 'talk', name: 'Der Eremit im Moor', text: 'Torwache Haldor erzählt von einem Einsiedler in den Moorlanden, der die Hexe kennt. Sprich mit Eremit Olm.', minLevel: 6, target: 'olm', outro: 'Olm blinzelt aus tiefen Höhlen der Augen. „Setz dich, Fremder. Das Moor flüstert.“' }),
   chainQ(CHAIN_MOOR, 2, { id: 'c_moor2', kind: 'bring', name: 'Irrlichtkraut', text: 'Bring Olm 5 Büschel Irrlichtkraut. Es wächst nur dort, wo Ghule und Moorleichen liegen.', minLevel: 7, requires: 'c_moor1', item: 'Irrlichtkraut', monsters: ['bog_ghoul', 'marsh_corpse'], chance: 0.45, count: 5, outro: 'Olm riecht an dem Kraut und lächelt dünn. „Genug für einen Trank der Klarsicht.“' }),
   chainQ(CHAIN_MOOR, 2, { id: 'c_moor3', kind: 'kill', name: 'Hexen des Moors', text: 'Die Sumpfhexen hören Veshras Ruf. Töte 6 von ihnen, damit ihr Singen leiser wird.', minLevel: 10, requires: 'c_moor2', target: 'bog_witch', count: 6, outro: 'Olm lauscht in die Nacht. „Leiser. Aber nicht still.“' }),
   chainQ(CHAIN_MOOR, 3, { id: 'c_moor4', kind: 'kill', name: 'Veshras Ende', text: 'Dringe in die Gruft der Moorhexe vor und töte Veshra. Olm hat sie einst gekannt.', minLevel: 14, requires: 'c_moor3', target: 'bog_queen', reward: 'unique', outro: 'Olm weint, ohne dass sich sein Gesicht bewegt. „Danke. Endlich ruht sie.“' }),
 
-  chainQ(CHAIN_OATH, 2, { id: 'c_eid1', kind: 'talk', name: 'Der Sterbende Ritter', text: 'Haldor spricht von einem Ritter, der in der Aschenöde liegt und nicht sterben will. Finde Aldric und höre ihn an.', minLevel: 20, target: 'Ritter Aldric', outro: 'Aldrics Atem rasselt. „Kommst du … von Thron und Krone?“' }),
+  chainQ(CHAIN_OATH, 2, { id: 'c_eid1', kind: 'talk', name: 'Der Sterbende Ritter', text: 'Haldor spricht von einem Ritter, der in der Aschenöde liegt und nicht sterben will. Finde Aldric und höre ihn an.', minLevel: 20, target: 'aldric', outro: 'Aldrics Atem rasselt. „Kommst du … von Thron und Krone?“' }),
   chainQ(CHAIN_OATH, 2, { id: 'c_eid2', kind: 'bring', name: 'Siegelsplitter', text: 'Aldric trug ein Siegel, das beim Fall des Throns zerbrach. Sammle 4 Siegelsplitter von den Wesen der Aschenöde.', minLevel: 21, requires: 'c_eid1', item: 'Siegelsplitter', monsters: ['ash_walker', 'cinder_wisp', 'imp', 'night_stalker'], chance: 0.35, count: 4, outro: 'Aldric hält die Splitter an die Brust. „Noch hält es. Noch.“' }),
   chainQ(CHAIN_OATH, 3, { id: 'c_eid3', kind: 'visit', name: 'Hinter der Asche', text: 'Aldric bittet dich, den Aschengrund im Osten der Öde zu betreten und zurückzukehren – er muss wissen, ob das Tor offen ist.', minLevel: 27, requires: 'c_eid2', place: 'Aschengrund', outro: 'Aldric schließt die Augen. „Offen. Wie ich fürchtete.“' }),
   chainQ(CHAIN_OATH, 4, { id: 'c_eid4', kind: 'unique', name: 'Morvaths Schwur', text: 'Aschenfürst Morvath hält die Pforte im Aschengrund. Zerschlage ihn, damit Aldrics Eid erfüllt ist.', minLevel: 28, requires: 'c_eid3', target: 'abyss_warden', reward: 'unique', outro: 'Aldric lächelt zum ersten Mal. „Die Wache … ist vorbei.“' }),
@@ -459,6 +459,20 @@ QUESTS.push(
   chainQ(CHAIN_WEB, 2, { id: 'c_web2', kind: 'bring', name: 'Seidenstränge', text: 'Sammle 5 Seidenstränge von den Spinnen im Nest. Die Schmiede brauchen sie als Beweis.', minLevel: 14, requires: 'c_web1', item: 'Seidenstrang', monsters: ['giant_spider', 'web_stalker', 'nest_matron', 'brood_spider'], chance: 0.4, count: 5, outro: 'Haldor hebt einen Strang ins Licht. „Dünner als Haar, fester als Stahl.“' }),
   chainQ(CHAIN_WEB, 3, { id: 'c_web3', kind: 'kill', name: 'Spinnenkönigin Vyrra', text: 'Töte die Königin des Nests, bevor sie sich ausbreitet.', minLevel: 17, requires: 'c_web2', target: 'spider_queen', reward: 'rare', outro: 'Haldor schweigt lange. „Schlaf gut heute Nacht. Ich werde es nicht.“' }),
 );
+
+/** Stabile NPC-Schlüssel (Gesprächsaufgaben referenzieren diese statt des Anzeigenamens) → Anzeigename. */
+export const NPC_KEYS: Record<string, string> = {
+  maren: 'Chronistin Maren',
+  haldor: 'Torwache Haldor',
+  ysa: 'Jägerin Ysa',
+  olm: 'Eremit Olm',
+  pell: 'Schatzsucher Pell',
+  aldric: 'Ritter Aldric',
+};
+/** Schlüssel eines NPC (aus dem Anzeigenamen) oder undefined. */
+export function npcKeyOf(name: string): string | undefined {
+  return Object.keys(NPC_KEYS).find((k) => NPC_KEYS[k] === name);
+}
 
 /** Dialoge der benannten NPCs (2–4 Absätze). Schlüssel: NPC-Name. Die Aufgaben stehen an den NPCs der Karte (Eigenschaft `quests`). */
 export const NPC_LORE: Record<string, string[]> = {

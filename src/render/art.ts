@@ -806,10 +806,31 @@ function spritePlayer(look: Look, frame: number, scale: number = SPRITE_SCALE.no
       for (const l of layers) if (l) x.drawImage(l, 0, 0);
       x.restore();
     };
+    // Saum von Umhang und Robe: unterhalb der Hüfte im Schritt leicht gegenläufig zum Schwung der Beine verschoben
+    // (Frame 0 bleibt unverändert: Versatz 0, Teilung an der Hüfte ist nahtlos)
+    const hem = (l: HTMLImageElement | null): void => {
+      if (!l) return;
+      x.save();
+      if (walking) x.translate(-side, -1);
+      x.beginPath();
+      x.rect(0, HIP, SP, SP - HIP);
+      x.clip();
+      x.drawImage(l, 0, 0);
+      x.restore();
+    };
     // Umhang hinter dem Körper, damit die Rüstung sichtbar bleibt
-    if (cloak) x.drawImage(cloak, 0, 0);
+    if (cloak) {
+      x.save();
+      x.beginPath();
+      x.rect(0, 0, SP, HIP);
+      x.clip();
+      x.drawImage(cloak, 0, 0);
+      x.restore();
+      hem(cloak);
+    }
     lowerHalf(true, [base, legs, boots]);
     lowerHalf(false, [base, legs, boots]);
+    hem(body);
     // Oberkörper: beim Gehen leichte Gegenneigung um die Hüfte und tiefer im Schritt
     x.save();
     if (walking) {
@@ -823,7 +844,15 @@ function spritePlayer(look: Look, frame: number, scale: number = SPRITE_SCALE.no
     x.clip();
     x.drawImage(base, 0, 0);
     x.restore();
-    for (const l of [body, gloves, hair, head, shield]) if (l) x.drawImage(l, 0, 0);
+    if (body) {
+      x.save();
+      x.beginPath();
+      x.rect(0, 0, SP, HIP);
+      x.clip();
+      x.drawImage(body, 0, 0);
+      x.restore();
+    }
+    for (const l of [gloves, hair, head, shield]) if (l) x.drawImage(l, 0, 0);
     if (wpn) drawPlayerWeapon(x, wpn, look, frame, attacking, walking ? side : 0);
     x.restore();
   }, scale, FEET_ORIGIN_Y);
