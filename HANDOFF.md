@@ -1,5 +1,21 @@
 # HANDOFF – Aschenthron
 
+## Lehrer nach Fachgebiet (uncommittet)
+- Trainer-NPCs haben `field` (`Kampf`|`Magie`, Tiled-Eigenschaft `field`); Skill-Fachgebiet = `skillField()` (area Magie → Magie, sonst Kampf), Prüfung `trainerTeaches()` in `world.ts` (learn/trainSkill), UI-Schleife über alle Lehrer in `ui.ts` `renderSide`. Ohne `field` lehrt ein Lehrer alles (Tests/alte Karten).
+- Karte: Lehrer Varn + Meisterin Kjorra = Kampf; neu Magierin Selka (Stufe 1, Haus mit Zauberstab-Schild gid 37 am Hafenplatz, `SPOT['magier']`) und Erzmagier Orvan (Stufe 2, Felsenwacht). Neues Türsymbol `staff` (`town.ts`), Sprites in `spriteMap.ts` (Varn jetzt human_new).
+- Offen: Respec-Knopf erscheint nur beim ersten Lehrer in Reichweite; im Spiel Selka/Orvan-Fenster einmal anklicken.
+- **Entscheidungen (zuletzt):** (1) Fachgebiet als optionales `field` am Trainer statt neuer NPC-Art: abwärtskompatibel, Tests/alte Karten lehren weiter alles. (2) Trennung nach Skill-`area` (Magie vs. Rest), nicht nach `school`: einfach und eindeutig, Passive wie Manafluss gehören zur Magie. (3) Magierhaus als zehntes Haus am Hafenplatz mit neuem Türsymbol `staff` (gid 37) statt vorhandene Häuser zu teilen.
+- **Learnings:** `spawnPlayer(w, x, y, name)` – ein falscher Aufruf mit 2 Argumenten lief in Vitest durch (kein Typecheck), also immer `npx tsc --noEmit` zusätzlich zu Vitest. `nearNpc(w,a,'trainer')` liefert nur den ersten Lehrer in Reichweite, bei mehreren Lehrern daher `w.npcs.filter` verwenden.
+- **Offen:** Beide Änderungen (Handelsstraße, Lehrer-Split) noch uncommittet; im Spiel Selka/Orvan-Fenster und Handelsstraße einmal ablaufen.
+
+## Handelsstraße – Stand: Handelsstraße (uncommittet, nur lokal)
+- **Stand:** `scripts/gen_map.py`, Abschnitt "Handelsstraße (sicherer Weg)" vor "Prüfung"; `src/data/aschenthron.json` neu erzeugt. Straße Osttor Aschenhafen → (89,141) → (89,106) → (112,106) → Südtor Felsenwacht, plus Osttor Felsenwacht → Hochland-Eingang (144,70). Streifen `SAFE_R=10` ohne Monster. Tests 265 grün, tsc ok, Pace 8,5 h / 14 Tode / Lvl 30.
+- **Entscheidungen:** (1) Rudel werden *verschoben* statt gelöscht (`relocate_packs`), damit XP-Angebot/Pace gleich bleiben. (2) Verschiebung nur innerhalb derselben Zone (`zone_of`) und gleicher Bodenkachel, sonst würden Düsterwald-Rudel in die Felder wandern. (3) Eigener Zufallsstrom `random.Random(7731)` und Ablauf nach allem Alten, damit der Rest der Karte unverändert bleibt; `MAP_VERSION` unverändert.
+- **TODO:** Im Spiel ablaufen/Screenshot prüfen; Straßen zu Totenacker/Aschenöde/Räuberlager (Eintrag in `TRADE_ROAD`); Wegweiser/Hinweis im Spiel (z. B. NPC-Text); committen.
+- **Learnings:** Aggro nur 4–6 Felder (`AGGRO_MAX`, `data.ts`), Rudelalarm `PACK_ALERT_RANGE`, Leash 14. Zwischen den Städten gab es vorher keine durchgehende Straße (`road()`-Aufrufe sind nur Zonen-Stubs). `--preview` in gen_map.py stürzt bei Kachel 15+ ab (ch-Tabelle). Camp-Boden ist Gid 7 wie Straße – nie über Gid 7 auf "Straße" schließen, `trade_tiles` verwenden.
+
+---
+
 ## AKTUELL: Aschenhafen als Hafenstadt (lokal committet, NICHT gepusht) + Stufe 6 komplett
 - **Aschenhafen neu** (`scripts/gen_map.py`, Abschnitt "Aschenhafen als Hafenstadt"; Moosbrück entfernt): Stadt x14–47/y132–175 + Kai/Stege bis y183, Nord- und Osttor, Hauptstraße + Querstraße mit Brunnen, Hafenplatz mit Marktständen, Booten, Schiff. 9 Häuser (8×6, Dielen, Tür mit Berufsschild), je ein NPC: Hafenmeister Joren (Anker, Willkommens-Infos + Ankunftskette), Lehrer Varn (Buch), Händlerin Mirel (Münzen), Schmiedin Ilse (Amboss), Lagerverwalter Ottmar (Truhe), Hauptmann Brandt (Schild), Kräuterfrau Odda (Blatt), Händler Wenzel (Schwert, Shop `artisan`), Chronistin Maren (Schriftrolle). Start am Hafen (31,170). MAP_VERSION unverändert (nur Wasser und Altstadt umgebaut).
 - **Grafik** `src/render/town.ts` (prozedural): neue Kacheln 15 Dielen, 16 Pflaster, 17 Blumenwiese (TILE_PAL in `art.ts`), Props 18 Hauswand, 19 Fass, 20 Kisten, 21 Brunnen, 22 Laterne, 23 Boot, 24 Stand, 25 Pfahl, 26 Schiff, 27 Blumenkasten (blockiert, `tiled.ts` BLOCKED), Türen 28–36 (begehbar, Symbol je Beruf, Achse aus Nachbarwänden in `GameScene.townProp`).

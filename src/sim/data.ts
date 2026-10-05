@@ -582,7 +582,8 @@ export const NPC_KEYS: Record<string, string> = {
 /** Rollenhinweis im Fenster jedes Stadt-NPCs: Was kann ich hier tun? */
 export const NPC_ROLE: Record<string, string> = {
   'Hafenmeister Joren': 'Willkommen! Frag mich, wenn du nicht weißt, wohin.',
-  'Lehrer Varn': 'Hier lernst du Fertigkeiten und verteilst deine Skillpunkte neu.',
+  'Lehrer Varn': 'Kampflehrer: Nahkampf, Fernkampf und Überleben lernen; hier verteilst du auch deine Skillpunkte neu.',
+  'Magierin Selka': 'Magielehrerin: Zauber lernen (Feuer, Frost, Heilung, Schutz). Kampffertigkeiten lehrt Varn.',
   'Händlerin Mirel': 'Kaufen und verkaufen: Waffen, Rüstung, Tränke.',
   'Händler Wenzel': 'Spezialausrüster: Ausrüstung für besondere Spielstile (Stäbe, Schilde, Ringe).',
   'Schmiedin Ilse': 'Gegenstände aufwerten, Zusatzwerte neu würfeln, Edelsteine einsetzen.',

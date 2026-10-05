@@ -9,10 +9,10 @@ import { TILE_H, TILE_W, WALL_H, ctxOf, css, diamondPath, grounded, mkCanvas, ou
 type Ctx = CanvasRenderingContext2D;
 
 /** Kachelnummern der Stadtprops (siehe scripts/gen_map.py und tiled.ts) */
-export const TOWN_GID = { wall: 18, barrel: 19, crates: 20, well: 21, lantern: 22, boat: 23, stall: 24, post: 25, ship: 26, flowers: 27, doorFirst: 28, doorLast: 36 } as const;
+export const TOWN_GID = { wall: 18, barrel: 19, crates: 20, well: 21, lantern: 22, boat: 23, stall: 24, post: 25, ship: 26, flowers: 27, doorFirst: 28, doorLast: 37 } as const;
 /** Kacheln, die über dem Wasser stehen (Boden darunter ist Wasser, kein Gras) */
 export const WATER_PROP_GIDS = new Set<number>([TOWN_GID.boat, TOWN_GID.post, TOWN_GID.ship]);
-export const DOOR_ICONS = ['anchor', 'book', 'coins', 'anvil', 'chest', 'shield', 'leaf', 'scroll', 'sword'] as const;
+export const DOOR_ICONS = ['anchor', 'book', 'coins', 'anvil', 'chest', 'shield', 'leaf', 'scroll', 'sword', 'staff'] as const;
 export type DoorIcon = (typeof DOOR_ICONS)[number];
 
 const PLASTER = [0xcdbf9f, 0xd8c8a8, 0xbfae90, 0xc9b69a];
@@ -121,6 +121,9 @@ function drawIcon(x: Ctx, icon: DoorIcon, ox: number, oy: number): void {
       break;
     case 'scroll':
       R(2, 3, 9, 9, 0xe8dcb8); R(1, 2, 11, 2, 0xc8b888); R(1, 11, 11, 2, 0xc8b888); R(3, 5, 6, 1, 0x6a5a40); R(3, 7, 5, 1, 0x6a5a40); R(3, 9, 6, 1, 0x6a5a40); R(10, 0, 2, 7, 0xe0e0e0);
+      break;
+    case 'staff':
+      R(6, 4, 2, 9, 0x6a4a2a); R(5, 1, 4, 4, 0x60c0f0); R(6, 0, 2, 6, 0xc8f0ff); R(4, 2, 6, 2, 0xc8f0ff); R(2, 8, 1, 1, 0xe8c840); R(11, 6, 1, 1, 0xe8c840); R(10, 10, 1, 1, 0xe8c840);
       break;
     case 'sword':
       R(6, 1, 2, 8, 0xd8d8e0); R(5, 9, 4, 1, 0xe8b830); R(6, 10, 2, 3, 0x6a4a2a); R(2, 4, 3, 2, 0x4a6aa8); R(3, 6, 1, 4, 0x4a6aa8);

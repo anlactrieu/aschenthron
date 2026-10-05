@@ -2,7 +2,7 @@ import { NPC_ROLE, npcKeyOf, ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOL
 import { POWER_TEXT, TEMPLATES, TIER_COLOR, GEM_COLOR, affixRange, gemAffix, gemName, handsOf, itemAffixes, itemReq, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
 import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
-  bulkSellable, sellPrice, critChance, attrBonus, equipSlotFor, socketCost, maxHpOf, maxManaOf, missingReq, nearNpc, powerOf, resistOf, type Actor, type Command, type Npc, type World,
+  bulkSellable, sellPrice, critChance, attrBonus, equipSlotFor, socketCost, maxHpOf, maxManaOf, missingReq, nearNpc, trainerTeaches, powerOf, resistOf, type Actor, type Command, type Npc, type World,
   activeSkills, gearStat, parryChance, passiveSum,
 } from '../sim/world';
 import { buildProfile } from '../sim/build';
@@ -939,7 +939,7 @@ export class Ui {
       return;
     }
     const body = el('div', 'a-body');
-    const trainer = near.find((n) => n.kind === 'trainer');
+    const trainers = near.filter((n) => n.kind === 'trainer');
     const merchants = near.filter((n) => n.kind === 'merchant');
     const stash = near.find((n) => n.kind === 'stash');
     const smith = near.find((n) => n.kind === 'smith');
@@ -1029,16 +1029,19 @@ export class Ui {
       }
       body.append(grid, el('div', 'a-note', 'Gegenstände aus dem Rucksack hierher ziehen (und zurück).'));
     }
-    if (trainer) {
-      body.append(el('div', 'a-sec', `${trainer.name} – Lehrer · ${p.skillPoints} Skillpunkte`));
-      const rs = el('button', 'a-btn', p.freeRespec ? 'Alles neu verteilen (einmal gratis)' : `Alles neu verteilen (${respecPrice(p.level)}g)`);
-      rs.title = 'Setzt Attribute und Fertigkeiten zurück, du bekommst alle Punkte zurück.';
-      rs.style.marginBottom = '6px';
-      rs.onclick = () => {
-        if (confirm(`Attribute und Fertigkeiten ${p.freeRespec ? 'einmalig kostenlos' : `für ${respecPrice(p.level)} Gold`} zurücksetzen?`)) this.send({ type: 'respec' });
-      };
-      body.append(rs);
-      for (const s of SKILLS.filter((x) => x.tier <= (trainer.tier ?? 1))) body.append(this.skillCard(s, p));
+    for (const trainer of trainers) {
+      const label = trainer.field === 'Magie' ? 'Magielehrer' : trainer.field === 'Kampf' ? 'Kampflehrer' : 'Lehrer';
+      body.append(el('div', 'a-sec', `${trainer.name} – ${label} · ${p.skillPoints} Skillpunkte`));
+      if (trainer === trainers[0]) {
+        const rs = el('button', 'a-btn', p.freeRespec ? 'Alles neu verteilen (einmal gratis)' : `Alles neu verteilen (${respecPrice(p.level)}g)`);
+        rs.title = 'Setzt Attribute und Fertigkeiten zurück, du bekommst alle Punkte zurück.';
+        rs.style.marginBottom = '6px';
+        rs.onclick = () => {
+          if (confirm(`Attribute und Fertigkeiten ${p.freeRespec ? 'einmalig kostenlos' : `für ${respecPrice(p.level)} Gold`} zurücksetzen?`)) this.send({ type: 'respec' });
+        };
+        body.append(rs);
+      }
+      for (const s of SKILLS.filter((x) => trainerTeaches(trainer, x))) body.append(this.skillCard(s, p));
     }
     if (smith) {
       body.append(el('div', 'a-sec', `${smith.name} – Schmiede`));

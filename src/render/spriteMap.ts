@@ -97,7 +97,9 @@ export const MONSTER_SPRITES: Record<string, MonsterSprite> = {
 
 /** NPC-Sprites: erst nach Name, dann nach Art (Händler, Lehrer, Schmied, Truhe, Questgeber). */
 export const NPC_NAME_SPRITES: Record<string, string> = {
-  'Lehrer Varn': 'monster/wizard.png',
+  'Lehrer Varn': 'monster/human_new.png',
+  'Magierin Selka': 'monster/wizard.png',
+  'Erzmagier Orvan': 'monster/wizard.png',
   'Hafenmeister Joren': 'monster/unique/frederick_new.png',
   'Lagerverwalter Ottmar': 'monster/human_new.png',
   'Händler Wenzel': 'monster/dwarf_new.png',

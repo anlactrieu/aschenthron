@@ -1,5 +1,5 @@
 import type { Grid } from './path';
-import { addNpc, createWorld, giveStarterKit, spawnMonster, spawnPlayer, type NpcKind, type Rect, type World } from './world';
+import { addNpc, createWorld, giveStarterKit, spawnMonster, spawnPlayer, type NpcKind, type Rect, type TrainerField, type World } from './world';
 
 interface TiledProp {
   name: string;
@@ -27,7 +27,7 @@ export interface TiledMap {
   layers: TiledLayer[];
 }
 
-/** Nicht begehbare Tile-IDs: 2 Wand, 6 Wasser, 10 Baum, 11 Fels, 12 Lava, 13 Grabstein, 14 Säule, 0 leer; Stadt: 18 Hauswand, 19 Fass, 20 Kisten, 21 Brunnen, 22 Laterne, 23 Boot, 24 Stand, 25 Pfahl, 26 Schiff, 27 Blumenkasten (begehbar: 15 Dielen, 16 Pflaster, 17 Blumenwiese, 28–36 Türen) */
+/** Nicht begehbare Tile-IDs: 2 Wand, 6 Wasser, 10 Baum, 11 Fels, 12 Lava, 13 Grabstein, 14 Säule, 0 leer; Stadt: 18 Hauswand, 19 Fass, 20 Kisten, 21 Brunnen, 22 Laterne, 23 Boot, 24 Stand, 25 Pfahl, 26 Schiff, 27 Blumenkasten (begehbar: 15 Dielen, 16 Pflaster, 17 Blumenwiese, 28–37 Türen) */
 const BLOCKED = new Set([0, 2, 6, 10, 11, 12, 13, 14, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]);
 
 export interface LoadedMap {
@@ -65,6 +65,7 @@ export function buildWorld(seed: number, map: TiledMap, opts: { player?: boolean
       addNpc(world, kind, o.name, o.x / ts, o.y / ts, {
         shop: prop(o, 'shop'),
         tier: prop(o, 'tier') ? Number(prop(o, 'tier')) : undefined,
+        field: prop(o, 'field') as TrainerField | undefined,
         quests: prop(o, 'quests')?.split(','),
       });
     }

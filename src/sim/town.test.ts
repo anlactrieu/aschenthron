@@ -3,7 +3,8 @@ import mapJson from '../data/aschenthron.json';
 import { buildWorld, loadMap, type TiledMap } from './tiled';
 import { NPC_KEYS, NPC_ROLE, QUESTS, SHOPS } from './data';
 import { TEMPLATES } from './items';
-import { applyCommand, drainEvents, inSafeZone, regionAt, spawnPlayer } from './world';
+import { addNpc, applyCommand, drainEvents, inSafeZone, regionAt, skillField, spawnPlayer } from './world';
+import { SKILLS } from './data';
 
 const map = mapJson as unknown as TiledMap;
 const { world: w } = buildWorld(1, map, { player: false });
@@ -33,11 +34,13 @@ describe('Aschenhafen (Hafenstadt)', () => {
   });
 
   it('jede Rolle hat einen NPC mit Rollenhinweis; Lehrer lehrt Stufe 1, zwei Händler mit verschiedenem Sortiment', () => {
-    expect(inTown).toHaveLength(9);
+    expect(inTown).toHaveLength(10);
     const kinds = inTown.map((n) => n.kind).sort();
-    expect(kinds).toEqual(['merchant', 'merchant', 'quest', 'quest', 'quest', 'quest', 'smith', 'stash', 'trainer']);
+    expect(kinds).toEqual(['merchant', 'merchant', 'quest', 'quest', 'quest', 'quest', 'smith', 'stash', 'trainer', 'trainer']);
     for (const n of inTown) expect(NPC_ROLE[n.name], n.name).toBeDefined();
-    expect(inTown.find((n) => n.kind === 'trainer')!.tier).toBe(1);
+    const trainers = inTown.filter((n) => n.kind === 'trainer');
+    expect(trainers.map((n) => n.tier)).toEqual([1, 1]);
+    expect(trainers.map((n) => n.field).sort()).toEqual(['Kampf', 'Magie']);
     const shops = inTown.filter((n) => n.kind === 'merchant').map((n) => n.shop);
     expect(new Set(shops).size).toBe(2);
     for (const key of shops) for (const id of SHOPS[key!]!) {
@@ -133,5 +136,50 @@ describe('Aschenhafen (Hafenstadt)', () => {
     }
     expect(p.gold).toBeGreaterThan(gold);
     void spawnPlayer;
+  });
+});
+
+describe('Lehrer nach Fachgebiet', () => {
+  const fresh = () => {
+    const w2 = buildWorld(2, map, { player: false }).world;
+    const p = spawnPlayer(w2, 1, 1, 'Test');
+    p.level = 30; p.gold = 99999; p.skillPoints = 10;
+    return { w2, p };
+  };
+  const at = (w2: typeof w, p: ReturnType<typeof spawnPlayer>, name: string) => {
+    const n = w2.npcs.find((x) => x.name === name)!;
+    p.x = n.x; p.y = n.y + 1;
+  };
+  it('Magie nur beim Magielehrer, Kampf nur beim Kampflehrer – in Aschenhafen und Felsenwacht', () => {
+    const { w2, p } = fresh();
+    at(w2, p, 'Lehrer Varn');
+    applyCommand(w2, p.id, { type: 'learnSkill', skillId: 'ember_bolt' });
+    expect(p.skills).toEqual([]);
+    applyCommand(w2, p.id, { type: 'learnSkill', skillId: 'power_strike' });
+    expect(p.skills).toEqual(['power_strike']);
+    at(w2, p, 'Magierin Selka');
+    applyCommand(w2, p.id, { type: 'learnSkill', skillId: 'quick_shot' });
+    expect(p.skills).toEqual(['power_strike']);
+    applyCommand(w2, p.id, { type: 'learnSkill', skillId: 'ember_bolt' });
+    expect(p.skills).toEqual(['power_strike', 'ember_bolt']);
+    // Stufe-2-Zauber verlangt den Erzmagier
+    applyCommand(w2, p.id, { type: 'learnSkill', skillId: 'fireball' });
+    expect(p.skills).not.toContain('fireball');
+    at(w2, p, 'Erzmagier Orvan');
+    applyCommand(w2, p.id, { type: 'learnSkill', skillId: 'fireball' });
+    expect(p.skills).toContain('fireball');
+    at(w2, p, 'Meisterin Kjorra');
+    applyCommand(w2, p.id, { type: 'learnSkill', skillId: 'lightning' });
+    expect(p.skills).not.toContain('lightning');
+  });
+  it('jeder Skill hat genau ein Fachgebiet; Lehrer ohne Fachgebiet (Testwelten) lehrt weiter alles', () => {
+    expect(SKILLS.filter((s) => s.area === 'Magie').every((s) => skillField(s) === 'Magie')).toBe(true);
+    expect(SKILLS.filter((s) => s.area !== 'Magie').every((s) => skillField(s) === 'Kampf')).toBe(true);
+    const { w2, p } = fresh();
+    addNpc(w2, 'trainer', 'Alleskönner', 5, 5, { tier: 1 });
+    p.x = 5; p.y = 6;
+    applyCommand(w2, p.id, { type: 'learnSkill', skillId: 'ember_bolt' });
+    applyCommand(w2, p.id, { type: 'learnSkill', skillId: 'power_strike' });
+    expect(p.skills).toEqual(['ember_bolt', 'power_strike']);
   });
 });

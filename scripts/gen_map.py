@@ -215,7 +215,8 @@ npc("Truhe", 9, 10, t1x, t1y, kind="stash")
 npc("Schmiedin Ilse", 14, 9, t1x, t1y, kind="smith")
 npc("Hauptmann Brandt", 16, 6, t1x, t1y, kind="quest", quests="q_rats,q_chests1,q_hounds,q_goblins,q_bandits,q_spiders,q_goblin_scouts,q_unique1")
 npc("Kräuterfrau Odda", 4, 9, t1x, t1y, kind="quest", quests="q_herbs,q_ghouls")
-npc("Meisterin Kjorra", 5, 7, t2x, t2y, kind="trainer", tier=2)
+npc("Meisterin Kjorra", 5, 7, t2x, t2y, kind="trainer", tier=2, field="Kampf")
+npc("Erzmagier Orvan", 8, 9, t2x, t2y, kind="trainer", tier=2, field="Magie")
 npc("Händler Dorn", 12, 7, t2x, t2y, kind="merchant", shop="advanced")
 npc("Truhe", 11, 12, t2x, t2y, kind="stash")
 npc("Schmied Torgal", 3, 11, t2x, t2y, kind="smith")
@@ -610,7 +611,7 @@ def house(lx0, ly0, door_side, icon):
     inner = {'S': (0, -1), 'N': (0, 1), 'E': (-1, 0), 'W': (1, 0)}[door_side]
     setg(door[0], door[1], 28 + ICONS.index(icon))
     return (door[0] + inner[0], door[1] + inner[1])
-ICONS = ['anchor', 'book', 'coins', 'anvil', 'chest', 'shield', 'leaf', 'scroll', 'sword']
+ICONS = ['anchor', 'book', 'coins', 'anvil', 'chest', 'shield', 'leaf', 'scroll', 'sword', 'staff']
 SPOT = {}
 SPOT['wache'] = house(5, 1, 'S', 'shield')
 SPOT['kraeuter'] = house(22, 1, 'S', 'leaf')
@@ -621,15 +622,16 @@ SPOT['ausruester'] = house(22, 20, 'W', 'sword')
 SPOT['lager'] = house(5, 28, 'E', 'chest')
 SPOT['chronik'] = house(22, 28, 'W', 'scroll')
 SPOT['hafen'] = house(3, 35, 'E', 'anchor')
+SPOT['magier'] = house(22, 35, 'W', 'staff')       # Magielehrerin: Gegenstück zum Hafenmeisterhaus am Hafenplatz
 # Schmuck: Gärten, Bäume, Laternen, Fässer, Kisten, Marktstände, Blumenkästen
 for ly in range(8, 12):
     for lx in range(1, 4): setg(lx, ly, 17)
     for lx in range(30, 33): setg(lx, ly, 17)
 for lx, ly in [(2, 3), (2, 5), (31, 3), (31, 5), (2, 15), (31, 15), (2, 26), (31, 26)]: setg(lx, ly, 10)
-for lx, ly in [(14, 3), (20, 3), (14, 14), (20, 14), (14, 18), (20, 18), (14, 26), (20, 26), (14, 34), (20, 34), (9, 9), (26, 9), (11, 36), (24, 36)]: setg(lx, ly, 22)
+for lx, ly in [(14, 3), (20, 3), (14, 14), (20, 14), (14, 18), (20, 18), (14, 26), (20, 26), (14, 34), (20, 34), (9, 9), (26, 9), (11, 36)]: setg(lx, ly, 22)
 for lx, ly in [(13, 21), (13, 26), (21, 26), (21, 21), (13, 29), (30, 40)]: setg(lx, ly, 19)
 for lx, ly in [(13, 25), (21, 25), (2, 36), (27, 42)]: setg(lx, ly, 20)
-for lx, ly in [(13, 37), (22, 37)]: setg(lx, ly, 24)
+for lx, ly in [(13, 37)]: setg(lx, ly, 24)
 for lx, ly in [(7, 7), (11, 7), (24, 7), (28, 7), (7, 11), (11, 11), (24, 11), (28, 11)]: setg(lx, ly, 27)
 
 # alte Objekte der Stadt entfernen (NPCs, Zonen, Start), neue setzen
@@ -648,7 +650,8 @@ obj("Aschenhafen", "safezone", tx0 - 1, ty0 - 1, tx1 - tx0 + 3, 55)
 obj("Aschenhafen", "region", tx0 - 1, ty0 - 1, tx1 - tx0 + 3, 55, levels="Stadt")
 def npc_at(name, key, **props): obj(name, "npc", *L(*SPOT[key]), **props)
 npc_at("Hafenmeister Joren", 'hafen', kind="quest", quests="c_arr1")
-npc_at("Lehrer Varn", 'lehrer', kind="trainer", tier=1, quests="c_arr2")
+npc_at("Lehrer Varn", 'lehrer', kind="trainer", tier=1, field="Kampf", quests="c_arr2")
+npc_at("Magierin Selka", 'magier', kind="trainer", tier=1, field="Magie")
 npc_at("Händlerin Mirel", 'haendler', kind="merchant", shop="basic", quests="c_arr3")
 npc_at("Schmiedin Ilse", 'schmied', kind="smith", quests="c_arr4")
 npc_at("Lagerverwalter Ottmar", 'lager', kind="stash", quests="c_arr5")
@@ -656,6 +659,63 @@ npc_at("Hauptmann Brandt", 'wache', kind="quest", quests="q_rats,q_chests1,q_hou
 npc_at("Kräuterfrau Odda", 'kraeuter', kind="quest", quests="q_herbs,q_ghouls")
 npc_at("Händler Wenzel", 'ausruester', kind="merchant", shop="artisan")
 npc_at("Chronistin Maren", 'chronik', kind="quest", quests="c_gob1")
+
+# ------------------------------------------------------------------ Handelsstraße (sicherer Weg)
+# Eine durchgehende Straße verbindet Aschenhafen mit der Felsenwacht (und weiter bis zum Hochland-Eingang). Entlang der Straße
+# bleibt ein Streifen frei von Monstern: Wer nur reisen will, wird nicht angegriffen. Rudel in dem Streifen ziehen innerhalb ihrer
+# Zone nach außen (Anzahl und Stufen bleiben gleich). Nach allem Alten und mit eigenem Zufallsstrom, damit der Rest unverändert bleibt.
+TRADE_ROAD = [[(TOWN[2] + 1, 141), (89, 141), (89, 106), (112, 106), (113, 94)],     # Osttor Aschenhafen -> Südtor Felsenwacht (dort schließt die alte Straße an)
+              [(TOWN2[2], 70), (144, 70)]]                                           # Osttor Felsenwacht -> Hochland-Eingang
+SAFE_R = 10                                                                           # Aggro-Reichweite ist höchstens 6, Rest ist Puffer
+trade_tiles = set()
+for pts in TRADE_ROAD:
+    before = {(x, y) for y in range(H) for x in range(W) if g[y][x] == 7}
+    road(pts, width=3)
+    for (ax, ay), (bx, by) in zip(pts, pts[1:]):
+        for x in range(min(ax, bx) - 1, max(ax, bx) + 2):
+            for y in range(min(ay, by) - 1, max(ay, by) + 2):
+                if 0 <= x < W and 0 <= y < H and g[y][x] == 7: trade_tiles.add((x, y))
+trade_pts = sorted(trade_tiles)
+def near_trade(x, y, r=SAFE_R):
+    return any((x - a) ** 2 + (y - b) ** 2 < r * r for a, b in trade_pts if abs(x - a) < r and abs(y - b) < r)
+zone_rects = list(ZONES.values())
+def zone_of(x, y): return next((i for i, (a, b, c, d) in enumerate(zone_rects) if a <= x <= c and b <= y <= d), None)
+rng2 = random.Random(7731)
+def relocate_packs():
+    mons_ = [o for o in objs if o["type"] == "monster"]
+    groups = collections.defaultdict(list)
+    for o in mons_:
+        pk = int(prop(o, "pack") or 0)
+        groups[pk if pk else -o["id"]].append(o)
+    moved = lost = 0
+    for key, mem in groups.items():
+        tiles = [(o["x"] // TS, o["y"] // TS) for o in mem]
+        if not any(near_trade(x, y) for x, y in tiles): continue
+        if any(g[y][x] == 5 for x, y in tiles): continue                               # Dungeons nie anfassen
+        zs = {zone_of(x, y) for x, y in tiles}
+        z0 = tiles and zone_of(*tiles[0])
+        others = [(o2["x"] // TS, o2["y"] // TS) for o2 in mons_ if o2 not in mem]
+        done = False
+        for r in range(1, 41):
+            cand = [(dx, dy) for dx in range(-r, r + 1) for dy in range(-r, r + 1) if max(abs(dx), abs(dy)) == r]
+            rng2.shuffle(cand)
+            for dx, dy in cand:
+                ok = True
+                for x, y in tiles:
+                    nx, ny = x + dx, y + dy
+                    if not (free(nx, ny) and g[ny][nx] == g[y][x] and zone_of(nx, ny) == z0 and not in_safe(nx, ny, 2) and not near_trade(nx, ny)
+                            and not any(abs(nx - a) < 2 and abs(ny - b) < 2 for a, b in others)):
+                        ok = False; break
+                if ok:
+                    for o in mem: o["x"] += dx * TS; o["y"] += dy * TS
+                    moved += 1; done = True; break
+            if done: break
+        if not done:
+            lost += len(mem)
+            ids = {o["id"] for o in mem}; objs[:] = [o for o in objs if o["id"] not in ids]
+    return moved, lost
+mv, ls = relocate_packs()
+print("Handelsstraße: %d Straßenfelder, %d Rudel nach außen verschoben, %d Monster entfernt" % (len(trade_tiles), mv, ls), file=sys.stderr)
 
 # ------------------------------------------------------------------ Prüfung
 sx, sy = START

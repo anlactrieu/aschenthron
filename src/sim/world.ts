@@ -189,6 +189,8 @@ export interface Chest {
 }
 
 export type NpcKind = 'trainer' | 'merchant' | 'stash' | 'quest' | 'smith';
+/** Fachgebiet eines Lehrers: Magie (Zauber) oder Kampf (Nahkampf, Fernkampf, Überleben). Ohne Angabe lehrt er alles. */
+export type TrainerField = 'Kampf' | 'Magie';
 export interface Npc {
   id: number;
   kind: NpcKind;
@@ -198,6 +200,8 @@ export interface Npc {
   /** Händler: Sortiment-Schlüssel; Lehrer: Stufe; Questgeber: Quest-IDs */
   shop?: string;
   tier?: number;
+  /** Lehrer: Fachgebiet (ohne Angabe: alle) */
+  field?: TrainerField;
   quests?: string[];
 }
 
@@ -607,6 +611,14 @@ export function regionAt(w: World, x: number, y: number): (Rect & { name: string
   return best;
 }
 
+/** Fachgebiet einer Fertigkeit: Zauber lehrt der Magielehrer, alles andere der Kampflehrer. */
+export function skillField(s: { area: string }): TrainerField {
+  return s.area === 'Magie' ? 'Magie' : 'Kampf';
+}
+export function trainerTeaches(n: Npc, s: { area: string; tier: number }): boolean {
+  return (n.tier ?? 1) >= s.tier && (!n.field || n.field === skillField(s));
+}
+
 export function nearNpc(w: World, a: Actor, kind: NpcKind): Npc | undefined {
   return w.npcs.find((n) => n.kind === kind && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
 }
@@ -779,9 +791,12 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
     case 'trainSkill': {
       const s = skillById(cmd.skillId);
       if (!s) return;
-      const trainer = nearNpc(w, a, 'trainer');
-      if (!trainer) return fail(w, 'Kein Lehrer in der Nähe.');
-      if ((trainer.tier ?? 1) < s.tier) return fail(w, 'Das lehrt dieser Lehrer nicht.');
+      const trainers = w.npcs.filter((n) => n.kind === 'trainer' && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
+      if (!trainers.length) return fail(w, 'Kein Lehrer in der Nähe.');
+      if (!trainers.some((n) => trainerTeaches(n, s))) {
+        if (trainers.every((n) => n.field && n.field !== skillField(s))) return fail(w, skillField(s) === 'Magie' ? 'Zauber lehrt dir ein Magielehrer.' : 'Das lehrt dir ein Kampflehrer, kein Magier.');
+        return fail(w, 'Das lehrt dieser Lehrer nicht.');
+      }
       const known = a.skills.includes(s.id);
       const rank = known ? (a.skillRanks[s.id] ?? 1) : 0;
       if (cmd.type === 'learnSkill' && known) return fail(w, 'Bereits gelernt – Ränge steigerst du mit dem Plus.');
