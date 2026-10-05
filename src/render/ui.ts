@@ -198,6 +198,7 @@ export class Ui {
     private useSkillSlot: (i: number) => void,
     private usePotionKind: (kind: 'heal' | 'mana') => void,
     private newGame: () => void,
+    private saveIo: { export: () => string; import: (json: string) => boolean } | null = null,
   ) {
     const style = document.createElement('style');
     style.textContent = CSS;
@@ -785,6 +786,52 @@ export class Ui {
     cb.style.margin = '14px 0 0 8px';
     cb.onclick = () => toggleCredits();
     body.append(nb, cb);
+    if (this.saveIo) this.renderSaveIo(body);
+  }
+
+  /** Spielstand liegt nur im Browser: Sicherung als Datei oder Code, damit er mit Browserwechsel/Inkognito mitzieht. */
+  private renderSaveIo(body: HTMLElement): void {
+    const io = this.saveIo!;
+    body.append(el('div', 'a-sec', 'Spielstand sichern'));
+    body.append(el('div', 'a-note', 'Der Spielstand liegt nur in diesem Browser (nicht im Inkognito-Fenster, nicht in anderen Browsern). Mit Datei oder Code nimmst du ihn mit.'));
+    const row = el('div');
+    row.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;margin-top:6px';
+    const btn = (label: string, fn: () => void): HTMLButtonElement => {
+      const b = el('button', 'a-btn', label) as HTMLButtonElement;
+      b.onclick = fn;
+      row.append(b);
+      return b;
+    };
+    btn('Als Datei speichern', () => {
+      const url = URL.createObjectURL(new Blob([io.export()], { type: 'application/json' }));
+      const a = Object.assign(document.createElement('a'), { href: url, download: `aschenthron-spielstand-${new Date().toISOString().slice(0, 10)}.json` });
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      this.say('Spielstand als Datei gespeichert.');
+    });
+    btn('Code kopieren', () => {
+      const text = io.export();
+      const done = () => this.say('Spielstand-Code in die Zwischenablage kopiert.');
+      if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done, () => window.prompt('Code kopieren (Strg/Cmd+C):', text));
+      else window.prompt('Code kopieren (Strg/Cmd+C):', text);
+    });
+    const load = (json: string): void => {
+      if (!confirm('Aktuellen Spielstand durch den geladenen ersetzen? (Der alte bleibt als Sicherung im Browser.)')) return;
+      if (!io.import(json)) this.say('Das ist kein gültiger Spielstand.');
+    };
+    btn('Aus Datei laden', () => {
+      const inp = Object.assign(document.createElement('input'), { type: 'file', accept: '.json,application/json' });
+      inp.onchange = () => {
+        const f = inp.files?.[0];
+        if (f) void f.text().then(load);
+      };
+      inp.click();
+    });
+    btn('Code einfügen', () => {
+      const t = window.prompt('Spielstand-Code hier einfügen:');
+      if (t) load(t.trim());
+    });
+    body.append(row);
   }
 
   private renderSkills(body: HTMLElement, p: Actor): void {

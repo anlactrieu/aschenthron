@@ -128,7 +128,7 @@ export class GameScene extends Phaser.Scene {
     }
     const saved = store?.getItem(SAVE_KEY);
     const p = this.player();
-    this.ui = new Ui((c) => this.send(c), (i) => this.useSkillSlot(i), (k) => this.usePotionKind(k), () => this.newGame());
+    this.ui = new Ui((c) => this.send(c), (i) => this.useSkillSlot(i), (k) => this.usePotionKind(k), () => this.newGame(), this.remote ? null : { export: () => exportPlayer(this.player()), import: (json) => this.importSave(json) });
     this.sfx = new Sfx();
     this.atmo = new Atmosphere(this, this.sfx);
     this.minimap = new Minimap(this.world, this.tiles);
@@ -173,6 +173,28 @@ export class GameScene extends Phaser.Scene {
     this.resetting = true;
     safeStorage()?.removeItem(SAVE_KEY);
     location.reload();
+  }
+
+  /** Spielstand aus Datei/Code übernehmen: prüfen, alten Stand als Sicherung behalten, neu laden. */
+  private importSave(json: string): boolean {
+    try {
+      const o = JSON.parse(json) as { player?: unknown };
+      if (!o || typeof o !== 'object' || !o.player || typeof o.player !== 'object') return false;
+    } catch {
+      return false;
+    }
+    const store = safeStorage();
+    if (!store) return false;
+    try {
+      const old = store.getItem(SAVE_KEY);
+      if (old) store.setItem(`${SAVE_KEY}.backup`, old);
+      store.setItem(SAVE_KEY, json);
+    } catch {
+      return false;
+    }
+    this.resetting = true;
+    location.reload();
+    return true;
   }
 
   private save(): void {
