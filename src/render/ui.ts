@@ -556,7 +556,7 @@ export class Ui {
 
   private dollImage(p: Actor): string {
     const look = lookOf(p);
-    const key = `${look.chest}_${look.head}_${look.weapon}_${look.hands}_${look.weaponKind}_${look.robe}_${look.quiver}`;
+    const key = `${look.chest}_${look.head}_${look.weapon}_${look.hands}_${look.weaponKind}_${look.robe}_${look.quiver}_${look.shield}`;
     if (key !== this.dollKey) {
       this.dollKey = key;
       this.dollUrl = playerCanvas(look, 0).toDataURL();

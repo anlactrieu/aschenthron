@@ -1011,7 +1011,7 @@ export class GameScene extends Phaser.Scene {
       const img = view.img;
       if (a.kind === 'player') {
         const look = lookOf(a);
-        const key = `pl_${look.chest}_${look.head}_${look.weapon}_${look.hands}_${look.weaponKind}_${look.robe ? 1 : 0}_${look.quiver ? 1 : 0}_${frame}${view.up ? 'b' : ''}`;
+        const key = `pl_${look.chest}_${look.head}_${look.weapon}_${look.hands}_${look.weaponKind}_${look.robe ? 1 : 0}_${look.quiver ? 1 : 0}_${look.shield}_${frame}${view.up ? 'b' : ''}`;
         img.setTexture(ensureTexture(this, key, () => playerCanvas(look, frame, !!view.up)));
       } else {
         const k = monsterKind(a.kindId!);

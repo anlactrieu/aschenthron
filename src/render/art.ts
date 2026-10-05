@@ -542,6 +542,8 @@ export interface Look {
   /** Robe statt Rüstung: langer Rock */
   robe: boolean;
   quiver: boolean;
+  /** Schild in der Nebenhand: Stufe (-1 = keins) */
+  shield: number;
 }
 
 export function lookOf(a: Actor): Look {
@@ -555,11 +557,12 @@ export function lookOf(a: Actor): Look {
     weaponKind: kind === 'bow' ? 1 : kind === 'staff' ? 2 : 0,
     robe: !!a.equipment.chest && a.equipment.chest.templateId.includes('robe'),
     quiver: a.equipment.offhand?.off === 'arrows',
+    shield: a.equipment.offhand?.off === 'shield' ? tierOf(templateById(a.equipment.offhand.templateId).minLevel) : -1,
   };
 }
 
 export function playerCanvas(look: Look, frame: number, back = false): HTMLCanvasElement {
-  const key = `pl_${look.chest}_${look.head}_${look.weapon}_${look.hands}_${look.weaponKind}_${look.robe ? 1 : 0}_${look.quiver ? 1 : 0}_${frame}${back ? 'b' : ''}`;
+  const key = `pl_${look.chest}_${look.head}_${look.weapon}_${look.hands}_${look.weaponKind}_${look.robe ? 1 : 0}_${look.quiver ? 1 : 0}_${look.shield}_${frame}${back ? 'b' : ''}`;
   return actorCanvas(key, (x) => {
     BACK = back;
     POSE = frame === 2 ? 'wind' : frame === 3 ? 'strike' : 'idle';
@@ -580,6 +583,13 @@ export function playerCanvas(look: Look, frame: number, back = false): HTMLCanva
       rect(x, 1, 6, 3, 9, 0x6a4a28);
       rect(x, 1, 5, 1, 2, 0xe8e0d0);
       rect(x, 2, 4, 1, 3, 0xd8c890);
+    }
+    if (look.shield >= 0) {
+      // Schild vor dem linken Arm
+      const sc = TIER_COL[look.shield]!;
+      rect(x, 0, 8, 5, 7, shade(sc, 0.75));
+      rect(x, 1, 9, 3, 5, sc);
+      rect(x, 2, 11, 1, 1, shade(sc, 1.4));
     }
     if (look.robe) {
       // langer Rock bis zu den Füßen
