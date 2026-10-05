@@ -221,7 +221,8 @@ describe('Neue Fertigkeiten', () => {
     for (const s of SKILLS) {
       expect([1, 2]).toContain(s.tier);
       expect(s.levelReq).toBeLessThanOrEqual(MAX_LEVEL);
-      if (s.heal === undefined) expect(s.mult !== undefined || s.base !== undefined).toBe(true);
+      // jeder Skill wirkt: Schaden, Heilung, Statuseffekt/Sonderwirkung oder Passiv
+      expect(s.heal !== undefined || s.mult !== undefined || s.base !== undefined || !!s.effect || !!s.action || !!s.passive).toBe(true);
     }
     expect(SKILLS.filter((s) => s.area === 'Nahkampf').length).toBeGreaterThanOrEqual(3);
     expect(SKILLS.filter((s) => s.area === 'Fernkampf').length).toBeGreaterThanOrEqual(3);

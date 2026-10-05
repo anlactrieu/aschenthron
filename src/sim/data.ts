@@ -63,7 +63,8 @@ export function totalXpFor(level: number): number {
 
 export type MonsterFamily = 'beast' | 'humanoid' | 'undead' | 'spider' | 'ghoul' | 'golem' | 'demon' | 'worm' | 'elemental';
 
-export type Ability = 'slam' | 'summon' | 'charge' | 'cast' | 'heal' | 'poisonBite' | 'archer' | 'raise';
+/** ward: schützt sich selbst vor Elementarschaden; dispel: bannt Verstärkungen des Ziels (Gegenmaßnahme zu Schutzzaubern) */
+export type Ability = 'slam' | 'summon' | 'charge' | 'cast' | 'heal' | 'poisonBite' | 'archer' | 'raise' | 'ward' | 'dispel';
 
 /** Schadensarten; Resistenz in Prozent (negativ = Schwäche, 100 = immun). */
 export type DmgType = 'physical' | 'fire' | 'frost' | 'poison';
@@ -72,11 +73,15 @@ export const DMG_COLOR: Record<DmgType, string> = { physical: '#ffffff', fire: '
 export const MAX_RES = 75;
 
 /** Statuseffekte (Dauer in Ticks im Actor-Feld `status`). */
-export type StatusId = 'slow' | 'stun' | 'burn';
+export type StatusId = 'slow' | 'stun' | 'burn' | 'ward' | 'stoneskin' | 'bandage' | 'weaken' | 'curse' | 'silence';
 /** Alle Statuseffekte an einer Stelle (Ablauf, Netz, HUD): neue Effekte hier und in `effects.ts` eintragen. */
-export const STATUS_IDS: readonly StatusId[] = ['slow', 'stun', 'burn'];
-export const STATUS_NAME: Record<StatusId, string> = { slow: 'Verlangsamt', stun: 'Betäubt', burn: 'Brennt' };
-export const STATUS_COLOR: Record<StatusId, string> = { slow: '#8fd0ff', stun: '#ffe45a', burn: '#ff9a3a' };
+export const STATUS_IDS: readonly StatusId[] = ['slow', 'stun', 'burn', 'ward', 'stoneskin', 'bandage', 'weaken', 'curse', 'silence'];
+export const STATUS_NAME: Record<StatusId, string> = {
+  slow: 'Verlangsamt', stun: 'Betäubt', burn: 'Brennt', ward: 'Elementarschild', stoneskin: 'Steinhaut', bandage: 'Verband', weaken: 'Entkräftet', curse: 'Verflucht', silence: 'Verstummt',
+};
+export const STATUS_COLOR: Record<StatusId, string> = {
+  slow: '#8fd0ff', stun: '#ffe45a', burn: '#ff9a3a', ward: '#7fb0ff', stoneskin: '#c8b898', bandage: '#8fe0a0', weaken: '#b08adf', curse: '#d05a8a', silence: '#e0e0e8',
+};
 /** Verlangsamung: Tempo und Angriffstempo auf diesen Faktor */
 export const SLOW_FACTOR = 0.6;
 
@@ -167,7 +172,7 @@ export const MONSTERS: MonsterKind[] = [
   mk('goblin', 'Goblin', 2, 'humanoid', 0x6a9a4a, { hp: 0.9 }),
   mk('goblin_scout', 'Goblinkundschafter', 4, 'humanoid', 0x7ab05a, { speed: 0.115, hp: 0.9 }),
   mk('goblin_warrior', 'Goblinkrieger', 8, 'humanoid', 0x5a8a3a, { hp: 1.25, dmg: 1.1 }),
-  mk('goblin_shaman', 'Goblinschamane', 10, 'humanoid', 0x8ac06a, { hp: 0.85, dmg: 1.25, abil: ['cast', 'heal'], dt: 'fire' }),
+  mk('goblin_shaman', 'Goblinschamane', 10, 'humanoid', 0x8ac06a, { hp: 0.85, dmg: 1.25, abil: ['cast', 'heal', 'ward'], dt: 'fire' }),
   mk('goblin_archer', 'Goblinschütze', 5, 'humanoid', 0x7ab05a, { hp: 0.8, dmg: 0.9, cd: 24, abil: ['archer'] }),
   mk('goblin_chief', 'Goblinhäuptling', 13, 'humanoid', 0x4a7a2a, { hp: 1.8, dmg: 1.2, cd: 22 }),
   mk('goblin_brute', 'Goblinbrecher', 11, 'humanoid', 0x4f7f30, { hp: 1.4, dmg: 1.15, cd: 22 }),
@@ -189,15 +194,15 @@ export const MONSTERS: MonsterKind[] = [
   // Sumpf
   mk('bog_ghoul', 'Sumpfghul', 6, 'ghoul', 0x5a8a5a, { speed: 0.085, hp: 1.15 }),
   mk('marsh_corpse', 'Moorleiche', 9, 'ghoul', 0x6a7a52, { speed: 0.08, hp: 1.35 }),
-  mk('bog_witch', 'Sumpfhexe', 11, 'humanoid', 0x7a4a8a, { hp: 0.85, dmg: 1.3, abil: ['cast'], dt: 'poison' }),
+  mk('bog_witch', 'Sumpfhexe', 11, 'humanoid', 0x7a4a8a, { hp: 0.85, dmg: 1.3, abil: ['cast', 'ward'], dt: 'poison' }),
   mk('ghoul_alpha', 'Ghulalpha', 15, 'ghoul', 0x4a6a3a, { speed: 0.09, hp: 1.6, dmg: 1.2 }),
   // Untote
   mk('skeleton', 'Skelett', 8, 'undead', 0xdcd4bc, { hp: 0.9, dmg: 1.05 }),
   mk('wraith', 'Friedhofsgeist', 9, 'undead', 0x8a9ad8, { speed: 0.095, hp: 0.9, dmg: 1.15 }),
-  mk('bone_acolyte', 'Knochenakolyth', 11, 'undead', 0xb8c8d8, { hp: 0.85, dmg: 1.1, abil: ['cast', 'heal'] }),
+  mk('bone_acolyte', 'Knochenakolyth', 11, 'undead', 0xb8c8d8, { hp: 0.85, dmg: 1.1, abil: ['cast', 'heal', 'dispel'] }),
   mk('zombie', 'Zombie', 10, 'undead', 0x7a8a62, { speed: 0.075, hp: 1.5 }),
   mk('bone_knight', 'Knochenritter', 13, 'undead', 0xd8d0b8, { speed: 0.085, hp: 1.3 }),
-  mk('necromancer', 'Totenbeschwörer', 14, 'undead', 0x6a4a8a, { hp: 0.9, dmg: 1.15, abil: ['cast', 'raise'], summon: 'skeleton', dt: 'frost' }),
+  mk('necromancer', 'Totenbeschwörer', 14, 'undead', 0x6a4a8a, { hp: 0.9, dmg: 1.15, abil: ['cast', 'raise', 'ward'], summon: 'skeleton', dt: 'frost' }),
   mk('crypt_guard', 'Gruftwächter', 18, 'undead', 0xb8b0c8, { speed: 0.08, hp: 1.55, dmg: 1.15 }),
   mk('death_knight', 'Todesritter', 27, 'undead', 0x5a5a7a, { hp: 1.4, dmg: 1.2 }),
   // Trolle und Golems
@@ -306,7 +311,7 @@ export interface SkillInfo {
 export interface SkillDef {
   id: string;
   name: string;
-  area: 'Nahkampf' | 'Fernkampf' | 'Magie';
+  area: 'Nahkampf' | 'Fernkampf' | 'Magie' | 'Überleben';
   levelReq: number;
   price: number;
   mana: number;
@@ -339,8 +344,19 @@ export interface SkillDef {
   target?: SkillTarget;
   /** Passiv: wirkt dauerhaft, belegt keinen Hotbar-Platz, wird nicht gewirkt */
   passive?: boolean;
+  /** Passiv: Wirkung je Rang (Summe über alle gelernten Passiven in `passiveSum`) */
+  pass?: Partial<Record<PassiveKey, number>>;
+  /** Statuseffekt auf Selbst (target self) oder Gegner: Stärke `mag` + `magPerRank` je Rang ab Rang 2, höchstens `cap` */
+  effect?: { id: StatusId; seconds: number; mag?: number; magPerRank?: number; cap?: number };
+  /** Sonderwirkung ohne Schaden: Läuterung (Debuffs und Kontrolle von dir entfernen) oder Bannung (Verstärkungen des Ziels entfernen) */
+  action?: 'cleanse' | 'dispel';
   info?: SkillInfo;
 }
+
+/** Passive Wirkungen (Prozent bzw. Punkte je Rang, siehe `passiveSum` in `world.ts`) */
+export type PassiveKey = 'parry' | 'evade' | 'crit' | 'armorPen' | 'shieldArmor' | 'manaCost' | 'manaRegen' | 'stealth' | 'fieldRegen' | 'carry';
+/** Obergrenzen gestapelter Passiven (Balance) */
+export const PASSIVE_CAP: Partial<Record<PassiveKey, number>> = { parry: 15, armorPen: 40, manaCost: 25, stealth: 40, shieldArmor: 60 };
 
 /** Funktionsgruppe eines Skills: explizit gesetzt oder aus den Wirkfeldern abgeleitet. */
 export function schoolOf(s: SkillDef): SkillSchool {
@@ -363,6 +379,39 @@ export const SKILLS: SkillDef[] = [
   { id: 'fireball', name: 'Feuerball', area: 'Magie', levelReq: 16, price: 1200, mana: 24, cooldown: 90, range: 7, base: [28, 42], scales: 'verstand', aoe: 2, ignoresArmor: true, dmgType: 'fire', status: { id: 'burn', seconds: 3 }, tier: 2, desc: 'Feuerschaden, explodiert am Ziel und trifft Gegner in der Nähe; setzt in Brand.' },
   { id: 'skull_split', name: 'Schädelspalter', area: 'Nahkampf', levelReq: 18, price: 1500, mana: 22, cooldown: 160, range: 1.5, mult: 3.2, ignoresArmor: false, status: { id: 'stun', seconds: 1.5 }, tier: 2, desc: 'Gewaltiger Hieb mit mehr als dreifachem Waffenschaden, betäubt 1,5 s.' },
   { id: 'lightning', name: 'Blitzschlag', area: 'Magie', levelReq: 22, price: 2400, mana: 30, cooldown: 120, range: 8, base: [60, 90], scales: 'verstand', ignoresArmor: true, tier: 2, desc: 'Zerschmetternder Blitz auf ein Ziel; ignoriert Rüstung und Elementarresistenzen (hohe Manakosten, lange Abklingzeit).' },
+  // Stufe 6: Schutz, Schwächung, Kontrolle, Bannung, Passive, Hilfsfertigkeiten
+  { id: 'cleanse', name: 'Läuterung', area: 'Magie', levelReq: 7, price: 300, mana: 12, cooldown: 300, range: 0, ignoresArmor: true, school: 'dispel', target: 'self', action: 'cleanse', tier: 1, desc: 'Entfernt Verlangsamung, Betäubung, Brand und Gift von dir.',
+    info: { role: 'Reinigt dich von Debuffs und Kontrolle.', build: 'Jeder Zauberwirker und Nahkämpfer, der gegen Gift, Frost und Betäubung kämpft.', synergy: 'Gut gegen Spinnen (Gift, Verlangsamung), Frost- und Brandangriffe; ergänzt Willenskraft und Resistenzen.', decision: 'Ein Skillpunkt gegen mehr Schaden: Du überlebst Kontrolle statt sie auszusitzen.', limit: 'Heilt keinen Schaden, schützt nicht vor dem nächsten Effekt, Abklingzeit 15 s.' } },
+  { id: 'elemental_ward', name: 'Elementarschild', area: 'Magie', levelReq: 8, price: 350, mana: 16, cooldown: 400, range: 0, ignoresArmor: true, school: 'protect', target: 'self', effect: { id: 'ward', seconds: 12, mag: 30, magPerRank: 4, cap: 60 }, tier: 1, desc: 'Senkt 12 s lang erlittenen Feuer-, Frost- und Giftschaden um 30 % (+4 % je Rang) und verkürzt Brand und Gift.',
+    info: { role: 'Zeitlich begrenzter Elementarschutz zusätzlich zu Resistenzen (Obergrenze 75 % gesamt).', build: 'Elementarmagier, Kampfmagier und alle, die gegen Schamanen, Imps und Spinnen kämpfen.', synergy: 'Addiert sich zu Resistenz-Affixen und Edelsteinen; wirkt auf Brand-Dauer.', decision: 'Mana und eine Aktion für Überleben statt Schaden; Zeitpunkt vor dem Kampf wählen.', limit: 'Hilft nicht gegen physischen Schaden; ein Entzauberer (Knochenakolyth) bannt den Schild.' } },
+  { id: 'weaken', name: 'Entkräftung', area: 'Magie', levelReq: 9, price: 400, mana: 12, cooldown: 300, range: 7, ignoresArmor: true, school: 'debuff', target: 'enemy', effect: { id: 'weaken', seconds: 10, mag: 25, magPerRank: 3, cap: 50 }, tier: 1, desc: 'Der Gegner verursacht 10 s lang 25 % (+3 % je Rang) weniger Schaden.',
+    info: { role: 'Senkt den ausgehenden Schaden eines einzelnen Gegners.', build: 'Kontroll- und Debuff-Spezialisten, Schildkämpfer gegen einzelne starke Gegner.', synergy: 'Mit hoher Rüstung und Schildbeherrschung wird ein einzelner Gegner kaum noch gefährlich.', decision: 'Eine Aktion gegen Dauerschaden, lohnt bei Elite- und Bossgegnern.', limit: 'Nur ein Ziel, wirkt nicht auf Flächenangriffe oder Beschwörungen, ersetzt nur schwächere Entkräftung.' } },
+  { id: 'dispel_magic', name: 'Entzaubern', area: 'Magie', levelReq: 10, price: 500, mana: 12, cooldown: 200, range: 7, ignoresArmor: true, school: 'dispel', target: 'enemy', action: 'dispel', tier: 2, desc: 'Entfernt Schutz- und Verstärkungszauber vom Ziel.',
+    info: { role: 'Bannt Verstärkungen eines Gegners.', build: 'Kampfmagier und Kontroll-Spezialisten gegen Zauberer.', synergy: 'Gegen Schamanen, Hexen und Totenbeschwörer, die sich mit Elementarschild schützen; danach Direktschaden.', decision: 'Ein Zug, der keinen Schaden macht, aber den Schild des Gegners zerstört.', limit: 'Wirkt nur auf Verstärkungen, nie auf Gift, Brand oder Kontrolle.' } },
+  { id: 'stone_skin', name: 'Steinhaut', area: 'Magie', levelReq: 12, price: 600, mana: 18, cooldown: 500, range: 0, ignoresArmor: true, school: 'protect', target: 'self', effect: { id: 'stoneskin', seconds: 12, mag: 25, magPerRank: 4, cap: 55 }, tier: 2, desc: 'Senkt 12 s lang erlittenen Nahkampf- und Fernkampfschaden (nach Rüstung) um 25 % (+4 % je Rang).',
+    info: { role: 'Zeitlich begrenzter Schutz gegen physische Treffer.', build: 'Schildkämpfer und Kampfmagier im Nahkampf.', synergy: 'Mit Rüstung, Schildbeherrschung und Parieren; ergänzt den Elementarschild.', decision: 'Mana gegen Lebensverlust in harten Kämpfen.', limit: 'Mindert keinen Elementar-, Gift- oder Brandschaden und keine Zauber, die Rüstung ignorieren.' } },
+  { id: 'silence', name: 'Verstummen', area: 'Magie', levelReq: 13, price: 800, mana: 14, cooldown: 360, range: 7, ignoresArmor: true, school: 'control', target: 'enemy', effect: { id: 'silence', seconds: 4 }, tier: 2, desc: 'Der Gegner kann 4 s lang nicht zaubern, heilen oder beschwören; Bosse halb so lange.',
+    info: { role: 'Unterbricht Zauberer und Heiler.', build: 'Kontroll-Spezialisten, Fernkämpfer gegen Schamanen und Totenbeschwörer.', synergy: 'Schaltet Heiler, Beschwörer und Schutzzauber der Gegner aus; wiederholte Anwendung verkürzt sich.', decision: 'Ein Zug gegen die wichtigste Fähigkeit des Gegners statt Schaden.', limit: 'Hindert keine Nahkampfangriffe und keine Pfeile; kurz, Wiederholungen werden kürzer.' } },
+  { id: 'curse', name: 'Fluch der Blöße', area: 'Magie', levelReq: 14, price: 900, mana: 20, cooldown: 450, range: 7, ignoresArmor: true, school: 'debuff', target: 'enemy', effect: { id: 'curse', seconds: 8, mag: 15, magPerRank: 2, cap: 35 }, tier: 2, desc: 'Der Gegner erleidet 8 s lang 15 % (+2 % je Rang) mehr Schaden.',
+    info: { role: 'Erhöht den Schaden, den ein Gegner erleidet.', build: 'Debuff-Spezialisten und Nahkämpfer gegen Bosse.', synergy: 'Mit großen Einzeltreffern (Schädelspalter, Blitzschlag) am wertvollsten.', decision: 'Eine Aktion und Mana zum Verstärken aller folgenden Treffer.', limit: 'Nur ein Ziel, hält 8 s, stärkerer Fluch ersetzt schwächeren.' } },
+  { id: 'first_aid', name: 'Erste Hilfe', area: 'Überleben', levelReq: 3, price: 150, mana: 0, cooldown: 1200, range: 0, ignoresArmor: true, school: 'utility', target: 'self', effect: { id: 'bandage', seconds: 8, mag: 3, magPerRank: 0.5, cap: 6 }, tier: 1, desc: 'Verband: heilt 8 s lang 3 % (+0,5 % je Rang) deines Lebens pro Sekunde; jeder Treffer löst ihn.',
+    info: { role: 'Kostenlose Heilung außerhalb von Kämpfen.', build: 'Jeder Build, der Tränke sparen will, besonders Magier ohne Mana-Reserve.', synergy: 'Mit Überleben und Rasten; spart Heiltränke beim Jagen.', decision: 'Ein Skillpunkt gegen Tränke: Zeit statt Gold.', limit: 'Jeder erlittene Treffer löst den Verband; Abklingzeit 60 s; kein Kampfmittel.' } },
+  { id: 'mana_flow', name: 'Manafluss', area: 'Magie', levelReq: 6, price: 250, mana: 0, cooldown: 0, range: 0, ignoresArmor: true, school: 'resource', target: 'self', passive: true, pass: { manaCost: 4, manaRegen: 10 }, tier: 1, desc: 'Passiv: Manakosten −4 % und Manaregeneration +10 % je Rang.',
+    info: { role: 'Verwaltet Mana: günstigere Zauber und schnellere Erholung.', build: 'Elementar- und Kampfmagier, Heiler.', synergy: 'Mit Willenskraft (Regeneration) und Stäben mit hohem Mana.', decision: 'Dauerhafter Vorteil statt neuem Zauber.', limit: 'Erhöht keinen Schaden; Kostensenkung höchstens 25 %.' } },
+  { id: 'parry', name: 'Parieren', area: 'Nahkampf', levelReq: 5, price: 300, mana: 0, cooldown: 0, range: 0, ignoresArmor: false, school: 'protect', target: 'self', passive: true, pass: { parry: 3 }, tier: 1, desc: 'Passiv: 3 % Chance je Rang, einen Nahkampfangriff ganz abzuwehren (Einhandwaffe oder Schild nötig).',
+    info: { role: 'Wehrt manche Nahkampftreffer vollständig ab.', build: 'Schild- und Einhandkämpfer.', synergy: 'Mit Schild (auch Schildbeherrschung) und Einhandwaffen; Dolche mit schnellem Tempo profitieren vom Austausch.', decision: 'Verteidigung als Glück statt Rüstung.', limit: 'Nicht mit Zweihand, Bogen oder Stab; wirkt nicht gegen Zauber, Pfeile oder Flächenschaden; höchstens 15 %.' } },
+  { id: 'shield_mastery', name: 'Schildbeherrschung', area: 'Nahkampf', levelReq: 8, price: 450, mana: 0, cooldown: 0, range: 0, ignoresArmor: false, school: 'protect', target: 'self', passive: true, pass: { shieldArmor: 12 }, tier: 1, desc: 'Passiv: Schilde bringen 12 % mehr Rüstung je Rang.',
+    info: { role: 'Verstärkt die Rüstung des angelegten Schilds.', build: 'Defensiver Schildkämpfer.', synergy: 'Mit Schwergewichtsschilden, Parieren und Steinhaut.', decision: 'Nur mit Schild nützlich: festlegen auf Einhand und Schild.', limit: 'Ohne Schild wirkungslos; Zweihandwaffen und Bögen schließen den Schild aus.' } },
+  { id: 'armor_break', name: 'Rüstungsbrecher', area: 'Nahkampf', levelReq: 9, price: 500, mana: 0, cooldown: 0, range: 0, ignoresArmor: false, school: 'direct', target: 'enemy', passive: true, pass: { armorPen: 6 }, tier: 2, desc: 'Passiv: Angriffe ignorieren 6 % der gegnerischen Rüstung je Rang.',
+    info: { role: 'Durchdringt Rüstung bei normalen Angriffen und Skills.', build: 'Nahkämpfer und Fernkämpfer gegen gepanzerte Gegner (Golems, Ritter).', synergy: 'Mit schweren Waffen (Zweihänder) und Schädelspalter.', decision: 'Dauerhafter Vorteil gegen Rüstung statt mehr Schaden.', limit: 'Wirkt nicht auf Zauber, die Rüstung ohnehin ignorieren; höchstens 40 %.' } },
+  { id: 'precision', name: 'Präzision', area: 'Fernkampf', levelReq: 7, price: 400, mana: 0, cooldown: 0, range: 0, ignoresArmor: false, school: 'direct', target: 'enemy', passive: true, pass: { crit: 2 }, tier: 1, desc: 'Passiv: +2 % kritische Trefferchance je Rang (zählt zur Obergrenze von 50 %).',
+    info: { role: 'Mehr kritische Treffer (doppelter Schaden).', build: 'Fernkämpfer und schnelle Dolchkämpfer.', synergy: 'Mit Eile und Krit-Affixen; Salve wirkt mehrfach.', decision: 'Schwankender Zusatzschaden statt Verlässlichkeit.', limit: 'Gesamt höchstens 50 % Krit; kein Effekt gegen immune Gegner.' } },
+  { id: 'evasion_training', name: 'Ausweichtraining', area: 'Fernkampf', levelReq: 6, price: 350, mana: 0, cooldown: 0, range: 0, ignoresArmor: false, school: 'protect', target: 'self', passive: true, pass: { evade: 6 }, tier: 1, desc: 'Passiv: +6 Ausweichwert je Rang (weniger gegnerische Treffer, keine Wirkung gegen Zauber).',
+    info: { role: 'Mehr Ausweichen gegen normale Angriffe.', build: 'Fernkämpfer und leicht gerüstete Kämpfer.', synergy: 'Mit Gewandtheit, Umhängen und Lederrüstung.', decision: 'Leichte Rüstung plus Ausweichen statt Plattenpanzer.', limit: 'Trefferchance bleibt mindestens 35 %; Zauber und Flächenschaden treffen immer.' } },
+  { id: 'stealth', name: 'Schleichen', area: 'Überleben', levelReq: 6, price: 300, mana: 0, cooldown: 0, range: 0, ignoresArmor: false, school: 'utility', target: 'self', passive: true, pass: { stealth: 8 }, tier: 1, desc: 'Passiv: Gegner bemerken dich 8 % je Rang später (kleinerer Entdeckungsradius).',
+    info: { role: 'Verkleinert den Radius, in dem Gegner dich entdecken.', build: 'Fernkämpfer, Jäger, Schatzsucher.', synergy: 'Mit Bogen: Ziele ansprechen, bevor sie angreifen.', decision: 'Vermeiden statt Kämpfen.', limit: 'Verhindert keinen Rudelalarm und wirkt nicht, wenn du Gegner angreifst; höchstens 40 %.' } },
+  { id: 'survival', name: 'Überleben', area: 'Überleben', levelReq: 4, price: 200, mana: 0, cooldown: 0, range: 0, ignoresArmor: false, school: 'utility', target: 'self', passive: true, pass: { fieldRegen: 0.5, carry: 2 }, tier: 1, desc: 'Passiv: +0,5 Leben/s außerhalb von Städten und +2 Traglast je Rang.',
+    info: { role: 'Erholung in der Wildnis und mehr Tragkraft.', build: 'Jäger und Grinder ohne viele Tränke.', synergy: 'Mit Erster Hilfe und Rasten (R).', decision: 'Ausdauer im Feld statt Kampfkraft.', limit: 'Wirkt nicht in Städten (dort ohnehin schnelle Erholung) und nicht im Kampf mit viel Schaden.' } },
 ];
 
 export function skillById(id: string): SkillDef | undefined {

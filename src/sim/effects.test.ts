@@ -116,7 +116,7 @@ describe('Effekte (Stufe 6, Phase 1)', () => {
     expect(schoolOf(SKILLS.find((s) => s.id === 'poison_shot')!)).toBe('dot');
     const { w, p } = fresh();
     p.skills = SKILLS.map((s) => s.id);
-    expect(activeSkills(p)).toEqual(p.skills);
+    expect(activeSkills(p)).toEqual(p.skills.filter((id) => !SKILLS.find((s) => s.id === id)!.passive));
     SKILLS.push({ ...SKILLS[0]!, id: 'test_passive', passive: true });
     try {
       p.skills.push('test_passive');

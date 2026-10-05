@@ -4,7 +4,7 @@ import { EQUIP_SLOT_LIST, GEM_KINDS, LEGENDARIES, SETS, TEMPLATES, handsOf, type
 import { maxHpOf, maxManaOf, type Actor, type World } from './world';
 
 const KEYS = [
-  'x', 'y', 'hp', 'mana', 'level', 'xp', 'statPoints', 'attrs', 'gold', 'skills', 'inventory', 'equipment', 'stash', 'maxHp', 'quests', 'skillRanks', 'skillPoints',
+  'x', 'y', 'hp', 'mana', 'level', 'xp', 'statPoints', 'attrs', 'gold', 'skills', 'inventory', 'equipment', 'stash', 'maxHp', 'quests', 'skillRanks', 'skillPoints', 'freeRespec',
 ] as const;
 
 
@@ -106,6 +106,8 @@ export function importPlayer(w: World, p: Actor, json: string): boolean {
         p.quests[id] = { state: st.state as 'active' | 'done' | 'turned', progress: Math.max(0, Math.floor(num(st.progress, 0))) };
       }
     }
+    // Altstände (ohne Merker): einmal kostenlos neu verteilen, damit die neuen Fertigkeiten ausprobiert werden können
+    p.freeRespec = typeof s.freeRespec === 'boolean' ? s.freeRespec : true;
     p.skillCd = {};
     p.path = [];
     p.targetId = null;

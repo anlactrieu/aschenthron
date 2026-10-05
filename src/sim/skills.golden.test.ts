@@ -8,6 +8,9 @@ import type { Grid } from './path';
  * Golden-Test: Werte, Ereignisse und RNG-Stand jedes Skills in festen Szenarien.
  * Schützt das Refactoring von `useSkill` (Stufe 6, Phase 1): die 12 Alt-Skills müssen identisch bleiben.
  */
+/** Die 12 Skills von vor Stufe 6 (neue Skills haben eigene Tests). */
+const LEGACY = ['power_strike', 'quick_shot', 'ember_bolt', 'healing_hand', 'poison_shot', 'whirlwind', 'frost_nova', 'multishot', 'fireball', 'skull_split', 'lightning'];
+const LEGACY_SKILLS = SKILLS.filter((s) => LEGACY.includes(s.id));
 const open = (): Grid => ({ w: 40, h: 40, walkable: new Array(1600).fill(true) });
 
 function setup(seed: number, weapon: string | null, offhand: string | null, rank: number, critBuild: boolean) {
@@ -17,8 +20,8 @@ function setup(seed: number, weapon: string | null, offhand: string | null, rank
   p.attrs = { kraft: 30, gewandtheit: 30, ausdauer: 20, verstand: 30, willenskraft: 20 };
   p.maxHp = p.hp = 5000;
   p.mana = 5000;
-  p.skills = SKILLS.map((s) => s.id);
-  p.skillRanks = Object.fromEntries(SKILLS.map((s) => [s.id, rank]));
+  p.skills = LEGACY_SKILLS.map((s) => s.id);
+  p.skillRanks = Object.fromEntries(LEGACY_SKILLS.map((s) => [s.id, rank]));
   for (const id of [weapon, offhand]) {
     if (!id) continue;
     const it = generateItem(w.rng, w.nextId++, id, 'normal');
@@ -49,7 +52,7 @@ function run(skillId: string, o: { weapon?: string | null; offhand?: string | nu
 }
 
 describe('Skills golden', () => {
-  for (const s of SKILLS) {
+  for (const s of LEGACY_SKILLS) {
     it(`${s.id} Rang 1`, () => {
       expect(run(s.id, { weapon: s.area === 'Fernkampf' ? 'hunt_bow' : s.area === 'Magie' ? 'oak_staff' : 'steel_sword', offhand: s.area === 'Fernkampf' ? 'iron_arrows' : null, hurt: s.id === 'healing_hand' })).toMatchSnapshot();
     });

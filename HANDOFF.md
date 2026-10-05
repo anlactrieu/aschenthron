@@ -3,7 +3,9 @@
 ## AKTUELL: Stufe 6 (Build-Tiefe) – Phase 1 (Fundament) umgesetzt und committet, Phase 2/3 offen
 - Phase 1: `effects.ts` (EFFECTS-Tabelle, mergeStatus, controlDr, cleanse/dispel), `STATUS_IDS` in `data.ts`, `SkillDef.school/target/passive/info` + `schoolOf`, `useSkill` zerlegt (Golden-Test `skills.golden.test.ts` + Snapshot beweist identische Werte), Event `note` (Kampflog, immer mit `to`), `activeSkills(p)` für Hotbar/Slots. 223 Tests, Lint, Build grün. NICHT gepusht (Push auf main deployt Pages).
 - Offen aus Phase 1: Blitzschlag-Fix (kein passender DmgType; eigener Commit/Entscheidung), Gratis-Respec-Merker kommt mit Phase 2 (`save.ts` KEYS).
-- Nächster Schritt: Phase 2 (neue Skills/Zauber).
+- Phase 2 umgesetzt (Commit nach Phase 1): 16 neue Skills in `data.ts` (Zauber: Läuterung, Elementarschild, Entkräftung, Entzaubern, Steinhaut, Verstummen, Fluch der Blöße; Passive: Manafluss, Parieren, Schildbeherrschung, Rüstungsbrecher, Präzision, Ausweichtraining, Schleichen, Überleben; aktiv: Erste Hilfe), neue Status ward/stoneskin/bandage/weaken/curse/silence, `passiveSum`/`PASSIVE_CAP`, `castEffect`, Monster-Fähigkeiten `ward` (Goblinschamane, Sumpfhexe, Totenbeschwörer) und `dispel` (Knochenakolyth), Gratis-Respec (`freeRespec` in `save.ts`), UI-Info (`skillInfo`), Statusicons. Pace danach: Seed 2024 8,3 h / 10 Tode. 238 Tests, Lint, Build grün; Browser kurz geprüft.
+- Nächster Schritt: Phase 3 (Items: neue Stats, Nachteile, Vorlagen je Build).
+- Gotcha: Golden-Test nutzt nur die 11 Alt-Skills (`LEGACY`); Schutz-Skills dürfen physischen Schaden nur im Rüstungszweig von `dealDamage` mindern.
 - Stand: Analysebericht geliefert, Entscheidungen in `SPEC.md` ("Stufe 6") festgehalten (ungecommittet). Kein Code geändert.
 - **Nächster Schritt:** `/clear`, frische Session, Phase 1 aus `SPEC.md` umsetzen (Fundament), Advisor zu Beginn.
 - **Letzte 3 Entscheidungen:**

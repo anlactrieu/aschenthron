@@ -26,6 +26,15 @@ export const EFFECTS: Record<StatusId, EffectDef> = {
   slow: { kind: 'control', stack: 'refresh', removable: true, label: 'Verlangsamung' },
   stun: { kind: 'control', stack: 'refresh', removable: true, label: 'Betäubung' },
   burn: { kind: 'debuff', stack: 'refresh', removable: true, label: 'Brand' },
+  // Verstärkungen: stärkerer Schutz ersetzt schwächeren, gleich starker verlängert nur
+  ward: { kind: 'buff', stack: 'replace', removable: true, label: 'Elementarschild' },
+  stoneskin: { kind: 'buff', stack: 'replace', removable: true, label: 'Steinhaut' },
+  bandage: { kind: 'buff', stack: 'refresh', removable: true, label: 'Verband' },
+  // Schwächungen: stärkere ersetzt schwächere
+  weaken: { kind: 'debuff', stack: 'replace', removable: true, label: 'Entkräftung' },
+  curse: { kind: 'debuff', stack: 'replace', removable: true, label: 'Fluch' },
+  // Stille: wiederholt innerhalb von 10 s um die Hälfte kürzer, mindestens ein Viertel
+  silence: { kind: 'control', stack: 'refresh', removable: true, dr: { window: 200, step: 0.5, floor: 0.25 }, label: 'Stille' },
 };
 
 export interface StatusState {

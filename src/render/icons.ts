@@ -1,6 +1,6 @@
 import type { Item } from '../sim/items';
 import { GEM_COLOR, templateById } from '../sim/items';
-import type { SkillDef, StatusId } from '../sim/data';
+import { schoolOf, type SkillDef, type StatusId } from '../sim/data';
 import { sprite } from './sprites';
 import { ITEM_SPRITES, POTION_QUICK, SKILL_SPRITES } from './spriteMap';
 
@@ -286,6 +286,15 @@ export function skillIcon(s: SkillDef): string {
       r(c, 6, 2, 4, 12, 0x60e890);
       r(c, 2, 6, 12, 4, 0x60e890);
       r(c, 7, 3, 2, 10, 0xe8fff0);
+    } else if (s.passive || s.effect || s.action) {
+      // Schule bestimmt die Farbe: Schutz blau, Schwächung violett, Kontrolle gelb, Bannung weiß, Hilfe grün
+      const school = schoolOf(s);
+      const col = school === 'protect' ? 0x6a9ae0 : school === 'debuff' ? 0xa070d0 : school === 'control' ? 0xe8d860 : school === 'dispel' ? 0xe8e8f0 : school === 'resource' ? 0x4ac0d8 : school === 'direct' ? 0xe08a4a : 0x6ad080;
+      r(c, 3, 2, 10, 8, col);
+      r(c, 4, 10, 8, 2, col);
+      r(c, 6, 12, 4, 2, col);
+      r(c, 5, 4, 6, 4, shade(col, 1.4));
+      if (s.passive) r(c, 1, 1, 14, 1, 0xffffff);
     } else if (s.area === 'Nahkampf') {
       diag(c, 1, 14, 12, 0xe8e8f0, 3);
       r(c, 11, 1, 4, 4, 0xff6a4a);
@@ -352,6 +361,33 @@ export function statusIcon(id: StatusId | 'poison'): string {
       r(c, 5, 12, 6, 3, 0xff9a3a);
       r(c, 6, 8, 4, 6, 0xffd23a);
       r(c, 7, 11, 2, 3, 0xfff4b0);
+    } else if (id === 'ward' || id === 'stoneskin') {
+      // Schild
+      const col = id === 'ward' ? 0x7fb0ff : 0xc8b898;
+      r(c, 3, 2, 10, 8, col);
+      r(c, 4, 10, 8, 2, col);
+      r(c, 6, 12, 4, 2, col);
+      r(c, 5, 3, 6, 6, id === 'ward' ? 0xd8ecff : 0x8a7a60);
+    } else if (id === 'bandage') {
+      // Verband mit Kreuz
+      r(c, 2, 5, 12, 6, 0xe8e0d0);
+      r(c, 7, 4, 2, 8, 0xd84a4a);
+      r(c, 4, 7, 8, 2, 0xd84a4a);
+    } else if (id === 'weaken') {
+      // gesenkte Faust
+      r(c, 3, 3, 10, 6, 0xb08adf);
+      r(c, 5, 9, 6, 4, 0xb08adf);
+      r(c, 6, 13, 4, 2, 0x6a4a9a);
+    } else if (id === 'curse') {
+      // Totenkopf
+      r(c, 4, 2, 8, 8, 0xe8d0dc);
+      r(c, 6, 10, 4, 3, 0xe8d0dc);
+      r(c, 5, 5, 2, 2, 0xd05a8a);
+      r(c, 9, 5, 2, 2, 0xd05a8a);
+    } else if (id === 'silence') {
+      // durchgestrichener Mund
+      r(c, 3, 6, 10, 4, 0xe0e0e8);
+      diag(c, 2, 13, 12, 0xd84a4a, 2);
     } else {
       // Gifttropfen
       r(c, 7, 1, 2, 3, 0x7fe060);

@@ -4,10 +4,10 @@ import { itemReq, itemAffixes, gemTemplateId, handsOf, weaponSpeedOf, rollGem, r
 import {
   ATTR_KEYS, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
   monsterKind, npcKeyOf, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
-  FAMILY_RES, MAX_RES, SLOW_FACTOR, STATUS_IDS, type DmgType, type StatusId, type SkillDef,
+  FAMILY_RES, MAX_RES, SLOW_FACTOR, STATUS_IDS, PASSIVE_CAP, DMG_NAME, type DmgType, type StatusId, type SkillDef, type PassiveKey,
   ATTR_THRESHOLD, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, WILL_STATUS_PER_POINT, WILL_STATUS_CAP, GEM_MIN_LEVEL, GEM_DROP, GEM_SOCKET_COST, WORLD_BOSS_LOOT, type QuestDef,
 } from './data';
-import { EFFECTS, controlDr, mergeStatus } from './effects';
+import { EFFECTS, cleanse, controlDr, dispel, mergeStatus } from './effects';
 
 export const TICK_RATE = 20;
 export const NPC_RANGE = 3;
@@ -124,6 +124,10 @@ export interface Actor {
   status: Partial<Record<StatusId, number>>;
   /** Stärke eines Effekts (nur Effekte mit Stärke, z. B. Schutz; optional, wird nicht gespeichert) */
   statusMag?: Partial<Record<StatusId, number>>;
+  /** Spieler: ein kostenloses Neuverteilen offen (einmalig nach dem Skill-Update, wird gespeichert) */
+  freeRespec?: boolean;
+  /** Monster: frühester Tick für den nächsten Schutz-/Bannzauber */
+  buffAt?: number;
   /** Kontroll-Verkürzung: letzter Treffer und Wiederholungszähler je Effekt */
   ccDr?: Partial<Record<StatusId, { at: number; n: number }>>;
   burn: { perSec: number; srcId: number } | null;
@@ -391,11 +395,33 @@ function affixSum(a: Actor, stat: Stat): number {
   return sum;
 }
 
+/** Summe einer passiven Skill-Wirkung (Wert je Rang mal Rang, gedeckelt durch `PASSIVE_CAP`). */
+export function passiveSum(a: Actor, key: PassiveKey): number {
+  let sum = 0;
+  for (const id of a.skills) {
+    const s = skillById(id);
+    const v = s?.pass?.[key];
+    if (v) sum += v * (a.skillRanks[id] ?? 1);
+  }
+  const cap = PASSIVE_CAP[key];
+  return cap !== undefined ? Math.min(cap, sum) : sum;
+}
+
+/** Wirkt Parieren? Einhandwaffe (kein Bogen/Stab) oder Schild nötig. */
+function canParry(a: Actor): boolean {
+  const wp = a.equipment.weapon;
+  if (a.equipment.offhand?.off === 'shield') return true;
+  return !!wp && wp.kind !== 'bow' && wp.kind !== 'staff' && handsOf(wp) === 1;
+}
+
 /** Resistenz in Prozent gegen eine Schadensart: Spieler über Affixe (höchstens 75), Monster über ihre Familie (negativ = Schwäche, 100 = immun). */
 export function resistOf(a: Actor, dt: DmgType): number {
   if (dt === 'physical') return 0;
-  if (a.kind === 'player') return Math.min(MAX_RES, affixSum(a, RES_STAT[dt]) + Math.max(0, Math.floor((a.attrs.willenskraft - 10) / 2)) * WILL_RES_PER_2);
-  return (a.kindId && FAMILY_RES[monsterKind(a.kindId).family]?.[dt]) || 0;
+  const ward = a.status.ward ? (a.statusMag?.ward ?? 0) : 0;
+  if (a.kind === 'player') return Math.min(MAX_RES, affixSum(a, RES_STAT[dt]) + Math.max(0, Math.floor((a.attrs.willenskraft - 10) / 2)) * WILL_RES_PER_2 + ward);
+  const fam = (a.kindId && FAMILY_RES[monsterKind(a.kindId).family]?.[dt]) || 0;
+  // Elementarschild eines Monsters: nie bis zur Immunität
+  return ward && fam < 100 ? Math.min(Math.max(MAX_RES, fam), fam + ward) : fam;
 }
 
 /** Entfernt alle Statuseffekte samt Stärken und Verkürzungszählern (Tod, Wiedererscheinen). */
@@ -431,7 +457,7 @@ export function applyStatus(w: World, t: Actor, id: StatusId, seconds: number, d
   // Willenskraft verkürzt Betäubung und Verlangsamung zusätzlich
   const will = id === 'stun' || id === 'slow' ? 1 - Math.min(WILL_STATUS_CAP, Math.max(0, t.attrs.willenskraft - 10) * WILL_STATUS_PER_POINT) : 1;
   const dr = controlDr(def, t.ccDr?.[id], w.tick);
-  const secs = seconds * (id === 'stun' && t.boss ? 0.5 : 1) * (1 - Math.max(0, res) / 100) * will * dr.factor;
+  const secs = seconds * ((id === 'stun' || id === 'silence') && t.boss ? 0.5 : 1) * (1 - Math.max(0, res) / 100) * will * dr.factor;
   const until = w.tick + Math.round(secs * TICK_RATE);
   if (until <= w.tick) return;
   if (def.dr) (t.ccDr ??= {})[id] = dr.state;
@@ -447,7 +473,7 @@ export function applyStatus(w: World, t: Actor, id: StatusId, seconds: number, d
 
 /** Kritische Trefferchance in Prozent: Unikate, Sets und Affixe zusammen, höchstens 50 %. */
 export function critChance(a: Actor): number {
-  return Math.min(MAX_CRIT_PERCENT, powerOf(a, 'crit') + affixSum(a, 'crit'));
+  return Math.min(MAX_CRIT_PERCENT, powerOf(a, 'crit') + affixSum(a, 'crit') + (a.kind === 'player' ? passiveSum(a, 'crit') : 0));
 }
 
 /** Summe eines besonderen Effekts aus Gegenständen und Set-Boni. */
@@ -465,6 +491,9 @@ export function effectiveKraft(a: Actor): number {
 export function armorOf(a: Actor): number {
   let sum = affixSum(a, 'armor');
   for (const it of equippedItems(a)) sum += it.armor ?? 0;
+  // Schildbeherrschung: mehr Rüstung vom Schild
+  const shield = a.equipment.offhand;
+  if (shield?.off === 'shield' && shield.armor) sum += (shield.armor * passiveSum(a, 'shieldArmor')) / 100;
   return sum;
 }
 
@@ -528,7 +557,7 @@ export function attackRating(a: Actor): number {
   return a.kind === 'player' ? 20 + 3 * a.level + 2 * a.attrs.gewandtheit + affixSum(a, 'accuracy') : 20 + 4 * a.level;
 }
 export function defenseRating(a: Actor): number {
-  return a.kind === 'player' ? 10 + 2 * a.level + 2 * a.attrs.gewandtheit + armorOf(a) * 0.5 + affixSum(a, 'evasion') : 10 + 3 * a.level;
+  return a.kind === 'player' ? 10 + 2 * a.level + 2 * a.attrs.gewandtheit + armorOf(a) * 0.5 + affixSum(a, 'evasion') + passiveSum(a, 'evade') : 10 + 3 * a.level;
 }
 /** Trefferchance 35–97 %: ATK / (ATK + 0,2 · DEF). Gleichstark ≈ 83 %. */
 export function hitChance(att: Actor, def: Actor): number {
@@ -537,7 +566,7 @@ export function hitChance(att: Actor, def: Actor): number {
 }
 
 export function carryCapacity(a: Actor): number {
-  return BASE_CARRY + CARRY_PER_KRAFT * effectiveKraft(a);
+  return BASE_CARRY + CARRY_PER_KRAFT * effectiveKraft(a) + passiveSum(a, 'carry');
 }
 
 export function carriedWeight(a: Actor): number {
@@ -763,9 +792,10 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
     case 'respec': {
       const trainer = nearNpc(w, a, 'trainer');
       if (!trainer) return fail(w, 'Kein Lehrer in der Nähe.');
-      const price = respecPrice(a.level);
+      const price = a.freeRespec ? 0 : respecPrice(a.level);
       if (a.gold < price) return fail(w, `Neuverteilen kostet ${price} Gold.`);
       a.gold -= price;
+      a.freeRespec = false;
       for (const k of ATTR_KEYS) a.attrs[k] = 10;
       a.statPoints = START_STAT_POINTS + STAT_POINTS_PER_LEVEL * (a.level - 1);
       a.skills = [];
@@ -1004,16 +1034,63 @@ function skillRiders(w: World, a: Actor, s: SkillDef, v: Actor, amount: number, 
   if (s.dot && resistOf(v, dt) < 100) v.dot = { perSec: Math.max(1, Math.round((amount * s.dot.factor) / s.dot.seconds)), until: w.tick + s.dot.seconds * TICK_RATE, srcId: a.id };
 }
 
+/** Skills ohne Schaden: Schutz/Verband auf sich, Schwächung/Kontrolle/Bannung auf einen Gegner, Läuterung. */
+function castEffect(w: World, a: Actor, s: SkillDef, rank: number, manaCost: number, targetId?: number): void {
+  const self = (s.target ?? 'enemy') === 'self';
+  let t: Actor = a;
+  if (!self) {
+    if (a.kind === 'player' && inSafeZone(w, a.x, a.y)) return fail(w, 'In der Stadt ist Kämpfen verboten.');
+    const first = getActor(w, targetId ?? a.targetId ?? -1);
+    if (!first || !first.alive || first.id === a.id) return fail(w, 'Kein Ziel.');
+    if (Math.hypot(a.x - first.x, a.y - first.y) > s.range) return fail(w, 'Ziel außer Reichweite.');
+    if (first.kind === 'player' && !canPvp(w, a, first)) return fail(w, 'Hier ist kein Kampf gegen Spieler erlaubt.');
+    t = first;
+  }
+  a.mana -= manaCost;
+  a.skillCd[s.id] = Math.round(s.cooldown * rankCooldown(rank));
+  if (!self) {
+    if (a.targetId !== t.id) a.autoAttack = false;
+    a.targetId = t.id;
+    a.path = [];
+    // Wer verflucht oder entkräftet wird, wehrt sich
+    if (t.kind === 'monster' && t.targetId === null) {
+      t.targetId = a.id;
+      t.autoAttack = true;
+      alertPack(w, t, a.id);
+    }
+  }
+  if (s.action === 'cleanse') {
+    const n = cleanse(a, STATUS_IDS);
+    note(w, a, n > 0 ? `${s.name}: ${n} schädliche Wirkung${n > 1 ? 'en' : ''} entfernt.` : `${s.name}: nichts zu entfernen.`);
+  }
+  if (s.action === 'dispel') {
+    const gone = dispel(t, STATUS_IDS);
+    note(w, a, gone.length ? `${s.name}: ${t.name} verliert ${gone.map((id) => EFFECTS[id].label).join(', ')}.` : `${s.name}: ${t.name} hat keine Verstärkungen.`);
+  }
+  const e = s.effect;
+  if (e) {
+    const mag = e.mag !== undefined ? Math.min(e.cap ?? Infinity, e.mag + (e.magPerRank ?? 0) * (rank - 1)) : undefined;
+    applyStatus(w, t, e.id, e.seconds, 'physical', undefined, mag);
+    if (t.status[e.id]) {
+      const amount = mag === undefined ? '' : e.id === 'bandage' ? `${mag} % Leben pro Sekunde, ` : `${mag} %, `;
+      note(w, a, `${EFFECTS[e.id].label}${self ? '' : ` auf ${t.name}`}: ${amount}bis ${Math.max(1, Math.round((t.status[e.id]! - w.tick) / TICK_RATE))} s.`);
+    }
+  }
+}
+
 function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void {
   const s = skillById(skillId);
   if (!s || !a.skills.includes(s.id)) return fail(w, 'Fertigkeit nicht gelernt.');
   if (s.passive) return fail(w, 'Passive Fertigkeiten wirken von selbst.');
   if ((a.skillCd[s.id] ?? 0) > 0) return;
   if (a.status.stun) return fail(w, 'Du bist betäubt.');
+  if (a.status.silence) return fail(w, 'Du bist zum Schweigen gebracht.');
   const rank = a.skillRanks[s.id] ?? 1;
-  const manaCost = Math.round(s.mana * rankMana(rank));
+  const cheaper = passiveSum(a, 'manaCost');
+  const manaCost = Math.round(s.mana * rankMana(rank) * (cheaper > 0 ? 1 - cheaper / 100 : 1));
   if (a.mana < manaCost) return fail(w, 'Nicht genug Mana.');
   if (s.heal !== undefined) return castHeal(w, a, s, rank, manaCost);
+  if (s.effect || s.action) return castEffect(w, a, s, rank, manaCost, targetId);
   if (a.kind === 'player' && inSafeZone(w, a.x, a.y)) return fail(w, 'In der Stadt ist Kämpfen verboten.');
   const bowShot = s.area === 'Fernkampf' && a.kind === 'player';
   if (bowShot) {
@@ -1176,6 +1253,33 @@ function healAi(w: World, m: Actor): boolean {
   return true;
 }
 
+const WARD_EVERY = 20;
+const WARD_MAG = 35;
+const DISPEL_EVERY = 10;
+
+/** Zauberer-Monster: schützt sich im Kampf mit einem Elementarschild (kurz, höchstens alle WARD_EVERY s); Stille und Entzaubern nehmen ihn. */
+function wardAi(w: World, m: Actor): boolean {
+  if (m.targetId === null || m.status.ward || w.tick < (m.buffAt ?? 0)) return false;
+  m.buffAt = w.tick + TICK_RATE * WARD_EVERY;
+  applyStatus(w, m, 'ward', 6, 'physical', undefined, WARD_MAG);
+  m.cooldownLeft = Math.max(m.cooldownLeft, 12);
+  m.path = [];
+  return true;
+}
+
+/** Entzauberer-Monster: bannt Schutz und Verstärkungen des Ziels (Gegenmaßnahme zu Schutzzaubern). */
+function dispelAi(w: World, m: Actor): boolean {
+  if (m.targetId === null || w.tick < (m.buffAt ?? 0)) return false;
+  const t = getActor(w, m.targetId);
+  if (!t || !t.alive || dist(m, t) > CAST_RANGE || !STATUS_IDS.some((id) => t.status[id] && EFFECTS[id].kind === 'buff')) return false;
+  m.buffAt = w.tick + TICK_RATE * DISPEL_EVERY;
+  const gone = dispel(t, STATUS_IDS);
+  m.cooldownLeft = Math.max(m.cooldownLeft, 12);
+  m.path = [];
+  if (gone.length) note(w, t, `${m.name} bannt deine Verstärkung: ${gone.map((id) => EFFECTS[id].label).join(', ')}.`);
+  return true;
+}
+
 /** Totenbeschwörer: ruft alle RAISE_EVERY Sekunden ein Skelett (höchstens RAISE_MAX gleichzeitig; gibt weder Beute noch XP). */
 function raiseAi(w: World, m: Actor): boolean {
   if (m.targetId === null || w.tick < m.raiseAt || !m.summonKind) return false;
@@ -1222,7 +1326,17 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
     w.events.push({ type: 'miss', attackerId: a.id, targetId: t.id });
     return -1;
   }
+  // Parieren: Nahkampftreffer (kein Skill, keine Zauber/Pfeile) auf Spieler mit passender Waffe; Würfel nur bei gelerntem Skill
+  if (canMiss && !noReflect && !skill && t.kind === 'player' && passiveSum(t, 'parry') > 0 && canParry(t) && w.rng.next() * 100 < passiveSum(t, 'parry')) {
+    t.lastHitAt = w.tick;
+    t.resting = false;
+    note(w, t, `Du parierst den Angriff von ${a.name}.`);
+    w.events.push({ type: 'miss', attackerId: a.id, targetId: t.id });
+    return -1;
+  }
   let raw = rawIn;
+  // Entkräftung des Angreifers
+  if (a.status.weaken) raw *= 1 - Math.min(50, a.statusMag?.weaken ?? 0) / 100;
   let crit = false;
   if (a.kind === 'player' && !noReflect) {
     const chance = critChance(a);
@@ -1232,8 +1346,26 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
     }
   }
   const res = resistOf(t, dt);
-  const amount = res >= 100 ? 0 : Math.max(1, Math.round((ignoreArmor ? raw : (raw * ARMOR_K) / (ARMOR_K + armorOf(t))) * (1 - res / 100)));
+  // Rüstungsbrecher (nur Angriffe, die Rüstung beachten); Steinhaut mindert nur im Rüstungszweig (Zauber, Gift und Brand bleiben unberührt)
+  let physical = raw;
+  if (!ignoreArmor) {
+    const pen = a.kind === 'player' ? passiveSum(a, 'armorPen') : 0;
+    physical = (raw * ARMOR_K) / (ARMOR_K + armorOf(t) * (1 - pen / 100));
+    if (t.status.stoneskin) {
+      const sk = Math.min(60, t.statusMag?.stoneskin ?? 0);
+      physical *= 1 - sk / 100;
+      note(w, t, `Steinhaut mindert physischen Schaden um ${sk} %.`);
+    }
+  }
+  if (res > 0 && t.status.ward && dt !== 'physical') note(w, t, `Elementarschild mindert ${DMG_NAME[dt]}schaden (Widerstand ${Math.round(res)} %).`);
+  const cursed = t.status.curse ? 1 + Math.min(35, t.statusMag?.curse ?? 0) / 100 : 1;
+  const amount = res >= 100 ? 0 : Math.max(1, Math.round(physical * (1 - res / 100) * cursed));
   t.hp = Math.max(0, t.hp - amount);
+  if (t.status.bandage && amount > 0) {
+    delete t.status.bandage;
+    if (t.statusMag) delete t.statusMag.bandage;
+    note(w, t, 'Der Verband löst sich durch den Treffer.');
+  }
   t.lastHitAt = w.tick;
   t.resting = false;
   // Wer angegriffen wird, wehrt sich (auch gegen Fernkämpfer außerhalb der Aggro-Reichweite)
@@ -1471,11 +1603,12 @@ export function tick(w: World): void {
       }
     }
     for (const id of Object.keys(a.skillCd)) if ((a.skillCd[id] ?? 0) > 0) a.skillCd[id]!--;
+    if (a.status.bandage && w.tick % TICK_RATE === 0) a.hp = Math.min(maxHpOf(a), a.hp + (maxHpOf(a) * (a.statusMag?.bandage ?? 0)) / 100);
     if (a.status.stun) {
       if (a.kind === 'player') regen(w, a);
       continue;
     }
-    if (a.kind === 'monster' && a.abilities.length && ((a.abilities.includes('heal') && healAi(w, a)) || (a.abilities.includes('raise') && raiseAi(w, a)))) continue;
+    if (a.kind === 'monster' && a.abilities.length && !a.status.silence && ((a.abilities.includes('heal') && healAi(w, a)) || (a.abilities.includes('raise') && raiseAi(w, a)) || (a.abilities.includes('ward') && wardAi(w, a)) || (a.abilities.includes('dispel') && dispelAi(w, a)))) continue;
     if (a.kind === 'player') regen(w, a);
     else monsterAi(w, a, players);
     if (a.kind === 'monster' && a.targetId === null && a.path.length === 0 && w.tick - a.lastHitAt > TICK_RATE * 6) {
@@ -1492,7 +1625,7 @@ export function tick(w: World): void {
       a.path = [];
     }
     if (t && t.alive && a.autoAttack && a.targetId !== null) {
-      if (a.kind === 'monster' && (a.abilities.includes('cast') || a.abilities.includes('archer')) && castAi(w, a, t)) {
+      if (a.kind === 'monster' && ((a.abilities.includes('cast') && !a.status.silence) || a.abilities.includes('archer')) && castAi(w, a, t)) {
         // Zauberer: schießt aus der Distanz oder weicht zurück
       } else if (a.kind === 'player' && bowAi(w, a, t)) {
         // Bogenschütze: schießt aus der Distanz
@@ -1550,9 +1683,9 @@ function regen(w: World, p: Actor): void {
   if (p.resting && (p.path.length > 0 || p.targetId !== null)) p.resting = false;
   const boost = p.resting ? 5 : 1;
   const max = maxHpOf(p);
-  p.hp = Math.min(max, p.hp + ((safe ? SAFE_REGEN : FIELD_REGEN + (p.attrs.ausdauer - 10) * 0.002) + Math.min(MAX_REGEN_PER_SEC, affixSum(p, 'regen')) / TICK_RATE) * (safe ? 1 : boost));
+  p.hp = Math.min(max, p.hp + ((safe ? SAFE_REGEN : FIELD_REGEN + (p.attrs.ausdauer - 10) * 0.002 + passiveSum(p, 'fieldRegen') / TICK_RATE) + Math.min(MAX_REGEN_PER_SEC, affixSum(p, 'regen')) / TICK_RATE) * (safe ? 1 : boost));
   const mmax = maxManaOf(p);
-  p.mana = Math.min(mmax, p.mana + (0.02 + (p.attrs.willenskraft - 10) * 0.005 + (safe ? 0.2 : 0)) * boost * (1 + attrBonus(p, 'willenskraft') / 100));
+  p.mana = Math.min(mmax, p.mana + (0.02 + (p.attrs.willenskraft - 10) * 0.005 + (safe ? 0.2 : 0)) * boost * (1 + attrBonus(p, 'willenskraft') / 100) * (1 + passiveSum(p, 'manaRegen') / 100));
 }
 
 function reviveMonster(w: World, m: Actor): void {
@@ -1597,7 +1730,8 @@ function monsterAi(w: World, m: Actor, players: Actor[]): void {
     for (const x of players) {
       if ((inSafeZone(w, x.x, x.y) && x.pkUntil <= w.tick)) continue;
       const d = dist(m, x);
-      if (d <= bd) {
+      const stealth = x.kind === 'player' ? passiveSum(x, 'stealth') : 0;
+      if (d <= bd && (stealth <= 0 || d <= m.aggroRange * (1 - stealth / 100))) {
         bd = d;
         best = x;
       }

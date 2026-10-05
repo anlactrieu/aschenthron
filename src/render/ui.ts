@@ -1,4 +1,4 @@
-import { ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, STATUS_IDS, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, uniqueDef, NPC_LORE, type QuestDef, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
+import { ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, STATUS_IDS, SCHOOL_NAME, schoolOf, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, uniqueDef, NPC_LORE, type QuestDef, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
 import { POWER_TEXT, TIER_COLOR, GEM_COLOR, affixRange, gemAffix, gemName, handsOf, itemAffixes, itemReq, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
 import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
@@ -96,6 +96,15 @@ export function resNote(family: MonsterFamily): string {
     else if (v >= 50) parts.push(`Resistent gegen ${DMG_NAME[dt]}`);
   }
   return parts.length ? ` – ${parts.join(', ')}` : '';
+}
+
+/** Einklappbare Erklärung eines Skills: Wirkung, Build, Synergie, Entscheidung, Grenze. */
+function skillInfo(s: SkillDef): HTMLElement[] {
+  if (!s.info) return [];
+  const d = el('details');
+  d.append(el('summary', 'a-note', 'Wofür? (Build, Synergie, Grenze)'));
+  for (const [label, text] of [['Wirkung', s.info.role], ['Build', s.info.build], ['Synergie', s.info.synergy], ['Entscheidung', s.info.decision], ['Grenze', s.info.limit]] as const) d.append(el('div', 'a-note', `${label}: ${text}`));
+  return [d];
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''): HTMLElementTagNameMap[K] {
@@ -295,7 +304,7 @@ export class Ui {
     this.lastW = w;
     this.updateHud(p, target);
     const near = w.npcs.filter((n) => Math.hypot(n.x - p.x, n.y - p.y) <= NPC_RANGE);
-    const key = JSON.stringify([this.open, this.tab, p.inventory, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.gold, p.level, near.map((n) => n.id), p.quests, p.xp > 0]);
+    const key = JSON.stringify([this.open, this.tab, p.inventory, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.freeRespec, p.gold, p.level, near.map((n) => n.id), p.quests, p.xp > 0]);
     if (key === this.key || this.dragging) return;
     this.key = key;
     if (this.open) this.renderMain(p);
@@ -846,7 +855,7 @@ export class Ui {
       const c = el('div', 'a-card');
       c.append(Object.assign(el('img'), { src: skillIcon(s) }));
       const t = el('div');
-      t.append(el('div', '', `${s.name}${i >= 0 && i < 9 ? ` [${i + 1}]` : ''}${s.passive ? ' (passiv)' : ''} · ${s.area} · Rang ${p.skillRanks[s.id] ?? 1}`), el('div', 'a-note', `${s.mana} Mana · ${Math.round(s.cooldown / TICK_RATE)} s Abklingzeit`), el('div', 'a-note', s.desc));
+      t.append(el('div', '', `${s.name}${i >= 0 && i < 9 ? ` [${i + 1}]` : ''}${s.passive ? ' (passiv)' : ''} · ${s.area} · Rang ${p.skillRanks[s.id] ?? 1}`), el('div', 'a-note', `${SCHOOL_NAME[schoolOf(s)]}${s.passive ? '' : ` · ${s.mana} Mana · ${Math.round(s.cooldown / TICK_RATE)} s Abklingzeit`}`), el('div', 'a-note', s.desc), ...skillInfo(s));
       c.append(t);
       body.append(c);
     });
@@ -991,11 +1000,11 @@ export class Ui {
     }
     if (trainer) {
       body.append(el('div', 'a-sec', `${trainer.name} – Lehrer · ${p.skillPoints} Skillpunkte`));
-      const rs = el('button', 'a-btn', `Alles neu verteilen (${respecPrice(p.level)}g)`);
+      const rs = el('button', 'a-btn', p.freeRespec ? 'Alles neu verteilen (einmal gratis)' : `Alles neu verteilen (${respecPrice(p.level)}g)`);
       rs.title = 'Setzt Attribute und Fertigkeiten zurück, du bekommst alle Punkte zurück.';
       rs.style.marginBottom = '6px';
       rs.onclick = () => {
-        if (confirm(`Attribute und Fertigkeiten für ${respecPrice(p.level)} Gold zurücksetzen?`)) this.send({ type: 'respec' });
+        if (confirm(`Attribute und Fertigkeiten ${p.freeRespec ? 'einmalig kostenlos' : `für ${respecPrice(p.level)} Gold`} zurücksetzen?`)) this.send({ type: 'respec' });
       };
       body.append(rs);
       for (const s of SKILLS.filter((x) => x.tier <= (trainer.tier ?? 1))) body.append(this.skillCard(s, p));
@@ -1099,7 +1108,7 @@ export class Ui {
     const t = el('div');
     t.style.flex = '1';
     const head = el('div', '', `${s.name} · ${s.area}${known ? ` · Rang ${rank}/${MAX_SKILL_RANK}` : ''}`);
-    t.append(head, el('div', 'a-note', `${s.desc} Ab Stufe ${s.levelReq}.`));
+    t.append(head, el('div', 'a-note', `${SCHOOL_NAME[schoolOf(s)]}${s.passive ? ' · passiv' : ''}`), el('div', 'a-note', `${s.desc} Ab Stufe ${s.levelReq}.`), ...skillInfo(s));
     c.append(t);
     if (rank >= MAX_SKILL_RANK) c.append(el('i', 'a-note', 'Maximum'));
     else {

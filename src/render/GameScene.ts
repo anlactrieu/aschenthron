@@ -213,7 +213,7 @@ export class GameScene extends Phaser.Scene {
     const id = activeSkills(p)[i];
     if (!id) return;
     const s = SKILLS.find((x) => x.id === id)!;
-    if (s.heal !== undefined || s.aoeSelf) {
+    if (s.heal !== undefined || s.aoeSelf || s.target === 'self') {
       this.setArmed(null);
       this.send({ type: 'useSkill', skillId: id });
       return;
