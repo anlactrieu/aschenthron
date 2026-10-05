@@ -24,7 +24,7 @@ export const GEM_DROP = { normal: 0.012, champion: 0.12, unique: 0.5, boss: 0.6,
 export const GEM_SOCKET_COST = 30;
 
 /** Version der Weltkarte: Spielstände mit anderer Version starten in der Stadt (Koordinaten passen nicht mehr). */
-export const MAP_VERSION = 3;
+export const MAP_VERSION = 4;
 
 export const MAX_LEVEL = 30;
 export const STAT_POINTS_PER_LEVEL = 5;
@@ -162,6 +162,8 @@ export const MONSTERS: MonsterKind[] = [
   mk('goblin_shaman', 'Goblinschamane', 10, 'humanoid', 0x8ac06a, { hp: 0.85, dmg: 1.25, abil: ['cast', 'heal'], dt: 'fire' }),
   mk('goblin_archer', 'Goblinschütze', 5, 'humanoid', 0x7ab05a, { hp: 0.8, dmg: 0.9, cd: 24, abil: ['archer'] }),
   mk('goblin_chief', 'Goblinhäuptling', 13, 'humanoid', 0x4a7a2a, { hp: 1.8, dmg: 1.2, cd: 22 }),
+  mk('goblin_brute', 'Goblinbrecher', 11, 'humanoid', 0x4f7f30, { hp: 1.4, dmg: 1.15, cd: 22 }),
+  mk('goblin_warlord', 'Goblinkriegsherr', 12, 'humanoid', 0x3f6f28, { hp: 1.6, dmg: 1.2, cd: 22 }),
   // Banditen
   mk('bandit_novice', 'Räuberlehrling', 3, 'humanoid', 0xb06a4a),
   mk('highwayman', 'Wegelagerer', 7, 'humanoid', 0xa05a3a, { dmg: 1.1 }),
@@ -173,6 +175,9 @@ export const MONSTERS: MonsterKind[] = [
   mk('venom_spider', 'Giftspinne', 9, 'spider', 0x3a5a3a, { speed: 0.115, hp: 0.95, dmg: 1.15, abil: ['poisonBite'], dt: 'poison' }),
   mk('giant_spider', 'Riesenspinne', 14, 'spider', 0x4a3a58, { speed: 0.11, hp: 1.4, dmg: 1.15, abil: ['poisonBite'] }),
   mk('cave_spider', 'Höhlenspinne', 20, 'spider', 0x5a4a38, { speed: 0.115, hp: 1.3, dmg: 1.2, abil: ['poisonBite'], dt: 'poison' }),
+  mk('brood_spider', 'Brutspinne', 15, 'spider', 0x4a3a52, { speed: 0.12, hp: 0.95, dmg: 1.1, abil: ['poisonBite'] }),
+  mk('web_stalker', 'Netzlauerer', 16, 'spider', 0x3a4a3a, { speed: 0.115, hp: 1.3, dmg: 1.2, abil: ['poisonBite'], dt: 'poison' }),
+  mk('nest_matron', 'Nestmatrone', 17, 'spider', 0x5a3a5a, { speed: 0.105, hp: 1.6, dmg: 1.2, abil: ['poisonBite'] }),
   // Sumpf
   mk('bog_ghoul', 'Sumpfghul', 6, 'ghoul', 0x5a8a5a, { speed: 0.085, hp: 1.15 }),
   mk('marsh_corpse', 'Moorleiche', 9, 'ghoul', 0x6a7a52, { speed: 0.08, hp: 1.35 }),
@@ -201,12 +206,17 @@ export const MONSTERS: MonsterKind[] = [
   mk('ember_elemental', 'Glutelementar', 27, 'elemental', 0xff5a1a, { speed: 0.1, hp: 1.5, dmg: 1.3, dt: 'fire' }),
   mk('imp', 'Imp', 24, 'demon', 0xd05a3a, { speed: 0.125, hp: 0.8, dmg: 1.3, cd: 16, abil: ['cast'], dt: 'fire' }),
   mk('hell_spawn', 'Höllenbrut', 29, 'demon', 0xc0402a, { speed: 0.1, hp: 1.3, dmg: 1.25, dt: 'fire' }),
+  // Aschengrund (Elite-Zone, Stufe 28–32)
+  mk('hell_hound', 'Höllenhund', 29, 'demon', 0xb03020, { speed: 0.13, hp: 1.1, dmg: 1.2, cd: 15, dt: 'fire' }),
+  mk('doom_knight', 'Verdammter Ritter', 30, 'undead', 0x44446a, { speed: 0.09, hp: 1.55, dmg: 1.25, cd: 20 }),
+  mk('pit_fiend', 'Grubenteufel', 32, 'demon', 0x9a2a1a, { speed: 0.1, hp: 1.6, dmg: 1.35, abil: ['cast'], dt: 'fire' }),
   // Bosse
   mk('goblin_king', 'Goblinkönig Grix', 10, 'humanoid', 0x3a6a1a, { boss: true, speed: 0.1, abil: ['slam', 'summon'], summon: 'goblin_scout' }),
   mk('bandit_lord', 'Räuberfürst Harkon', 12, 'humanoid', 0xc07a3a, { boss: true, speed: 0.1, abil: ['slam'] }),
   mk('bone_lord', 'Knochenfürst Morrik', 14, 'undead', 0xe8e0c0, { boss: true, speed: 0.09, abil: ['slam', 'summon'], summon: 'skeleton' }),
   mk('bog_queen', 'Moorhexe Veshra', 16, 'humanoid', 0x9a4a9a, { boss: true, speed: 0.095, abil: ['slam', 'summon'], summon: 'bog_ghoul' }),
   mk('stone_colossus', 'Steinkoloss', 20, 'golem', 0xa09a8a, { boss: true, speed: 0.07, abil: ['slam', 'charge'] }),
+  mk('spider_queen', 'Spinnenkönigin Vyrra', 18, 'spider', 0x7a2a5a, { boss: true, speed: 0.1, abil: ['summon', 'charge'], summon: 'brood_spider' }),
   mk('web_mother', 'Webmutter Skarra', 23, 'spider', 0x6a3a6a, { boss: true, speed: 0.1, abil: ['summon', 'charge'], summon: 'cave_spider' }),
   mk('ash_king', 'Aschenkönig', 30, 'demon', 0xd86a2a, { boss: true, speed: 0.085, abil: ['slam', 'summon', 'charge'], summon: 'imp' }),
 ];
@@ -231,6 +241,10 @@ export interface UniqueDef {
   abilities: Ability[];
   summon?: string;
   respawnMin: number;
+  /** Weltboss: wartet lange, kündigt Erscheinen und Tod an, lässt T4/T5-Affixe und bessere Edelsteine fallen */
+  world?: boolean;
+  /** Ort für Bannertexte */
+  where?: string;
 }
 export const UNIQUES: UniqueDef[] = [
   { id: 'rat_king', name: 'Rattenkönig Knabber', base: 'giant_rat', hp: 6, dmg: 1.5, abilities: ['summon'], summon: 'field_rat', respawnMin: 15 },
@@ -246,11 +260,17 @@ export const UNIQUES: UniqueDef[] = [
   { id: 'alpha_fenrik', name: 'Alphawolf Fenrik', base: 'dire_wolf', hp: 6, dmg: 1.5, abilities: ['charge', 'summon'], summon: 'wolf', respawnMin: 22 },
   { id: 'cinder_lord_zarkesh', name: 'Glutfürst Zarkesh', base: 'ember_elemental', hp: 4.5, dmg: 1.4, abilities: ['slam', 'summon'], summon: 'cinder_wisp', respawnMin: 25 },
   { id: 'dread_valdor', name: 'Schreckensritter Valdor', base: 'death_knight', hp: 4, dmg: 1.4, abilities: ['charge', 'slam'], respawnMin: 25 },
+  // Weltbosse: lange Wartezeit, Beute mit hohen Affix-Stufen
+  { id: 'bog_titan', name: 'Moorverschlinger Gurrak', base: 'ghoul_alpha', hp: 10, dmg: 1.6, abilities: ['slam', 'summon', 'charge'], summon: 'bog_ghoul', respawnMin: 25, world: true, where: 'in den Moorlanden' },
+  { id: 'mountain_king', name: 'Bergkönig Thurgrim', base: 'rock_troll', hp: 9, dmg: 1.5, abilities: ['slam', 'charge', 'summon'], summon: 'hill_troll', respawnMin: 32, world: true, where: 'im Hochland' },
+  { id: 'abyss_warden', name: 'Aschenfürst Morvath', base: 'pit_fiend', hp: 8, dmg: 1.5, abilities: ['slam', 'summon', 'charge'], summon: 'hell_hound', respawnMin: 40, world: true, where: 'im Aschengrund' },
 ];
 export function uniqueDef(id: string): UniqueDef | undefined {
   return UNIQUES.find((u) => u.id === id);
 }
 export const UNIQUE_REWARD = 6;
+/** Weltboss-Beute: Anzahl garantierter seltener Gegenstände mit mindestens dieser Affix-Stufe, Edelstein-Mindestqualität */
+export const WORLD_BOSS_LOOT = { rares: 2, minTier: 4, minGem: 2 } as const;
 
 export function monsterKind(id: string): MonsterKind {
   const k = MONSTERS.find((m) => m.id === id);
@@ -325,7 +345,8 @@ export const POTION_COOLDOWN_TICKS = 100;
 /** Rüstungs-Formel: Schaden * K / (K + Rüstung) */
 export const ARMOR_K = 30;
 
-export type QuestKind = 'kill' | 'chest' | 'champion' | 'unique';
+/** kill: Monsterart; chest: Truhen; champion/unique: Champions bzw. Mini-Bosse (unique mit `target`: ein bestimmter); visit: Region betreten; bring: Gegenstand von Monstern/Truhen sammeln; talk: mit einem NPC sprechen */
+export type QuestKind = 'kill' | 'chest' | 'champion' | 'unique' | 'visit' | 'bring' | 'talk';
 
 export interface QuestDef {
   id: string;
@@ -339,6 +360,21 @@ export interface QuestDef {
   count: number;
   xp: number;
   gold: number;
+  /** Aufgabenkette (Titel); Reihenfolge im Feld QUESTS bestimmt die Kapitel */
+  chain?: string;
+  /** Vorgänger in der Kette: erst nach dessen Abgabe freigeschaltet */
+  requires?: string;
+  /** visit: Regionsname, der betreten werden muss; bring mit `chestRegion`: Region der Truhen */
+  place?: string;
+  /** bring: Name des Quest-Gegenstands (kein echter Inventar-Gegenstand, nur gezählt, nicht verkaufbar), Quellmonster, Trefferchance je Kill */
+  item?: string;
+  monsters?: string[];
+  chance?: number;
+  chestRegion?: string;
+  /** Belohnung zusätzlich zu XP/Gold: ein seltener Gegenstand oder ein Unikat/Set-Teil */
+  reward?: 'rare' | 'unique';
+  /** Abschlusstext (Chatzeile bei Abgabe) */
+  outro?: string;
 }
 
 const q = (id: string, name: string, text: string, minLevel: number, target: string, count: number, xpMul: number, goldMul: number): QuestDef => {
@@ -358,7 +394,7 @@ export const QUESTS: QuestDef[] = [
   q('q_hounds', 'Wilde Hunde', 'Wildhunde reißen unser Vieh. Erlege 8 davon.', 2, 'wild_hound', 8, 1.5, 1.5),
   q('q_goblins', 'Goblinplage', 'Goblins plündern die Höfe am Waldrand. Vertreibe 10 Goblins.', 3, 'goblin', 10, 1.5, 1.5),
   q('q_goblin_scouts', 'Späher im Unterholz', 'Goblinkundschafter spähen unsere Wege aus. Töte 8.', 5, 'goblin_scout', 8, 1.5, 1.5),
-  q('q_goblin_king', 'Der Goblinkönig', 'Grix sammelt ein Heer im Düsterwald. Erschlage ihn.', 10, 'goblin_king', 1, 1.5, 2),
+  q('q_goblin_king', 'Der Goblinkönig', 'Grix sammelt ein Heer im Goblinbau nördlich des Räuberlagers. Erschlage ihn.', 10, 'goblin_king', 1, 1.5, 2),
   q('q_bandits', 'Lehrlinge des Bösen', 'Räuberlehrlinge lauern an den Wegen. Besiege 8.', 3, 'bandit_novice', 8, 1.5, 1.5),
   q('q_spiders', 'Netze im Wald', 'Der Düsterwald ist voller Waldspinnen. Töte 10.', 4, 'forest_spider', 10, 1.5, 1.5),
   q('q_herbs', 'Sumpfkraut', 'Ohne Ghule im Moor kann ich Kräuter sammeln. Besiege 6 Sumpfghule.', 5, 'bog_ghoul', 6, 1.5, 1.5),
@@ -381,6 +417,83 @@ QUESTS.push(
   qv('q_unique2', 'Legenden der Wildnis', 'Jage 3 benannte Gegner.', 14, 'unique', 3, 5),
   qv('q_champs2', 'Eiserne Anführer', 'Brich die Macht von 8 Champions.', 18, 'champion', 8, 2),
 );
+
+type ChainStep = Partial<QuestDef> & Pick<QuestDef, 'id' | 'kind' | 'name' | 'text' | 'minLevel'>;
+/** Kettenglied: Belohnung wächst mit Stufe und Faktor `mult`; talk/visit zählen 1. */
+const chainQ = (chain: string, mult: number, st: ChainStep): QuestDef => {
+  const count = st.count ?? 1;
+  return {
+    target: '', count, ...st, chain,
+    xp: Math.round(SCALE.xp(st.minLevel + 1) * count * mult * (st.kind === 'bring' ? 0.5 : 1)),
+    gold: Math.round((st.minLevel * 3 + 3) * Math.max(1, count * 0.7) * mult),
+  };
+};
+
+export const CHAIN_GOBLIN = 'Spuren des Goblinkönigs';
+export const CHAIN_MOOR = 'Das Schweigen im Moor';
+export const CHAIN_OATH = 'Der letzte Eid';
+export const CHAIN_MINE = 'Pells Fund';
+export const CHAIN_WEB = 'Netze der Königin';
+
+QUESTS.push(
+  chainQ(CHAIN_GOBLIN, 2, { id: 'c_gob1', kind: 'talk', name: 'Ein Wort mit der Jägerin', text: 'Chronistin Maren schickt dich zu Jägerin Ysa am Räuberlager: Sie hat die Spuren des Goblinkönigs gelesen.', minLevel: 5, target: 'Jägerin Ysa', outro: 'Ysa nickt knapp: „Dann hör gut zu. Es gibt Arbeit.“' }),
+  chainQ(CHAIN_GOBLIN, 2, { id: 'c_gob2', kind: 'bring', name: 'Goblinzeichen', text: 'Sammle 4 Goblinzeichen: abgenagte Knochenstücke, die Goblins bei sich tragen. Ysa liest daraus, wohin sie ziehen.', minLevel: 6, requires: 'c_gob1', item: 'Goblinzeichen', monsters: ['goblin', 'goblin_scout', 'goblin_archer', 'goblin_warrior', 'goblin_shaman'], chance: 0.5, count: 4, outro: 'Ysa ordnet die Zeichen in den Staub. „Ein Bau. Tief unter dem Lager.“' }),
+  chainQ(CHAIN_GOBLIN, 2, { id: 'c_gob3', kind: 'visit', name: 'Der Eingang des Baus', text: 'Finde den Goblinbau im Norden des Räuberlagers und betritt ihn. Nur einen Blick, mehr nicht.', minLevel: 8, requires: 'c_gob2', place: 'Goblinbau', outro: 'Ysa: „Du lebst. Gut. Dann weißt du jetzt, womit wir es zu tun haben.“' }),
+  chainQ(CHAIN_GOBLIN, 3, { id: 'c_gob4', kind: 'kill', name: 'Das Ende des Goblinkönigs', text: 'Grix hat sich in seinem Bau verschanzt. Erschlage ihn, bevor sein Heer die Höfe überrennt.', minLevel: 10, requires: 'c_gob3', target: 'goblin_king', reward: 'rare', outro: 'Ysa spuckt in die Asche: „Der Wald atmet wieder.“' }),
+
+  chainQ(CHAIN_MOOR, 2, { id: 'c_moor1', kind: 'talk', name: 'Der Eremit im Moor', text: 'Torwache Haldor erzählt von einem Einsiedler in den Moorlanden, der die Hexe kennt. Sprich mit Eremit Olm.', minLevel: 6, target: 'Eremit Olm', outro: 'Olm blinzelt aus tiefen Höhlen der Augen. „Setz dich, Fremder. Das Moor flüstert.“' }),
+  chainQ(CHAIN_MOOR, 2, { id: 'c_moor2', kind: 'bring', name: 'Irrlichtkraut', text: 'Bring Olm 5 Büschel Irrlichtkraut. Es wächst nur dort, wo Ghule und Moorleichen liegen.', minLevel: 7, requires: 'c_moor1', item: 'Irrlichtkraut', monsters: ['bog_ghoul', 'marsh_corpse'], chance: 0.45, count: 5, outro: 'Olm riecht an dem Kraut und lächelt dünn. „Genug für einen Trank der Klarsicht.“' }),
+  chainQ(CHAIN_MOOR, 2, { id: 'c_moor3', kind: 'kill', name: 'Hexen des Moors', text: 'Die Sumpfhexen hören Veshras Ruf. Töte 6 von ihnen, damit ihr Singen leiser wird.', minLevel: 10, requires: 'c_moor2', target: 'bog_witch', count: 6, outro: 'Olm lauscht in die Nacht. „Leiser. Aber nicht still.“' }),
+  chainQ(CHAIN_MOOR, 3, { id: 'c_moor4', kind: 'kill', name: 'Veshras Ende', text: 'Dringe in die Gruft der Moorhexe vor und töte Veshra. Olm hat sie einst gekannt.', minLevel: 14, requires: 'c_moor3', target: 'bog_queen', reward: 'unique', outro: 'Olm weint, ohne dass sich sein Gesicht bewegt. „Danke. Endlich ruht sie.“' }),
+
+  chainQ(CHAIN_OATH, 2, { id: 'c_eid1', kind: 'talk', name: 'Der Sterbende Ritter', text: 'Haldor spricht von einem Ritter, der in der Aschenöde liegt und nicht sterben will. Finde Aldric und höre ihn an.', minLevel: 20, target: 'Ritter Aldric', outro: 'Aldrics Atem rasselt. „Kommst du … von Thron und Krone?“' }),
+  chainQ(CHAIN_OATH, 2, { id: 'c_eid2', kind: 'bring', name: 'Siegelsplitter', text: 'Aldric trug ein Siegel, das beim Fall des Throns zerbrach. Sammle 4 Siegelsplitter von den Wesen der Aschenöde.', minLevel: 21, requires: 'c_eid1', item: 'Siegelsplitter', monsters: ['ash_walker', 'cinder_wisp', 'imp', 'night_stalker'], chance: 0.35, count: 4, outro: 'Aldric hält die Splitter an die Brust. „Noch hält es. Noch.“' }),
+  chainQ(CHAIN_OATH, 3, { id: 'c_eid3', kind: 'visit', name: 'Hinter der Asche', text: 'Aldric bittet dich, den Aschengrund im Osten der Öde zu betreten und zurückzukehren – er muss wissen, ob das Tor offen ist.', minLevel: 27, requires: 'c_eid2', place: 'Aschengrund', outro: 'Aldric schließt die Augen. „Offen. Wie ich fürchtete.“' }),
+  chainQ(CHAIN_OATH, 4, { id: 'c_eid4', kind: 'unique', name: 'Morvaths Schwur', text: 'Aschenfürst Morvath hält die Pforte im Aschengrund. Zerschlage ihn, damit Aldrics Eid erfüllt ist.', minLevel: 28, requires: 'c_eid3', target: 'abyss_warden', reward: 'unique', outro: 'Aldric lächelt zum ersten Mal. „Die Wache … ist vorbei.“' }),
+
+  chainQ(CHAIN_MINE, 2, { id: 'c_pell1', kind: 'chest', name: 'Pells Spürsinn', text: 'Der Schatzsucher Pell hat die Mine kartiert, aber nie Zeit gehabt, alles zu leeren. Öffne 3 Truhen irgendwo im Land.', minLevel: 17, count: 3 }),
+  chainQ(CHAIN_MINE, 2, { id: 'c_pell2', kind: 'bring', name: 'Pells Beutel', text: 'Pell hat seinen Beutel in einer Truhe der Tiefenmine verloren. Finde 2 Beutel in den Truhen dort.', minLevel: 17, requires: 'c_pell1', item: 'Pells Beutel', chestRegion: 'Tiefenmine', count: 2, outro: 'Pell zählt die Münzen mit zitternden Fingern. „Alles da. Fast alles.“' }),
+  chainQ(CHAIN_MINE, 3, { id: 'c_pell3', kind: 'kill', name: 'Die Webmutter', text: 'Hinter dem letzten Gang wartet Webmutter Skarra. Pell traut sich nicht, solange sie lebt.', minLevel: 20, requires: 'c_pell2', target: 'web_mother', reward: 'rare', outro: 'Pell lacht heiser. „Dann gehört die Mine wieder den Lebenden.“' }),
+
+  chainQ(CHAIN_WEB, 2, { id: 'c_web1', kind: 'visit', name: 'Das Spinnennest', text: 'Südlich vom Totenacker liegt ein Nest. Haldor will wissen, wie groß es ist. Betritt das Spinnennest.', minLevel: 13, place: 'Spinnennest', outro: 'Haldor zeichnet das Nest in die Karte. „Größer als gedacht.“' }),
+  chainQ(CHAIN_WEB, 2, { id: 'c_web2', kind: 'bring', name: 'Seidenstränge', text: 'Sammle 5 Seidenstränge von den Spinnen im Nest. Die Schmiede brauchen sie als Beweis.', minLevel: 14, requires: 'c_web1', item: 'Seidenstrang', monsters: ['giant_spider', 'web_stalker', 'nest_matron', 'brood_spider'], chance: 0.4, count: 5, outro: 'Haldor hebt einen Strang ins Licht. „Dünner als Haar, fester als Stahl.“' }),
+  chainQ(CHAIN_WEB, 3, { id: 'c_web3', kind: 'kill', name: 'Spinnenkönigin Vyrra', text: 'Töte die Königin des Nests, bevor sie sich ausbreitet.', minLevel: 17, requires: 'c_web2', target: 'spider_queen', reward: 'rare', outro: 'Haldor schweigt lange. „Schlaf gut heute Nacht. Ich werde es nicht.“' }),
+);
+
+/** Dialoge der benannten NPCs (2–4 Absätze). Schlüssel: NPC-Name. Die Aufgaben stehen an den NPCs der Karte (Eigenschaft `quests`). */
+export const NPC_LORE: Record<string, string[]> = {
+  'Chronistin Maren': [
+    'Ich schreibe auf, was andere vergessen wollen. Aschental war einmal ein Garten, bevor der Thron der Asche den Himmel verbrannte.',
+    'Die Felder, der Wald, das Moor – überall liegen Namen im Boden, die niemand mehr trägt. Jede Truhe, jedes Grab gehört zu einer Geschichte.',
+    'Wenn du mir Spuren bringst, schreibe ich sie nieder. Wer weiß, vielleicht kannst du ein Kapitel zu Ende führen, das ich nur anfangen konnte.',
+  ],
+  'Jägerin Ysa': [
+    'Hier ist das Räuberlager, und trotzdem fürchte ich weniger die Banditen als das, was unter ihnen scharrt.',
+    'Goblins graben. Nicht zufällig, nicht wild – sie folgen einem Plan. Wo Grix ist, wird gegraben.',
+    'Ich habe gelernt, auf Zeichen zu achten. Kleine Dinge. Knochen, Fußspuren, ein verlorener Zahn. Hilf mir, sie zu sammeln.',
+  ],
+  'Eremit Olm': [
+    'Siebzig Winter im Moor, und es hat mich nicht geholt. Ich muss ihm langweilig vorkommen.',
+    'Veshra war früher eine Heilerin, bevor sie ihren Kummer in den Sumpf goss. Jetzt singt der Sumpf für sie, und wer ihm lauscht, bleibt.',
+    'Ich kann dir nicht helfen, ohne dass du mir hilfst. Kräuter, Geduld, ein bisschen Mut. Mehr verlange ich nicht.',
+    'Wenn du Gurrak begegnest, dem Verschlinger: lauf. Oder bring Freunde. Und Tränke. Viele Tränke.',
+  ],
+  'Torwache Haldor': [
+    'Seit vierzig Jahren stehe ich an diesem Tor. Die Felsenwacht hat nie gefallen – aber sie hat auch nie gewonnen.',
+    'Was aus den Bergen kommt, wird größer. Was aus dem Süden kommt, wird zahlreicher. Beides macht mir Sorgen.',
+    'Ich habe Namen für Dinge, die andere nicht sehen wollen: den Eremiten im Moor, den sterbenden Ritter in der Asche, das Nest im Süden. Du kannst mit ihnen sprechen, wenn du mutig bist.',
+  ],
+  'Schatzsucher Pell': [
+    'Psst. Nicht so laut. Die Mine hat Ohren, und manche davon haben acht Beine.',
+    'Ich habe alles gekartet. Jede Truhe, jeden Gang. Aber ich habe vergessen, dass man am Ende wieder hinaus muss.',
+    'Wenn du Truhen öffnest, denk an mich. Und wenn du auf einen schwarzen Beutel stößt – der gehört mir.',
+  ],
+  'Ritter Aldric': [
+    'Sie nennen mich den Sterbenden, aber das ist ein Titel, der mir mit jedem Tag ungenauer erscheint.',
+    'Wir waren dreißig, als wir zum Thron zogen. Wir schworen, die Asche aufzuhalten. Ich bin der Letzte, der noch nicht vergessen hat, warum.',
+    'Der Aschenkönig fiel, doch hinter ihm liegt eine Pforte im Aschengrund. Morvath wacht dort. Was er behütet, will ich nicht aussprechen.',
+  ],
+};
 
 export function questById(id: string): QuestDef | undefined {
   return QUESTS.find((x) => x.id === id);

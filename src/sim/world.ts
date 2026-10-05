@@ -1,11 +1,11 @@
 import { Rng } from './rng';
 import { findPath, isWalkable, type Grid, type Pt } from './path';
-import { itemReq, itemAffixes, gemTemplateId, handsOf, weaponSpeedOf, rollGem, rollUniqueSpecial, rollDrop, rollPotion, rollSpecial, templateById, generateItem, rerollAffixes, extendAffixes, SETS, type GemInfo, type Item, type PowerId, type SetBonus, type EquipSlot, type Stat } from './items';
+import { itemReq, itemAffixes, gemTemplateId, handsOf, weaponSpeedOf, rollGem, rollUniqueSpecial, rollWorldDrop, rollWorldSpecial, rollDrop, rollPotion, rollSpecial, templateById, generateItem, rerollAffixes, extendAffixes, SETS, type GemInfo, type Item, type PowerId, type SetBonus, type EquipSlot, type Stat } from './items';
 import {
   ATTR_KEYS, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
   monsterKind, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
   FAMILY_RES, MAX_RES, SLOW_FACTOR, type DmgType, type StatusId,
-  ATTR_THRESHOLD, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, WILL_STATUS_PER_POINT, WILL_STATUS_CAP, GEM_MIN_LEVEL, GEM_DROP, GEM_SOCKET_COST,
+  ATTR_THRESHOLD, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, WILL_STATUS_PER_POINT, WILL_STATUS_CAP, GEM_MIN_LEVEL, GEM_DROP, GEM_SOCKET_COST, WORLD_BOSS_LOOT, type QuestDef,
 } from './data';
 
 export const TICK_RATE = 20;
@@ -59,6 +59,7 @@ export type Command =
   | { type: 'openChest'; chestId: number }
   | { type: 'acceptQuest'; questId: string }
   | { type: 'turnInQuest'; questId: string }
+  | { type: 'talk'; npcId: number }
   | { type: 'craft'; itemId: number; op: 'upgrade' | 'reroll' | 'extend' }
   | { type: 'socket'; gemId: number; itemId: number; index?: number };
 
@@ -207,7 +208,10 @@ type GameEventBase =
   | { type: 'potion'; item: Item }
   | { type: 'questProgress'; questId: string; progress: number; count: number }
   | { type: 'questDone'; questId: string }
-  | { type: 'questTurned'; questId: string; xp: number; gold: number }
+  | { type: 'questTurned'; questId: string; xp: number; gold: number; item?: Item }
+  | { type: 'questItem'; questId: string; item: string; progress: number; count: number }
+  | { type: 'talk'; npcId: number }
+  | { type: 'worldBoss'; id: number; name: string; state: 'spawn' | 'dead'; where: string }
   | { type: 'enraged'; id: number }
   | { type: 'fail'; reason: string }
   | { type: 'pk'; id: number }
@@ -329,7 +333,7 @@ export function spawnMonster(w: World, x: number, y: number, kindId = 'field_rat
     a.summonKind = u.summon;
     a.rewardMult = UNIQUE_REWARD;
     a.respawnTicks = TICK_RATE * 60 * u.respawnMin;
-    a.aggroRange = Math.max(a.aggroRange, 7);
+    a.aggroRange = u.world ? Math.min(a.aggroRange, 6) : Math.max(a.aggroRange, 7);
   }
   return a;
 }
@@ -511,6 +515,15 @@ export function inSafeZone(w: World, x: number, y: number): boolean {
   return w.safe.some((r) => x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h);
 }
 
+/** Kleinste benannte Region (Zone/Dungeon), die den Punkt enthält. */
+export function regionAt(w: World, x: number, y: number): (Rect & { name: string; levels: string }) | undefined {
+  let best: (Rect & { name: string; levels: string }) | undefined;
+  for (const r of w.regions) {
+    if (x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h && (!best || r.w * r.h < best.w * best.h)) best = r;
+  }
+  return best;
+}
+
 export function nearNpc(w: World, a: Actor, kind: NpcKind): Npc | undefined {
   return w.npcs.find((n) => n.kind === kind && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
 }
@@ -530,6 +543,25 @@ export function getActor(w: World, id: number): Actor | undefined {
 }
 
 /* ---------- Befehle ---------- */
+
+/** Gibt eine erfüllte Aufgabe ab: Gold, XP, optional ein seltener Gegenstand oder ein Unikat/Set-Teil (landet im Rucksack). */
+function finishQuest(w: World, a: Actor, def: QuestDef): void {
+  const st = a.quests[def.id];
+  if (!st) return;
+  st.state = 'turned';
+  a.gold += def.gold;
+  let item: Item | undefined;
+  if (def.reward) {
+    const lv = def.minLevel + 2;
+    const ids = () => w.nextId++;
+    let special: Item | null = null;
+    if (def.reward === 'unique') for (let i = 0; i < 8 && !special; i++) special = i % 2 ? rollWorldSpecial(w.rng, ids, lv) : rollUniqueSpecial(w.rng, ids, lv);
+    item = special ?? rollDrop(w.rng, ids, lv, 'rare');
+    a.inventory.push(item);
+  }
+  w.events.push({ type: 'questTurned', questId: def.id, xp: def.xp, gold: def.gold, ...(item ? { item } : {}), to: a.id });
+  gainXp(w, a, def.xp);
+}
 
 function fail(w: World, reason: string): void {
   w.events.push({ type: 'fail', reason, to: w.cmdActor ?? undefined });
@@ -747,6 +779,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       if (!def || !giver) return fail(w, 'Hier gibt es diese Aufgabe nicht.');
       if (a.quests[def.id]) return fail(w, 'Aufgabe bereits angenommen.');
       if (a.level < def.minLevel) return fail(w, `Benötigt Level ${def.minLevel}.`);
+      if (def.requires && a.quests[def.requires]?.state !== 'turned') return fail(w, `Erst „${questById(def.requires)?.name ?? '?'}“ abschließen.`);
       a.quests[def.id] = { state: 'active', progress: 0 };
       break;
     }
@@ -756,10 +789,22 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       const giver = w.npcs.find((n) => n.kind === 'quest' && n.quests?.includes(cmd.questId) && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
       if (!def || !st || !giver) return fail(w, 'Hier gibt es nichts abzugeben.');
       if (st.state !== 'done') return fail(w, 'Aufgabe noch nicht erfüllt.');
-      st.state = 'turned';
-      a.gold += def.gold;
-      w.events.push({ type: 'questTurned', questId: def.id, xp: def.xp, gold: def.gold, to: a.id });
-      gainXp(w, a, def.xp);
+      finishQuest(w, a, def);
+      break;
+    }
+    case 'talk': {
+      const n = w.npcs.find((x) => x.id === cmd.npcId);
+      if (!n || Math.hypot(n.x - a.x, n.y - a.y) > NPC_RANGE) return fail(w, 'Zu weit entfernt.');
+      w.events.push({ type: 'talk', npcId: n.id, to: a.id });
+      // Gesprächsaufgaben mit diesem NPC als Ziel sind sofort erfüllt und abgegeben
+      for (const def of QUESTS) {
+        const st = a.quests[def.id];
+        if (def.kind === 'talk' && def.target === n.name && st?.state === 'active') {
+          st.progress = def.count;
+          st.state = 'done';
+          finishQuest(w, a, def);
+        }
+      }
       break;
     }
     case 'craft': {
@@ -1174,14 +1219,17 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
   for (const pl of credited.values()) {
     for (const q of QUESTS) {
       const st = pl.quests[q.id];
-      const matches = q.kind === 'kill' ? q.target === m.kindId : q.kind === 'champion' ? !!m.champ : q.kind === 'unique' ? !!m.unique : false;
-      if (st?.state === 'active' && matches) {
+      if (st?.state !== 'active') continue;
+      const matches = q.kind === 'kill' ? q.target === m.kindId : q.kind === 'champion' ? !!m.champ : q.kind === 'unique' ? !!m.unique && (!q.target || q.target === m.unique) : false;
+      if (matches) {
         st.progress++;
         w.events.push({ type: 'questProgress', questId: q.id, progress: st.progress, count: q.count, to: pl.id });
         if (st.progress >= q.count) {
           st.state = 'done';
           w.events.push({ type: 'questDone', questId: q.id, to: pl.id });
         }
+      } else if (q.kind === 'bring' && q.monsters?.includes(m.kindId!) && !m.summoned && w.rng.next() < (q.chance ?? 0.4)) {
+        questItemFound(w, pl, q, st);
       }
     }
     gainXp(w, killer, Math.round(k.xp * (1 + powerOf(pl, 'xpBonus') / 100)));
@@ -1203,7 +1251,18 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
   if (w.rng.next() <= POTION_DROP_CHANCE) drop(rollPotion(w.rng, () => w.nextId++, k.level));
   if (k.level >= GEM_MIN_LEVEL && w.rng.next() < (k.boss ? GEM_DROP.boss : m.unique ? GEM_DROP.unique : m.champ ? GEM_DROP.champion : GEM_DROP.normal)) drop(rollGem(w.rng, () => w.nextId++, k.level));
   if (m.champ) drop(rollDrop(w.rng, () => w.nextId++, k.level, w.rng.next() < 0.25 ? 'rare' : 'magic'));
-  if (m.unique) {
+  const wb = m.unique ? uniqueDef(m.unique) : undefined;
+  if (wb?.world) {
+    // Weltboss: garantierte seltene Stücke mit hohen Affix-Stufen, bessere Edelsteine, oft Unikat/Set-Teil
+    const nid = () => w.nextId++;
+    for (let i = 0; i < WORLD_BOSS_LOOT.rares; i++) drop(rollWorldDrop(w.rng, nid, k.level, WORLD_BOSS_LOOT.minTier));
+    drop(rollGem(w.rng, nid, k.level, WORLD_BOSS_LOOT.minGem));
+    if (w.rng.next() < 0.5) drop(rollGem(w.rng, nid, k.level, WORLD_BOSS_LOOT.minGem));
+    const wsp = rollWorldSpecial(w.rng, nid, Math.min(k.level + 2, 30));
+    if (wsp) drop(wsp);
+    drop(rollPotion(w.rng, nid, k.level));
+    w.events.push({ type: 'worldBoss', id: m.id, name: m.name, state: 'dead', where: wb.where ?? '' });
+  } else if (m.unique) {
     drop(rollDrop(w.rng, () => w.nextId++, k.level, 'rare'));
     if (w.rng.next() < 0.5) drop(rollDrop(w.rng, () => w.nextId++, k.level, 'rare'));
     const sp = rollUniqueSpecial(w.rng, () => w.nextId++, k.level);
@@ -1212,6 +1271,16 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
   }
   const special = rollSpecial(w.rng, () => w.nextId++, k.level, k.id, !!k.boss);
   if (special) drop(special);
+}
+
+/** Ein Quest-Gegenstand wird gefunden (nur gezählt, nicht im Rucksack: nicht verkaufbar, nicht verlierbar). */
+function questItemFound(w: World, pl: Actor, q: QuestDef, st: { state: 'active' | 'done' | 'turned'; progress: number }): void {
+  st.progress++;
+  w.events.push({ type: 'questItem', questId: q.id, item: q.item ?? 'Gegenstand', progress: st.progress, count: q.count, to: pl.id });
+  if (st.progress >= q.count) {
+    st.state = 'done';
+    w.events.push({ type: 'questDone', questId: q.id, to: pl.id });
+  }
 }
 
 export function gainXp(w: World, a: Actor, amount: number): void {
@@ -1283,6 +1352,7 @@ export function tick(w: World): void {
   for (const c of w.chests) if (c.opened && w.tick >= c.respawnAt) c.opened = false;
   w.ground = w.ground.filter((g) => g.expiresAt === null || g.expiresAt > w.tick);
   const players = w.actors.filter((x) => x.kind === 'player' && x.alive);
+  if (w.tick % 10 === 0) for (const pl of players) checkVisits(w, pl);
   for (const a of w.actors) {
     if (a.kind === 'monster' && a.alive && a.targetId === null && a.path.length === 0 && a.hp >= a.maxHp) {
       if (!players.some((pl) => Math.abs(pl.x - a.x) < SLEEP_DIST && Math.abs(pl.y - a.y) < SLEEP_DIST)) continue;
@@ -1360,6 +1430,20 @@ export function tick(w: World): void {
   }
 }
 
+/** Besuchsaufgaben: erfüllt, sobald der Spieler die Region betritt (alle 0,5 s geprüft). */
+function checkVisits(w: World, pl: Actor): void {
+  for (const q of QUESTS) {
+    if (q.kind !== 'visit' || pl.quests[q.id]?.state !== 'active') continue;
+    const r = w.regions.find((x) => x.name === q.place);
+    if (!r || pl.x < r.x || pl.y < r.y || pl.x >= r.x + r.w || pl.y >= r.y + r.h) continue;
+    const st = pl.quests[q.id]!;
+    st.progress = q.count;
+    st.state = 'done';
+    w.events.push({ type: 'questProgress', questId: q.id, progress: st.progress, count: q.count, to: pl.id });
+    w.events.push({ type: 'questDone', questId: q.id, to: pl.id });
+  }
+}
+
 function cleanupSummons(w: World): void {
   let any = false;
   for (const a of w.actors) {
@@ -1400,6 +1484,8 @@ function reviveMonster(w: World, m: Actor): void {
     m.enraged = false;
     m.damage = monsterKind(m.kindId!).damage;
   }
+  const wb = m.unique ? uniqueDef(m.unique) : undefined;
+  if (wb?.world) w.events.push({ type: 'worldBoss', id: m.id, name: m.name, state: 'spawn', where: wb.where ?? '' });
 }
 
 /** Rudelmitglieder in der Nähe greifen dasselbe Ziel an. */
@@ -1516,7 +1602,12 @@ function openChest(w: World, a: Actor, c: Chest): void {
   c.respawnAt = w.tick + CHEST_RESPAWN_TICKS;
   for (const q of QUESTS) {
     const st = a.quests[q.id];
-    if (q.kind !== 'chest' || st?.state !== 'active') continue;
+    if (st?.state !== 'active') continue;
+    if (q.kind === 'bring' && q.chestRegion && regionAt(w, c.x, c.y)?.name === q.chestRegion) {
+      questItemFound(w, a, q, st);
+      continue;
+    }
+    if (q.kind !== 'chest') continue;
     st.progress++;
     w.events.push({ type: 'questProgress', questId: q.id, progress: st.progress, count: q.count, to: a.id });
     if (st.progress >= q.count) {

@@ -18,7 +18,7 @@ describe('Gebiet „Aschental“: Inhalt und Größe', () => {
     expect(w.safe.length).toBeGreaterThanOrEqual(2);
     expect(w.towns.length).toBeGreaterThanOrEqual(2);
     const bosses = new Set(monsters.filter((m) => m.boss).map((m) => m.kindId));
-    expect([...bosses].sort()).toEqual(['ash_king', 'bandit_lord', 'bog_queen', 'bone_lord', 'goblin_king', 'stone_colossus', 'web_mother']);
+    expect([...bosses].sort()).toEqual(['ash_king', 'bandit_lord', 'bog_queen', 'bone_lord', 'goblin_king', 'spider_queen', 'stone_colossus', 'web_mother']);
     const kinds = new Set(monsters.map((m) => m.kindId));
     expect(kinds.size).toBeGreaterThanOrEqual(40);
   });

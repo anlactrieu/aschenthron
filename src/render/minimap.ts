@@ -1,4 +1,6 @@
 import type { World } from '../sim/world';
+import type { QuestMark } from '../sim/quests';
+import { uniqueDef } from '../sim/data';
 
 const COLORS: Record<number, string> = {
   1: '#6a625c', 2: '#2c2824', 3: '#35483a', 4: '#3f6034', 5: '#4a4452', 6: '#1d3550', 7: '#8a7658',
@@ -25,11 +27,13 @@ export class Minimap {
       }
     }
     this.view = document.createElement('canvas');
-    this.view.width = gw * 1.4;
-    this.view.height = gh * 1.4;
+    // Größe wie bisher (≈ 340 px breit), auch wenn die Karte größer wird
+    const zoom = Math.min(1.4, 340 / gw);
+    this.view.width = gw * zoom;
+    this.view.height = gh * zoom;
     Object.assign(this.view.style, {
       position: 'fixed', left: '12px', top: '12px', border: '1px solid #4b3f3a', background: '#0b0a0d',
-      imageRendering: 'pixelated', opacity: '0.92', pointerEvents: 'none',
+      imageRendering: 'pixelated', opacity: '0.92', pointerEvents: 'none', zIndex: '3',
     } as Partial<CSSStyleDeclaration>);
     document.body.appendChild(this.view);
     window.addEventListener('keydown', (e) => {
@@ -40,7 +44,7 @@ export class Minimap {
     });
   }
 
-  draw(px: number, py: number): void {
+  draw(px: number, py: number, marks: QuestMark[] = []): void {
     if (!this.visible) return;
     const k = this.view.width / this.base.width;
     const c = this.view.getContext('2d')!;
@@ -57,13 +61,26 @@ export class Minimap {
     }
     for (const a of this.w.actors) {
       if (a.kind === 'monster' && a.unique && a.alive) {
-        c.fillStyle = '#ff9a2a';
+        c.fillStyle = uniqueDef(a.unique)?.world ? '#c77fff' : '#ff9a2a';
         c.fillRect(a.x * k - 2, a.y * k - 2, 4, 4);
       }
       if (a.kind === 'monster' && a.boss && a.alive) {
         c.fillStyle = '#e04030';
         c.fillRect(a.x * k - 2, a.y * k - 2, 4, 4);
       }
+    }
+    // Aufgabenziele: gelbe Rauten (grün = abgeben)
+    for (const m of marks) {
+      c.fillStyle = m.done ? '#6fe08a' : '#ffe45a';
+      c.beginPath();
+      c.moveTo(m.x * k, m.y * k - 5);
+      c.lineTo(m.x * k + 4, m.y * k);
+      c.lineTo(m.x * k, m.y * k + 5);
+      c.lineTo(m.x * k - 4, m.y * k);
+      c.closePath();
+      c.fill();
+      c.strokeStyle = '#000';
+      c.stroke();
     }
     c.fillStyle = '#ffffff';
     c.fillRect(px * k - 2, py * k - 2, 5, 5);

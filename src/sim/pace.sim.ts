@@ -4,7 +4,7 @@ import { buildWorld, type TiledMap } from './tiled';
 import { MAX_LEVEL, SHOPS, totalXpFor } from './data';
 import { handsOf, templateById, type Item } from './items';
 import {
-  missingReq, applyCommand, buyPrice, armorOf, carryCapacity, drainEvents, getActor, inSafeZone, maxHpOf, tick, TICK_RATE,
+  missingReq, applyCommand, regionAt, buyPrice, armorOf, carryCapacity, drainEvents, getActor, inSafeZone, maxHpOf, tick, TICK_RATE,
   type Actor, type World,
 } from './world';
 
@@ -62,14 +62,18 @@ describe('Level-Tempo (Messung)', () => {
     const lastHits: string[] = [];
     let mode: 'hunt' | 'town' = 'town'; // wie ein echter Spieler: erst mit dem Startgold einkaufen
     const maxTicks = TICK_RATE * 3600 * 12;
+    let prev: { x: number; y: number };
+    let prevTid: number | null;
     for (let t = 0; t < maxTicks; t++) {
+      prev = { x: p.x, y: p.y };
+      prevTid = p.targetId;
       tick(w);
       for (const e of drainEvents(w)) {
         if (e.type === 'hit' && e.targetId === p.id) lastHits.push(getActor(w, e.attackerId)?.name ?? '?');
-        if (e.type === 'levelUp') reached[e.level] ??= w.tick;
+        if (e.type === 'levelUp') { reached[e.level] ??= w.tick; if (process.env.PACE_LEVELS) console.log(`LEVEL ${e.level} nach ${(w.tick / TICK_RATE / 60).toFixed(0)} min @${Math.round(p.x)},${Math.round(p.y)} ${regionAt(w, p.x, p.y)?.name ?? '-'}`); }
         if (e.type === 'deathPenalty') {
           deaths++;
-          if (process.env.PACE_DEATHS) { const nm = w.actors.filter((a) => a.kind === 'monster' && a.alive).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0]; console.log(`DEATH L${p.level} bei ${nm?.name} (${nm?.champ ?? '-'}) killer ${[...new Set(lastHits.slice(-12))].join('/')} hp max ${maxHpOf(p)} armor ${armorOf(p)}`); }
+          if (process.env.PACE_DEATHS) { const nm = w.actors.filter((a) => a.kind === 'monster' && a.alive).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0]; console.log(`DEATH L${p.level} @${Math.round(prev.x)},${Math.round(prev.y)} ${regionAt(w, prev.x, prev.y)?.name ?? '-'} ziel ${(() => { const tg = prevTid !== null ? getActor(w, prevTid) : undefined; return tg ? `${tg.name} L${tg.level}@${Math.round(tg.x)},${Math.round(tg.y)}` : '-'; })()} bei ${nm?.name} (${nm?.champ ?? '-'}) killer ${[...new Set(lastHits.slice(-12))].join('/')} hp max ${maxHpOf(p)} armor ${armorOf(p)}`); }
           deathLevels[p.level] = (deathLevels[p.level] ?? 0) + 1;
         }
       }

@@ -1,10 +1,11 @@
-import { ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
+import { ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, uniqueDef, NPC_LORE, type QuestDef, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
 import { POWER_TEXT, TIER_COLOR, GEM_COLOR, affixRange, gemAffix, gemName, handsOf, itemAffixes, itemReq, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
 import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
   critChance, attrBonus, equipSlotFor, socketCost, maxHpOf, maxManaOf, missingReq, nearNpc, powerOf, resistOf, type Actor, type Command, type Npc, type World,
 } from '../sim/world';
 import { itemIcon, potionIcon, skillIcon } from './icons';
+import { giverLocation, questAvailable, questChains, questWhere, targetName } from '../sim/quests';
 import { lookOf, playerCanvas } from './art';
 
 const RARITY_COLOR: Record<Item['rarity'], string> = { normal: '#c9c4bd', magic: '#7f9fff', rare: '#f2c94c', set: '#5fd070', legendary: '#ff8a2a' };
@@ -216,8 +217,8 @@ export class Ui {
     this.buildOrbs();
     this.hud.append(this.orbHp, mid, this.orbMp);
 
-    this.target.style.cssText = 'position:fixed;left:50%;top:10px;transform:translateX(-50%);background:rgba(14,12,18,.88);border:1px solid #6b5a48;color:#d4c4a8;font:13px Georgia,serif;padding:4px 12px;display:none;text-align:center;min-width:160px';
-    this.toast.style.cssText = 'position:fixed;left:12px;bottom:112px;width:420px;color:#d4c4a8;font:13px/1.35 Georgia,serif;pointer-events:none;text-shadow:0 1px 2px #000,0 0 4px #000';
+    this.target.style.cssText = 'position:fixed;z-index:4;left:50%;top:10px;transform:translateX(-50%);background:rgba(14,12,18,.88);border:1px solid #6b5a48;color:#d4c4a8;font:13px Georgia,serif;padding:4px 12px;display:none;text-align:center;min-width:160px';
+    this.toast.style.cssText = 'position:fixed;z-index:4;left:12px;bottom:112px;width:420px;color:#d4c4a8;font:13px/1.35 Georgia,serif;pointer-events:none;text-shadow:0 1px 2px #000,0 0 4px #000';
     this.bannerEl.style.cssText = 'position:fixed;left:50%;top:70px;transform:translateX(-50%);color:#e8d9b0;font:bold 24px Georgia,serif;text-shadow:0 2px 8px #000,0 0 2px #000;letter-spacing:1.5px;opacity:0;transition:opacity .6s;pointer-events:none;z-index:6;text-align:center';
     this.tip.style.cssText = 'position:fixed;z-index:50;max-width:270px;background:rgba(10,8,14,.97);border:1px solid #8a7258;color:#d4c4a8;font:12px/1.45 Georgia,serif;padding:8px 10px;pointer-events:none;display:none;box-shadow:0 4px 16px #000';
     document.body.append(this.main, this.side, this.hud, this.target, this.toast, this.bannerEl, this.tip);
@@ -377,7 +378,7 @@ export class Ui {
       this.target.style.display = 'block';
       const k = monsterKind(t.kindId!);
       const mod = t.champ ? { swift: 'sehr schnell', armored: 'sehr zäh', fiery: 'setzt in Brand', vampiric: 'heilt sich durch Treffer', thorned: 'wirft Schaden zurück' }[t.champ] : '';
-      this.target.textContent = `${t.name} (Stufe ${k.level}) ${Math.ceil(t.hp)}/${t.maxHp}${mod ? ` – ${mod}` : t.unique ? ' – Mini-Boss' : ''}${resNote(k.family)}`;
+      this.target.textContent = `${t.name} (Stufe ${k.level}) ${Math.ceil(t.hp)}/${t.maxHp}${mod ? ` – ${mod}` : t.unique ? (uniqueDef(t.unique)?.world ? ' – Weltboss' : ' – Mini-Boss') : ''}${resNote(k.family)}`;
     } else this.target.style.display = 'none';
   }
 
@@ -691,6 +692,19 @@ export class Ui {
       grid.append(s);
     }
     body.append(grid);
+    // Quest-Gegenstände (gesammelte Sammelaufgaben): nur Anzeige, zählen nicht zum Gewicht, nicht verkaufbar
+    const qitems = QUESTS.filter((q) => q.kind === 'bring' && p.quests[q.id] && p.quests[q.id]!.state !== 'turned');
+    if (qitems.length) {
+      body.append(el('div', 'a-sec', 'Quest-Gegenstände'));
+      for (const q of qitems) {
+        const st = p.quests[q.id]!;
+        const row = el('div', 'a-card', `${q.item ?? 'Gegenstand'} × ${Math.min(st.progress, q.count)}/${q.count}`);
+        row.style.color = '#ffe8a0';
+        row.title = 'Quest-Gegenstand – nicht verkaufbar, geht beim Tod nicht verloren';
+        row.append(el('span', 'a-note', ` · ${q.name}`));
+        body.append(row);
+      }
+    }
     const wgt = carriedWeight(p);
     const cap = carryCapacity(p);
     const bar = el('div', 'a-bar');
@@ -771,21 +785,53 @@ export class Ui {
     });
   }
 
+  /** Zielbeschreibung einer Aufgabe: Art, Fortschritt und Ort (Region-Name). */
+  private questGoal(def: QuestDef, p: Actor): string {
+    const st = p.quests[def.id];
+    const prog = st ? `${Math.min(st.progress, def.count)}/${def.count}` : `0/${def.count}`;
+    switch (def.kind) {
+      case 'kill': return `Töte ${def.count > 1 ? `${def.count}× ` : ''}${targetName(def)} (${prog})`;
+      case 'bring': return `Sammle ${def.item} (${prog})`;
+      case 'visit': return `Betritt: ${def.place}`;
+      case 'talk': return `Sprich mit ${def.target}`;
+      case 'chest': return `Öffne Truhen (${prog})`;
+      case 'champion': return `Besiege Champions (${prog})`;
+      case 'unique': return def.target ? `Besiege den Weltboss (${prog})` : `Besiege benannte Gegner (${prog})`;
+    }
+  }
+
+  private questCard(def: QuestDef, p: Actor, w: World | null): HTMLElement {
+    const st = p.quests[def.id]!;
+    const c = el('div', 'a-card');
+    c.style.display = 'block';
+    c.append(el('div', '', def.name), el('div', 'a-note', def.text), el('div', 'a-note', this.questGoal(def, p)));
+    const where = w ? questWhere(w, def, st.state === 'done') : '';
+    if (where) c.append(el('div', 'a-note', `${st.state === 'done' ? 'Abgabe' : 'Ort'}: ${where}`));
+    const bar = el('div', 'a-bar');
+    const f = el('div');
+    f.style.cssText = `width:${Math.min(100, (st.progress / def.count) * 100)}%;background:${st.state === 'done' ? '#6fe08a' : '#d8a24a'}`;
+    bar.append(f);
+    const rew = `Belohnung ${def.xp} XP, ${def.gold} Gold${def.reward ? (def.reward === 'unique' ? ', Unikat/Set-Teil' : ', seltener Gegenstand') : ''}`;
+    c.append(bar, el('div', 'a-note', st.state === 'done' ? 'Fertig – beim Auftraggeber abgeben!' : rew));
+    return c;
+  }
+
   private renderQuests(body: HTMLElement, p: Actor): void {
-    const active = QUESTS.filter((q) => p.quests[q.id] && p.quests[q.id]!.state !== 'turned');
-    body.append(el('div', 'a-sec', 'Aktive Aufgaben'));
+    const w = this.lastW;
+    const chained = new Set(questChains().flatMap((c) => c.quests.map((q) => q.id)));
+    const active = QUESTS.filter((q) => !chained.has(q.id) && p.quests[q.id] && p.quests[q.id]!.state !== 'turned');
+    body.append(el('div', 'a-sec', 'Aufgaben'));
     if (!active.length) body.append(el('div', 'a-note', 'Keine. Questgeber (gelbes ! über dem Kopf) stehen in den Städten.'));
-    for (const q of active) {
-      const st = p.quests[q.id]!;
-      const c = el('div', 'a-card');
-      c.style.display = 'block';
-      c.append(el('div', '', q.name), el('div', 'a-note', q.text));
-      const bar = el('div', 'a-bar');
-      const f = el('div');
-      f.style.cssText = `width:${Math.min(100, (st.progress / q.count) * 100)}%;background:${st.state === 'done' ? '#6fe08a' : '#d8a24a'}`;
-      bar.append(f);
-      c.append(bar, el('div', 'a-note', st.state === 'done' ? 'Fertig – beim Auftraggeber abgeben!' : `${st.progress}/${q.count} · Belohnung ${q.xp} XP, ${q.gold} Gold`));
-      body.append(c);
+    for (const q of active) body.append(this.questCard(q, p, w));
+    for (const chain of questChains()) {
+      const done = chain.quests.filter((q) => p.quests[q.id]?.state === 'turned').length;
+      const cur = chain.quests.find((q) => p.quests[q.id] && p.quests[q.id]!.state !== 'turned');
+      const next = chain.quests.find((q) => !p.quests[q.id]);
+      if (!cur && done === 0 && !(next && p.level >= next.minLevel - 3)) continue;
+      body.append(el('div', 'a-sec', `${chain.name} · Kapitel ${Math.min(done + (cur ? 1 : 0), chain.quests.length)}/${chain.quests.length}`));
+      if (cur) body.append(this.questCard(cur, p, w));
+      else if (done === chain.quests.length) body.append(el('div', 'a-note', 'Abgeschlossen.'));
+      else if (next) body.append(el('div', 'a-note', `Nächstes Kapitel „${next.name}“ ab Stufe ${next.minLevel}${next.requires ? ' – beim Auftraggeber abholen' : ''}${w && giverLocation(w, next) ? `: ${giverLocation(w, next)!.text}` : ''}.`));
     }
   }
 
@@ -802,6 +848,25 @@ export class Ui {
     const stash = near.find((n) => n.kind === 'stash');
     const smith = near.find((n) => n.kind === 'smith');
     const givers = near.filter((n) => n.kind === 'quest');
+    const talkers = near.filter((n) => NPC_LORE[n.name]);
+    for (const t of talkers) {
+      // Gespräch: Text des NPC; mit offener Gesprächsaufgabe gibt es einen Knopf, das Anliegen vorzutragen
+      body.append(el('div', 'a-sec', `Gespräch – ${t.name}`));
+      const box = el('div', 'a-card');
+      box.style.cssText += ';display:block;font-style:italic;line-height:1.5';
+      for (const para of NPC_LORE[t.name]!) {
+        const d = el('div', '', `„${para}“`);
+        d.style.margin = '0 0 6px';
+        box.append(d);
+      }
+      body.append(box);
+      const pending = QUESTS.find((q) => q.kind === 'talk' && q.target === t.name && p.quests[q.id]?.state === 'active');
+      if (pending) {
+        const b = el('button', 'a-btn', `Anliegen vortragen: ${pending.name}`);
+        b.onclick = () => this.send({ type: 'talk', npcId: t.id });
+        body.append(b);
+      }
+    }
     for (const m of merchants) {
       body.append(el('div', 'a-sec', `${m.name} – Waren`));
       const grid = el('div', 'a-grid');
@@ -908,20 +973,27 @@ export class Ui {
     }
     for (const g of givers) {
       body.append(el('div', 'a-sec', `${g.name} – Aufgaben`));
+      let locked = 0;
       for (const id of g.quests ?? []) {
         const def = questById(id);
         if (!def) continue;
         const st = p.quests[id];
+        if (!st && def.requires && p.quests[def.requires]?.state !== 'turned') {
+          locked++;
+          continue;
+        }
         const c = el('div', 'a-card');
         c.style.display = 'block';
         const t = el('div', '', `${def.name} (ab Stufe ${def.minLevel})`);
         t.style.fontWeight = 'bold';
-        c.append(t, el('div', 'a-note', def.text), el('div', 'a-note', `Belohnung: ${def.xp} XP, ${def.gold} Gold`));
+        c.append(t);
+        if (def.chain) c.append(el('div', 'a-note', `Kette: ${def.chain}`));
+        c.append(el('div', 'a-note', def.text), el('div', 'a-note', `Belohnung: ${def.xp} XP, ${def.gold} Gold${def.reward ? (def.reward === 'unique' ? ', Unikat/Set-Teil' : ', seltener Gegenstand') : ''}`));
         if (!st) {
-          const b = el('button', `a-btn${p.level < def.minLevel ? ' off' : ''}`, 'Annehmen');
+          const b = el('button', `a-btn${questAvailable(p, def) ? '' : ' off'}`, 'Annehmen');
           b.onclick = () => this.send({ type: 'acceptQuest', questId: id });
           c.append(b);
-        } else if (st.state === 'active') c.append(el('i', 'a-note', `Fortschritt ${st.progress}/${def.count}`));
+        } else if (st.state === 'active') c.append(el('i', 'a-note', this.questGoal(def, p)));
         else if (st.state === 'done') {
           const b = el('button', 'a-btn', 'Abgeben');
           b.onclick = () => this.send({ type: 'turnInQuest', questId: id });
@@ -929,6 +1001,7 @@ export class Ui {
         } else c.append(el('i', 'a-note', 'erledigt'));
         body.append(c);
       }
+      if (locked) body.append(el('div', 'a-note', `Weitere Aufgaben (${locked}) folgen, sobald die vorherige erledigt ist.`));
     }
     const title = el('h3', '', near.map((n) => n.name).join(' · '));
     this.side.replaceChildren(title, body);

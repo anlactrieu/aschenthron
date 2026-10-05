@@ -39,6 +39,8 @@ export function validateCommand(w: World, c: unknown): Command | null {
       return str(o.skillId) && (o.targetId === undefined || int(o.targetId)) ? { type: 'useSkill', skillId: o.skillId, targetId: o.targetId as number | undefined } : null;
     case 'buy':
       return str(o.templateId) ? { type: 'buy', templateId: o.templateId } : null;
+    case 'talk':
+      return int(o.npcId) ? { type: 'talk', npcId: o.npcId } : null;
     case 'acceptQuest': case 'turnInQuest':
       return str(o.questId) ? ({ type: o.type, questId: o.questId } as Command) : null;
     case 'craft':
@@ -122,7 +124,7 @@ export function makeSnapshot(w: World, you: Actor, events: GameEvent[]): Snapsho
       case 'miss': return byId.has(e.targetId) || e.targetId === you.id || e.attackerId === you.id;
       case 'summon': case 'charge': return byId.has(e.id) || e.id === you.id;
       case 'mheal': return byId.has(e.targetId);
-      case 'chestOpened': return true;
+      case 'chestOpened': case 'worldBoss': return true;
       default: return false;
     }
   });

@@ -2,15 +2,17 @@ import Phaser from 'phaser';
 import mapJson from '../data/aschenthron.json';
 import { buildWorld, type TiledMap } from '../sim/tiled';
 import { DMG_COLOR, STATUS_COLOR, monsterKind, questById, SKILLS, type StatusId } from '../sim/data';
+import { questAvailable, questMarks, type QuestMark } from '../sim/quests';
 import { exportPlayer, importPlayer } from '../sim/save';
 import {
-  applyCommand, drainEvents, getActor, maxHpOf, maxManaOf, tick, TICK_RATE, type Actor, type Chest, type Command, type Npc, type World,
+  applyCommand, drainEvents, getActor, maxHpOf, maxManaOf, regionAt, tick, TICK_RATE, type Actor, type Chest, type Command, type Npc, type World,
 } from '../sim/world';
 import { isWalkable } from '../sim/path';
 import { toScreen, toTile } from './iso';
 import { Ui, describeItem } from './ui';
 import { Sfx } from './audio';
 import { Minimap } from './minimap';
+import { Atmosphere, isDungeon } from './atmosphere';
 import { Fx } from './fx';
 import type { RemoteSession } from '../net/client';
 import {
@@ -68,6 +70,8 @@ export class GameScene extends Phaser.Scene {
   private minimap!: Minimap;
   private fpsText: Phaser.GameObjects.Text | null = null;
   private fx!: Fx;
+  private atmo!: Atmosphere;
+  private marks: QuestMark[] = [];
   private gfxGround!: Phaser.GameObjects.Graphics;
   private gfxShimmer!: Phaser.GameObjects.Graphics;
   private lastShimmer = -1000;
@@ -119,6 +123,7 @@ export class GameScene extends Phaser.Scene {
     const p = this.player();
     this.ui = new Ui((c) => this.send(c), (i) => this.useSkillSlot(i), (k) => this.usePotionKind(k), () => this.newGame());
     this.sfx = new Sfx();
+    this.atmo = new Atmosphere(this, this.sfx);
     this.minimap = new Minimap(this.world, this.tiles);
     if (this.remote) this.ui.say(`Verbunden als ${p.name}${this.remote.pvp ? ' – PvP außerhalb der Städte aktiv, Angreifer werden zu Mördern' : ''}. Klick auf Spieler greift an.`);
     else if (saved && importPlayer(this.world, p, saved)) this.ui.say('Spielstand geladen.');
@@ -589,7 +594,27 @@ export class GameScene extends Phaser.Scene {
         }
         case 'questProgress': say(`Aufgabe: ${e.progress}/${e.count}`); break;
         case 'questDone': say(`Aufgabe erfüllt: ${questById(e.questId)?.name} – beim Auftraggeber abgeben!`); this.sfx.quest(); break;
-        case 'questTurned': say(`Aufgabe abgegeben: +${e.xp} XP, +${e.gold} Gold`); this.sfx.quest(); break;
+        case 'questTurned': {
+          const def = questById(e.questId);
+          say(`Aufgabe abgegeben: +${e.xp} XP, +${e.gold} Gold${e.item ? `, ${e.item.name}` : ''}`);
+          if (def?.outro) say(def.outro);
+          if (e.item) this.ui.banner(`Belohnung: ${e.item.name}`, '#ffd23a');
+          this.sfx.quest();
+          break;
+        }
+        case 'questItem': say(`${e.item} gefunden (${e.progress}/${e.count})`); this.sfx.pickup(); break;
+        case 'talk': this.sfx.quest(); break;
+        case 'worldBoss': {
+          if (e.state === 'spawn') {
+            this.ui.banner(`${e.name} erwacht ${e.where}!`, '#c77fff');
+            say(`Weltboss erwacht: ${e.name} ${e.where}.`);
+            this.sfx.boss();
+          } else {
+            this.ui.banner(`${e.name} ist gefallen!`, '#ffd23a');
+            say(`Weltboss besiegt: ${e.name}. Beute liegt am Boden.`);
+          }
+          break;
+        }
         case 'deathPenalty':
           say(`Du bist gestorben: −${e.xpLost} XP, ${e.dropped.length} Item(s) liegen an der Todesstelle (5 Min.).`);
           this.sfx.death();
@@ -644,13 +669,17 @@ export class GameScene extends Phaser.Scene {
     this.updateActors(time, p, g);
     for (const r of this.world.safe) this.outline(g, r.x, r.y, r.w, r.h);
     this.shimmer(time, px, py);
+    const dtFrame = Math.min(time - this.lastTime, 100);
+    this.atmo.update(dtFrame);
+    this.ambientKind = this.atmo.ambientKind();
     this.fx.setAmbient(this.ambientKind, this.cameras.main.worldView, time - this.lastTime);
     this.lastTime = time;
     this.fx.update(time, g);
     const cp = this.camPos ?? p;
     const { sx, sy } = toScreen(cp.x, cp.y);
     this.cameras.main.centerOn(Math.round(sx), Math.round(sy - 14));
-    if (this.frame % 6 === 0) this.minimap.draw(p.x, p.y);
+    if (this.frame % 30 === 0) this.marks = questMarks(this.world, p);
+    if (this.frame % 6 === 0) this.minimap.draw(p.x, p.y, this.marks);
     this.updateRegion(p);
   }
 
@@ -706,18 +735,17 @@ export class GameScene extends Phaser.Scene {
 
   private updateRegion(p: Actor): void {
     // Dungeons liegen innerhalb der Landkarte; kleinste passende Zone gewinnt
-    const hit = this.world.regions
-      .filter((r) => p.x >= r.x && p.y >= r.y && p.x < r.x + r.w && p.y < r.y + r.h)
-      .sort((a, b) => a.w * a.h - b.w * b.h)[0];
+    const hit = regionAt(this.world, p.x, p.y);
     const name = hit?.name ?? '';
     if (name !== this.regionName) {
       this.regionName = name;
-      const dungeon = ['Gruft der Moorhexe', 'Katakomben', 'Tiefenmine', 'Thron der Asche'].includes(name);
+      const dungeon = isDungeon(name);
       this.vignette.style.background = dungeon
         ? 'radial-gradient(ellipse at center,rgba(8,6,20,.15) 30%,rgba(2,0,10,.82) 100%)'
         : 'radial-gradient(ellipse at center,rgba(0,0,0,0) 58%,rgba(0,0,0,.45) 100%)';
-      this.ambientKind = name === 'Aschenöde' || name === 'Thron der Asche' ? 'embers' : name === 'Moorlande' || name === 'Gruft der Moorhexe' ? 'mist' : null;
-      this.sfx.ambient(name === 'Moorlande' || name === 'Gruft der Moorhexe' ? 'wind' : name === 'Aschenöde' || name === 'Thron der Asche' ? 'embers' : dungeon ? 'cave' : null);
+      this.atmo.setRegion(name);
+      const ash = name === 'Aschenöde' || name === 'Aschengrund' || name === 'Thron der Asche';
+      this.sfx.ambient(name === 'Moorlande' || name === 'Gruft der Moorhexe' ? 'wind' : ash ? 'embers' : dungeon ? 'cave' : null);
       if (hit) this.ui.banner(`${hit.name}${hit.levels && hit.levels !== 'Stadt' ? ` · Stufe ${hit.levels}` : ''}`);
     }
   }
@@ -880,7 +908,7 @@ export class GameScene extends Phaser.Scene {
       img.setPosition(sx, sy + 8).setDepth(sy + 8);
       this.label(`n${n.id}`, n.name, sx, sy - 52, '#e8d9b0', seen);
       const mark = this.questMark(n, p);
-      if (mark) this.label(`m${n.id}`, mark, sx, sy - 70 + Math.sin(time / 200) * 2, mark === '!' ? '#ffe45a' : '#7fe08a', seen, 22);
+      if (mark) this.label(`m${n.id}`, mark, sx, sy - 70 + Math.sin(time / 200) * 2, mark === '!' ? '#ffe45a' : mark === '…' ? '#8fd0ff' : '#7fe08a', seen, 22);
     }
     this.cleanLabels(seen, ['n', 'm']);
   }
@@ -921,7 +949,12 @@ export class GameScene extends Phaser.Scene {
       const st = p.quests[id];
       const def = questById(id);
       if (st?.state === 'done') return '?';
-      if (!st && def && p.level >= def.minLevel) avail = true;
+      if (def && questAvailable(p, def)) avail = true;
+    }
+    // Gesprächsziel einer offenen Aufgabe: Sprechblase
+    for (const [id, st] of Object.entries(p.quests)) {
+      const def = questById(id);
+      if (st.state === 'active' && def?.kind === 'talk' && def.target === n.name) return '…';
     }
     return avail ? '!' : '';
   }

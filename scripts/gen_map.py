@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Erzeugt src/data/aschenthron.json (Tiled-JSON, orthogonal, 32px) – die Insel „Aschental“ (Version 3).
+"""Erzeugt src/data/aschenthron.json (Tiled-JSON, orthogonal, 32px) – die Insel „Aschental“ (Version 4: 300x240 mit Goblinbau, Spinnennest, Aschengrund, Weltbossen und Lore-NPCs).
 Gids: 1 Stadtstein, 2 Wand, 3 Sumpf, 4 Gras, 5 Dungeonboden, 6 Wasser, 7 Weg, 8 Hochland, 9 Asche,
 10 Baum, 11 Fels, 12 Lava, 13 Grabstein, 14 Säule (alle blockiert außer 1,3,4,5,7,8,9).
 Monster stehen in Rudeln (1–5, mit Anführer einer höheren Stufe). Je weiter vom Zoneneingang, desto stärker.
@@ -7,7 +7,7 @@ Alles hier ist eigener Entwurf. Danach in Tiled editierbar; das Spiel liest nur 
 import json, random, collections, sys
 
 S = 1.5                                  # Skalierung gegenüber dem ersten Entwurf (160x120)
-W, H, TS = 240, 180, 32
+W, H, TS = 300, 240, 32
 random.seed(20261005)
 g = [[6] * W for _ in range(H)]
 BLOCK = {2, 6, 10, 11, 12, 13, 14}
@@ -256,7 +256,9 @@ def spawn_pack(kinds, x, y, ground, size, leader=None, gap=3, champions=True):
         taken.append((mx, my))
     return len(members)
 
-def zone_packs(zone, entry, bands, n_packs, ground):
+PACK_META = {}                           # Rudel-Id -> (Zonen-Tag, Entfernung vom Eingang 0..1)
+
+def zone_packs(zone, entry, bands, n_packs, ground, tag=None):
     """bands: [(f_max, [(kind, gewicht)...], leader_kind|None)] nach Entfernung vom Eingang (0..1)."""
     x0, y0, x1, y1 = zone
     far = max(abs(entry[0] - x0), abs(entry[0] - x1)) + max(abs(entry[1] - y0), abs(entry[1] - y1))
@@ -273,6 +275,7 @@ def zone_packs(zone, entry, bands, n_packs, ground):
             size = random.choice([1, 1, 2])   # nahe am Zoneneingang: kleine Rudel, damit die ersten Minuten fair bleiben
         leader = band[2] if band[2] and size >= 3 and random.random() < 0.5 else None
         total += spawn_pack(kinds, x, y, ground, size, leader, champions=f >= 0.3)
+        PACK_META[pack_counter[0]] = (tag, f)
         placed += 1
     if placed < n_packs: print("WARN nur", placed, "von", n_packs, "Rudeln in", zone, file=sys.stderr)
     return total
@@ -286,15 +289,16 @@ zone_packs(ZONES['farm'], T1_E, [
 # Düsterwald L3-10: Goblins in Stufen, Spinnen, Banditen-Späher
 zone_packs(ZONES['forest'], P(50, 80), [
     (0.25, [('goblin', 4), ('feral_hound', 2), ('forest_spider', 2)], 'goblin_scout'),
-    (0.55, [('goblin_scout', 3), ('goblin_archer', 1), ('forest_spider', 3), ('bandit_novice', 2)], 'goblin_warrior'),
+    (0.55, [('goblin_scout', 3), ('goblin_archer', 1), ('forest_spider', 3), ('bandit_novice', 2)], 'goblin_archer'),   # Anführer L5 statt Krieger L8: der Wald-Osthang liegt neben Felsenwacht, Stufe-4-Spieler sterben dort sonst in Schleifen
     (0.80, [('goblin_warrior', 3), ('wolf', 2), ('venom_spider', 2), ('highwayman', 1), ('bandit_archer', 1)], 'goblin_shaman'),
-    (1.00, [('goblin_warrior', 3), ('goblin_shaman', 2), ('venom_spider', 2), ('wolf', 2)], 'goblin_chief')], 30, (4,))
-# Goblinkönig im Düsterwald (tief im Wald)
+    (1.00, [('goblin_warrior', 3), ('goblin_shaman', 2), ('venom_spider', 2), ('wolf', 2)], 'goblin_chief')], 30, (4,), tag='forest')
+# Goblinkönig: früher im Düsterwald, jetzt im Goblinbau (siehe unten)
 gk = (sc(22), sc(50))
 for _ in range(200):
     gx, gy = random.randint(sc(16), sc(30)), random.randint(sc(50), sc(60))
     if place_ok(gx, gy, (4,), 0, 2):
-        fill((gx - 2, gy - 2, gx + 2, gy + 2), 4); obj("Goblinkönig Grix", "monster", gx, gy, kind="goblin_king", pack=0); taken.append((gx, gy)); break
+        # Grix sitzt jetzt im Goblinbau (P3); der Platz bleibt reserviert, damit der restliche Entwurf unverändert bleibt
+        fill((gx - 2, gy - 2, gx + 2, gy + 2), 4); taken.append((gx, gy)); break
 # Räuberlager L7-13
 zone_packs(ZONES['camp'], P(30, 44), [
     (0.45, [('highwayman', 2), ('bandit_archer', 1), ('bandit', 3), ('bandit_novice', 1)], 'bandit'),
@@ -438,6 +442,138 @@ for name, (rooms, ent, boss, dist) in dg.items():
                 if free(x, y) and not any(abs(x - a) < 3 and abs(y - b) < 3 for a, b in taken + ctaken):
                     chest(x, y, lv, 'gold' if f > 0.6 else 'iron'); break
 
+
+# ============================================================ P3: neue Dungeons, Aschengrund, Weltbosse, Lore-NPCs
+# Alles Neue entsteht nach dem bisherigen Entwurf mit eigenem Zufallsstrom, damit die alten Zonen unverändert bleiben.
+random.seed(20261006)
+
+def water_ok(box, pad=1):
+    x0, y0, x1, y1 = box
+    return all(0 <= x < W and 0 <= y < H and g[y][x] == 6 for y in range(y0 - pad, y1 + pad + 1) for x in range(x0 - pad, x1 + pad + 1))
+
+NEW_DUNGEONS = {
+    'goblin': dict(box=(4, 4, 60, 33), entrance=(28, 34)),         # Goblinbau: Zugang vom Räuberlager (Nordrand, weit weg von Harkon)
+    'nest': dict(box=(100, 178, 152, 208), entrance=(126, 176)),   # Spinnennest: Zugang vom Totenacker (Südrand)
+}
+for name, d in NEW_DUNGEONS.items():
+    assert water_ok(d['box']), "Platz für " + name + " nicht frei"
+    dg[name] = dungeon(d['box'], d['entrance'])
+road([(28, 34), (28, 44)], width=3, gid=7)
+road([(126, 166), (126, 176)], width=3, gid=7)
+
+GRUND = (236, 90, 294, 150)
+assert water_ok(GRUND), "Platz für Aschengrund nicht frei"
+fill(GRUND, 9); ragged(GRUND, 9)
+blobs(GRUND, 9, 12, 34, 4); scatter(GRUND, 9, 11, 0.09)
+road([(222, 114), (244, 114)], width=3, gid=9)
+
+for nm, r, lv in [("Goblinbau", NEW_DUNGEONS['goblin']['box'], "8-12"), ("Spinnennest", NEW_DUNGEONS['nest']['box'], "13-18"), ("Aschengrund", GRUND, "28-32")]:
+    obj(nm, "region", r[0], r[1], r[2] - r[0] + 1, r[3] - r[1] + 1, levels=lv)
+
+def dungeon_spawns2(name, bands, boss_kind, per_room=(1, 2)):
+    """Wie dungeon_spawns, aber ohne Wächter im Bossraum; Rudelgröße je Band, Räume neben dem Eingang höchstens 2."""
+    rooms, ent, boss, dist = dg[name]
+    maxd = max(dist.values()) or 1
+    for k, r in rooms.items():
+        if k == ent: continue
+        if k == boss:
+            cx, cy = room_center(r)
+            obj(boss_kind, "monster", cx, cy, kind=boss_kind, pack=0); taken.append((cx, cy))
+            continue
+        f = dist.get(k, maxd) / maxd
+        band = next((b for b in bands if f <= b[0]), bands[-1])
+        kinds = [kk for kk, w in band[1] for _ in range(w)]
+        lo, hi = band[3]
+        if dist.get(k, maxd) <= 1: hi = min(hi, 2)
+        for _ in range(random.randint(*per_room)):
+            for _t in range(40):
+                x, y = random.randint(r[0] + 1, r[2] - 1), random.randint(r[1] + 1, r[3] - 1)
+                if place_ok(x, y, (5,), 0, 3):
+                    spawn_pack(kinds, x, y, (5,), random.randint(lo, hi), band[2]); break
+
+dungeon_spawns2('goblin', [
+    (0.34, [('goblin_warrior', 3), ('goblin_archer', 1), ('goblin_scout', 1)], 'goblin_warrior', (1, 2)),
+    (0.67, [('goblin_warrior', 3), ('goblin_shaman', 1), ('goblin_brute', 2), ('goblin_archer', 1)], 'goblin_brute', (1, 3)),
+    (1.00, [('goblin_brute', 3), ('goblin_shaman', 1), ('goblin_warlord', 2)], 'goblin_warlord', (2, 3))], 'goblin_king')
+dungeon_spawns2('nest', [
+    (0.34, [('giant_spider', 3), ('brood_spider', 3)], 'giant_spider', (1, 2)),
+    (0.67, [('web_stalker', 3), ('giant_spider', 2), ('brood_spider', 2)], 'web_stalker', (1, 3)),
+    (1.00, [('nest_matron', 3), ('web_stalker', 3), ('brood_spider', 1)], 'nest_matron', (2, 3))], 'spider_queen')
+
+def dungeon_chests(name, lv, total=(3, 5)):
+    """3–5 Truhen je Dungeon: zwei goldene im Bossraum, der Rest in zufälligen Räumen."""
+    rooms, ent, boss, dist = dg[name]
+    maxd = max(dist.values()) or 1
+    n = random.randint(*total); placed = 0
+    for dx in (-2, 2):
+        x, y = room_center(rooms[boss]); x += dx; y += 2
+        if free(x, y) and placed < n: chest(x, y, lv[1], 'gold'); placed += 1
+    others = [k for k in rooms if k not in (ent, boss)]
+    random.shuffle(others)
+    for k in others:
+        if placed >= n: break
+        r = rooms[k]; f = dist.get(k, maxd) / maxd
+        for _t in range(30):
+            x, y = random.randint(r[0] + 1, r[2] - 1), random.randint(r[1] + 1, r[3] - 1)
+            if free(x, y) and not any(abs(x - a) < 3 and abs(y - b) < 3 for a, b in taken + ctaken):
+                chest(x, y, lv[0] + int((lv[1] - lv[0]) * f), 'gold' if f > 0.6 else 'iron'); placed += 1; break
+
+dungeon_chests('goblin', (8, 12))
+dungeon_chests('nest', (13, 18))
+
+# Aschengrund: Elite-Zone (Stufe 28–32), dichter besetzt als die Aschenöde, bessere Truhen
+GRUND_ENTRY = (236, 114)
+zone_packs(GRUND, GRUND_ENTRY, [
+    (0.30, [('hell_spawn', 3), ('hell_hound', 3)], 'hell_hound'),
+    (0.65, [('hell_hound', 3), ('doom_knight', 3), ('hell_spawn', 2)], 'doom_knight'),
+    (1.00, [('doom_knight', 3), ('pit_fiend', 3), ('hell_hound', 2)], 'pit_fiend')], 52, (9,), tag='grund')
+zone_chests(GRUND, (9,), 9, (28, 32), ('iron', 'gold', 'gold'), GRUND_ENTRY)
+
+# Weltbosse: weit vom Zoneneingang, abseits der Wege (nur auf Zonenboden, nie Weg)
+place_unique(ZONES['swamp'], (3,), 'bog_titan', 'ghoul_alpha', P(78, 62), 0.65)
+place_unique(ZONES['hills'], (8,), 'mountain_king', 'rock_troll', P(92, 49), 0.7)
+place_unique(GRUND, (9,), 'abyss_warden', 'pit_fiend', GRUND_ENTRY, 0.75)
+
+# Lore-NPCs: feste Plätze (kein Zufall), danach werden Monster in 5 Feldern Umkreis entfernt
+def prop(o, n): return next((p["value"] for p in o["properties"] if p["name"] == n), None)
+BOSS_KINDS = {"goblin_king", "bandit_lord", "bone_lord", "bog_queen", "stone_colossus", "web_mother", "ash_king", "spider_queen"}
+LORE_POS = []
+def free_near(x, y, ground, maxr=14):
+    for r in range(maxr + 1):
+        for dx in range(-r, r + 1):
+            for dy in range(-r, r + 1):
+                if max(abs(dx), abs(dy)) != r: continue
+                nx, ny = x + dx, y + dy
+                if free(nx, ny) and g[ny][nx] in ground and sum(1 for ax in (-1, 0, 1) for ay in (-1, 0, 1) if free(nx + ax, ny + ay)) >= 7 \
+                        and not any(abs(nx - a) < 3 and abs(ny - b) < 3 for a, b in ctaken + LORE_POS) \
+                        and not any(abs(nx - o["x"] // TS) < 9 and abs(ny - o["y"] // TS) < 9 for o in objs if o["type"] == "monster" and (prop(o, "unique") or prop(o, "kind") in BOSS_KINDS)):
+                    return nx, ny
+    raise SystemExit("kein Platz für NPC bei %d,%d" % (x, y))
+
+def lore_npc(name, x, y, quests, ground):
+    nx, ny = free_near(x, y, ground)
+    obj(name, "npc", nx, ny, kind="quest", quests=quests)
+    LORE_POS.append((nx, ny)); taken.append((nx, ny))
+
+lore_npc("Chronistin Maren", t1x + 9, t1y + 7, "c_gob1", (1,))
+lore_npc("Torwache Haldor", t2x + 9, t2y + 18, "c_moor1,c_eid1,c_web1,c_web2,c_web3", (1,))
+lore_npc("Jägerin Ysa", 47, 63, "c_gob2,c_gob3,c_gob4", (7, 4))
+lore_npc("Eremit Olm", sc(88), sc(80), "c_moor2,c_moor3,c_moor4", (3,))
+_er = dg['mine'][0][dg['mine'][1]]
+lore_npc("Schatzsucher Pell", (_er[0] + _er[2]) // 2 + 1, (_er[1] + _er[3]) // 2 + 1, "c_pell1,c_pell2,c_pell3", (5,))
+lore_npc("Ritter Aldric", 181, 118, "c_eid2,c_eid3,c_eid4", (9,))
+objs[:] = [o for o in objs if not (o["type"] == "monster" and not any(p["name"] == "unique" or (p["name"] == "kind" and p["value"] in ("bandit_lord", "goblin_king")) for p in o["properties"])
+                                   and any(abs(o["x"] // TS - a) <= 5 and abs(o["y"] // TS - b) <= 5 for a, b in LORE_POS))]
+
+# Forst-Eingang entschärfen: im vorderen Düsterwald höchstens 3 je Rudel (nachträglich gekürzt, Zufallsstrom bleibt gleich)
+trim = 0
+for pid, (tag, f) in PACK_META.items():
+    if tag == 'forest' and f < 0.5:
+        members = [o for o in objs if o["type"] == "monster" and any(p["name"] == "pack" and p["value"] == str(pid) for p in o["properties"])]
+        for o in members[3:]:
+            objs.remove(o); trim += 1
+print("Düsterwald: %d Rudelmitglieder im Eingangsbereich gekürzt" % trim, file=sys.stderr)
+
 # ------------------------------------------------------------------ Prüfung
 sx, sy = START
 seen = {(sx, sy)}; q = collections.deque([(sx, sy)])
@@ -449,11 +585,20 @@ while q:
             seen.add((nx, ny)); q.append((nx, ny))
 bad = [o for o in objs if o["type"] in ("monster", "npc", "chest") and (o["x"] // TS, o["y"] // TS) not in seen]
 if bad:
-    crit = [o for o in bad if o["type"] == "npc" or "boss" in o["name"].lower() or o["name"] in ("Räuberfürst Harkon", "Moorhexe Veshra", "Aschenkönig", "Steinkoloss", "Knochenfürst Morrik", "Goblinkönig Grix", "Webmutter Skarra")]
     for o in bad[:20]: print("UNERREICHBAR", o["name"], o["x"] // TS, o["y"] // TS, file=sys.stderr)
+    crit = [o for o in bad if o["type"] == "npc"]
     if crit: sys.exit("kritische Objekte unerreichbar: " + ", ".join(o["name"] for o in crit))
-    ids = {o["id"] for o in bad}; objs[:] = [o for o in objs if o["id"] not in ids]
-    print("entfernt:", len(bad), "unerreichbare Objekte", file=sys.stderr)
+    keep = []
+    for o in bad:
+        if o["type"] == "monster" and (prop(o, "unique") or prop(o, "kind") in BOSS_KINDS):
+            # Mini-Bosse/Bosse nie löschen: auf das nächste erreichbare Feld verschieben
+            ox, oy = o["x"] // TS, o["y"] // TS
+            tx, ty = min(((x, y) for (x, y) in seen if g[y][x] == g[oy][ox] or g[y][x] in (3, 4, 5, 8, 9)), key=lambda c: abs(c[0] - ox) + abs(c[1] - oy))
+            print("verschoben:", o["name"], (ox, oy), "->", (tx, ty), file=sys.stderr)
+            o["x"], o["y"] = tx * TS, ty * TS
+        else: keep.append(o)
+    ids = {o["id"] for o in keep}; objs[:] = [o for o in objs if o["id"] not in ids]
+    print("entfernt:", len(keep), "unerreichbare Objekte", file=sys.stderr)
 
 data = [g[y][x] for y in range(H) for x in range(W)]
 tmj = {"compressionlevel": -1, "height": H, "width": W, "infinite": False, "orientation": "orthogonal", "renderorder": "right-down",

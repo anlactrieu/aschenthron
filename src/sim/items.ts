@@ -306,10 +306,12 @@ export function rollSockets(rng: Rng, t: ItemTemplate, rarity: Rarity): (GemInfo
 }
 
 /** Edelstein-Drop passend zur Stufe: höhere Qualität erst in höheren Gegenden. */
-export function rollGem(rng: Rng, nextId: () => number, level: number): Item {
+export function rollGem(rng: Rng, nextId: () => number, level: number, minQuality: GemQuality = 1): Item {
   const kind = GEM_KINDS[rng.int(0, GEM_KINDS.length - 1)]!;
   const r = rng.next();
-  const q: GemQuality = level >= 20 && r < 0.2 ? 3 : level >= 14 && r < 0.5 ? 2 : 1;
+  const natural: GemQuality = level >= 20 && r < 0.2 ? 3 : level >= 14 && r < 0.5 ? 2 : 1;
+  // Mindestqualität (Weltbosse): Stufe 3 weiter möglich, wenn die Gegend hoch genug ist
+  const q: GemQuality = minQuality > natural ? (level >= 20 && rng.next() < 0.35 ? 3 : minQuality) : natural;
   return generateItem(rng, nextId(), `gem_${kind}_${q}`, 'normal');
 }
 
@@ -551,6 +553,8 @@ export const LEGENDARIES: LegendaryDef[] = [
   { id: 'colossus_heart', name: 'Kolossherz', base: 'dread_mail', minLevel: 20, affixes: [{ stat: 'armor', min: 10, max: 14 }, { stat: 'maxHp', min: 80, max: 120 }], power: { id: 'thorns', value: 25 }, source: 'stone_colossus' },
   { id: 'death_grip', name: 'Griff des Todes', base: 'dread_fists', minLevel: 21, affixes: [{ stat: 'damage', min: 8, max: 12 }, { stat: 'armor', min: 4, max: 6 }], power: { id: 'lifesteal', value: 6 } },
   { id: 'ash_bringer', name: 'Aschenbringer', base: 'ash_greatsword', minLevel: 26, affixes: [{ stat: 'damage', min: 15, max: 20 }, { stat: 'kraft', min: 4, max: 6 }], power: { id: 'lifesteal', value: 8 }, source: 'ash_king' },
+  { id: 'abyss_edge', name: 'Schneide des Abgrunds', base: 'ash_saber', minLevel: 28, affixes: [{ stat: 'damage', min: 14, max: 18 }, { stat: 'haste', min: 4, max: 6 }], power: { id: 'lifesteal', value: 7 } },
+  { id: 'warden_aegis', name: 'Ägide des Wächters', base: 'ash_shield', minLevel: 28, affixes: [{ stat: 'armor', min: 10, max: 14 }, { stat: 'maxHp', min: 90, max: 130 }], power: { id: 'thorns', value: 30 } },
   { id: 'ash_crown', name: 'Aschenkrone', base: 'ash_visor', minLevel: 26, affixes: [{ stat: 'armor', min: 8, max: 12 }, { stat: 'maxHp', min: 100, max: 150 }], power: { id: 'xpBonus', value: 15 }, source: 'ash_king' },
 ];
 
@@ -705,4 +709,37 @@ export function rollUniqueSpecial(rng: Rng, nextId: () => number, level: number)
     }
   }
   return null;
+}
+
+/** Hebt alle gewürfelten Affixe eines Gegenstands auf mindestens Stufe `minTier` (Weltboss-Beute); T5 bleibt möglich. */
+export function boostAffixTiers(rng: Rng, item: Item, minTier: number): void {
+  if (item.slot === 'potion' || item.slot === 'gem') return;
+  const t = templateById(item.templateId);
+  const base = t.base?.length ?? 0;
+  for (let i = base; i < item.affixes.length; i++) {
+    const a = item.affixes[i]!;
+    if ((a.tier ?? 0) >= minTier) continue;
+    const tier = rng.next() < 0.35 ? 5 : minTier;
+    const [lo, hi] = affixRange(a.stat, t.minLevel, tier);
+    item.value += 6 * (tier - (a.tier ?? 1));
+    item.affixes[i] = { stat: a.stat, value: rng.int(lo, hi), tier };
+  }
+}
+
+/** Weltboss-Ausrüstung: seltenes Stück mit hohen Affix-Stufen. */
+export function rollWorldDrop(rng: Rng, nextId: () => number, level: number, minTier: number): Item {
+  const it = rollDrop(rng, nextId, level, 'rare');
+  boostAffixTiers(rng, it, minTier);
+  return it;
+}
+
+/** Weltboss-Sonderdrop: Unikat oder Set-Teil passend zur Stufe (60 %), sonst nichts. */
+export function rollWorldSpecial(rng: Rng, nextId: () => number, level: number): Item | null {
+  if (rng.next() < 0.4) return null;
+  const pool = LEGENDARIES.filter((d) => !d.source && d.minLevel <= level + 3 && d.minLevel >= level - 10);
+  if (pool.length && rng.next() < 0.6) return generateLegendary(rng, nextId(), pool[rng.int(0, pool.length - 1)]!.id);
+  const sets = SETS.filter((d) => d.minLevel <= level + 3 && d.minLevel >= level - 10);
+  if (!sets.length) return pool.length ? generateLegendary(rng, nextId(), pool[rng.int(0, pool.length - 1)]!.id) : null;
+  const set = sets[rng.int(0, sets.length - 1)]!;
+  return generateSetPiece(rng, nextId(), set.id, rng.int(0, set.pieces.length - 1));
 }

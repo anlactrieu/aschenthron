@@ -10,6 +10,8 @@ export class Sfx {
   private noiseBuf: AudioBuffer | null = null;
   private bed: { noise: GainNode; lp: BiquadFilterNode; drone: GainNode; osc: OscillatorNode } | null = null;
   private bedKind: 'wind' | 'embers' | 'cave' | null = null;
+  private rainGain: GainNode | null = null;
+  private rainLevel = 0;
 
   constructor() {
     const start = () => this.ensure();
@@ -78,7 +80,20 @@ export class Sfx {
     osc.connect(drone).connect(this.master!);
     osc.start();
     this.bed = { noise, lp, drone, osc };
+    // Regenbett: eigenes Rauschen, Bandpass um 3 kHz, nur bei Regen hörbar
+    const rs = c.createBufferSource();
+    rs.buffer = this.noiseBuf;
+    rs.loop = true;
+    const bp = c.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 3200;
+    bp.Q.value = 0.4;
+    this.rainGain = c.createGain();
+    this.rainGain.gain.value = 0;
+    rs.connect(bp).connect(this.rainGain).connect(this.master!);
+    rs.start();
     this.ambient(this.bedKind);
+    this.rain(this.rainLevel);
   }
 
   /** Umgebungston der Zone: Wind (Moor), Glut (Aschenöde), Höhle (Dungeons) oder Stille. */
@@ -91,6 +106,12 @@ export class Sfx {
     this.bed.noise.gain.setTargetAtTime(p[1]!, t, 1.2);
     this.bed.drone.gain.setTargetAtTime(p[2]!, t, 1.2);
     this.bed.osc.frequency.setTargetAtTime(p[3]!, t, 1.2);
+  }
+
+  /** Regenrauschen 0–1 (leise; M schaltet über den Master stumm). */
+  rain(level: number): void {
+    this.rainLevel = level;
+    if (this.rainGain && this.ctx) this.rainGain.gain.setTargetAtTime(level * 0.11, this.ctx.currentTime, 0.8);
   }
 
   private gate(name: string, ms: number): boolean {
