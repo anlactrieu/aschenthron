@@ -1,7 +1,7 @@
 /** Einstellungen (Lautstärke, Anzeigen, Schnell aufheben) und Tastenbelegung; liegt nur im Browser (localStorage). */
 
 export type Action =
-  | 'inv' | 'char' | 'skills' | 'quests' | 'ach' | 'settings' | 'rest' | 'heal' | 'mana'
+  | 'inv' | 'char' | 'skills' | 'quests' | 'ach' | 'settings' | 'rest' | 'heal' | 'mana' | 'quicksave' | 'quickload'
   | 'skill1' | 'skill2' | 'skill3' | 'skill4' | 'skill5' | 'skill6' | 'skill7' | 'skill8' | 'skill9';
 
 export const ACTIONS: { id: Action; label: string; def: string }[] = [
@@ -14,6 +14,8 @@ export const ACTIONS: { id: Action; label: string; def: string }[] = [
   { id: 'rest', label: 'Rasten', def: 'r' },
   { id: 'heal', label: 'Heiltrank', def: 'q' },
   { id: 'mana', label: 'Manatrank', def: 'e' },
+  { id: 'quicksave', label: 'Schnell speichern', def: 'f5' },
+  { id: 'quickload', label: 'Schnell laden', def: 'f9' },
   ...([1, 2, 3, 4, 5, 6, 7, 8, 9] as const).map((n) => ({ id: `skill${n}` as Action, label: `Fertigkeit ${n}`, def: String(n) })),
 ];
 

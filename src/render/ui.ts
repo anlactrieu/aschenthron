@@ -263,6 +263,7 @@ export class Ui {
   private dollKey = '';
   private dollUrl = '';
   private dollWidth = 104;
+  private showSaveIo = false;
   private bagFilter: BagFilter = 'all';
   private bagSort: BagSort = 'none';
 
@@ -273,6 +274,7 @@ export class Ui {
     private newGame: () => void,
     private saveIo: { export: () => string; import: (json: string) => boolean } | null = null,
     private slotIo: { list: () => { n: number; label: string; exists: boolean; active: boolean }[]; switchTo: (n: number) => void } | null = null,
+    private manualIo: { save: () => void; load: () => void; info: () => string | null } | null = null,
   ) {
     const style = document.createElement('style');
     style.textContent = CSS;
@@ -320,6 +322,11 @@ export class Ui {
       else if (a === 'rest') this.send({ type: 'rest' });
       else if (a === 'heal') this.usePotionKind('heal');
       else if (a === 'mana') this.usePotionKind('mana');
+      else if (a === 'quicksave' || a === 'quickload') {
+        e.preventDefault();
+        if (a === 'quicksave') this.manualIo?.save();
+        else this.confirmLoad();
+      }
       else this.useSkillSlot(Number(a.slice(5)) - 1);
     });
   }
@@ -1000,6 +1007,23 @@ export class Ui {
 
   private renderSettings(body: HTMLElement): void {
     const cfg = settings();
+    if (this.manualIo) {
+      const mio = this.manualIo;
+      body.append(el('div', 'a-sec', 'Speichern und Laden'));
+      const info = mio.info();
+      body.append(el('div', 'a-note', `Das Spiel speichert auch von selbst. Mit „Jetzt speichern“ legst du einen Spielstand ab, zu dem du jederzeit zurückkehren kannst (${keyLabel(keyOf('quicksave'))} speichern, ${keyLabel(keyOf('quickload'))} laden). ${info ? `Gespeichert: ${info}` : 'Noch nichts gespeichert.'}`));
+      const mr = el('div');
+      mr.style.cssText = 'display:flex;gap:6px;margin:6px 0';
+      const sv = el('button', 'a-btn', 'Jetzt speichern') as HTMLButtonElement;
+      sv.onclick = () => {
+        mio.save();
+        this.key = '';
+      };
+      const ld = el('button', `a-btn${info ? '' : ' off'}`, 'Gespeicherten Stand laden') as HTMLButtonElement;
+      if (info) ld.onclick = () => this.confirmLoad();
+      mr.append(sv, ld);
+      body.append(mr);
+    }
     body.append(el('div', 'a-sec', 'Anzeige und Ton'));
     const row = (label: string, ctl: HTMLElement): void => {
       const r = el('div', 'a-row');
@@ -1075,11 +1099,29 @@ export class Ui {
         body.append(r);
       }
     }
-    if (this.saveIo) this.renderSaveIo(body);
+    if (this.saveIo) {
+      const adv = el('button', 'a-btn', this.showSaveIo ? 'Datei/Code-Sicherung ausblenden' : 'Erweitert: Datei/Code-Sicherung') as HTMLButtonElement;
+      adv.style.marginTop = '10px';
+      adv.onclick = () => {
+        this.showSaveIo = !this.showSaveIo;
+        this.key = '';
+      };
+      body.append(adv);
+      if (this.showSaveIo) this.renderSaveIo(body);
+    }
+  }
+
+  private confirmLoad(): void {
+    if (!this.manualIo?.info()) {
+      this.say('Es gibt noch keinen gespeicherten Stand.');
+      return;
+    }
+    if (confirm('Gespeicherten Stand laden? Der aktuelle Fortschritt seit dem Speichern geht verloren.')) this.manualIo.load();
   }
 
   /** Kurzer Hinweis oben links, dass gespeichert wurde. */
-  savedHint(): void {
+  savedHint(text = 'Gespeichert'): void {
+    this.hintEl.textContent = text;
     this.hintEl.style.opacity = '1';
     window.clearTimeout(this.hintTimer);
     this.hintTimer = window.setTimeout(() => (this.hintEl.style.opacity = '0'), 1400);

@@ -186,7 +186,7 @@ export class GameScene extends Phaser.Scene {
       const nm = store?.getItem('aschenthron.name');
       if (nm && !this.remote) p.name = nm;
     } catch { /* ohne Speicher: Standardname */ }
-    this.ui = new Ui((c) => this.send(c), (i) => this.useSkillSlot(i), (k) => this.usePotionKind(k), () => this.newGame(), this.remote ? null : { export: () => exportPlayer(this.player()), import: (json) => this.importSave(json) }, this.remote ? null : { list: () => this.slotList(), switchTo: (n) => this.switchSlot(n) });
+    this.ui = new Ui((c) => this.send(c), (i) => this.useSkillSlot(i), (k) => this.usePotionKind(k), () => this.newGame(), this.remote ? null : { export: () => exportPlayer(this.player()), import: (json) => this.importSave(json) }, this.remote ? null : { list: () => this.slotList(), switchTo: (n) => this.switchSlot(n) }, this.remote ? null : { save: () => this.manualSave(), load: () => this.manualLoad(), info: () => this.manualInfo() });
     this.ui.ach = this.achv;
     this.sfx = new Sfx();
     this.sfx.setVolume(settings().volume);
@@ -339,6 +339,60 @@ export class GameScene extends Phaser.Scene {
     } catch {
       /* Speicher voll oder gesperrt: Spiel läuft ohne Speichern weiter */
     }
+  }
+
+  /** Eigener Speicherstand des aktiven Platzes (zusätzlich zum Autospeichern), zu dem man zurückkehren kann. */
+  private manualKey(): string {
+    return `${saveKey()}.manual`;
+  }
+
+  private manualSave(): void {
+    if (this.remote) return;
+    const store = safeStorage();
+    try {
+      const json = exportPlayer(this.player());
+      store?.setItem(this.manualKey(), JSON.stringify({ at: Date.now(), json }));
+      store?.setItem(saveKey(), json);
+      this.ui.savedHint('Spielstand gespeichert');
+    } catch {
+      this.ui.say('Speichern nicht möglich (Browser-Speicher voll oder gesperrt).');
+    }
+  }
+
+  private manualRead(): { at: number; json: string } | null {
+    try {
+      const raw = safeStorage()?.getItem(this.manualKey());
+      if (!raw) return null;
+      const o = JSON.parse(raw) as { at?: number; json?: string };
+      return typeof o.json === 'string' && typeof o.at === 'number' ? { at: o.at, json: o.json } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private manualInfo(): string | null {
+    const m = this.manualRead();
+    if (!m) return null;
+    let who = '';
+    try {
+      const o = JSON.parse(m.json) as { player?: { level?: number } };
+      if (o.player?.level) who = `Stufe ${o.player.level}, `;
+    } catch { /* Format unbekannt */ }
+    return `${who}${new Date(m.at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`;
+  }
+
+  private manualLoad(): void {
+    const m = this.manualRead();
+    const store = safeStorage();
+    if (!m || !store) return;
+    try {
+      store.setItem(saveKey(), m.json);
+    } catch {
+      this.ui.say('Laden nicht möglich.');
+      return;
+    }
+    this.resetting = true;
+    location.reload();
   }
 
   /** Übersicht der Speicherplätze für das Einstellungsfenster. */
