@@ -220,8 +220,8 @@ npc("Erzmagier Orvan", 8, 9, t2x, t2y, kind="trainer", tier=2, field="Magie")
 npc("Händler Dorn", 12, 7, t2x, t2y, kind="merchant", shop="advanced")
 npc("Truhe", 11, 12, t2x, t2y, kind="stash")
 npc("Schmied Torgal", 3, 11, t2x, t2y, kind="smith")
-npc("Wachführerin Tessa", 16, 11, t2x, t2y, kind="quest", quests="q_harkon,q_champs1,q_goblin_king,q_wraiths,q_chests2,q_veshra,q_trolls")
-npc("Späher Ruven", 11, 5, t2x, t2y, kind="quest", quests="q_unique2,q_mine,q_champs2,q_ash,q_katacombs,q_king")
+npc("Wachführerin Tessa", 16, 11, t2x, t2y, kind="quest", quests="q_harkon,q_champs1,q_goblin_king,q_wraiths,q_chests2,q_veshra,q_trolls,c_thr3")
+npc("Späher Ruven", 11, 5, t2x, t2y, kind="quest", quests="q_unique2,q_mine,q_champs2,q_ash,q_katacombs,q_king,c_thr4,c_thr5")
 
 safe_rects = [(TOWN1[0] - 1, TOWN1[1] - 1, TOWN1[2] + 1, TOWN1[3] + 1), (TOWN2[0] - 1, TOWN2[1] - 1, TOWN2[2] + 1, TOWN2[3] + 1)]
 def in_safe(x, y, pad=0):
@@ -672,7 +672,7 @@ npc_at("Lagerverwalter Ottmar", 'lager', kind="stash", quests="c_arr5")
 npc_at("Hauptmann Brandt", 'wache', kind="quest", quests="q_rats,q_chests1,q_hounds,q_goblins,q_bandits,q_spiders,q_goblin_scouts,q_unique1")
 npc_at("Kräuterfrau Odda", 'kraeuter', kind="quest", quests="q_herbs,q_ghouls")
 npc_at("Händler Wenzel", 'ausruester', kind="merchant", shop="artisan")
-npc_at("Chronistin Maren", 'chronik', kind="quest", quests="c_gob1")
+npc_at("Chronistin Maren", 'chronik', kind="quest", quests="c_gob1,c_thr1,c_thr2,c_thr6")
 
 # ------------------------------------------------------------------ Felsenwacht: Lagerhaus
 # Die freistehende "Truhe" wird durch ein richtiges Haus (Wände, Dielen, Tür mit Truhen-Schild) mit Lagerverwalter ersetzt.

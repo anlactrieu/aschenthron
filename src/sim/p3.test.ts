@@ -34,7 +34,7 @@ describe('P3: Aufgabenketten', () => {
     expect(chains.length).toBeGreaterThanOrEqual(3);
     for (const c of chains) {
       expect(c.quests.length, c.name).toBeGreaterThanOrEqual(3);
-      expect(c.quests.length, c.name).toBeLessThanOrEqual(5);
+      expect(c.quests.length, c.name).toBeLessThanOrEqual(6);
       c.quests.forEach((q, i) => {
         if (i === 0) expect(q.requires, q.id).toBeUndefined();
         else expect(q.requires, q.id).toBe(c.quests[i - 1]!.id);

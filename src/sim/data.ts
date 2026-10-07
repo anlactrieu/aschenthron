@@ -564,6 +564,7 @@ export const CHAIN_OATH = 'Der letzte Eid';
 export const CHAIN_MINE = 'Pells Fund';
 export const CHAIN_WEB = 'Netze der Königin';
 export const CHAIN_ARRIVAL = 'Ankunft in Aschenhafen';
+export const CHAIN_THRONE = 'Die Chronik der Asche';
 
 QUESTS.push(
   chainQ(CHAIN_GOBLIN, 2, { id: 'c_gob1', kind: 'talk', name: 'Ein Wort mit der Jägerin', text: 'Chronistin Maren schickt dich zu Jägerin Ysa am Räuberlager: Sie hat die Spuren des Goblinkönigs gelesen.', minLevel: 5, target: 'ysa', outro: 'Ysa nickt knapp: „Dann hör gut zu. Es gibt Arbeit.“' }),
@@ -588,6 +589,16 @@ QUESTS.push(
   chainQ(CHAIN_WEB, 2, { id: 'c_web1', kind: 'visit', name: 'Das Spinnennest', text: 'Südlich vom Totenacker liegt ein Nest. Haldor will wissen, wie groß es ist. Betritt das Spinnennest.', minLevel: 13, place: 'Spinnennest', outro: 'Haldor zeichnet das Nest in die Karte. „Größer als gedacht.“' }),
   chainQ(CHAIN_WEB, 2, { id: 'c_web2', kind: 'bring', name: 'Seidenstränge', text: 'Sammle 5 Seidenstränge von den Spinnen im Nest. Die Schmiede brauchen sie als Beweis.', minLevel: 14, requires: 'c_web1', item: 'Seidenstrang', monsters: ['giant_spider', 'web_stalker', 'nest_matron', 'brood_spider'], chance: 0.4, count: 5, outro: 'Haldor hebt einen Strang ins Licht. „Dünner als Haar, fester als Stahl.“' }),
   chainQ(CHAIN_WEB, 3, { id: 'c_web3', kind: 'kill', name: 'Spinnenkönigin Vyrra', text: 'Töte die Königin des Nests, bevor sie sich ausbreitet.', minLevel: 17, requires: 'c_web2', target: 'spider_queen', reward: 'rare', outro: 'Haldor schweigt lange. „Schlaf gut heute Nacht. Ich werde es nicht.“' }),
+);
+
+// Hauptfaden für die hohen Stufen: Chronistin Maren führt Schritt für Schritt zum Aschenkönig
+QUESTS.push(
+  chainQ(CHAIN_THRONE, 2.5, { id: 'c_thr1', kind: 'kill', name: 'Der Knochenfürst', text: 'Maren schreibt die Geschichte des Falls nieder und braucht Zeugen. Beginne mit Knochenfürst Morrik: Er hütet die Toten im Totenacker.', minLevel: 15, target: 'bone_lord', reward: 'rare', outro: 'Maren streicht eine Zeile durch. „Einer weniger, der sich erinnert. Danke.“' }),
+  chainQ(CHAIN_THRONE, 2.5, { id: 'c_thr2', kind: 'unique', name: 'Der Wächter der Gruft', text: 'Gruftwächter Ormund trägt den Schlüssel zur alten Königsgruft. Erlege ihn und bring Maren die Nachricht.', minLevel: 18, requires: 'c_thr1', target: 'crypt_ormund', outro: 'Maren: „Die Gruft steht offen. Was darin lag, ist längst Asche.“' }),
+  chainQ(CHAIN_THRONE, 3, { id: 'c_thr3', kind: 'champion', name: 'Die Brut der Asche', text: 'Wachführerin Tessa meldet: Immer mehr Anführer sammeln sich im Osten. Brich die Macht von 4 Champions.', minLevel: 22, requires: 'c_thr2', count: 4, outro: 'Tessa nickt knapp. „Sie sammeln sich nicht umsonst. Etwas ruft sie.“' }),
+  chainQ(CHAIN_THRONE, 3, { id: 'c_thr4', kind: 'unique', name: 'Der Bergkönig', text: 'Späher Ruven hat den Bergkönig Thurgrim in den Hochlanden gesehen. Wer ihn schlägt, öffnet den Weg zum Thron.', minLevel: 24, requires: 'c_thr3', target: 'mountain_king', reward: 'rare', outro: 'Ruven pfeift leise. „Das hätte ich dir nicht zugetraut. Jetzt traue ich es dir zu.“' }),
+  chainQ(CHAIN_THRONE, 3.5, { id: 'c_thr5', kind: 'unique', name: 'Der Glutfürst', text: 'Glutfürst Zarkesh bewacht die Pforte zur Aschenöde. Ruven: „Ohne seine Glut kommt keiner an den Thron.“', minLevel: 26, requires: 'c_thr4', target: 'cinder_lord_zarkesh', reward: 'unique', outro: 'Ruven senkt die Stimme. „Der Weg ist frei. Der Aschenkönig wartet.“' }),
+  chainQ(CHAIN_THRONE, 3.5, { id: 'c_thr6', kind: 'visit', name: 'Vor dem Thron', text: 'Betritt den Thron der Asche und sieh dem König ins Gesicht. Maren will wissen, ob die Chronik enden darf.', minLevel: 28, requires: 'c_thr5', place: 'Thron der Asche', outro: 'Maren legt die Feder nieder. „Dann schreibt jetzt kein Chronist mehr. Sondern du.“' }),
 );
 
 // Ankunftskette für neue Spieler: ein Rundgang, bei dem jede Rolle der Stadt einmal erklärt wird (reine Gesprächsaufgaben, kleine Belohnung)

@@ -93,6 +93,7 @@ export function questMarks(w: World, p: Actor): QuestMark[] {
 /** Ortsangabe für die Aufgabenliste: Region-Name(n), in denen das Ziel zu finden ist. */
 export function questWhere(w: World, def: QuestDef, done = false): string {
   if (done) return giverLocation(w, def)?.text ?? '';
+  if (def.kind === 'champion') return 'Champions in der Wildnis (Gegner mit Aura)';
   const names = new Set<string>();
   if (def.kind === 'visit' && def.place) names.add(def.place);
   else if (def.kind === 'talk') {
