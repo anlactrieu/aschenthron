@@ -12,6 +12,7 @@ import { isWalkable } from '../sim/path';
 import { toScreen, toTile } from './iso';
 import { DOOR_ICONS, TOWN_GID, WATER_PROP_GIDS, registerTownArt } from './town';
 import { Ui, describeItem } from './ui';
+import { skillIcon } from './icons';
 import { Sfx } from './audio';
 import { Minimap } from './minimap';
 import { Atmosphere, isDungeon } from './atmosphere';
@@ -111,6 +112,10 @@ export class GameScene extends Phaser.Scene {
   private fireballs = new Map<number, { impacts: (() => void)[]; target: number }>();
   private regionName = '';
   private armedSkill: string | null = null;
+  private armedCursor = '';
+  /** Zauber, der nach dem Anlaufen gewirkt wird (Ziel war außer Reichweite). */
+  private pendingCast: { skillId: string; targetId: number } | null = null;
+  private pendingRepath = 0;
   private resetting = false;
   private ended = false;
   private camPos: { x: number; y: number } | null = null;
@@ -130,6 +135,7 @@ export class GameScene extends Phaser.Scene {
     } else {
       const built = buildWorld(Date.now() >>> 0, mapJson as unknown as TiledMap);
       this.world = built.world;
+      this.world.npcWander = true;
       this.tiles = built.tiles;
       this.playerId = built.playerId;
     }
@@ -302,8 +308,12 @@ export class GameScene extends Phaser.Scene {
 
   private setArmed(id: string | null): void {
     this.armedSkill = id;
+    this.pendingCast = null;
     this.ui.setArmed(id);
-    this.game.canvas.style.cursor = id ? 'crosshair' : '';
+    const sk = id ? SKILLS.find((x) => x.id === id) : undefined;
+    // Mauszeiger wird zum Zauber-Symbol (Mitte = Klickpunkt)
+    this.armedCursor = sk ? `url(${skillIcon(sk)}) 24 24, crosshair` : '';
+    this.cursor = '\0';
   }
 
   private usePotionKind(kind: 'heal' | 'mana'): void {
@@ -349,13 +359,48 @@ export class GameScene extends Phaser.Scene {
     return best;
   }
 
+  /** Zauber auf Ziel: in Reichweite sofort wirken, sonst hinlaufen und danach wirken (Zauber bleibt gewählt). */
+  private castAt(skillId: string, target: Actor): void {
+    const sk = SKILLS.find((x) => x.id === skillId)!;
+    const p = this.player();
+    if (Math.hypot(p.x - target.x, p.y - target.y) <= sk.range) {
+      this.pendingCast = null;
+      this.send({ type: 'useSkill', skillId, targetId: target.id });
+      return;
+    }
+    this.pendingCast = { skillId, targetId: target.id };
+    this.pendingRepath = 0;
+  }
+
+  private pendingCastStep(time: number): void {
+    const pc = this.pendingCast;
+    if (!pc) return;
+    const p = this.player();
+    const t = getActor(this.world, pc.targetId);
+    const sk = SKILLS.find((x) => x.id === pc.skillId);
+    if (!p?.alive || !t || !t.alive || !sk || this.arrows.size) {
+      this.pendingCast = null;
+      return;
+    }
+    if (Math.hypot(p.x - t.x, p.y - t.y) <= sk.range - 0.3) {
+      this.pendingCast = null;
+      this.send({ type: 'moveTo', x: Math.round(p.x), y: Math.round(p.y) });
+      this.send({ type: 'useSkill', skillId: pc.skillId, targetId: t.id });
+      return;
+    }
+    if (time - this.pendingRepath < 250) return;
+    this.pendingRepath = time;
+    this.send({ type: 'moveTo', x: Math.round(t.x), y: Math.round(t.y) });
+  }
+
   private onClick(ptr: Phaser.Input.Pointer): void {
     const t = toTile(ptr.worldX, ptr.worldY);
     const w = this.world;
     const hit = this.pick(ptr.worldX, ptr.worldY);
     if (this.armedSkill) {
       if (ptr.rightButtonDown()) return this.setArmed(null);
-      if (hit?.actor) return this.send({ type: 'useSkill', skillId: this.armedSkill, targetId: hit.actor.id });
+      if (hit?.actor) return this.castAt(this.armedSkill, hit.actor);
+      this.pendingCast = null;
     }
     if (hit?.npc) {
       this.ui.toggle(true);
@@ -388,6 +433,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.now = time;
     this.arrowMove(time);
+    this.pendingCastStep(time);
     this.handleEvents();
     if (this.timers.length) {
       const due = this.timers.filter((t) => t.at <= time);
@@ -871,9 +917,10 @@ export class GameScene extends Phaser.Scene {
     const hit = this.pick(wp.x, wp.y);
     this.hover = hit;
     let cursor = '';
-    if (hit?.actor) cursor = 'crosshair';
+    if (this.armedSkill) cursor = this.armedCursor;
+    else if (hit?.actor) cursor = 'crosshair';
     else if (hit?.npc || hit?.chest) cursor = 'pointer';
-    else {
+    else if (!this.armedSkill) {
       const t = toTile(wp.x, wp.y);
       if (this.world.ground.some((gi) => Math.hypot(gi.x - t.x, gi.y - t.y) < 0.8)) cursor = 'pointer';
     }
@@ -1067,7 +1114,8 @@ export class GameScene extends Phaser.Scene {
     const seen = new Set<string>();
     for (const n of this.world.npcs) {
       let img = this.npcViews.get(n.id);
-      const { sx, sy } = toScreen(n.x, n.y);
+      const np = this.dispPos(n);
+      const { sx, sy } = toScreen(np.x, np.y);
       if (!img) {
         img = this.add.image(sx, sy + 8, npcTextureKey(n.kind, n.name)).setOrigin(0.5, FEET_ORIGIN_Y);
         this.npcViews.set(n.id, img);
@@ -1338,7 +1386,7 @@ export class GameScene extends Phaser.Scene {
 
   /** Position vor dem letzten Simulationsschritt, damit die Darstellung zwischen den 20 Schritten pro Sekunde gleiten kann. */
   private snapshotPrev(): void {
-    for (const a of this.world.actors) {
+    for (const a of [...this.world.actors, ...this.world.npcs]) {
       const v = this.prevPos.get(a.id);
       if (v) {
         v.x = a.x;
@@ -1348,7 +1396,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Anzeigeposition: lokal zwischen letztem und aktuellem Simulationsschritt interpoliert, online geglättet zwischen den 10-Hz-Schnappschüssen. */
-  private dispPos(a: Actor): { x: number; y: number } {
+  private dispPos(a: { id: number; x: number; y: number }): { x: number; y: number } {
     if (!this.remote) {
       const v = this.prevPos.get(a.id);
       if (!v) return a;

@@ -1,5 +1,20 @@
 # HANDOFF – Aschenthron
 
+## Sitzungsstand (alles uncommittet; tsc + 272 Tests grün, nichts im Browser abgenommen)
+- **Zauber anwählen + hinlaufen** (`GameScene.ts`: `castAt`, `pendingCastStep`, `setArmed`/`armedCursor`, `updateHover`): Ziffer wählt Zauber, Cursor = Skill-Icon, Klick auf Monster zaubert oder läuft erst hin; Zauber bleibt gewählt, Esc/Rechtsklick bricht ab.
+- **Minimap** (`minimap.ts`): Deckkraft 0,7; Taste **B** wechselt Größe 100/70/45 % (localStorage `aschenthron.minimapSize`). M ist Ton, daher B.
+- **Felsenwacht-Lagerhaus** (`gen_map.py`, Abschnitt "Felsenwacht: Lagerhaus"): Haus 8x6 bei (t2x+12, t2y+14), Tür West mit Truhen-Schild (gid 32), NPC `Lagerverwalter Torvin` (kind stash) ersetzt freistehende "Truhe". Dazu `NPC_ROLE` (`data.ts`), Sprite (`spriteMap.ts`), Test in `town.test.ts` (Truhen-Tür jetzt 2x erwartet).
+- **Dolch-Meldung:** war kein Bug (Dolch war nicht ausgerüstet).
+- **Entscheidungen (letzte 3):** (1) Felsenwacht-Lager als eigenes Haus mit neuem NPC-Namen statt "Truhe" umzubauen: `tiled.ts` nimmt Name "Truhe" von Wandern aus, Haus-NPCs wandern wie in Aschenhafen. (2) Hotkey B statt M für Minimap-Größe wegen Kollision mit Stummschaltung (`audio.ts`). (3) Hinlaufen-zum-Zaubern clientseitig, Sim/Protokoll unverändert.
+- **Offen:** alles im Browser ansehen (Cursor-Hotspot, Hinlaufen, Minimap B, Lagerhaus Felsenwacht: Optik/Erreichbarkeit der Tür); `/code-review`; committen (Dateien aus früheren Paketen sind ebenfalls noch uncommittet).
+- **Learnings:** Phaser `setDefaultCursor` überschreibt direkt gesetzte Canvas-Cursor → Cursor in `updateHover` setzen. `gen_map.py` erzeugt nur Änderungen als Diff, wenn neuer Code nach allem Zufall läuft (hier: 48 Kacheln, 1 Objekt weg/1 neu); "UNERREICHBAR …"-Ausgaben beim Lauf sind vorbestehend. Dev-Server (`aschenthron`, Port 5173) läuft noch im Hintergrund.
+
+## Lebendige Welt (uncommittet; letzter Push: 612ac7e Laufen-Interpolation, davor 37b816f Handelsstraße + Lehrer-Split)
+- Rudel max. 3 Tiere, 60 % der Rudel (`PACK_MAX`, `PACK_DENSITY`, `gen_map.py`); patrouillieren gemeinsam (`setupPatrols`, `patrolStep`, `World.packs`, Zufall `World.fx`). Stadt-NPCs schlendern (`Npc.wander`, `npcWanderStep`, nur lokal via `World.npcWander`). Darstellung interpoliert auch NPCs (`GameScene.dispPos`). `SAFE_R` jetzt 12. Feldratten-Rudel am Start werden explizit gesetzt (Übungsziele). Tests: `src/sim/life.test.ts`; Pace 9,0 h, 5 Tode, Lvl 30. Spec in `SPEC.md`.
+- **Entscheidungen:** (1) Patrouille rudelweise mit festem Versatz je Mitglied statt Einzelwandern: wirkt wie eine Gruppe, billig zu rechnen. (2) Eigener Zufallsstrom `fx`, damit Kampf-Determinismus der Tests bleibt. (3) NPCs nur lokal wandern lassen, weil online die Client-Welt NPCs nicht synchronisiert.
+- **Learnings:** Reduzierte Rudelzahl ließ im Farm-Eingang keine `field_rat` mehr übrig (Test `q_rats` schlug fehl) – seltene Pflicht-Monster explizit platzieren, nicht auf Zufall verlassen. Schlafende Monster (> `SLEEP_DIST` vom Spieler) patrouillieren nicht, das ist gewollt.
+- **Offen:** Im Spiel Patrouillen über längere Zeit beobachten (Tempo, Pausen), ggf. NPC-Radius > 2; committen.
+
 ## Lehrer nach Fachgebiet (uncommittet)
 - Trainer-NPCs haben `field` (`Kampf`|`Magie`, Tiled-Eigenschaft `field`); Skill-Fachgebiet = `skillField()` (area Magie → Magie, sonst Kampf), Prüfung `trainerTeaches()` in `world.ts` (learn/trainSkill), UI-Schleife über alle Lehrer in `ui.ts` `renderSide`. Ohne `field` lehrt ein Lehrer alles (Tests/alte Karten).
 - Karte: Lehrer Varn + Meisterin Kjorra = Kampf; neu Magierin Selka (Stufe 1, Haus mit Zauberstab-Schild gid 37 am Hafenplatz, `SPOT['magier']`) und Erzmagier Orvan (Stufe 2, Felsenwacht). Neues Türsymbol `staff` (`town.ts`), Sprites in `spriteMap.ts` (Varn jetzt human_new).

@@ -102,6 +102,7 @@ export const NPC_NAME_SPRITES: Record<string, string> = {
   'Erzmagier Orvan': 'monster/wizard.png',
   'Hafenmeister Joren': 'monster/unique/frederick_new.png',
   'Lagerverwalter Ottmar': 'monster/human_new.png',
+  'Lagerverwalter Torvin': 'monster/human_new.png',
   'Händler Wenzel': 'monster/dwarf_new.png',
   'Meisterin Kjorra': 'monster/unique/agnes_new.png',
   'Händlerin Mirel': 'monster/unique/margery_new.png',

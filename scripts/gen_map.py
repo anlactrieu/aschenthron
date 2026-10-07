@@ -234,8 +234,12 @@ def place_ok(x, y, ground, pad, gap):
     if in_safe(x, y, pad): return False
     return not any(abs(x - a) < gap and abs(y - b) < gap for a, b in taken)
 
+PACK_MAX = 3                             # Rudel bleiben klein (2–3 Tiere), sie patrouillieren im Spiel gemeinsam
+PACK_DENSITY = 0.6                       # Anteil der früheren Rudelanzahl je Zone
+
 def spawn_pack(kinds, x, y, ground, size, leader=None, gap=3, champions=True):
     """Ein Rudel um (x,y): Anführer (falls angegeben) und size-1 Mitglieder in 3 Tiles Umkreis."""
+    size = min(size, PACK_MAX)
     pack_counter[0] += 1
     pid = pack_counter[0]
     members = []
@@ -262,6 +266,7 @@ PACK_META = {}                           # Rudel-Id -> (Zonen-Tag, Entfernung vo
 def zone_packs(zone, entry, bands, n_packs, ground, tag=None):
     """bands: [(f_max, [(kind, gewicht)...], leader_kind|None)] nach Entfernung vom Eingang (0..1)."""
     x0, y0, x1, y1 = zone
+    n_packs = max(1, round(n_packs * PACK_DENSITY))
     far = max(abs(entry[0] - x0), abs(entry[0] - x1)) + max(abs(entry[1] - y0), abs(entry[1] - y1))
     placed, tries, total = 0, 0, 0
     while placed < n_packs and tries < n_packs * 60:
@@ -271,9 +276,9 @@ def zone_packs(zone, entry, bands, n_packs, ground, tag=None):
         f = (abs(x - entry[0]) + abs(y - entry[1])) / far
         band = next((b for b in bands if f <= b[0]), bands[-1])
         kinds = [k for k, w in band[1] for _ in range(w)]
-        size = random.choices([1, 2, 3, 4, 5], weights=[3, 4, 4, 3, 2] if f < 0.7 else [3, 4, 3, 2, 1])[0]
+        size = random.choices([1, 2, 3], weights=[1, 5, 4] if f < 0.7 else [0, 4, 5])[0]
         if f < 0.25:
-            size = random.choice([1, 1, 2])   # nahe am Zoneneingang: kleine Rudel, damit die ersten Minuten fair bleiben
+            size = random.choice([1, 2, 2])   # nahe am Zoneneingang: kleine Rudel, damit die ersten Minuten fair bleiben
         leader = band[2] if band[2] and size >= 3 and random.random() < 0.5 else None
         total += spawn_pack(kinds, x, y, ground, size, leader, champions=f >= 0.3)
         PACK_META[pack_counter[0]] = (tag, f)
@@ -643,6 +648,15 @@ near = [o for o in objs if o["type"] == "monster" and math.hypot(o["x"] // TS - 
 dropped = [o for o in near if prop(o, "kind") != "field_rat"]      # nur die schwächsten Tiere (Feldratten) bleiben als Übungsziel
 objs[:] = [o for o in objs if o not in dropped]
 print("Aschenhafen: %d Monster am Osttor entfernt, %d Feldratten bleiben" % (len(dropped), len(near) - len(dropped)), file=sys.stderr)
+# Übungsziele: ein paar Feldratten-Rudel im vorderen Drittel der Felder (nicht auf der Straße: die Handelsstraße schiebt sie danach vom Weg weg)
+fx0, fy0, fx1, fy1 = ZONES['farm']
+rat_packs = 0
+for _ in range(400):
+    if rat_packs >= 5: break
+    x, y = random.randint(fx0, fx0 + 22), random.randint(fy0, fy1)
+    if place_ok(x, y, (4,), 0, 6) and 16 <= math.hypot(x - GATE_E[0], y - GATE_E[1]) <= 34:
+        spawn_pack([('field_rat')], x, y, (4,), 2, None, champions=False); rat_packs += 1
+print("Aschenhafen: %d Feldratten-Rudel als Übungsziele" % rat_packs, file=sys.stderr)
 START = L(17, 38)
 obj("Start", "start", *START)
 obj("Aschenhafen", "townstart", *START)
@@ -660,13 +674,26 @@ npc_at("Kräuterfrau Odda", 'kraeuter', kind="quest", quests="q_herbs,q_ghouls")
 npc_at("Händler Wenzel", 'ausruester', kind="merchant", shop="artisan")
 npc_at("Chronistin Maren", 'chronik', kind="quest", quests="c_gob1")
 
+# ------------------------------------------------------------------ Felsenwacht: Lagerhaus
+# Die freistehende "Truhe" wird durch ein richtiges Haus (Wände, Dielen, Tür mit Truhen-Schild) mit Lagerverwalter ersetzt.
+# Kein Zufall, nur Kacheln innerhalb der Stadtmauer; der alte Mauerklotz unten rechts liegt im Grundriss und verschwindet.
+fx0, fy0 = t2x + 12, t2y + 14          # Haus 8x6 (Außenmaß), Tür nach Westen
+for y in range(fy0, fy0 + 6):
+    for x in range(fx0, fx0 + 8):
+        assert g[y][x] in (1, 2), ("Felsenwacht: Lagerhaus-Fläche nicht frei", x, y, g[y][x])
+        edge = y in (fy0, fy0 + 5) or x in (fx0, fx0 + 7)
+        g[y][x] = 18 if edge else 15
+g[fy0 + 3][fx0] = 28 + ICONS.index('chest')
+objs[:] = [o for o in objs if not (o["type"] == "npc" and o["name"] == "Truhe")]
+obj("Lagerverwalter Torvin", "npc", fx0 + 1, fy0 + 3, kind="stash")
+
 # ------------------------------------------------------------------ Handelsstraße (sicherer Weg)
 # Eine durchgehende Straße verbindet Aschenhafen mit der Felsenwacht (und weiter bis zum Hochland-Eingang). Entlang der Straße
 # bleibt ein Streifen frei von Monstern: Wer nur reisen will, wird nicht angegriffen. Rudel in dem Streifen ziehen innerhalb ihrer
 # Zone nach außen (Anzahl und Stufen bleiben gleich). Nach allem Alten und mit eigenem Zufallsstrom, damit der Rest unverändert bleibt.
 TRADE_ROAD = [[(TOWN[2] + 1, 141), (89, 141), (89, 106), (112, 106), (113, 94)],     # Osttor Aschenhafen -> Südtor Felsenwacht (dort schließt die alte Straße an)
               [(TOWN2[2], 70), (144, 70)]]                                           # Osttor Felsenwacht -> Hochland-Eingang
-SAFE_R = 10                                                                           # Aggro-Reichweite ist höchstens 6, Rest ist Puffer
+SAFE_R = 12                                                                           # Aggro höchstens 6 + Patrouille höchstens 5 Felder um den Rudelplatz
 trade_tiles = set()
 for pts in TRADE_ROAD:
     before = {(x, y) for y in range(H) for x in range(W) if g[y][x] == 7}

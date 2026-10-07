@@ -14,6 +14,18 @@ const inTown = w.npcs.filter((n) => regionAt(w, n.x, n.y)?.name === 'Aschenhafen
 const FLOOR = 15;
 const WALL = 18;
 
+describe('Felsenwacht Lagerhaus', () => {
+  it('Lagerverwalter Torvin steht in einem Haus mit Truhen-Tür, die freistehende Truhe ist weg', () => {
+    expect(w.npcs.some((n) => n.name === 'Truhe')).toBe(false);
+    const torvin = w.npcs.find((n) => n.name === 'Lagerverwalter Torvin')!;
+    expect(torvin.kind).toBe('stash');
+    expect(regionAt(w, torvin.x, torvin.y)?.name).not.toBe('Aschenhafen');
+    expect(tile(torvin.x, torvin.y)).toBe(FLOOR);
+    expect(tile(torvin.x - 1, torvin.y)).toBe(32);
+    expect(grid.walkable[Math.round(torvin.y) * grid.w + Math.round(torvin.x) - 1]).toBe(true);
+  });
+});
+
 describe('Aschenhafen (Hafenstadt)', () => {
   it('ist Stadt, Sicherheitszone und Wiederbelebungspunkt, ohne Monster; Start liegt am Hafen', () => {
     const r = w.regions.find((x) => x.name === 'Aschenhafen')!;
@@ -82,7 +94,8 @@ describe('Aschenhafen (Hafenstadt)', () => {
     const doors = new Map<number, number>();
     for (const t of tiles) if (t >= 28 && t <= 36) doors.set(t, (doors.get(t) ?? 0) + 1);
     expect([...doors.keys()].sort()).toEqual([28, 29, 30, 31, 32, 33, 34, 35, 36]);
-    for (const c of doors.values()) expect(c).toBe(1);
+    // Truhen-Schild (32) gibt es zweimal: Lagerhaus Aschenhafen und Lagerhaus Felsenwacht
+    for (const [gid, c] of doors) expect(c, `Tür ${gid}`).toBe(gid === 32 ? 2 : 1);
   });
 
   it('Stadt-NPCs und Türen sind vom Start aus erreichbar (Tür offen, Props blockieren, Dielen und Türen begehbar)', () => {

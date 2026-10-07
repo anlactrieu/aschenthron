@@ -9,11 +9,15 @@ const COLORS: Record<number, string> = {
   28: '#7a5a38', 29: '#7a5a38', 30: '#7a5a38', 31: '#7a5a38', 32: '#7a5a38', 33: '#7a5a38', 34: '#7a5a38', 35: '#7a5a38', 36: '#7a5a38',
 };
 
-/** Kleine Übersichtskarte (Taste N): Gelände einmal vorgerendert, pro Aufruf nur Marker. */
+const SIZES = [1, 0.7, 0.45];
+const SIZE_KEY = 'aschenthron.minimapSize';
+
+/** Kleine Übersichtskarte (N ein/aus, B Größe wechseln): Gelände einmal vorgerendert, pro Aufruf nur Marker. */
 export class Minimap {
   private base: HTMLCanvasElement;
   private view: HTMLCanvasElement;
   private visible = true;
+  private sizeIdx = 0;
 
   constructor(private w: World, tiles: number[]) {
     const { w: gw, h: gh } = w.grid;
@@ -35,15 +39,37 @@ export class Minimap {
     this.view.height = gh * zoom;
     Object.assign(this.view.style, {
       position: 'fixed', left: '12px', top: '12px', border: '1px solid #4b3f3a', background: '#0b0a0d',
-      imageRendering: 'pixelated', opacity: '0.92', pointerEvents: 'none', zIndex: '3',
+      imageRendering: 'pixelated', opacity: '0.7', pointerEvents: 'none', zIndex: '3',
     } as Partial<CSSStyleDeclaration>);
     document.body.appendChild(this.view);
+    try {
+      const n = Number(localStorage.getItem(SIZE_KEY));
+      if (n >= 0 && n < SIZES.length) this.sizeIdx = n;
+    } catch {
+      /* ohne Speicher: Standardgröße */
+    }
+    this.applySize();
     window.addEventListener('keydown', (e) => {
+      if (e.key.toLowerCase() === 'b' && !e.ctrlKey && !e.metaKey && !e.altKey && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
+        this.sizeIdx = (this.sizeIdx + 1) % SIZES.length;
+        this.applySize();
+        try {
+          localStorage.setItem(SIZE_KEY, String(this.sizeIdx));
+        } catch {
+          /* egal */
+        }
+      }
       if (e.key.toLowerCase() === 'n') {
         this.visible = !this.visible;
         this.view.style.display = this.visible ? 'block' : 'none';
       }
     });
+  }
+
+  /** Anzeigegröße per CSS (Auflösung bleibt, Marker skalieren mit). */
+  private applySize(): void {
+    this.view.style.width = `${Math.round(this.view.width * SIZES[this.sizeIdx]!)}px`;
+    this.view.style.height = `${Math.round(this.view.height * SIZES[this.sizeIdx]!)}px`;
   }
 
   draw(px: number, py: number, marks: QuestMark[] = []): void {

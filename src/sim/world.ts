@@ -36,6 +36,11 @@ const LEASH = 14;
 /** Rudel-Alarm: nur Rudelmitglieder in diesem Umkreis (Felder) eilen dem Angegriffenen zu Hilfe (kleiner = Lager lassen sich einzeln abziehen) */
 const NOTE_DEBOUNCE = 100;
 const PACK_ALERT_RANGE = 8;
+/** Rudel-Patrouille: Umkreis um den Rudelplatz (Felder), Tempo gegenüber normalem Gehen, Verweilzeit an einem Wegpunkt (Ticks) */
+const PATROL_RADIUS = 5;
+const PATROL_SPEED = 0.55;
+const PATROL_DWELL = [TICK_RATE * 6, TICK_RATE * 14] as const;
+const NPC_WANDER_SPEED = 0.04;
 /** Monster schlafen (kein Tick), wenn kein Spieler näher ist als dies */
 const SLEEP_DIST = 32;
 const REPATH_TICKS = 8;
@@ -111,6 +116,10 @@ export interface Actor {
   /** rastet: Leben und Mana füllen sich schneller, jede Aktion oder jeder Treffer beendet es */
   resting: boolean;
   home?: Pt;
+  /** Rudel-Patrouille: letzter Wegpunkt-Schritt des Rudels, dem dieses Mitglied gefolgt ist; Versatz zum Rudelmittelpunkt; läuft gerade gemächlich */
+  patrolSeq?: number;
+  patrolOff?: Pt;
+  patrolling?: boolean;
   diedAt: number;
   boss: boolean;
   enraged: boolean;
@@ -203,6 +212,11 @@ export interface Npc {
   /** Lehrer: Fachgebiet (ohne Angabe: alle) */
   field?: TrainerField;
   quests?: string[];
+  /** Schlendert in diesem Umkreis (Felder) um `home`, solange niemand in der Nähe ist (nur wenn `World.npcWander`) */
+  wander?: number;
+  home?: Pt;
+  path?: Pt[];
+  nextMoveAt?: number;
 }
 
 type GameEventBase =
@@ -266,10 +280,24 @@ export interface World {
   cmdActor: number | null;
   /** Kampflog-Entprellung: letzter Tick je Empfänger und Text (nur Laufzeit) */
   noteSeen?: Map<string, number>;
+  /** Patrouillen der Rudel (Schlüssel: Rudel-Id); nur Darstellung des Verhaltens, eigener Zufallsstrom `fx` */
+  packs: Map<number, PackPatrol>;
+  /** Stadt-NPCs dürfen schlendern (nur Einzelspieler; online kennen Clients die NPC-Positionen nur am Heimatplatz) */
+  npcWander: boolean;
+  fx: Rng;
+}
+
+export interface PackPatrol {
+  pts: Pt[];
+  idx: number;
+  dir: 1 | -1;
+  seq: number;
+  nextAt: number;
+  seen: number;
 }
 
 export function createWorld(seed: number, grid: Grid, safe: Rect[] = []): World {
-  return { tick: 0, grid, rng: new Rng(seed), actors: [], nextId: 1, events: [], ground: [], safe, npcs: [], start: { x: 1, y: 1 }, towns: [], regions: [], pvp: false, chests: [], telegraphs: [], cmdActor: null };
+  return { tick: 0, grid, rng: new Rng(seed), actors: [], nextId: 1, events: [], ground: [], safe, npcs: [], start: { x: 1, y: 1 }, towns: [], regions: [], pvp: false, chests: [], telegraphs: [], cmdActor: null, packs: new Map(), npcWander: false, fx: new Rng((seed ^ 0x9e3779b9) >>> 0) };
 }
 
 export function addNpc(w: World, kind: NpcKind, name: string, x: number, y: number, extra: Partial<Npc> = {}): Npc {
@@ -1170,7 +1198,8 @@ function dist(a: Actor, b: Actor): number {
 function speedOf(a: Actor, tickNow: number): number {
   const gear = a.kind === 'player' ? affixSum(a, 'move') : 0;
   const move = gear !== 0 ? Math.min(1.3, Math.max(0.6, 1 + gear / 100)) : 1;
-  return (a.chargeUntil > tickNow ? a.speed * 3 : a.speed) * (a.status.slow ? SLOW_FACTOR : 1) * move;
+  const stroll = a.patrolling && a.targetId === null ? PATROL_SPEED : 1;
+  return (a.chargeUntil > tickNow ? a.speed * 3 : a.speed) * (a.status.slow ? SLOW_FACTOR : 1) * move * stroll;
 }
 
 function stepAlong(a: Actor, tickNow = 0): void {
@@ -1612,6 +1641,7 @@ export function tick(w: World): void {
   for (const c of w.chests) if (c.opened && w.tick >= c.respawnAt) c.opened = false;
   w.ground = w.ground.filter((g) => g.expiresAt === null || g.expiresAt > w.tick);
   const players = w.actors.filter((x) => x.kind === 'player' && x.alive);
+  if (w.npcWander) npcWanderStep(w, players);
   if (w.tick % 10 === 0) for (const pl of players) checkVisits(w, pl);
   for (const a of w.actors) {
     if (a.kind === 'monster' && a.alive && a.targetId === null && a.path.length === 0 && a.hp >= a.maxHp) {
@@ -1733,6 +1763,8 @@ function reviveMonster(w: World, m: Actor): void {
   // Helfer vom letzten Mal verschwinden, sonst häufen sie sich über Respawns
   if (m.abilities.includes('summon')) dismissSummons(w, m);
   m.alive = true;
+  m.patrolling = false;
+  m.patrolSeq = -1;
   m.hp = m.maxHp;
   m.x = m.home!.x;
   m.y = m.home!.y;
@@ -1758,8 +1790,99 @@ function alertPack(w: World, m: Actor, targetId: number): void {
   for (const o of w.actors) {
     if (o.kind === 'monster' && o.alive && o.packId === m.packId && o.targetId === null && o.id !== m.id && Math.hypot(o.x - m.x, o.y - m.y) <= PACK_ALERT_RANGE) {
       o.targetId = targetId;
+      o.patrolling = false;
       o.autoAttack = true;
     }
+  }
+}
+
+/** Legt für jedes Rudel (Rudel-Id > 0, ohne Bosse und Mini-Bosse) 1–2 Wegpunkte im Umkreis des Rudelplatzes fest; Nutzt nur den Zufallsstrom `fx`. */
+export function setupPatrols(w: World): void {
+  const groups = new Map<number, Actor[]>();
+  for (const a of w.actors) {
+    if (a.kind !== 'monster' || !a.packId || a.boss || a.unique || a.summonedBy || !a.home) continue;
+    let g = groups.get(a.packId);
+    if (!g) groups.set(a.packId, (g = []));
+    g.push(a);
+  }
+  for (const [id, mem] of groups) {
+    const anchor = { x: Math.round(mem[0]!.home!.x), y: Math.round(mem[0]!.home!.y) };
+    const pts: Pt[] = [anchor];
+    for (let tries = 0; tries < 24 && pts.length < 3; tries++) {
+      const p = { x: anchor.x + w.fx.int(-PATROL_RADIUS, PATROL_RADIUS), y: anchor.y + w.fx.int(-PATROL_RADIUS, PATROL_RADIUS) };
+      if (!isWalkable(w.grid, p.x, p.y) || inSafeZone(w, p.x, p.y)) continue;
+      if (pts.some((q) => Math.abs(q.x - p.x) + Math.abs(q.y - p.y) < 4)) continue;
+      const path = findPath(w.grid, anchor, p);
+      if (!path.length || path.length > PATROL_RADIUS * 2 + 2) continue;
+      pts.push(p);
+    }
+    if (pts.length < 2) continue;
+    for (const m of mem) m.patrolOff = { x: Math.round(m.home!.x) - anchor.x, y: Math.round(m.home!.y) - anchor.y };
+    w.packs.set(id, { pts, idx: 0, dir: 1, seq: 0, nextAt: w.fx.int(PATROL_DWELL[0], PATROL_DWELL[1]), seen: -1 });
+  }
+}
+
+/** Ruhiges Rudel: Alle Mitglieder wandern gemeinsam (mit ihrem Versatz) von Wegpunkt zu Wegpunkt und warten dazwischen. */
+function patrolStep(w: World, m: Actor): void {
+  const pk = w.packs.get(m.packId);
+  if (!pk || !m.patrolOff) return;
+  if (pk.seen !== w.tick) {
+    pk.seen = w.tick;
+    if (w.tick >= pk.nextAt) {
+      if (pk.idx + pk.dir < 0 || pk.idx + pk.dir >= pk.pts.length) pk.dir = (pk.dir * -1) as 1 | -1;
+      pk.idx += pk.dir;
+      pk.seq++;
+      pk.nextAt = w.tick + w.fx.int(PATROL_DWELL[0], PATROL_DWELL[1]);
+    }
+  }
+  if (m.patrolSeq === pk.seq || m.path.length) return;
+  m.patrolSeq = pk.seq;
+  const wp = pk.pts[pk.idx]!;
+  let tx = wp.x + m.patrolOff.x;
+  let ty = wp.y + m.patrolOff.y;
+  if (!isWalkable(w.grid, tx, ty) || inSafeZone(w, tx, ty)) {
+    tx = wp.x;
+    ty = wp.y;
+  }
+  const path = findPath(w.grid, { x: Math.round(m.x), y: Math.round(m.y) }, { x: tx, y: ty });
+  if (path.length) {
+    m.path = path;
+    m.patrolling = true;
+  }
+}
+
+/** Stadt-NPCs schlendern gemächlich in kleinem Umkreis, bleiben aber stehen, sobald jemand mit ihnen reden könnte. */
+function npcWanderStep(w: World, players: Actor[]): void {
+  for (const n of w.npcs) {
+    if (!n.wander) continue;
+    if (!n.home) n.home = { x: n.x, y: n.y };
+    if (!players.some((p) => Math.abs(p.x - n.x) < SLEEP_DIST && Math.abs(p.y - n.y) < SLEEP_DIST)) continue;
+    if (players.some((p) => Math.hypot(p.x - n.x, p.y - n.y) <= NPC_RANGE + 1.5)) {
+      n.path = [];
+      continue;
+    }
+    const next = n.path?.[0];
+    if (next) {
+      const dx = next.x - n.x;
+      const dy = next.y - n.y;
+      const d = Math.hypot(dx, dy);
+      if (d <= NPC_WANDER_SPEED) {
+        n.x = next.x;
+        n.y = next.y;
+        n.path!.shift();
+        if (!n.path!.length) n.nextMoveAt = w.tick + w.fx.int(TICK_RATE * 4, TICK_RATE * 10);
+      } else {
+        n.x += (dx / d) * NPC_WANDER_SPEED;
+        n.y += (dy / d) * NPC_WANDER_SPEED;
+      }
+      continue;
+    }
+    if (w.tick < (n.nextMoveAt ?? 0)) continue;
+    n.nextMoveAt = w.tick + TICK_RATE * 2;
+    const t = { x: Math.round(n.home.x) + w.fx.int(-n.wander, n.wander), y: Math.round(n.home.y) + w.fx.int(-n.wander, n.wander) };
+    if (!isWalkable(w.grid, t.x, t.y) || (Math.abs(t.x - n.x) < 1 && Math.abs(t.y - n.y) < 1)) continue;
+    const path = findPath(w.grid, { x: Math.round(n.x), y: Math.round(n.y) }, t);
+    if (path.length && path.length <= n.wander * 3) n.path = path;
   }
 }
 
@@ -1779,14 +1902,19 @@ function monsterAi(w: World, m: Actor, players: Actor[]): void {
     }
     if (best) {
       m.targetId = best.id;
+      m.patrolling = false;
       alertPack(w, m, best.id);
+      return;
     }
+    patrolStep(w, m);
     return;
   }
   const t = getActor(w, m.targetId);
   const lost = !t || !t.alive || (inSafeZone(w, t.x, t.y) && t.pkUntil <= w.tick) || Math.hypot(m.x - home.x, m.y - home.y) > LEASH;
   if (lost) {
     m.targetId = null;
+    m.patrolling = false;
+    m.patrolSeq = -1;
     m.path = findPath(w.grid, { x: Math.round(m.x), y: Math.round(m.y) }, home);
     return;
   }

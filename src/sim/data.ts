@@ -588,6 +588,7 @@ export const NPC_ROLE: Record<string, string> = {
   'Händler Wenzel': 'Spezialausrüster: Ausrüstung für besondere Spielstile (Stäbe, Schilde, Ringe).',
   'Schmiedin Ilse': 'Gegenstände aufwerten, Zusatzwerte neu würfeln, Edelsteine einsetzen.',
   'Lagerverwalter Ottmar': 'Sicheres Lager: Hier abgelegte Gegenstände bleiben dir auch beim Tod.',
+  'Lagerverwalter Torvin': 'Sicheres Lager der Felsenwacht: dasselbe Lager wie in Aschenhafen, Gegenstände bleiben dir auch beim Tod.',
   'Hauptmann Brandt': 'Aufträge der Wache: Jagd, Truhen und Anführer.',
   'Kräuterfrau Odda': 'Aufträge rund um Kräuter und die Ghule im Moor.',
   'Chronistin Maren': 'Geschichten und Spuren der Insel; ihre Aufträge führen weit hinaus.',

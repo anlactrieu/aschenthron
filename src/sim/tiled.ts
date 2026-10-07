@@ -1,5 +1,5 @@
 import type { Grid } from './path';
-import { addNpc, createWorld, giveStarterKit, spawnMonster, spawnPlayer, type NpcKind, type Rect, type TrainerField, type World } from './world';
+import { addNpc, createWorld, giveStarterKit, inSafeZone, setupPatrols, spawnMonster, spawnPlayer, type NpcKind, type Rect, type TrainerField, type World } from './world';
 
 interface TiledProp {
   name: string;
@@ -68,6 +68,8 @@ export function buildWorld(seed: number, map: TiledMap, opts: { player?: boolean
         field: prop(o, 'field') as TrainerField | undefined,
         quests: prop(o, 'quests')?.split(','),
       });
+      // Stadtbewohner schlendern (die Truhe als Möbel nicht); NPCs draußen bleiben stehen
+      if (inSafeZone(world, o.x / ts, o.y / ts) && o.name !== 'Truhe') world.npcs[world.npcs.length - 1]!.wander = 2;
     }
     if (o.type === 'chest') {
       world.chests.push({ id: world.nextId++, x: o.x / ts, y: o.y / ts, level: Number(prop(o, 'level') ?? 1), tier: (prop(o, 'tier') ?? 'wood') as 'wood', opened: false, respawnAt: 0 });
@@ -78,6 +80,7 @@ export function buildWorld(seed: number, map: TiledMap, opts: { player?: boolean
       m.packId = Number(prop(o, 'pack') ?? 0);
     }
   }
+  setupPatrols(world);
   world.start = { x: start.x / ts, y: start.y / ts };
   if (opts.player === false) return { world, tiles, playerId: -1 };
   const player = spawnPlayer(world, start.x / ts, start.y / ts);

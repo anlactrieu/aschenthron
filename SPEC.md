@@ -184,3 +184,9 @@ Ziel: freie Builds statt Itemleiter, nur Prinzipien klassischer freier MMORPGs, 
 **Risiken:** IDs nie entfernen/umbenennen; unbekannte Stats/Powers tolerant laden; Snapshot-Felder optional + Defaults in `actorFromLite`; `ActorLite.st` erweitern; Tests mit festen Skill-Listen (`stage2.test.ts`) prüfen.
 
 **Umsetzungsstand:** Alle Phasen umgesetzt (Effektsystem `effects.ts`, 27 Skills mit `info`, 21 Build-Items, Buildprofil `build.ts`, Benchmark `builds.bench.test.ts`, Stadt Moosbrück). Messung: Fern-/Zauberbuilds liefern im Altbestand 2–5× den Nahkampf-DPS (reglose Zielpuppe); bewusst nicht angefasst (Balance-Vorgabe), siehe Kommentar im Benchmark.
+
+## Lebendige Welt (Rudel und Stadtbewohner)
+- **Rudel:** höchstens 3 Tiere (meist 2–3), etwa 60 % der früheren Rudelanzahl je Zone (`PACK_MAX`, `PACK_DENSITY` in `scripts/gen_map.py`). Im Spiel patrouilliert jedes Rudel gemeinsam zwischen 1–2 Wegpunkten im Umkreis von 5 Feldern um den Rudelplatz (Tempo ×0,55, 6–14 s Pause), `setupPatrols`/`patrolStep` in `world.ts`. Beim Entdecken des Spielers Kampf wie bisher, danach zurück in die Patrouille. Bosse und Mini-Bosse bleiben stehen.
+- **Handelsstraße:** Monster-freier Streifen `SAFE_R = 12` (Aggro 6 + Patrouille 5 + Puffer).
+- **Stadtbewohner:** alle NPCs innerhalb der Sicherheitszone (außer der Truhe) schlendern in 2 Feldern Umkreis (`Npc.wander`), halten an, sobald jemand in Gesprächsreichweite ist. Nur Einzelspieler (`World.npcWander`), online bleiben NPCs am Platz, weil Clients nur den Heimatplatz kennen.
+- Zufall für Verhalten nutzt den eigenen Strom `World.fx`, damit Kampf und Beute der Simulation unverändert deterministisch bleiben.
