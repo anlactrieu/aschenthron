@@ -206,3 +206,4 @@ Ziel: freie Builds statt Itemleiter, nur Prinzipien klassischer freier MMORPGs, 
 - **Orientierung:** Richtungspfeil mit Entfernung zum nächsten Aufgabenziel ab 10 Feldern (`updateCompass`), Hinweis alle 90 s ohne laufende Aufgabe (`idleHint`), Endziel im Aufgabenfenster.
 - **Titelbild** für neue Spiele mit Prämisse und Namenswahl (`showTitle`, Name in localStorage `aschenthron.name`); Erfolg und Banner beim Sturz des Aschenkönigs; Banner und Blitz bei Rare-Drops.
 - **Nicht gemacht:** Startschaden erhöhen (Golden-Tests und Balance hängen daran), Server-Rangliste (braucht Server-Persistenz), Legendär-Droprate/Duplikate.
+- **Pace-Kontrolle nach Runde 2:** Bot-Lauf Level 5 nach 13 min, 10 nach 50 min, 20 nach 188 min, 30 nach 504 min (8,4 h, 8 Tode). Entspricht den früheren Messungen, `XP_LATE_FACTOR = 1.0` passt also. Der Bot nutzt keine Skills; die Balance der neuen Skills bleibt per Hand zu prüfen.
