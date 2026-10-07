@@ -22,7 +22,7 @@ import { Atmosphere, isDungeon } from './atmosphere';
 import { Fx } from './fx';
 import type { RemoteSession } from '../net/client';
 import {
-  ensureTexture, tileBase, FEET_ORIGIN_Y, FRAME_STEP_L, FRAME_STEP_R, FRAME_WIND, FRAME_STRIKE, lookKey, lookOf, npcTextureKey, monsterCanvas, playerCanvas, registerStaticArt, tileCanvas, TILE_H, TILE_VARIANTS, TILE_W, WALL_VARIANTS,
+  ensureTexture, tileBase, FEET_ORIGIN_Y, FRAME_STEP_L, FRAME_STEP_R, FRAME_WIND, FRAME_STRIKE, lookKey, lookOf, npcTextureKey, monsterCanvas, npcCanvas, playerCanvas, registerStaticArt, tileCanvas, TILE_H, TILE_VARIANTS, TILE_W, WALL_VARIANTS,
 } from './art';
 
 const SAVE_KEY = 'aschenthron.save.v1';
@@ -83,7 +83,9 @@ export class GameScene extends Phaser.Scene {
   private props = new Map<number, Phaser.GameObjects.Image>();
   private actorViews = new Map<number, ActorView>();
   private lootViews = new Map<number, Phaser.GameObjects.Image>();
-  private npcViews = new Map<number, Phaser.GameObjects.Image>();  private chestViews = new Map<number, Phaser.GameObjects.Image>();
+  private npcViews = new Map<number, Phaser.GameObjects.Image>();
+  /** Laufrichtung der NPCs: Spiegeln, Seitenansicht und Laufzyklus */
+  private npcDir = new Map<number, { x: number; y: number; flip: boolean; side: boolean; movingUntil: number }>();  private chestViews = new Map<number, Phaser.GameObjects.Image>();
   private flash = new Map<number, number>();
   private acc = 0;
   private step: NextStep | null = null;
@@ -1271,6 +1273,26 @@ export class GameScene extends Phaser.Scene {
       }
       this.gfxGround.fillStyle(0x000000, 0.2);
       this.gfxGround.fillEllipse(sx, sy + 9, n.kind === 'stash' ? 34 : 26, n.kind === 'stash' ? 13 : 10);
+      let dir = this.npcDir.get(n.id);
+      if (!dir) {
+        dir = { x: np.x, y: np.y, flip: false, side: false, movingUntil: 0 };
+        this.npcDir.set(n.id, dir);
+      }
+      const ndx = np.x - dir.x;
+      const ndy = np.y - dir.y;
+      if (Math.abs(ndx) + Math.abs(ndy) > 0.001) {
+        dir.movingUntil = time + 160;
+        if (Math.abs(ndx - ndy) > 0.0005) dir.flip = ndx - ndy < 0;
+        dir.side = Math.abs(ndx - ndy) > Math.abs(ndx + ndy) * 1.5;
+      }
+      dir.x = np.x;
+      dir.y = np.y;
+      if (n.kind !== 'stash') {
+        const nf = time < dir.movingUntil ? WALK_FRAMES[Math.floor(time / STEP_MS) % 4]! : 0;
+        const nSide = dir.side;
+        img.setTexture(ensureTexture(this, nSide ? `${npcTextureKey(n.kind, n.name)}_${nf}s` : npcTextureKey(n.kind, n.name), () => (nSide ? npcCanvas(n.kind, n.name, nf, true) : npcCanvas(n.kind, n.name))));
+        img.setFlipX(dir.flip);
+      }
       img.setPosition(sx, sy + 8).setDepth(sy + 8);
       this.label(`n${n.id}`, n.name, sx, sy - 52, '#e8d9b0', seen);
       const mark = this.questMark(n, p);
@@ -1447,8 +1469,8 @@ export class GameScene extends Phaser.Scene {
         img.setTexture(ensureTexture(this, lookKey(look, frame, !!view.up && !view.side, !!view.side), () => playerCanvas(look, frame, !!view.up && !view.side, !!view.side)));
       } else {
         const k = monsterKind(a.kindId!);
-        const key = `mon_${k.id}_${frame}${view.up ? 'b' : ''}`;
-        img.setTexture(ensureTexture(this, key, () => monsterCanvas(k.id, k.family, k.color, !!k.boss, frame, !!view.up)));
+        const key = `mon_${k.id}_${frame}${view.up && !view.side ? 'b' : ''}${view.side ? 's' : ''}`;
+        img.setTexture(ensureTexture(this, key, () => monsterCanvas(k.id, k.family, k.color, !!k.boss, frame, !!view.up && !view.side, !!view.side)));
       }
       // Rückstoß/Ausfallschritt aus Treffern, klingt schnell ab
       const kk = this.kicks.get(a.id);

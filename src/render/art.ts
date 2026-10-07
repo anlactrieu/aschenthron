@@ -154,6 +154,55 @@ function opaqueBottom(img: HTMLImageElement): number {
   return b;
 }
 
+/** Oberste nicht-transparente Pixelzeile eines Sprites. */
+function opaqueTop(img: HTMLImageElement): number {
+  const w = img.naturalWidth || img.width;
+  const h = img.naturalHeight || img.height;
+  const c = mkCanvas(w, h);
+  const cx = ctxOf(c);
+  cx.drawImage(img, 0, 0);
+  const d = cx.getImageData(0, 0, w, h).data;
+  let t = 0;
+  while (t < h - 1 && !d.subarray(t * w * 4, (t + 1) * w * 4).some((v, i) => i % 4 === 3 && v > 0)) t++;
+  return t;
+}
+
+/**
+ * Seitenansicht einer zweibeinigen Einzelfigur: Körper schmaler, beim Gehen schwingen die Beine
+ * (untere ~40 % der Figur, links/rechts getrennt) entlang der Laufrichtung statt zur Seite zu spreizen.
+ */
+function drawProfile(x: Ctx, img: HTMLImageElement, tint: number | undefined, frame: number): void {
+  const t = mkCanvas(SP, SP);
+  drawSprite(ctxOf(t), img, tint);
+  x.translate(SP / 2, 0);
+  x.scale(0.88, 1);
+  x.translate(-SP / 2, 0);
+  if (frame !== FRAME_STEP_L && frame !== FRAME_STEP_R) {
+    x.drawImage(t, 0, 0);
+    return;
+  }
+  const top = opaqueTop(img);
+  const bottom = opaqueBottom(img);
+  const hip = Math.round(top + (bottom - top + 1) * 0.6);
+  const side = frame === FRAME_STEP_L ? -1 : 1;
+  x.save();
+  x.beginPath();
+  x.rect(0, 0, SP, hip);
+  x.clip();
+  x.drawImage(t, 0, 0);
+  x.restore();
+  for (const left of [true, false]) {
+    const dx = (left ? 1 : -1) * side * 3;
+    x.save();
+    x.translate(dx, dx > 0 ? -1 : 0);
+    x.beginPath();
+    x.rect(left ? 0 : SP / 2, hip, SP / 2, SP - hip);
+    x.clip();
+    x.drawImage(t, 0, 0);
+    x.restore();
+  }
+}
+
 function spriteCanvas(key: string, draw: (x: Ctx) => void, scale: number, originY: number, rim?: string, foot?: number): HTMLCanvasElement {
   const hit = actorCache.get(key);
   if (hit) return hit;
@@ -726,19 +775,23 @@ function actorCanvas(key: string, build: (x: Ctx) => void, scale: number): HTMLC
   return out;
 }
 
-function spriteMonster(id: string, boss: boolean, frame: number): HTMLCanvasElement | null {
+/** Familien mit zwei Beinen: nur sie bekommen die Seitenansicht (Tiere sind im Sprite schon seitlich). */
+const BIPED = new Set<MonsterFamily>(['humanoid', 'undead', 'ghoul', 'demon']);
+
+function spriteMonster(id: string, boss: boolean, frame: number, profile: boolean): HTMLCanvasElement | null {
   const def = MONSTER_SPRITES[id];
   const img = def ? sprite(def.file) : null;
   if (!def || !img) return null;
   const scale = boss ? Math.max(SPRITE_SCALE.boss, def.scale ?? 0) : def.scale ?? SPRITE_SCALE.normal;
-  return spriteCanvas(`smon_${id}_${frame}${boss ? 'B' : ''}`, (x) => {
+  return spriteCanvas(`smon_${id}_${frame}${boss ? 'B' : ''}${profile ? 's' : ''}`, (x) => {
     pose(x, frame, boss ? 0.5 : scale > SPRITE_SCALE.normal ? 0.7 : 1);
-    drawSprite(x, img, def.tint);
+    if (profile) drawProfile(x, img, def.tint, frame);
+    else drawSprite(x, img, def.tint);
   }, scale, FEET_ORIGIN_Y, boss ? '#c8801c' : undefined);
 }
 
-export function monsterCanvas(id: string, family: MonsterFamily, color: number, boss: boolean, frame: number, back = false): HTMLCanvasElement {
-  const sp = spriteMonster(id, boss, frame);
+export function monsterCanvas(id: string, family: MonsterFamily, color: number, boss: boolean, frame: number, back = false, profile = false): HTMLCanvasElement {
+  const sp = spriteMonster(id, boss, frame, profile && BIPED.has(family));
   if (sp) return sp;
   const fb = frame === FRAME_STEP_R ? FRAME_STEP_L : frame; // prozedurale Figur kennt nur einen Schrittwechsel
   return actorCanvas(`mon_${id}_${fb}${back ? 'b' : ''}`, (x) => {
@@ -1089,10 +1142,16 @@ export function npcTextureKey(kind: string, name?: string): string {
   return name && f && sprite(f) ? `npc_n_${name}` : `npc_${kind}`;
 }
 
-export function npcCanvas(kind: string, name?: string): HTMLCanvasElement {
+export function npcCanvas(kind: string, name?: string, frame = 0, profile = false): HTMLCanvasElement {
   const file = npcSpriteFile(kind, name);
   const img = file ? sprite(file) : null;
   if (img) {
+    if (profile && kind !== 'stash') {
+      return spriteCanvas(`snpc_${kind}_${name ?? ''}_${frame}s`, (x) => {
+        pose(x, frame, 1);
+        drawProfile(x, img, undefined, frame);
+      }, SPRITE_SCALE.normal, FEET_ORIGIN_Y);
+    }
     return spriteCanvas(`snpc_${kind}_${name ?? ''}`, (x) => drawSprite(x, img), SPRITE_SCALE.normal, FEET_ORIGIN_Y);
   }
   return actorCanvas(`npc_${kind}`, (x) => {
