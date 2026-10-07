@@ -194,7 +194,7 @@ function drawProfile(x: Ctx, img: HTMLImageElement, tint: number | undefined, fr
   for (const left of [true, false]) {
     const dx = (left ? 1 : -1) * side * 3;
     x.save();
-    x.translate(dx, dx > 0 ? -1 : 0);
+    x.translate(dx, dx < 0 ? -1 : 0);
     x.beginPath();
     x.rect(left ? 0 : SP / 2, hip, SP / 2, SP - hip);
     x.clip();
@@ -246,9 +246,13 @@ interface BodyPose {
 }
 
 /** Körperhaltung der ganzen Figur um den Fußpunkt; `damp` schwächt große Figuren/Bosse ab. */
-function bodyPose(frame: number, kind: AttackKind, damp = 1): BodyPose {
+function bodyPose(frame: number, kind: AttackKind, damp = 1, profile = false): BodyPose {
   const p: BodyPose = { rot: 0, dx: 0, dy: 0, sx: 1, sy: 1 };
-  if (frame === FRAME_STEP_L || frame === FRAME_STEP_R) {
+  if (profile && (frame === FRAME_STEP_L || frame === FRAME_STEP_R)) {
+    // Seitenansicht: gleichbleibend leicht nach vorn geneigt (Blick nach rechts), kein Wechsel nach hinten
+    p.rot = 3 * damp;
+    p.sy = 1 - 0.03 * damp;
+  } else if (frame === FRAME_STEP_L || frame === FRAME_STEP_R) {
     const side = frame === FRAME_STEP_L ? -1 : 1;
     p.rot = side * 4 * damp;
     p.sy = 1 - 0.04 * damp;
@@ -275,8 +279,8 @@ function applyBodyPose(x: Ctx, p: BodyPose): void {
 }
 
 /** Einteilige Figur (Monster): Haltung um den Fußpunkt. */
-function pose(x: Ctx, frame: number, damp = 1): void {
-  applyBodyPose(x, bodyPose(frame, 'melee', damp));
+function pose(x: Ctx, frame: number, damp = 1, profile = false): void {
+  applyBodyPose(x, bodyPose(frame, 'melee', damp, profile));
 }
 
 interface WeaponGeo {
@@ -784,7 +788,7 @@ function spriteMonster(id: string, boss: boolean, frame: number, profile: boolea
   if (!def || !img) return null;
   const scale = boss ? Math.max(SPRITE_SCALE.boss, def.scale ?? 0) : def.scale ?? SPRITE_SCALE.normal;
   return spriteCanvas(`smon_${id}_${frame}${boss ? 'B' : ''}${profile ? 's' : ''}`, (x) => {
-    pose(x, frame, boss ? 0.5 : scale > SPRITE_SCALE.normal ? 0.7 : 1);
+    pose(x, frame, boss ? 0.5 : scale > SPRITE_SCALE.normal ? 0.7 : 1, profile);
     if (profile) drawProfile(x, img, def.tint, frame);
     else drawSprite(x, img, def.tint);
   }, scale, FEET_ORIGIN_Y, boss ? '#c8801c' : undefined);
@@ -878,7 +882,7 @@ function spritePlayer(look: Look, frame: number, scale: number = SPRITE_SCALE.no
     const walking = frame === FRAME_STEP_L || frame === FRAME_STEP_R;
     const attacking = frame === FRAME_WIND || frame === FRAME_STRIKE;
     const side = frame === FRAME_STEP_L ? -1 : 1;
-    applyBodyPose(x, bodyPose(frame, kind));
+    applyBodyPose(x, bodyPose(frame, kind, 1, profile));
     // Seitenansicht: Körper schmaler, Beine schwingen entlang der Laufrichtung (Vorderansicht → Profil)
     if (profile) {
       x.translate(SP / 2, 0);
@@ -891,7 +895,7 @@ function spritePlayer(look: Look, frame: number, scale: number = SPRITE_SCALE.no
       if (profile) {
         if (walking) {
           const dx = (left ? 1 : -1) * side * 3;
-          return [dx, dx > 0 ? -1 : 0];
+          return [dx, dx < 0 ? -1 : 0];
         }
         if (frame === FRAME_STRIKE && kind === 'melee') return left ? [3, 0] : [-3, 0];
         if (frame === FRAME_WIND && kind === 'melee') return left ? [-1, 0] : [1, 0];
@@ -942,7 +946,7 @@ function spritePlayer(look: Look, frame: number, scale: number = SPRITE_SCALE.no
     hem(body);
     // Oberkörper: beim Gehen leichte Gegenneigung um die Hüfte und tiefer im Schritt
     x.save();
-    if (walking) {
+    if (walking && !profile) {
       x.translate(SP / 2, HIP);
       x.rotate(((-side * 2.5 * Math.PI) / 180));
       x.translate(-SP / 2, -HIP + 1);
@@ -1148,7 +1152,7 @@ export function npcCanvas(kind: string, name?: string, frame = 0, profile = fals
   if (img) {
     if (profile && kind !== 'stash') {
       return spriteCanvas(`snpc_${kind}_${name ?? ''}_${frame}s`, (x) => {
-        pose(x, frame, 1);
+        pose(x, frame, 1, true);
         drawProfile(x, img, undefined, frame);
       }, SPRITE_SCALE.normal, FEET_ORIGIN_Y);
     }
