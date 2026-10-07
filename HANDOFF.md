@@ -1,5 +1,11 @@
 # HANDOFF – Aschenthron
 
+## AKTUELL (2026-10-07): Blickrichtung der Figuren – umgesetzt (Rückenansicht abgedunkelt, NPCs laufen mit Richtung); Rest der Zeilen unten ist der Plan
+- **Stand:** main == origin/main (6829e89, Schriftrollen-Icon neu). Nur `SPEC.md` (Abschnitt "Blickrichtung der Figuren") ist uncommittet ergänzt. 285 Tests grün.
+- **Letzte 3 Entscheidungen:** (1) Schriftrollen-Icon prozedural neu gezeichnet (`icons.ts` ~99), weil kein DCSS-Scroll-Sprite im Asset-Ordner und Download Freigabe braucht. (2) Blickrichtung: Spiegeln für Seite + abgedunkelter Rücken, keine neuen Assets (User-Wahl, geringer Aufwand). (3) Umfang: Spieler + NPCs + Monster.
+- **TODO:** `back` in `spritePlayer`/`spriteMonster` (`art.ts:729, 806`) auswerten; `playerCanvas`/`monsterCanvas` (`art.ts:740, 990`) kehren bisher vor der Rückenzeichnung zurück; NPCs prüfen; im Browser abnehmen (links/rechts/hoch/runter). Umsetzung in frischer Session mit SPEC.md.
+- **Learnings:** `GameScene.ts` ~1425 setzt `view.flip` (Bildschirm-x) und `view.up` schon; nur der Sprite-Pfad nutzt `back` nicht. Online-Rangliste: Erfolge-Fenster (Taste O), nur mit Server.
+
 ## Sitzungsstand (Audit "D4O-Gefuehl"; umgesetzt, tsc + 272 Tests gruen)
 - Auftrag: Subagents pruefen Progression/Builds, Loot/Items, Welt/Kampf/Ziele; danach Luecken umsetzen. Bericht Welt/Kampf/Ziele liegt vor, die zwei anderen (Progression, Loot) laufen noch.
 - **Luecken aus Welt/Kampf/Ziele:** (1) kein Intro/Titel/Endziel (Lore nur verstreut in `data.ts:601-640`, Start nur Chatzeile `GameScene.ts:160`); (2) kein dauerhafter Quest-Tracker im HUD (Quests nur in J-Fenster `ui.ts:248/629`); (3) Crit klingt wie Treffer (`audio.ts:155` hit()), kein Hit-Stop, Tod nur Chattext (`GameScene.ts:814`), keine Achievements/Ranglisten.

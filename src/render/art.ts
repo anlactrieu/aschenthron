@@ -137,6 +137,15 @@ function drawSprite(x: Ctx, img: HTMLImageElement, tint?: number): void {
  * Baut aus gezeichneten Sprite-Ebenen eine Figurentextur: Umriss, Hochskalierung und eine Bildhöhe, bei der die
  * unterste deckende Zeile genau auf `originY` liegt (so passt `setOrigin(0.5, originY)` für beliebige Sprites).
  */
+/** Rückenansicht der DCSS-Sprites (nur Vorderansicht vorhanden): bestehende Pixel abdunkeln. */
+function backShade(x: Ctx): void {
+  x.save();
+  x.globalCompositeOperation = 'source-atop';
+  x.fillStyle = 'rgba(10,8,22,0.4)';
+  x.fillRect(-SP_PAD, -SP_PAD, SP_SIZE, SP_SIZE);
+  x.restore();
+}
+
 const footCache = new WeakMap<HTMLImageElement, number>();
 /** Unterste nicht-transparente Pixelzeile eines Sprites (Fußpunkt der Figur, unabhängig von Waffe/Umhang darüber). */
 function opaqueBottom(img: HTMLImageElement): number {
@@ -726,19 +735,20 @@ function actorCanvas(key: string, build: (x: Ctx) => void, scale: number): HTMLC
   return out;
 }
 
-function spriteMonster(id: string, boss: boolean, frame: number): HTMLCanvasElement | null {
+function spriteMonster(id: string, boss: boolean, frame: number, back: boolean): HTMLCanvasElement | null {
   const def = MONSTER_SPRITES[id];
   const img = def ? sprite(def.file) : null;
   if (!def || !img) return null;
   const scale = boss ? Math.max(SPRITE_SCALE.boss, def.scale ?? 0) : def.scale ?? SPRITE_SCALE.normal;
-  return spriteCanvas(`smon_${id}_${frame}${boss ? 'B' : ''}`, (x) => {
+  return spriteCanvas(`smon_${id}_${frame}${boss ? 'B' : ''}${back ? 'b' : ''}`, (x) => {
     pose(x, frame, boss ? 0.5 : scale > SPRITE_SCALE.normal ? 0.7 : 1);
     drawSprite(x, img, def.tint);
+    if (back) backShade(x);
   }, scale, FEET_ORIGIN_Y, boss ? '#c8801c' : undefined);
 }
 
 export function monsterCanvas(id: string, family: MonsterFamily, color: number, boss: boolean, frame: number, back = false): HTMLCanvasElement {
-  const sp = spriteMonster(id, boss, frame);
+  const sp = spriteMonster(id, boss, frame, back);
   if (sp) return sp;
   const fb = frame === FRAME_STEP_R ? FRAME_STEP_L : frame; // prozedurale Figur kennt nur einen Schrittwechsel
   return actorCanvas(`mon_${id}_${fb}${back ? 'b' : ''}`, (x) => {
@@ -803,7 +813,7 @@ export function lookKey(look: Look, frame: number, back: boolean): string {
 }
 
 /** Spielerfigur aus DCSS-Ebenen (Körper, Beine, Stiefel, Rüstung, Umhang, Handschuhe, Kopf, Schild, Waffe). Null = Fallback. */
-function spritePlayer(look: Look, frame: number, scale: number = SPRITE_SCALE.normal): HTMLCanvasElement | null {
+function spritePlayer(look: Look, frame: number, scale: number = SPRITE_SCALE.normal, back = false): HTMLCanvasElement | null {
   const base = sprite(PLAYER_BASE);
   if (!base) return null;
   const i = look.ids;
@@ -821,7 +831,7 @@ function spritePlayer(look: Look, frame: number, scale: number = SPRITE_SCALE.no
   const shield = layer(i.offhand);
   const wpn = layer(i.weapon);
   const kind: AttackKind = look.weaponKind === 1 ? 'bow' : look.weaponKind === 2 ? 'staff' : 'melee';
-  return spriteCanvas(`${lookKey(look, frame, false)}_x${scale}`, (x) => {
+  return spriteCanvas(`${lookKey(look, frame, back)}_x${scale}`, (x) => {
     const walking = frame === FRAME_STEP_L || frame === FRAME_STEP_R;
     const attacking = frame === FRAME_WIND || frame === FRAME_STRIKE;
     const side = frame === FRAME_STEP_L ? -1 : 1;
@@ -885,6 +895,14 @@ function spritePlayer(look: Look, frame: number, scale: number = SPRITE_SCALE.no
     x.clip();
     x.drawImage(base, 0, 0);
     x.restore();
+    if (back) {
+      // Rücken: Gesichtsfläche der Basisfigur mit Haarfarbe überdecken (nur auf vorhandenen Pixeln)
+      x.save();
+      x.globalCompositeOperation = 'source-atop';
+      x.fillStyle = '#4a3020';
+      x.fillRect(12, 3, 8, 7);
+      x.restore();
+    }
     if (body) {
       x.save();
       x.beginPath();
@@ -896,6 +914,7 @@ function spritePlayer(look: Look, frame: number, scale: number = SPRITE_SCALE.no
     for (const l of [gloves, hair, head, shield]) if (l) x.drawImage(l, 0, 0);
     if (wpn) drawPlayerWeapon(x, wpn, look, frame, attacking, walking ? side : 0);
     x.restore();
+    if (back) backShade(x);
   }, scale, FEET_ORIGIN_Y, undefined, Math.max(opaqueBottom(base), boots ? opaqueBottom(boots) : 0));
 }
 
@@ -988,7 +1007,7 @@ export function playerPortrait(look: Look): { canvas: HTMLCanvasElement; width: 
 }
 
 export function playerCanvas(look: Look, frame: number, back = false): HTMLCanvasElement {
-  const sp = spritePlayer(look, frame);
+  const sp = spritePlayer(look, frame, SPRITE_SCALE.normal, back);
   if (sp) return sp;
   const fb = frame === FRAME_STEP_R ? FRAME_STEP_L : frame;
   return actorCanvas(lookKey(look, fb, back), (x) => {
@@ -1062,14 +1081,17 @@ export function npcTextureKey(kind: string, name?: string): string {
   return name && f && sprite(f) ? `npc_n_${name}` : `npc_${kind}`;
 }
 
-export function npcCanvas(kind: string, name?: string): HTMLCanvasElement {
+export function npcCanvas(kind: string, name?: string, back = false): HTMLCanvasElement {
   const file = npcSpriteFile(kind, name);
   const img = file ? sprite(file) : null;
   if (img) {
-    return spriteCanvas(`snpc_${kind}_${name ?? ''}`, (x) => drawSprite(x, img), SPRITE_SCALE.normal, FEET_ORIGIN_Y);
+    return spriteCanvas(`snpc_${kind}_${name ?? ''}${back ? 'b' : ''}`, (x) => {
+      drawSprite(x, img);
+      if (back) backShade(x);
+    }, SPRITE_SCALE.normal, FEET_ORIGIN_Y);
   }
-  return actorCanvas(`npc_${kind}`, (x) => {
-    BACK = false;
+  return actorCanvas(`npc_${kind}${back ? 'b' : ''}`, (x) => {
+    BACK = back && kind !== 'stash';
     POSE = 'idle';
     if (kind === 'stash') {
       rect(x, 2, 12, 12, 9, 0x7a5a30);

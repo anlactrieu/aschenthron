@@ -22,7 +22,7 @@ import { Atmosphere, isDungeon } from './atmosphere';
 import { Fx } from './fx';
 import type { RemoteSession } from '../net/client';
 import {
-  ensureTexture, tileBase, FEET_ORIGIN_Y, FRAME_STEP_L, FRAME_STEP_R, FRAME_WIND, FRAME_STRIKE, lookKey, lookOf, npcTextureKey, monsterCanvas, playerCanvas, registerStaticArt, tileCanvas, TILE_H, TILE_VARIANTS, TILE_W, WALL_VARIANTS,
+  ensureTexture, tileBase, FEET_ORIGIN_Y, FRAME_STEP_L, FRAME_STEP_R, FRAME_WIND, FRAME_STRIKE, lookKey, lookOf, npcTextureKey, monsterCanvas, npcCanvas, playerCanvas, registerStaticArt, tileCanvas, TILE_H, TILE_VARIANTS, TILE_W, WALL_VARIANTS,
 } from './art';
 
 const SAVE_KEY = 'aschenthron.save.v1';
@@ -82,6 +82,8 @@ export class GameScene extends Phaser.Scene {
   private actorViews = new Map<number, ActorView>();
   private lootViews = new Map<number, Phaser.GameObjects.Image>();
   private npcViews = new Map<number, Phaser.GameObjects.Image>();
+  /** Letzte Laufrichtung der NPCs (Spiegeln nach links, Rücken beim Weglaufen) */
+  private npcDir = new Map<number, { x: number; y: number; flip: boolean; up: boolean }>();
   private chestViews = new Map<number, Phaser.GameObjects.Image>();
   private flash = new Map<number, number>();
   private acc = 0;
@@ -1270,6 +1272,24 @@ export class GameScene extends Phaser.Scene {
       }
       this.gfxGround.fillStyle(0x000000, 0.2);
       this.gfxGround.fillEllipse(sx, sy + 9, n.kind === 'stash' ? 34 : 26, n.kind === 'stash' ? 13 : 10);
+      let dir = this.npcDir.get(n.id);
+      if (!dir) {
+        dir = { x: np.x, y: np.y, flip: false, up: false };
+        this.npcDir.set(n.id, dir);
+      }
+      const ndx = np.x - dir.x;
+      const ndy = np.y - dir.y;
+      if (Math.abs(ndx) + Math.abs(ndy) > 0.001) {
+        if (Math.abs(ndx - ndy) > 0.0005) dir.flip = ndx - ndy < 0;
+        if (Math.abs(ndx + ndy) > 0.0005) dir.up = ndx + ndy < 0;
+      }
+      dir.x = np.x;
+      dir.y = np.y;
+      if (n.kind !== 'stash') {
+        const nk = npcTextureKey(n.kind, n.name) + (dir.up ? '_b' : '');
+        img.setTexture(ensureTexture(this, nk, () => npcCanvas(n.kind, n.name, dir.up)));
+        img.setFlipX(dir.flip);
+      }
       img.setPosition(sx, sy + 8).setDepth(sy + 8);
       this.label(`n${n.id}`, n.name, sx, sy - 52, '#e8d9b0', seen);
       const mark = this.questMark(n, p);

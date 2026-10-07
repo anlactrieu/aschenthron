@@ -225,3 +225,11 @@ Anlass: Spieler wusste nicht, was zu tun ist, und fand Quest-Monster nicht.
 - **Rangliste:** Server beantwortet `{t:'board'}` mit den 10 XP-stärksten Spielern (gespeicherte + aktive); online im Erfolge-Tab.
 - **Startwaffe:** Neues Spiel beginnt mit Rostschwert (Schaden 7–13 statt 4–7), nur Client, Sim und Golden-Tests unberührt.
 - **Nicht gemacht:** Legendär-Droprate/Duplikate (braucht Spielerkontext im Wurf; ohne Spielgefühl nur geraten).
+
+## Blickrichtung der Figuren (geplant, Entscheidung 2026-10-07)
+Ziel: Spieler, NPCs und Monster zeigen beim Laufen die Seite (rechts/links) bzw. den Rücken (hoch/weg von der Kamera).
+- **Ist-Stand:** `GameScene.ts` (~1425-1470) setzt pro Figur `view.flip` (Bildschirm-x, Spiegeln via `setFlipX`) und `view.up` (nach oben laufen) und reicht `back` an `playerCanvas`/`monsterCanvas` (`art.ts:740, 990`) weiter. Die DCSS-Sprites (`spritePlayer`, `spriteMonster`) ignorieren `back`: der Sprite-Pfad kehrt vor der prozeduralen Rückenzeichnung zurück. Rechts/links funktioniert bereits durch Spiegeln.
+- **Entscheidung (User):** Keine neuen Assets. Rückenansicht = Sprite abgedunkelt und Gesicht überdeckt; Seitenansicht = Spiegeln (bleibt).
+- **Umsetzung:** (1) `back` in `spritePlayer`/`spriteMonster` auswerten (eigener Cache-Key mit `b`), Abdunkeln per Multiply ~0.65, beim Spieler Gesichtsbereich der Kopfebene mit Haarfarbe (`PLAYER_HAIR`) übermalen, bei Monstern nur abdunkeln (Augen/Gesicht über Pixelmaske des oberen Spritedrittels dunkler). (2) NPCs prüfen: laufen sie (`npcWander`) über denselben Pfad `actorViews`, sonst anbinden. (3) Stehende Figur behält letzte Richtung (`view.up` nicht zurücksetzen). (4) Waffe/Schild vertauscht sich beim Spiegeln automatisch, bei Rückenansicht Waffe hinter Körper zeichnen (Ebenenreihenfolge in `spritePlayer`).
+- **Nicht im Umfang:** echte 4-Richtungs-Sprites, Diagonalen als eigene Ansicht (Iso-Bewegung entlang einer Achse zählt als Seite bzw. Rücken).
+- **Prüfen:** Visuell im Browser (links/rechts/hoch/runter, Spieler, ein NPC, drei Monsterfamilien), `tsc` + Tests; Golden-Tests der Sim bleiben unberührt (nur Client).
