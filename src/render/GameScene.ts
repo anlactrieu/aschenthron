@@ -22,7 +22,7 @@ import { Atmosphere, isDungeon } from './atmosphere';
 import { Fx } from './fx';
 import type { RemoteSession } from '../net/client';
 import {
-  ensureTexture, tileBase, FEET_ORIGIN_Y, FRAME_STEP_L, FRAME_STEP_R, FRAME_WIND, FRAME_STRIKE, lookKey, lookOf, npcTextureKey, monsterCanvas, npcCanvas, playerCanvas, registerStaticArt, tileCanvas, TILE_H, TILE_VARIANTS, TILE_W, WALL_VARIANTS,
+  ensureTexture, tileBase, FEET_ORIGIN_Y, FRAME_STEP_L, FRAME_STEP_R, FRAME_WIND, FRAME_STRIKE, lookKey, lookOf, npcTextureKey, BIPED, monsterCanvas, npcCanvas, playerCanvas, registerStaticArt, tileCanvas, TILE_H, TILE_VARIANTS, TILE_W, WALL_VARIANTS,
 } from './art';
 
 const SAVE_KEY = 'aschenthron.save.v1';
@@ -1494,7 +1494,10 @@ export class GameScene extends Phaser.Scene {
         this.gfxGround.fillStyle(0x000000, 0.22);
         this.gfxGround.fillEllipse(sx + ox, sy + 9 + oy, wide * 0.85, wide * 0.34);
       }
-      img.setVisible(true).setPosition(sx + ox, sy + 8 + oy + bob).setDepth(sy + 8).setFlipX(view.flip);
+      img.setVisible(true).setPosition(sx + ox, sy + 8 + oy + bob).setDepth(sy + 8).setFlipX(
+        // DCSS-Monster blicken von Haus aus nach links; nur die vorab gespiegelte Seitenansicht (Zweibeiner) blickt nach rechts
+        a.kind === 'monster' && !(view.side && BIPED.has(monsterKind(a.kindId!).family)) ? !view.flip : view.flip,
+      );
       if (!a.alive) {
         const age = a.kind === 'monster' ? (this.world.tick - a.diedAt) / (TICK_RATE * 4) : 0;
         img.setAngle(view.flip ? -90 : 90).setAlpha(Math.max(0, 0.6 - age * 0.6)).setTintMode(Phaser.TintModes.MULTIPLY).setTint(0x664444).setScale(1);

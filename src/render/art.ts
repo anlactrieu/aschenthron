@@ -781,7 +781,7 @@ function actorCanvas(key: string, build: (x: Ctx) => void, scale: number): HTMLC
 }
 
 /** Familien mit zwei Beinen: nur sie bekommen die Seitenansicht (Tiere sind im Sprite schon seitlich). */
-const BIPED = new Set<MonsterFamily>(['humanoid', 'undead', 'ghoul', 'demon']);
+export const BIPED = new Set<MonsterFamily>(['humanoid', 'undead', 'ghoul', 'demon']);
 
 function spriteMonster(id: string, boss: boolean, frame: number, profile: boolean): HTMLCanvasElement | null {
   const def = MONSTER_SPRITES[id];
