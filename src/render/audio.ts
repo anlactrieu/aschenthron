@@ -157,6 +157,16 @@ export class Sfx {
     this.noise(0.09, 0.5, 1800);
     this.tone(160, 0.08, 'square', 0.18, 70);
   }
+  crit(): void {
+    if (!this.gate('crit', 60)) return;
+    this.noise(0.12, 0.6, 3200);
+    this.tone(260, 0.1, 'square', 0.22, 90);
+    this.tone(1200, 0.08, 'triangle', 0.14, 600, 0.02);
+  }
+  rare(): void {
+    if (!this.gate('rare', 400)) return;
+    [523, 659, 784].forEach((f, i) => this.tone(f, 0.3, 'triangle', 0.16, undefined, i * 0.07));
+  }
   hurt(): void {
     if (!this.gate('hurt', 120)) return;
     this.noise(0.14, 0.45, 900);

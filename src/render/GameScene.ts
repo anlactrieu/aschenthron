@@ -11,7 +11,7 @@ import {
 import { isWalkable } from '../sim/path';
 import { toScreen, toTile } from './iso';
 import { DOOR_ICONS, TOWN_GID, WATER_PROP_GIDS, registerTownArt } from './town';
-import { Ui, describeItem } from './ui';
+import { Ui, describeItem, isUpgrade } from './ui';
 import { skillCursor } from './icons';
 import { Sfx } from './audio';
 import { Minimap } from './minimap';
@@ -157,7 +157,11 @@ export class GameScene extends Phaser.Scene {
     this.minimap = new Minimap(this.world, this.tiles);
     if (this.remote) this.ui.say(`Verbunden als ${p.name}${this.remote.pvp ? ' – PvP außerhalb der Städte aktiv, Angreifer werden zu Mördern' : ''}. Klick auf Spieler greift an.`);
     else if (saved && importPlayer(this.world, p, saved)) this.ui.say('Spielstand geladen.');
-    else this.ui.say('Willkommen im Hafen von Aschenhafen! Hafenmeister Joren (Haus mit Anker, links vom Platz) zeigt dir die Stadt: Lehrhaus (Buch), Kaufhaus (Münzen), Schmiede (Amboss), Lager (Truhe), Wache (Schild). Mit Startgold, Schwert oder Bogen geht es auf die Felder. C: Charakter (Attributpunkte verteilen!) · K: Fertigkeiten · Q/E: Tränke · R: Rasten · N: Karte · Pfeiltasten oder Klick: laufen · Klick auf Gegner: angreifen.');
+    else {
+      this.ui.banner('Aschental brennt. Der Thron der Asche ruft.', '#d8a24a');
+      this.ui.say('Einst war Aschental ein Garten – dann verbrannte der Aschenkönig den Himmel. Du bist einer der Letzten, die noch gegen ihn ziehen. Dein Ziel: Stufe 30, der Thron der Asche.');
+      this.ui.say('Willkommen im Hafen von Aschenhafen! Hafenmeister Joren (Haus mit Anker, links vom Platz) zeigt dir die Stadt: Lehrhaus (Buch), Kaufhaus (Münzen), Schmiede (Amboss), Lager (Truhe), Wache (Schild). Mit Startgold, Schwert oder Bogen geht es auf die Felder. C: Charakter (Attributpunkte verteilen!) · K: Fertigkeiten · Q/E: Tränke · R: Rasten · N: Karte · Pfeiltasten oder Klick: laufen · Klick auf Gegner: angreifen. Deine laufenden Aufgaben stehen oben rechts.');
+    }
     this.gfx = this.add.graphics().setDepth(OVERLAY_DEPTH);
     this.gfxGround = this.add.graphics().setDepth(-9e5);
     this.gfxShimmer = this.add.graphics().setDepth(-9e5 + 1);
@@ -544,6 +548,7 @@ export class GameScene extends Phaser.Scene {
             if (toPlayer) this.cameras.main.shake(60, 0.002);
             if (fromPlayer) {
               if (sk) this.sfx.cast(sk.area);
+              else if (e.crit) this.sfx.crit();
               else this.sfx.hit();
             } else if (toPlayer) this.sfx.hurt();
           };
@@ -697,7 +702,10 @@ export class GameScene extends Phaser.Scene {
             this.ui.banner(`${r === 'legendary' ? 'Legendär' : 'Set-Teil'}: ${e.item.name}`, r === 'legendary' ? '#ff8a2a' : '#5fd070');
             this.cameras.main.flash(220, r === 'legendary' ? 255 : 120, r === 'legendary' ? 150 : 255, 60);
             say(`Beute: ${e.item.name}!`);
-          } else if (r === 'rare' || e.item.slot === 'gem') say(`Beute: ${e.item.name}`);
+          } else if (r === 'rare' || e.item.slot === 'gem') {
+            if (r === 'rare') this.sfx.rare();
+            say(`Beute: ${e.item.name}`);
+          }
           break;
         }
         case 'note': say(e.text); break;
@@ -815,6 +823,8 @@ export class GameScene extends Phaser.Scene {
           say(`Du bist gestorben: −${e.xpLost} XP, ${e.dropped.length} Item(s) liegen an der Todesstelle (5 Min.).`);
           this.sfx.death();
           this.cameras.main.shake(300, 0.008);
+          this.cameras.main.flash(500, 120, 0, 0);
+          this.ui.banner('Du bist gefallen', '#c43a3a');
           break;
         case 'respawned': say('Du erwachst in der Stadt.'); break;
         case 'fail': say(e.reason); break;
@@ -1215,7 +1225,7 @@ export class GameScene extends Phaser.Scene {
       const near = Math.hypot(gi.x - p.x, gi.y - p.y);
       const hov = hoverTile && Math.hypot(gi.x - hoverTile.x, gi.y - hoverTile.y) < 0.9;
       if (near < 12 && (r !== 'normal' || near < 5 || hov) && k >= 1) {
-        this.label(`l${gi.id}`, gi.item.name, sx, sy - (r === 'legendary' ? 24 : 18), '#' + col.toString(16).padStart(6, '0'), seen, r === 'normal' ? 11 : 12);
+        this.label(`l${gi.id}`, (isUpgrade(p, gi.item) ? '▲ ' : '') + gi.item.name, sx, sy - (r === 'legendary' ? 24 : 18), '#' + col.toString(16).padStart(6, '0'), seen, r === 'normal' ? 11 : 12);
       }
       if (hov) {
         g.lineStyle(2, col, 0.9);

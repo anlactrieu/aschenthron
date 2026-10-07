@@ -32,7 +32,7 @@ function gearScore(i: Item): number {
   return v;
 }
 
-function isUpgrade(p: Actor, it: Item): boolean {
+export function isUpgrade(p: Actor, it: Item): boolean {
   if (it.slot === 'potion' || it.slot === 'gem' || it.off === 'arrows') return false;
   const cur = p.equipment[equipSlotFor(p, it)];
   if (missingReq(p, it, cur).length) return false;
@@ -190,6 +190,8 @@ export class Ui {
   private statusKey = '';
   private toast = el('div');
   private bannerEl = el('div');
+  private tracker = el('div');
+  private trackerKey = '';
   private bannerTimer = 0;
   private tip = el('div');
   private msgs: string[] = [];
@@ -235,9 +237,10 @@ export class Ui {
 
     this.target.style.cssText = 'position:fixed;z-index:4;left:50%;top:10px;transform:translateX(-50%);background:rgba(14,12,18,.88);border:1px solid #6b5a48;color:#d4c4a8;font:13px Georgia,serif;padding:4px 12px;display:none;text-align:center;min-width:160px';
     this.toast.style.cssText = 'position:fixed;z-index:4;left:12px;bottom:112px;width:420px;color:#d4c4a8;font:13px/1.35 Georgia,serif;pointer-events:none;text-shadow:0 1px 2px #000,0 0 4px #000';
+    this.tracker.style.cssText = 'position:fixed;right:12px;top:12px;max-width:260px;text-align:right;color:#e8d9b0;font:13px Georgia,serif;text-shadow:0 1px 4px #000,0 0 2px #000;background:rgba(10,8,6,.45);border-right:2px solid #d8a24a;padding:6px 10px;pointer-events:none;z-index:5;display:none';
     this.bannerEl.style.cssText = 'position:fixed;left:50%;top:70px;transform:translateX(-50%);color:#e8d9b0;font:bold 24px Georgia,serif;text-shadow:0 2px 8px #000,0 0 2px #000;letter-spacing:1.5px;opacity:0;transition:opacity .6s;pointer-events:none;z-index:6;text-align:center';
     this.tip.style.cssText = 'position:fixed;z-index:50;max-width:270px;background:rgba(10,8,14,.97);border:1px solid #8a7258;color:#d4c4a8;font:12px/1.45 Georgia,serif;padding:8px 10px;pointer-events:none;display:none;box-shadow:0 4px 16px #000';
-    document.body.append(this.main, this.side, this.hud, this.target, this.toast, this.bannerEl, this.tip);
+    document.body.append(this.main, this.side, this.hud, this.tracker, this.target, this.toast, this.bannerEl, this.tip);
 
     initCredits();
     window.addEventListener('keydown', (e) => {
@@ -306,12 +309,39 @@ export class Ui {
     this.lastP = p;
     this.lastW = w;
     this.updateHud(p, target);
+    this.updateTracker(w, p);
     const near = w.npcs.filter((n) => Math.hypot(n.x - p.x, n.y - p.y) <= NPC_RANGE);
     const key = JSON.stringify([this.open, this.tab, p.inventory, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.freeRespec, p.gold, p.level, near.map((n) => n.id), p.quests, p.xp > 0]);
     if (key === this.key || this.dragging) return;
     this.key = key;
     if (this.open) this.renderMain(p);
     this.renderSide(p, this.open ? near : []);
+  }
+
+  /** Dauerhafte Aufgabenanzeige oben links: bis zu 3 laufende Aufgaben mit Ziel und Ort. */
+  private updateTracker(w: World, p: Actor): void {
+    const act = QUESTS.filter((q) => p.quests[q.id] && p.quests[q.id]!.state !== 'turned');
+    act.sort((a, b) => Number(p.quests[b.id]!.state === 'done') - Number(p.quests[a.id]!.state === 'done'));
+    const shown = act.slice(0, 3);
+    const key = JSON.stringify(shown.map((q) => [q.id, p.quests[q.id]]));
+    if (key === this.trackerKey) return;
+    this.trackerKey = key;
+    this.tracker.replaceChildren();
+    this.tracker.style.display = shown.length ? 'block' : 'none';
+    for (const q of shown) {
+      const done = p.quests[q.id]!.state === 'done';
+      const row = el('div');
+      row.style.margin = '2px 0';
+      const title = el('div', '', q.name);
+      title.style.cssText = `font-weight:bold;color:${done ? '#6fe08a' : '#e8d9b0'}`;
+      const goal = el('div', '', done ? 'Fertig – beim Auftraggeber abgeben' : this.questGoal(q, p));
+      goal.style.opacity = '.85';
+      row.append(title, goal);
+      const where = questWhere(w, q, done);
+      if (where) { const wh = el('div', '', where); wh.style.cssText = 'opacity:.6;font-size:12px'; row.append(wh); }
+      this.tracker.append(row);
+    }
+    if (act.length > shown.length) { const more = el('div', '', `+${act.length - shown.length} weitere (J)`); more.style.cssText = 'opacity:.6;font-size:12px'; this.tracker.append(more); }
   }
 
   private updateHud(p: Actor, t?: Actor): void {

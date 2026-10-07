@@ -1,5 +1,13 @@
 # HANDOFF – Aschenthron
 
+## Sitzungsstand (Audit "D4O-Gefuehl"; umgesetzt, tsc + 272 Tests gruen)
+- Auftrag: Subagents pruefen Progression/Builds, Loot/Items, Welt/Kampf/Ziele; danach Luecken umsetzen. Bericht Welt/Kampf/Ziele liegt vor, die zwei anderen (Progression, Loot) laufen noch.
+- **Luecken aus Welt/Kampf/Ziele:** (1) kein Intro/Titel/Endziel (Lore nur verstreut in `data.ts:601-640`, Start nur Chatzeile `GameScene.ts:160`); (2) kein dauerhafter Quest-Tracker im HUD (Quests nur in J-Fenster `ui.ts:248/629`); (3) Crit klingt wie Treffer (`audio.ts:155` hit()), kein Hit-Stop, Tod nur Chattext (`GameScene.ts:814`), keine Achievements/Ranglisten.
+- **Entscheidungen:** (1) Erst Audit per Read-only-Subagents, dann umsetzen, damit Aufwand auf echte Luecken geht. (2) Chat-Diagnose des Users (Fragen A-F) als Checkliste genutzt. (3) Noch offen: Umfang der Umsetzung; laut CLAUDE.md bei Groesserem erst AskUserQuestion + SPEC.md.
+- **Umgesetzt (nur Client, Sim unberuehrt):** Quest-Tracker oben rechts (`updateTracker`, ui.ts); Crit-Sound `crit()`, Rare-Drop-Sound `rare()` (audio.ts); ▲ am Bodenlabel bei Upgrade (`isUpgrade` jetzt exportiert); Intro-Banner + Praemisse beim Neustart; roter Blitz + Banner beim Tod (GameScene.ts).
+- **Offen (bewusst nicht gemacht, Balance/Spec noetig):** Skill-Wueste Lvl 23-30 (Tier-3-Lehrer/Meisterskills), Spezialisierungs-Weichen, mehr Powers/Proc-Affixe fuer magic/rare, Achievements/Rangliste, Hit-Stop. Vorher per AskUserQuestion + SPEC.md klaeren.
+- **Learnings:** Subagent-Zahlen (Kampfdauer, Drops) sind Schaetzungen aus Formeln, nicht gemessen.
+
 ## Sitzungsstand (Zauber-Auswahl; uncommittet, tsc + 272 Tests grün, Optik nicht im Browser gesehen)
 - Letzter Commit/Push: 40de62a (Lebendige Welt, Zauber-Hinlaufen, Minimap B, Lagerhaus). Danach nur diese zwei Änderungen:
 - **Mauszeiger nur Motiv:** `skillCursor()` in `icons.ts` macht den vom Rand zusammenhängenden dunklen Kachelhintergrund (Helligkeit < 60) durchsichtig; 32 px, Hotspot 16/16 (`setArmed` in `GameScene.ts`).
