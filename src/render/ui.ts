@@ -120,11 +120,43 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''):
   return e;
 }
 
+/** Titelleiste eines Fensters: zum Verschieben ziehen, ✕ schließt. Die Position bleibt, weil nur der Inhalt neu aufgebaut wird. */
+function titleBar(text: string, win: HTMLElement, onClose: () => void): HTMLElement {
+  const h = el('h3');
+  h.append(el('span', '', text));
+  const x = el('span', 'a-x', '✕');
+  x.title = 'Schließen';
+  x.onpointerdown = (e) => e.stopPropagation();
+  x.onclick = onClose;
+  h.append(x);
+  h.onpointerdown = (e) => {
+    if (e.button !== 0) return;
+    const r = win.getBoundingClientRect();
+    const zoom = r.width / win.offsetWidth || 1;
+    const dx = e.clientX - r.left;
+    const dy = e.clientY - r.top;
+    h.setPointerCapture(e.pointerId);
+    h.onpointermove = (m) => {
+      const left = Math.max(0, Math.min(window.innerWidth - 80, m.clientX - dx));
+      const top = Math.max(0, Math.min(window.innerHeight - 40, m.clientY - dy));
+      Object.assign(win.style, { left: `${left / zoom}px`, top: `${top / zoom}px`, right: 'auto' });
+    };
+    h.onpointerup = () => {
+      h.onpointermove = null;
+      h.onpointerup = null;
+    };
+  };
+  return h;
+}
+
 const CSS = `
 .a-win{position:fixed;background:linear-gradient(180deg,#1b1620 0%,#120f16 100%);border:2px solid #6b5a48;box-shadow:0 0 0 1px #14100c,0 0 0 3px #3a2f26,0 8px 30px rgba(0,0,0,.7);color:#d4c4a8;font:13px/1.4 Georgia,'Times New Roman',serif;display:none;z-index:10;user-select:none}
 .a-win{max-height:calc(100vh - 24px)}
 @media (max-width:1000px){.a-win{zoom:.76}}
 .a-win h3{margin:0;padding:6px 10px;font:bold 14px Georgia,serif;letter-spacing:.5px;color:#e8d4a8;background:linear-gradient(180deg,#3a2f26,#241d18);border-bottom:1px solid #6b5a48}
+.a-win h3{display:flex;align-items:center;justify-content:space-between;cursor:move;touch-action:none}
+.a-x{cursor:pointer;color:#c9b898;padding:0 6px;margin:-2px -4px -2px 8px;font:bold 16px Georgia,serif;line-height:1.2;border-radius:3px}
+.a-x:hover{color:#fff;background:#8a2a2a}
 .a-tabs{display:flex;background:#241d18;border-bottom:1px solid #6b5a48}
 .a-tab{flex:1;padding:6px 4px;text-align:center;cursor:pointer;color:#9a8a70;border-right:1px solid #3a2f26;font-size:12px}
 .a-tab:hover{color:#e8d4a8;background:#2e251e}
@@ -196,6 +228,7 @@ export class Ui {
   private bannerEl = el('div');
   private tracker = el('div');
   private trackerKey = '';
+  private sideClosed = '';
   private bannerTimer = 0;
   private tip = el('div');
   private msgs: string[] = [];
@@ -675,7 +708,7 @@ export class Ui {
     else if (this.tab === 'skills') this.renderSkills(body, p);
     else if (this.tab === 'ach') this.renderAch(body);
     else this.renderQuests(body, p);
-    const title = el('h3', '', `${p.name} · Stufe ${p.level}`);
+    const title = titleBar(`${p.name} · Stufe ${p.level}`, this.main, () => this.toggle(false));
     this.main.replaceChildren(title, tabs, body);
   }
 
@@ -1007,8 +1040,14 @@ export class Ui {
   private renderSide(p: Actor, near: Npc[]): void {
     if (!near.length) {
       this.side.style.display = 'none';
+      this.sideClosed = '';
       return;
     }
+    if (near.map((n) => n.id).join(',') === this.sideClosed) {
+      this.side.style.display = 'none';
+      return;
+    }
+    this.sideClosed = '';
     const body = el('div', 'a-body');
     const trainers = near.filter((n) => n.kind === 'trainer');
     const merchants = near.filter((n) => n.kind === 'merchant');
@@ -1200,7 +1239,10 @@ export class Ui {
       }
       if (locked) body.append(el('div', 'a-note', `Weitere Aufgaben (${locked}) folgen, sobald die vorherige erledigt ist.`));
     }
-    const title = el('h3', '', near.map((n) => n.name).join(' · '));
+    const title = titleBar(near.map((n) => n.name).join(' · '), this.side, () => {
+      this.sideClosed = near.map((n) => n.id).join(',');
+      this.side.style.display = 'none';
+    });
     this.side.replaceChildren(title, body);
     this.side.style.display = 'block';
   }
