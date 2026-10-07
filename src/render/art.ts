@@ -797,13 +797,13 @@ export function lookOf(a: Actor): Look {
 }
 
 /** Cache-/Texturschlüssel einer Spielerfigur (Aussehen + Bewegungsphase + Blickrichtung). */
-export function lookKey(look: Look, frame: number, back: boolean): string {
+export function lookKey(look: Look, frame: number, back: boolean, profile = false): string {
   const i = look.ids;
-  return `pl_${look.chest}_${look.head}_${look.weapon}_${look.hands}_${look.weaponKind}_${look.robe ? 1 : 0}_${look.quiver ? 1 : 0}_${look.shield}_${i.chest}.${i.legs}.${i.feet}.${i.hands}.${i.head}.${i.cloak}.${i.weapon}.${i.offhand}_${frame}${back ? 'b' : ''}`;
+  return `pl_${look.chest}_${look.head}_${look.weapon}_${look.hands}_${look.weaponKind}_${look.robe ? 1 : 0}_${look.quiver ? 1 : 0}_${look.shield}_${i.chest}.${i.legs}.${i.feet}.${i.hands}.${i.head}.${i.cloak}.${i.weapon}.${i.offhand}_${frame}${back ? 'b' : ''}${profile ? 's' : ''}`;
 }
 
 /** Spielerfigur aus DCSS-Ebenen (Körper, Beine, Stiefel, Rüstung, Umhang, Handschuhe, Kopf, Schild, Waffe). Null = Fallback. */
-function spritePlayer(look: Look, frame: number, scale: number = SPRITE_SCALE.normal, back = false): HTMLCanvasElement | null {
+function spritePlayer(look: Look, frame: number, scale: number = SPRITE_SCALE.normal, back = false, profile = false): HTMLCanvasElement | null {
   const base = sprite(PLAYER_BASE);
   if (!base) return null;
   const i = look.ids;
@@ -821,14 +821,29 @@ function spritePlayer(look: Look, frame: number, scale: number = SPRITE_SCALE.no
   const shield = layer(i.offhand);
   const wpn = layer(i.weapon);
   const kind: AttackKind = look.weaponKind === 1 ? 'bow' : look.weaponKind === 2 ? 'staff' : 'melee';
-  return spriteCanvas(`${lookKey(look, frame, back)}_x${scale}`, (x) => {
+  return spriteCanvas(`${lookKey(look, frame, back, profile)}_x${scale}`, (x) => {
     const walking = frame === FRAME_STEP_L || frame === FRAME_STEP_R;
     const attacking = frame === FRAME_WIND || frame === FRAME_STRIKE;
     const side = frame === FRAME_STEP_L ? -1 : 1;
     applyBodyPose(x, bodyPose(frame, kind));
+    // Seitenansicht: Körper schmaler, Beine schwingen entlang der Laufrichtung (Vorderansicht → Profil)
+    if (profile) {
+      x.translate(SP / 2, 0);
+      x.scale(0.72, 1);
+      x.translate(-SP / 2, 0);
+    }
     const HIP = 20;
     // Beine/Stiefel: linkes und rechtes Bein getrennt versetzt (Schrittzyklus bzw. breiter Stand beim Schlag)
     const legOff = (left: boolean): [number, number] => {
+      if (profile) {
+        if (walking) {
+          const dx = (left ? 1 : -1) * side * 4;
+          return [dx, dx > 0 ? -1 : 0];
+        }
+        if (frame === FRAME_STRIKE && kind === 'melee') return left ? [3, 0] : [-3, 0];
+        if (frame === FRAME_WIND && kind === 'melee') return left ? [-1, 0] : [1, 0];
+        return [0, 0];
+      }
       if (walking) {
         const fwd = left === (side < 0); // vorderes (angehobenes) Bein
         return fwd ? [left ? -1 : 1, -2] : [left ? 1 : -1, 0];
@@ -999,11 +1014,11 @@ export function playerPortrait(look: Look): { canvas: HTMLCanvasElement; width: 
   return { canvas: playerCanvas(look, 0), width: 104 };
 }
 
-export function playerCanvas(look: Look, frame: number, back = false): HTMLCanvasElement {
-  const sp = spritePlayer(look, frame, SPRITE_SCALE.normal, back);
+export function playerCanvas(look: Look, frame: number, back = false, profile = false): HTMLCanvasElement {
+  const sp = spritePlayer(look, frame, SPRITE_SCALE.normal, back, profile);
   if (sp) return sp;
   const fb = frame === FRAME_STEP_R ? FRAME_STEP_L : frame;
-  return actorCanvas(lookKey(look, fb, back), (x) => {
+  return actorCanvas(lookKey(look, fb, back, profile), (x) => {
     BACK = back;
     POSE = fb === 2 ? 'wind' : fb === 3 ? 'strike' : 'idle';
     const body = look.chest >= 0 ? TIER_COL[look.chest]! : 0x4a68a0;

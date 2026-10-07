@@ -69,6 +69,8 @@ interface ActorView {
   swingStart?: number;
   /** läuft im Bild nach oben: Rückansicht */
   up?: boolean;
+  /** läuft im Bild überwiegend seitlich: Seitenansicht */
+  side?: boolean;
 }
 
 export class GameScene extends Phaser.Scene {
@@ -1428,7 +1430,9 @@ export class GameScene extends Phaser.Scene {
         // Bildschirm-Richtung: iso x-y
         const screenDx = dx - dy;
         if (Math.abs(screenDx) > 0.0005) view.flip = screenDx < 0;
-        if (Math.abs(dx + dy) > 0.0005) view.up = dx + dy < 0;
+        const screenDy = dx + dy;
+        view.side = Math.abs(screenDx) > Math.abs(screenDy) * 1.5;
+        if (Math.abs(screenDy) > 0.0005) view.up = screenDy < 0;
       }
       view.lastX = pos.x;
       view.lastY = pos.y;
@@ -1440,7 +1444,7 @@ export class GameScene extends Phaser.Scene {
       const img = view.img;
       if (a.kind === 'player') {
         const look = lookOf(a);
-        img.setTexture(ensureTexture(this, lookKey(look, frame, !!view.up), () => playerCanvas(look, frame, !!view.up)));
+        img.setTexture(ensureTexture(this, lookKey(look, frame, !!view.up && !view.side, !!view.side), () => playerCanvas(look, frame, !!view.up && !view.side, !!view.side)));
       } else {
         const k = monsterKind(a.kindId!);
         const key = `mon_${k.id}_${frame}${view.up ? 'b' : ''}`;

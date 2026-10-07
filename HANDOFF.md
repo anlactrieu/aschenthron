@@ -1,10 +1,10 @@
 # HANDOFF – Aschenthron
 
-## AKTUELL (2026-10-07): Blickrichtung – zurückgenommen, LPC verworfen
-- **Stand:** Abdunkeln bei Monstern/NPCs und NPC-Spiegeln entfernt. Spieler: Rückenansicht ohne Abdunkeln, Gesicht mit Haarfarbe überdeckt (`spritePlayer`, art.ts). Monster/NPCs wie vor c1b0317 (nur Spiegeln links/rechts). tsc + 285 Tests grün, im Browser nicht gesehen.
-- **Entscheidungen:** (1) LPC-Sprites verworfen (Stilbruch, kaum Monster, 1,5-GB-Repo; Download hat den Mac lahmgelegt, siehe Memory `feedback-grosse-downloads`). (2) Monster behalten nur Spiegeln. (3) Spieler-Rücken im DCSS-Stil als Kompromiss.
-- **Offen:** Spieler-Rücken optisch prüfen (Helme/Frisuren, Gesichtsfläche x12-19/y3-9 geschätzt); echte Seitenansicht fehlt.
-- **Learnings:** Auf macOS gibt es kein `timeout`; Teil-Klone großer Repos nie nutzen.
+## AKTUELL (2026-10-07): Spieler-Seitenansicht (uncommittet, tsc läuft/ungeprüft, im Browser nicht gesehen)
+- **Stand:** Rückseite gefällt dem User. Neu: Profil beim seitlichen Laufen (`spritePlayer(..., back, profile)` in art.ts: Körper x0.72 schmaler, Beine schwingen ±4 entlang der Laufrichtung statt zu spreizen; `lookKey/playerCanvas` haben 4. Param `profile`, Key-Suffix `s`). `GameScene`: `view.side = |screenDx| > 1.5·|screenDy|`, Rücken (`view.up`) nur ohne `side`. Monster/NPCs unverändert (nur Spiegeln). Vorher gepusht: 1bbecdb.
+- **Entscheidungen:** (1) LPC verworfen (Stilbruch, kaum Monster, Download legte den Mac lahm; Memory `feedback-grosse-downloads`). (2) Profil aus der Vorderansicht gebaut statt neuer Assets. (3) Seitenansicht nur bei überwiegend waagerechter Bildschirmbewegung, damit der gelobte Rücken bei Achsen-Schritten (Diagonale im Bild) bleibt.
+- **Offen:** Optik im Browser prüfen (links/rechts laufen, Waffe/Schild im Profil, Umhang); tsc + Tests + Commit + Push; Second-Brain-Notiz zum Download-Gotcha nachtragen (Dienst war nach Neustart nicht erreichbar, "fetch failed").
+- **Learnings:** Iso-Achsenschritte erscheinen im Bild diagonal (|sdx|≈|sdy|); rein seitlich sind nur Diagonal-Schritte im Raster. macOS hat kein `timeout`.
 
 ## Sitzungsstand (Audit "D4O-Gefuehl"; umgesetzt, tsc + 272 Tests gruen)
 - Auftrag: Subagents pruefen Progression/Builds, Loot/Items, Welt/Kampf/Ziele; danach Luecken umsetzen. Bericht Welt/Kampf/Ziele liegt vor, die zwei anderen (Progression, Loot) laufen noch.
