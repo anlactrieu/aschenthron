@@ -1,10 +1,10 @@
 # HANDOFF – Aschenthron
 
-## AKTUELL (2026-10-07): Blickrichtung – Umsetzung c1b0317 gefällt dem User NICHT, Neuentscheidung offen
-- **Stand:** origin/main = c1b0317 (Rückenansicht = abgedunkelter Sprite + Gesicht überdeckt, NPC-Spiegeln; `backShade` in `art.ts`, `npcDir` in `GameScene.updateNpcs`). User: "sieht komisch aus" bei Monstern und Figuren. 285 Tests grün.
-- **Letzte 3 Entscheidungen:** (1) User wählte "echte 4-Richtungs-Sprites" statt Rückbau. (2) Recherche: LPC (CC-BY-SA/GPL) ist die einzige modulare Quelle mit Rücken/Seite/Front (64px, 9 Laufbilder, Zeilen: hoch, links, runter, rechts); Basispaket hat nur Körper/Hose/Haare/Soldat + 10 Monster (Fledermaus, Biene, Würmer, Auge, Geist, Pflanze, Kürbis, Schleim, Schlange). (3) User sagte "1" = LPC komplett für den Spieler (Generator mit Ebenen) – danach Download gestartet, User brach Wartebefehl ab und fragte nach dem Stand.
-- **Offen:** Download `Universal-LPC-Spritesheet-Character-Generator` (1,5 GB Repo, Sparse-Clone von body/hair/torso/legs/feet/hat/weapon/shield/cape/arms in `scratchpad/lpcgen`) läuft/hängt; User muss entscheiden: weiter warten, abbrechen + Abdunkeln zurücknehmen, oder Spieler-Richtungen selbst im DCSS-Stil zeichnen. Monster bekommen mit LPC keine Richtungen (fehlende Arten).
-- **Learnings:** LPC-Zip Basis: `https://opengameart.org/sites/default/files/lpc_base_assets.zip` (713 KB), liegt in `scratchpad/lpc`. Teil-Clone des Generators dauert >10 min (viele Blobs). Lizenz verlangt Credits + gleiche Lizenz für Ableitungen. Playerrenderer `spritePlayer` (art.ts ~806) ist auf 32px-DCSS-Ebenen ausgelegt, LPC wäre Umbau mit 64px-Frames.
+## AKTUELL (2026-10-07): Blickrichtung – zurückgenommen, LPC verworfen
+- **Stand:** Abdunkeln bei Monstern/NPCs und NPC-Spiegeln entfernt. Spieler: Rückenansicht ohne Abdunkeln, Gesicht mit Haarfarbe überdeckt (`spritePlayer`, art.ts). Monster/NPCs wie vor c1b0317 (nur Spiegeln links/rechts). tsc + 285 Tests grün, im Browser nicht gesehen.
+- **Entscheidungen:** (1) LPC-Sprites verworfen (Stilbruch, kaum Monster, 1,5-GB-Repo; Download hat den Mac lahmgelegt, siehe Memory `feedback-grosse-downloads`). (2) Monster behalten nur Spiegeln. (3) Spieler-Rücken im DCSS-Stil als Kompromiss.
+- **Offen:** Spieler-Rücken optisch prüfen (Helme/Frisuren, Gesichtsfläche x12-19/y3-9 geschätzt); echte Seitenansicht fehlt.
+- **Learnings:** Auf macOS gibt es kein `timeout`; Teil-Klone großer Repos nie nutzen.
 
 ## Sitzungsstand (Audit "D4O-Gefuehl"; umgesetzt, tsc + 272 Tests gruen)
 - Auftrag: Subagents pruefen Progression/Builds, Loot/Items, Welt/Kampf/Ziele; danach Luecken umsetzen. Bericht Welt/Kampf/Ziele liegt vor, die zwei anderen (Progression, Loot) laufen noch.
