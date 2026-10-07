@@ -360,13 +360,7 @@ export class GameScene extends Phaser.Scene {
 
   /** Zauber auf Ziel: in Reichweite sofort wirken, sonst hinlaufen und danach wirken (Auswahl endet nach dem Klick). */
   private castAt(skillId: string, target: Actor): void {
-    const sk = SKILLS.find((x) => x.id === skillId)!;
-    const p = this.player();
-    if (Math.hypot(p.x - target.x, p.y - target.y) <= sk.range) {
-      this.pendingCast = null;
-      this.send({ type: 'useSkill', skillId, targetId: target.id });
-      return;
-    }
+    // Dauerfeuer: hinlaufen, dann immer wieder wirken, bis das Ziel tot ist (oder ein neuer Klick/Mana-Mangel es beendet)
     this.pendingCast = { skillId, targetId: target.id };
     this.pendingRepath = 0;
   }
@@ -382,8 +376,13 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (Math.hypot(p.x - t.x, p.y - t.y) <= sk.range - 0.3) {
-      this.pendingCast = null;
-      this.send({ type: 'moveTo', x: Math.round(p.x), y: Math.round(p.y) });
+      if (p.path.length) this.send({ type: 'moveTo', x: Math.round(p.x), y: Math.round(p.y) });
+      if ((p.skillCd[sk.id] ?? 0) > 0) return;
+      if (p.mana < sk.mana) {
+        this.pendingCast = null;
+        this.ui.say('Nicht genug Mana.');
+        return;
+      }
       this.send({ type: 'useSkill', skillId: pc.skillId, targetId: t.id });
       return;
     }
@@ -396,6 +395,7 @@ export class GameScene extends Phaser.Scene {
     const t = toTile(ptr.worldX, ptr.worldY);
     const w = this.world;
     const hit = this.pick(ptr.worldX, ptr.worldY);
+    this.pendingCast = null;                                  // jeder neue Klick beendet das Dauerfeuer
     if (this.armedSkill) {
       if (ptr.rightButtonDown()) return this.setArmed(null);
       const id = this.armedSkill;
