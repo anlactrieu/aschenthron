@@ -1157,6 +1157,12 @@ export function npcCanvas(kind: string, name?: string, frame = 0, profile = fals
         drawProfile(x, img, undefined, frame);
       }, SPRITE_SCALE.normal, FEET_ORIGIN_Y);
     }
+    if (frame !== 0 && kind !== 'stash') {
+      return spriteCanvas(`snpc_${kind}_${name ?? ''}_${frame}`, (x) => {
+        pose(x, frame, 1);
+        drawSprite(x, img);
+      }, SPRITE_SCALE.normal, FEET_ORIGIN_Y);
+    }
     return spriteCanvas(`snpc_${kind}_${name ?? ''}`, (x) => drawSprite(x, img), SPRITE_SCALE.normal, FEET_ORIGIN_Y);
   }
   return actorCanvas(`npc_${kind}`, (x) => {

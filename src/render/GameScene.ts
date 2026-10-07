@@ -1290,10 +1290,12 @@ export class GameScene extends Phaser.Scene {
       if (n.kind !== 'stash') {
         const nf = time < dir.movingUntil ? WALK_FRAMES[Math.floor(time / STEP_MS) % 4]! : 0;
         const nSide = dir.side;
-        img.setTexture(ensureTexture(this, nSide ? `${npcTextureKey(n.kind, n.name)}_${nf}s` : npcTextureKey(n.kind, n.name), () => (nSide ? npcCanvas(n.kind, n.name, nf, true) : npcCanvas(n.kind, n.name))));
+        const nk = npcTextureKey(n.kind, n.name);
+        img.setTexture(ensureTexture(this, nSide ? `${nk}_${nf}s` : nf ? `${nk}_${nf}` : nk, () => (nSide ? npcCanvas(n.kind, n.name, nf, true) : npcCanvas(n.kind, n.name, nf))));
         img.setFlipX(dir.flip);
       }
-      img.setPosition(sx, sy + 8).setDepth(sy + 8);
+      const nBob = n.kind !== 'stash' && time < dir.movingUntil ? -Math.abs(Math.sin((time / STEP_MS) * Math.PI * 0.5)) * 1.2 : 0;
+      img.setPosition(sx, sy + 8 + nBob).setDepth(sy + 8);
       this.label(`n${n.id}`, n.name, sx, sy - 52, '#e8d9b0', seen);
       const mark = this.questMark(n, p);
       if (mark) this.label(`m${n.id}`, mark, sx, sy - 70 + Math.sin(time / 200) * 2, mark === '!' ? '#ffe45a' : mark === '…' ? '#8fd0ff' : '#7fe08a', seen, 22);
