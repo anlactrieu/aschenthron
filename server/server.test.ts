@@ -201,3 +201,22 @@ describe('Mehrspieler: Combat-Logging und Robustheit', () => {
     expect(getActor(srv.world, a2.id)!.gold).toBe(55);
   });
 });
+
+describe('Rangliste', () => {
+  it('liefert angemeldete Spieler nach XP sortiert', async () => {
+    const srv = await startServer({ port: 0, seed: 5 });
+    open.push(srv);
+    const a = await connect(srv, 'Alpha');
+    clients.push(a);
+    const got = new Promise<{ rows: { name: string; xp: number }[] }>((res) => {
+      a.ws.on('message', (d) => {
+        const m = JSON.parse(d.toString());
+        if (m.t === 'board') res(m);
+      });
+    });
+    a.send({ t: 'board' });
+    const m = await got;
+    expect(m.rows.some((r) => r.name === 'Alpha')).toBe(true);
+  });
+});
+

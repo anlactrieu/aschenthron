@@ -217,3 +217,11 @@ Anlass: Spieler wusste nicht, was zu tun ist, und fand Quest-Monster nicht.
 - **Nächster Schritt** (`nextStep` in quests.ts, Anzeige oben im Tracker, Knopf „Hinlaufen“, Richtungspfeil folgt ihm): 1) fertige Aufgabe abgeben, 2) nächstes Geschichts-Kettenglied (höchstens 6 Stufen unter der eigenen), 3) „Gesucht“: lebender benannter Elitegegner ±4 Stufen (seltene Beute, Chance auf Legendäres/Set), 4) nächstes Ziel einer laufenden Aufgabe, 5) Jagdgebiet passend zur Stufe.
 - **Mit-Jagen** (`onMonsterDeath`): Kills der Monsterart einer freien Töte-Aufgabe (ohne Kette, Stufe erreicht) starten die Aufgabe automatisch; Abgabe weiter beim Auftraggeber.
 - **Offen:** Kopfgeld-Aushang (nicht gewählt), mehr Story-Szenen/Kapitel für Stufe 15–30, gezielte Set-Jagd („wo droppt mein fehlendes Teil?“).
+
+## Runde 3: Kopfgelder, Set-Jagd, Hauptfaden, Rangliste, Startwaffe (umgesetzt)
+- **Kopfgelder:** Aushang in jeder Stadt (Befehl `bountyBoard`, Tag = Tagesnummer vom Client), 3 Kopfgelder je Tag für die Stufe (8–14 Kills einer Gegnerart, Gold + 10 % der Stufen-XP + 30 % Chance auf Seltenes); Abholen nur in der Stadt (`claimBounty`); `Actor.bounties/bountyDay`, gespeichert. Zufall nur über `w.fx`.
+- **Set-Jagd:** Abschnitt im Aufgabenfenster für Sets, von denen man Teile besitzt (fehlende Teile + Fundorte).
+- **Hauptfaden „Die Chronik der Asche“:** 6 Glieder (Stufe 15–28) über Maren, Tessa und Ruven bis zum Thron der Asche (Karte: `gen_map.py` und JSON gleich angepasst).
+- **Rangliste:** Server beantwortet `{t:'board'}` mit den 10 XP-stärksten Spielern (gespeicherte + aktive); online im Erfolge-Tab.
+- **Startwaffe:** Neues Spiel beginnt mit Rostschwert (Schaden 7–13 statt 4–7), nur Client, Sim und Golden-Tests unberührt.
+- **Nicht gemacht:** Legendär-Droprate/Duplikate (braucht Spielerkontext im Wurf; ohne Spielgefühl nur geraten).

@@ -12,7 +12,7 @@ import { isWalkable } from '../sim/path';
 import { toScreen, toTile } from './iso';
 import { DOOR_ICONS, TOWN_GID, WATER_PROP_GIDS, registerTownArt } from './town';
 import { Ui, describeItem, isUpgrade } from './ui';
-import type { Item } from '../sim/items';
+import { generateItem, type Item } from '../sim/items';
 import type { Mood } from './music';
 import { AchievementTracker, type Stats } from './achievements';
 import { itemIcon, skillCursor } from './icons';
@@ -87,6 +87,7 @@ export class GameScene extends Phaser.Scene {
   private acc = 0;
   private step: NextStep | null = null;
   private lastHint = 0;
+  private lastBoard = -1e9;
   private zoneMood: Mood = 'town';
   private achv = new AchievementTracker();
   /** Hit-Stop: so viele ms bleibt die Simulation stehen (nur Einzelspieler), gibt Treffern Wucht */
@@ -173,6 +174,10 @@ export class GameScene extends Phaser.Scene {
     else if (saved && importPlayer(this.world, p, saved)) this.ui.say('Spielstand geladen.');
     else {
       this.showTitle(p);
+      // Erstausstattung: ein Rostschwert, damit die ersten Kämpfe nicht mit bloßen Fäusten beginnen
+      const sword = generateItem(this.world.rng, this.world.nextId++, 'rusty_sword', 'normal');
+      p.inventory.push(sword);
+      this.send({ type: 'equip', itemId: sword.id });
       this.ui.banner('Aschental brennt. Der Thron der Asche ruft.', '#d8a24a');
       this.ui.say('Einst war Aschental ein Garten – dann verbrannte der Aschenkönig den Himmel. Du bist einer der Letzten, die noch gegen ihn ziehen. Dein Ziel: Stufe 30, der Thron der Asche.');
       this.ui.say('Willkommen im Hafen von Aschenhafen! Hafenmeister Joren (Haus mit Anker, links vom Platz) zeigt dir die Stadt: Lehrhaus (Buch), Kaufhaus (Münzen), Schmiede (Amboss), Lager (Truhe), Wache (Schild). Mit Startgold, Schwert oder Bogen geht es auf die Felder. C: Charakter (Attributpunkte verteilen!) · K: Fertigkeiten · Q/E: Tränke · R: Rasten · N: Karte · Pfeiltasten oder Klick: laufen · Klick auf Gegner: angreifen. Deine laufenden Aufgaben stehen oben rechts.');
@@ -501,6 +506,11 @@ export class GameScene extends Phaser.Scene {
     }
     this.now = time;
     this.idleHint(time);
+    if (this.remote && time - this.lastBoard > 15000) {
+      this.lastBoard = time;
+      this.remote.requestBoard();
+      this.ui.board = this.remote.board;
+    }
     this.arrowMove(time);
     this.pendingCastStep(time);
     this.handleEvents();

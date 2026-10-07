@@ -113,6 +113,22 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     } else finalize(c.name, c.actorId);
   };
 
+  /** Rangliste: gespeicherte und aktive Spieler, nach XP absteigend (die ersten 10). */
+  const leaderboard = (): { name: string; level: number; xp: number }[] => {
+    const rows = new Map<string, { name: string; level: number; xp: number }>();
+    for (const [name, json] of saves) {
+      try {
+        const pl = (JSON.parse(json) as { player?: { level?: unknown; xp?: unknown } }).player;
+        if (pl && typeof pl.level === 'number' && typeof pl.xp === 'number') rows.set(name.toLowerCase(), { name, level: pl.level, xp: pl.xp });
+      } catch { /* kaputter Eintrag: überspringen */ }
+    }
+    for (const c of clients.values()) {
+      const a = getActor(w, c.actorId);
+      if (a) rows.set(c.name.toLowerCase(), { name: c.name, level: a.level, xp: a.xp });
+    }
+    return [...rows.values()].sort((x, y) => y.xp - x.xp).slice(0, 10);
+  };
+
   const send = (ws: WebSocket, msg: unknown): void => {
     if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg));
   };
@@ -165,6 +181,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
         send(ws, { t: 'welcome', id: actor.id, tickRate: TICK_RATE, pvp: w.pvp, seed: opts.seed ?? 0 });
         return;
       }
+      if (msg.t === 'board') return send(ws, { t: 'board', rows: leaderboard() });
       if (msg.t !== 'cmd') return;
       const cmd = validateCommand(w, msg.c);
       if (!cmd) return;

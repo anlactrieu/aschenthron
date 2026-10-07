@@ -14,6 +14,8 @@ export class RemoteSession {
   private ws: WebSocket | null = null;
   private events: GameEvent[] = [];
   closed = false;
+  /** Rangliste vom Server (die ersten 10 nach XP) */
+  board: { name: string; level: number; xp: number }[] = [];
 
   constructor(private url: string, private name: string, map: TiledMap) {
     const built = buildWorld(0, map, { player: false });
@@ -35,7 +37,7 @@ export class RemoteSession {
       };
       ws.onopen = () => ws.send(JSON.stringify({ t: 'join', name: this.name }));
       ws.onmessage = (ev) => {
-        let m: { t: string; id?: number; reason?: string; pvp?: boolean };
+        let m: { t: string; id?: number; reason?: string; pvp?: boolean; rows?: { name: string; level: number; xp: number }[] };
         try {
           m = JSON.parse(String(ev.data)) as typeof m;
         } catch {
@@ -46,6 +48,10 @@ export class RemoteSession {
           this.playerId = m.id!;
           this.pvp = !!m.pvp;
           this.world.pvp = this.pvp;
+          return;
+        }
+        if (m.t === 'board' && Array.isArray(m.rows)) {
+          this.board = m.rows.slice(0, 10).filter((r) => typeof r.name === 'string' && typeof r.level === 'number' && typeof r.xp === 'number');
           return;
         }
         if (m.t === 'snap') {
@@ -70,6 +76,10 @@ export class RemoteSession {
 
   send(c: Command): void {
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify({ t: 'cmd', c }));
+  }
+
+  requestBoard(): void {
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify({ t: 'board' }));
   }
 
   drainEvents(): GameEvent[] {

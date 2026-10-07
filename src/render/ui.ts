@@ -220,6 +220,8 @@ interface Drag {
 export class Ui {
   open = false;
   ach: AchievementTracker | null = null;
+  /** Server-Rangliste (nur online) */
+  board: { name: string; level: number; xp: number }[] | null = null;
   private tab: Tab = 'inv';
   private main = el('div', 'a-win');
   private side = el('div', 'a-win');
@@ -361,7 +363,7 @@ export class Ui {
     this.updateHud(p, target);
     this.updateTracker(w, p);
     const near = w.npcs.filter((n) => Math.hypot(n.x - p.x, n.y - p.y) <= NPC_RANGE);
-    const key = JSON.stringify([this.open, this.tab, p.inventory, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.freeRespec, p.gold, p.level, p.spec, near.map((n) => n.id), p.quests, p.bounties, p.xp > 0, this.ach?.unlocked.size, this.ach?.stats.kills]);
+    const key = JSON.stringify([this.open, this.tab, p.inventory, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.freeRespec, p.gold, p.level, p.spec, near.map((n) => n.id), p.quests, p.bounties, p.xp > 0, this.board?.map((r) => r.name + r.xp).join(), this.ach?.unlocked.size, this.ach?.stats.kills]);
     if (key === this.key || this.dragging) return;
     this.key = key;
     if (this.open) this.renderMain(p);
@@ -1047,6 +1049,14 @@ export class Ui {
   }
 
   private renderAch(body: HTMLElement): void {
+    if (this.board) {
+      body.append(el('div', 'a-sec', 'Rangliste (Server)'));
+      this.board.forEach((r, i) => {
+        const row = el('div', 'a-row');
+        row.append(el('span', '', `${i + 1}. ${r.name}`), el('span', '', `Stufe ${r.level} · ${r.xp} XP`));
+        body.append(row);
+      });
+    }
     const t = this.ach;
     if (!t) { body.append(el('div', 'a-note', 'Erfolge gibt es nur im Einzelspielermodus.')); return; }
     body.append(el('div', 'a-sec', `Erfolge ${t.unlocked.size}/${ACHIEVEMENTS.length}`));
