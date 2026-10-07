@@ -118,3 +118,67 @@ export function targetName(def: QuestDef): string {
   if (def.kind === 'talk') return NPC_KEYS[def.target] ?? def.target;
   return def.item ?? def.target;
 }
+
+export interface NextStep {
+  kind: 'turnin' | 'story' | 'hunt' | 'quest' | 'zone';
+  text: string;
+  x?: number;
+  y?: number;
+}
+
+/** Stufenbereich einer Region ("3-10") oder undefined (Stadt, ohne Angabe). */
+function levelRange(levels: string): [number, number] | undefined {
+  const m = /^(\d+)-(\d+)$/.exec(levels);
+  return m ? [Number(m[1]), Number(m[2])] : undefined;
+}
+
+/**
+ * Der eine „nächste Schritt“ für den Spieler, nach Wichtigkeit:
+ * fertige Aufgabe abgeben → Geschichte weiterführen → gesuchten Elitegegner jagen → laufende Aufgabe → Jagdgebiet für die Stufe.
+ */
+export function nextStep(w: World, p: Actor): NextStep | null {
+  // 1) Abgabe
+  for (const def of QUESTS) {
+    if (p.quests[def.id]?.state !== 'done') continue;
+    const g = giverLocation(w, def);
+    return { kind: 'turnin', text: `Abgeben: „${def.name}“ bei ${g?.text ?? 'dem Auftraggeber'}`, x: g?.pos.x, y: g?.pos.y };
+  }
+  // 2) Geschichte: nächstes Kettenglied, das jetzt angenommen werden kann
+  const chained = QUESTS.filter((q) => q.chain && questAvailable(p, q) && p.level - q.minLevel <= 6).sort((a, b) => a.minLevel - b.minLevel)[0];
+  if (chained) {
+    const g = giverLocation(w, chained);
+    return { kind: 'story', text: `Geschichte: „${chained.name}“ – sprich mit ${g?.text ?? 'dem Auftraggeber'}`, x: g?.pos.x, y: g?.pos.y };
+  }
+  // 3) Gesucht: lebender benannter Gegner in Reichweite der Stufe (1–2 seltene Gegenstände, Chance auf Legendäres oder Set-Teil)
+  let hunt: Actor | undefined;
+  let hd = Infinity;
+  for (const a of w.actors) {
+    if (a.kind !== 'monster' || !a.alive || !a.unique || Math.abs(a.level - p.level) > 4) continue;
+    const d = Math.hypot(a.x - p.x, a.y - p.y);
+    if (d < hd) { hd = d; hunt = a; }
+  }
+  if (hunt) return { kind: 'hunt', text: `Gesucht: ${hunt.name} (Stufe ${hunt.level}, ${regionAt(w, hunt.x, hunt.y)?.name ?? '?'}) – bringt seltene Beute`, x: hunt.x, y: hunt.y };
+  // 4) laufende Aufgabe (Ziel in der Nähe zuerst)
+  let best: { def: QuestDef; t: { x: number; y: number }; d: number } | undefined;
+  for (const def of QUESTS) {
+    if (p.quests[def.id]?.state !== 'active') continue;
+    const t = questTarget(w, p, def, false);
+    if (!t) continue;
+    const d = Math.hypot(t.x - p.x, t.y - p.y);
+    if (!best || d < best.d) best = { def, t, d };
+  }
+  if (best) return { kind: 'quest', text: `Aufgabe: „${best.def.name}“ – ${questWhere(w, best.def) || 'Ziel suchen'}`, x: best.t.x, y: best.t.y };
+  // 5) Jagdgebiet: die fortgeschrittenste Zone, deren Stufenbereich zur Stufe passt
+  let zone: (typeof w.regions)[number] | undefined;
+  let zl = -1;
+  for (const r of w.regions) {
+    const lr = levelRange(r.levels);
+    if (!lr || p.level < lr[0] || p.level > lr[1] + 2) continue;
+    if (lr[0] > zl) { zl = lr[0]; zone = r; }
+  }
+  if (zone) {
+    const c = center(zone);
+    return { kind: 'zone', text: `Jagdgebiet für Stufe ${p.level}: ${zone.name} (Stufe ${zone.levels})`, x: c.x, y: c.y };
+  }
+  return null;
+}

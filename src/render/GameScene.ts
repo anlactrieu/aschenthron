@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import mapJson from '../data/aschenthron.json';
 import { buildWorld, type TiledMap } from '../sim/tiled';
 import { DMG_COLOR, STATUS_COLOR, monsterKind, npcKeyOf, questById, QUESTS, SKILLS, STATUS_IDS } from '../sim/data';
-import { giverLocation, questAvailable, questMarks, type QuestMark } from '../sim/quests';
+import { giverLocation, nextStep, type NextStep, questAvailable, questMarks, type QuestMark } from '../sim/quests';
 import { exportPlayer, importPlayer } from '../sim/save';
 import {
   applyCommand, drainEvents, getActor, maxHpOf, maxManaOf, regionAt, tick, TICK_RATE, type Actor, type Chest, type Command, type Npc, type World,
@@ -85,6 +85,7 @@ export class GameScene extends Phaser.Scene {
   private chestViews = new Map<number, Phaser.GameObjects.Image>();
   private flash = new Map<number, number>();
   private acc = 0;
+  private step: NextStep | null = null;
   private lastHint = 0;
   private zoneMood: Mood = 'town';
   private achv = new AchievementTracker();
@@ -964,7 +965,11 @@ export class GameScene extends Phaser.Scene {
     const cp = this.camPos ?? p;
     const { sx, sy } = toScreen(cp.x, cp.y);
     this.cameras.main.centerOn(Math.round(sx), Math.round(sy - 14));
-    if (this.frame % 30 === 0) this.marks = questMarks(this.world, p);
+    if (this.frame % 30 === 0) {
+      this.marks = questMarks(this.world, p);
+      this.step = nextStep(this.world, p);
+      this.ui.step = this.step;
+    }
     if (this.frame % 6 === 0) this.minimap.draw(p.x, p.y, this.marks);
     this.updateCompass(g, p, time);
     this.updateRegion(p);
@@ -973,9 +978,12 @@ export class GameScene extends Phaser.Scene {
   /** Pfeil um die Figur zum nächsten Aufgabenziel (erst ab 10 Feldern Abstand); Entfernung daneben. */
   private updateCompass(g: Phaser.GameObjects.Graphics, p: Actor, time: number): void {
     const seen = new Set<string>();
-    let best: QuestMark | null = null;
+    let best: { x: number; y: number; done: boolean } | null = null;
     let bd = Infinity;
-    for (const m of this.marks) {
+    if (this.step?.x !== undefined && this.step.y !== undefined) {
+      best = { x: this.step.x, y: this.step.y, done: this.step.kind === 'turnin' };
+      bd = Math.hypot(best.x - p.x, best.y - p.y);
+    } else for (const m of this.marks) {
       const d = Math.hypot(m.x - p.x, m.y - p.y);
       if (d < bd) { bd = d; best = m; }
     }

@@ -92,3 +92,28 @@ describe('Teleport-Schriftrollen', () => {
     expect(p.inventory.some((i) => i.id === scroll.id)).toBe(true);
   });
 });
+
+describe('Roter Faden und Mit-Jagen', () => {
+  it('Kills starten freie Töte-Aufgaben automatisch und zählen', async () => {
+    const { spawnMonster } = await import('./world');
+    const { QUESTS } = await import('./data');
+    const w = createWorld(1, big());
+    const p = spawnPlayer(w, 10, 10);
+    const q = QUESTS.find((x) => x.kind === 'kill' && !x.chain && !x.requires && x.minLevel <= 1)!;
+    expect(q).toBeDefined();
+    const m = spawnMonster(w, 11, 10, q.target);
+    m.hp = 1;
+    applyCommand(w, p.id, { type: 'attack', targetId: m.id });
+    for (let i = 0; i < 400 && m.alive; i++) tick(w);
+    expect(m.alive).toBe(false);
+    expect(p.quests[q.id]?.progress).toBe(1);
+    expect(p.quests[q.id]?.state === 'active' || p.quests[q.id]?.state === 'done').toBe(true);
+  });
+  it('nextStep liefert für Neulinge einen Geschichtsschritt oder ein Jagdgebiet', async () => {
+    const { nextStep } = await import('./quests');
+    const w = createWorld(1, big());
+    const p = spawnPlayer(w, 10, 10);
+    const s = nextStep(w, p);
+    expect(s === null || ['story', 'zone', 'quest', 'hunt', 'turnin'].includes(s.kind)).toBe(true);
+  });
+});

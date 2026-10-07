@@ -9,7 +9,7 @@ import { buildProfile } from '../sim/build';
 import { itemIcon, potionIcon, skillIcon, statusIcon } from './icons';
 import type { AchievementTracker } from './achievements';
 import { ACHIEVEMENTS } from './achievements';
-import { giverLocation, questAvailable, questChains, questWhere, targetName } from '../sim/quests';
+import { type NextStep, giverLocation, questAvailable, questChains, questWhere, targetName } from '../sim/quests';
 import { lookKey, lookOf, playerPortrait } from './art';
 import { initCredits, toggleCredits } from './credits';
 
@@ -239,6 +239,8 @@ export class Ui {
   private tracker = el('div');
   private trackerKey = '';
   private sideClosed = '';
+  /** Nächster Schritt (von der Szene alle 0,5 s gesetzt) */
+  step: NextStep | null = null;
   private bannerTimer = 0;
   private tip = el('div');
   private msgs: string[] = [];
@@ -284,7 +286,7 @@ export class Ui {
 
     this.target.style.cssText = 'position:fixed;z-index:4;left:50%;top:10px;transform:translateX(-50%);background:rgba(14,12,18,.88);border:1px solid #6b5a48;color:#d4c4a8;font:13px Georgia,serif;padding:4px 12px;display:none;text-align:center;min-width:160px';
     this.toast.style.cssText = 'position:fixed;z-index:4;left:12px;bottom:112px;width:420px;color:#d4c4a8;font:13px/1.35 Georgia,serif;pointer-events:none;text-shadow:0 1px 2px #000,0 0 4px #000';
-    this.tracker.style.cssText = 'position:fixed;right:12px;top:12px;max-width:260px;text-align:right;color:#e8d9b0;font:13px Georgia,serif;text-shadow:0 1px 4px #000,0 0 2px #000;background:rgba(10,8,6,.45);border-right:2px solid #d8a24a;padding:6px 10px;pointer-events:none;z-index:5;display:none';
+    this.tracker.style.cssText = 'position:fixed;right:12px;top:12px;max-width:260px;text-align:right;color:#e8d9b0;font:13px Georgia,serif;text-shadow:0 1px 4px #000,0 0 2px #000;background:rgba(10,8,6,.45);border-right:2px solid #d8a24a;padding:6px 10px;pointer-events:auto;z-index:5;display:none';
     this.bannerEl.style.cssText = 'position:fixed;left:50%;top:70px;transform:translateX(-50%);color:#e8d9b0;font:bold 24px Georgia,serif;text-shadow:0 2px 8px #000,0 0 2px #000;letter-spacing:1.5px;opacity:0;transition:opacity .6s;pointer-events:none;z-index:6;text-align:center';
     this.tip.style.cssText = 'position:fixed;z-index:50;max-width:270px;background:rgba(10,8,14,.97);border:1px solid #8a7258;color:#d4c4a8;font:12px/1.45 Georgia,serif;padding:8px 10px;pointer-events:none;display:none;box-shadow:0 4px 16px #000';
     document.body.append(this.main, this.side, this.hud, this.tracker, this.target, this.toast, this.bannerEl, this.tip);
@@ -371,11 +373,27 @@ export class Ui {
     const act = QUESTS.filter((q) => p.quests[q.id] && p.quests[q.id]!.state !== 'turned');
     act.sort((a, b) => Number(p.quests[b.id]!.state === 'done') - Number(p.quests[a.id]!.state === 'done'));
     const shown = act.slice(0, 3);
-    const key = JSON.stringify(shown.map((q) => [q.id, p.quests[q.id]]));
+    const step = this.step;
+    const key = JSON.stringify([shown.map((q) => [q.id, p.quests[q.id]]), step?.text]);
     if (key === this.trackerKey) return;
     this.trackerKey = key;
     this.tracker.replaceChildren();
-    this.tracker.style.display = shown.length ? 'block' : 'none';
+    this.tracker.style.display = shown.length || step ? 'block' : 'none';
+    if (step) {
+      const row = el('div');
+      row.style.cssText = 'margin:0 0 6px;padding-bottom:5px;border-bottom:1px solid #6b5a48';
+      const head = el('div', '', '▶ Nächster Schritt');
+      head.style.cssText = 'font-weight:bold;color:#ffcf6a;font-size:12px;letter-spacing:.5px';
+      const txt = el('div', '', step.text);
+      row.append(head, txt);
+      if (step.x !== undefined && step.y !== undefined) {
+        const go = el('button', 'a-btn', 'Hinlaufen');
+        go.style.cssText = 'margin-top:4px;font-size:11px;padding:2px 8px;cursor:pointer';
+        go.onclick = () => this.send({ type: 'moveTo', x: Math.round(step.x!), y: Math.round(step.y!) });
+        row.append(go);
+      }
+      this.tracker.append(row);
+    }
     for (const q of shown) {
       const done = p.quests[q.id]!.state === 'done';
       const row = el('div');

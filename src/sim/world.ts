@@ -1540,6 +1540,15 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
     if (pl && pl.alive && w.tick - at <= TICK_RATE * 30 && Math.hypot(pl.x - m.x, pl.y - m.y) <= 25) credited.set(pl.id, pl);
   }
   for (const pl of credited.values()) {
+    // Beim Jagen nebenbei: freie Töte-Aufgaben (ohne Kette) für diese Monsterart starten automatisch
+    if (m.kindId && !m.summoned) {
+      for (const q of QUESTS) {
+        if (q.kind !== 'kill' || q.chain || q.target !== m.kindId || pl.quests[q.id] || pl.level < q.minLevel) continue;
+        if (q.requires && pl.quests[q.requires]?.state !== 'turned') continue;
+        pl.quests[q.id] = { state: 'active', progress: 0 };
+        note(w, pl, `Aufgabe „${q.name}“ läuft jetzt mit – deine Kills zählen.`);
+      }
+    }
     for (const q of QUESTS) {
       const st = pl.quests[q.id];
       if (st?.state !== 'active') continue;

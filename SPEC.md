@@ -211,3 +211,9 @@ Ziel: freie Builds statt Itemleiter, nur Prinzipien klassischer freier MMORPGs, 
 ## Teleport-Schriftrollen (Goldsenke)
 - Zwei Rollen (`scroll_hafen` Stufe 1, 60 Wert; `scroll_wacht` Stufe 6, 90 Wert) als Verbrauchsgegenstand (Slot `potion`, Feld `town`), bei den Händlern `basic` und `advanced` kaufbar; Kaufpreis = 2 × Wert (120 bzw. 180 Gold), fallen nicht als Beute.
 - Lesen: 3 s Wirkzeit (`TELEPORT_TICKS`, `Actor.tele`, `updateTeleport` in world.ts); Bewegung, Treffer, Kampf oder Tod brechen ab, die Rolle bleibt dann erhalten. Nicht lesbar im Kampf und nicht, wenn man schon in der Zielstadt ist (< 25 Felder). Stadtname kommt aus der Tiled-Karte (`world.towns[].name`).
+
+## Roter Faden, Beute-Jagd, Mit-Jagen (Motivation)
+Anlass: Spieler wusste nicht, was zu tun ist, und fand Quest-Monster nicht.
+- **Nächster Schritt** (`nextStep` in quests.ts, Anzeige oben im Tracker, Knopf „Hinlaufen“, Richtungspfeil folgt ihm): 1) fertige Aufgabe abgeben, 2) nächstes Geschichts-Kettenglied (höchstens 6 Stufen unter der eigenen), 3) „Gesucht“: lebender benannter Elitegegner ±4 Stufen (seltene Beute, Chance auf Legendäres/Set), 4) nächstes Ziel einer laufenden Aufgabe, 5) Jagdgebiet passend zur Stufe.
+- **Mit-Jagen** (`onMonsterDeath`): Kills der Monsterart einer freien Töte-Aufgabe (ohne Kette, Stufe erreicht) starten die Aufgabe automatisch; Abgabe weiter beim Auftraggeber.
+- **Offen:** Kopfgeld-Aushang (nicht gewählt), mehr Story-Szenen/Kapitel für Stufe 15–30, gezielte Set-Jagd („wo droppt mein fehlendes Teil?“).
