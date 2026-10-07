@@ -174,8 +174,9 @@ function opaqueTop(img: HTMLImageElement): number {
 function drawProfile(x: Ctx, img: HTMLImageElement, tint: number | undefined, frame: number): void {
   const t = mkCanvas(SP, SP);
   drawSprite(ctxOf(t), img, tint);
+  // DCSS-Figuren sind leicht nach links gedreht: vorab nach rechts spiegeln, damit Neigung und Beinschritt zur Laufrichtung passen
   x.translate(SP / 2, 0);
-  x.scale(0.88, 1);
+  x.scale(-0.88, 1);
   x.translate(-SP / 2, 0);
   if (frame !== FRAME_STEP_L && frame !== FRAME_STEP_R) {
     x.drawImage(t, 0, 0);
