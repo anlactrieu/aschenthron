@@ -5,7 +5,7 @@ import { DMG_COLOR, STATUS_COLOR, monsterKind, npcKeyOf, questById, QUESTS, SKIL
 import { giverLocation, nextStep, type NextStep, questAvailable, questMarks, type QuestMark } from '../sim/quests';
 import { exportPlayer, importPlayer } from '../sim/save';
 import {
-  applyCommand, drainEvents, getActor, maxHpOf, maxManaOf, regionAt, tick, TICK_RATE, type Actor, type Chest, type Command, type Npc, type World,
+  applyCommand, carriedWeight, carryCapacity, drainEvents, getActor, maxHpOf, maxManaOf, regionAt, tick, TICK_RATE, type Actor, type Chest, type Command, type Npc, type World,
   activeSkills,
 } from '../sim/world';
 import { isWalkable } from '../sim/path';
@@ -114,6 +114,8 @@ export class GameScene extends Phaser.Scene {
   private hitStop = 0;
   private autosave = 0;
   private lastSavedHint = 0;
+  /** Letzter Zeitpunkt, an dem der Spieler lief oder kämpfte (für Erinnerungen bei Leerlauf) */
+  private lastActivity = 0;
   private lastAutoPick = 0;
   /** Beute-IDs, die schon einmal automatisch angesteuert wurden (kein Dauerversuch bei vollem Rucksack) */
   private autoTried = new Map<number, number>();
@@ -206,7 +208,8 @@ export class GameScene extends Phaser.Scene {
       this.send({ type: 'equip', itemId: sword.id });
       this.ui.banner('Aschental brennt. Der Thron der Asche ruft.', '#d8a24a');
       this.ui.say('Einst war Aschental ein Garten – dann verbrannte der Aschenkönig den Himmel. Du bist einer der Letzten, die noch gegen ihn ziehen. Dein Ziel: Stufe 30, der Thron der Asche.');
-      this.ui.say('Willkommen im Hafen von Aschenhafen! Hafenmeister Joren (Haus mit Anker, links vom Platz) zeigt dir die Stadt: Lehrhaus (Buch), Kaufhaus (Münzen), Schmiede (Amboss), Lager (Truhe), Wache (Schild). Mit Startgold, Schwert oder Bogen geht es auf die Felder. C: Charakter (Attributpunkte verteilen!) · K: Fertigkeiten · Q/E: Tränke · R: Rasten · N: Karte · Pfeiltasten oder Klick: laufen · Klick auf Gegner: angreifen. Deine laufenden Aufgaben stehen oben rechts.');
+      this.ui.say('Willkommen in Aschenhafen! Sprich mit Hafenmeister Joren (Haus mit Anker, links vom Platz) – er zeigt dir die Stadt. Klick auf den Boden: laufen. Klick auf einen Gegner: angreifen. Dein nächster Schritt steht oben rechts.');
+      this.ui.say('Du hast Punkte zu verteilen: C öffnet deinen Charakter (Attribute), K die Fertigkeiten. Alle Tasten und Tipps findest du unter P.');
     }
     this.gfx = this.add.graphics().setDepth(OVERLAY_DEPTH);
     this.gfxGround = this.add.graphics().setDepth(-9e5);
@@ -602,7 +605,8 @@ export class GameScene extends Phaser.Scene {
 <p style="margin:18px 0 6px;line-height:1.55">Aschental war ein Garten, bis der Aschenkönig den Himmel verbrannte. Seitdem wandern Tote durch die Moore, Goblins und Räuber plündern die Straßen, und die Hafenstadt hält sich am letzten Licht.</p>
 <p style="margin:6px 0 18px;line-height:1.55;opacity:.9">Du bist eine der Letzten, die noch gegen ihn ziehen. Werde stärker, finde seltene Beute und bring den Aschenkönig auf seinem Thron zu Fall.</p>
 <div style="margin-bottom:14px">Dein Name: <input id="ttl-name" maxlength="16" value="Held" style="background:#120f16;border:1px solid #6b5a48;color:#e8d9b0;padding:6px 10px;font:16px Georgia,serif;text-align:center;width:180px"></div>
-<button id="ttl-go" style="background:#3a2f26;border:2px solid #d8a24a;color:#ffe8b0;padding:10px 26px;font:bold 16px Georgia,serif;cursor:pointer">Das Abenteuer beginnt</button>`;
+<button id="ttl-go" style="background:#3a2f26;border:2px solid #d8a24a;color:#ffe8b0;padding:10px 26px;font:bold 16px Georgia,serif;cursor:pointer">Das Abenteuer beginnt</button>
+<p style="margin:16px 0 0;font-size:12px;opacity:.65">Klick = laufen und angreifen · Pfeiltasten laufen auch · Hilfe und Tasten: P</p>`;
     box.append(inner);
     document.body.append(box);
     const go = (): void => {
@@ -622,7 +626,13 @@ export class GameScene extends Phaser.Scene {
   private idleHint(time: number): void {
     if (this.remote || this.frame % 60 !== 0 || time - this.lastHint < 90000) return;
     const p = this.player();
-    if (Object.values(p.quests).some((q) => q.state !== 'turned')) { this.lastHint = time; return; }
+    if (Object.values(p.quests).some((q) => q.state !== 'turned')) {
+      // Aufgabe läuft, aber lange nichts getan: den nächsten Schritt wiederholen
+      this.lastHint = time;
+      const idle = time - this.lastActivity > 60000;
+      if (idle && this.step) this.ui.say(`Nächster Schritt: ${this.step.text}`);
+      return;
+    }
     const next = QUESTS.find((q) => !p.quests[q.id] && questAvailable(p, q));
     this.lastHint = time;
     if (!next) return;
@@ -678,7 +688,16 @@ export class GameScene extends Phaser.Scene {
       if (time - this.lastSavedHint > 30000) {
         this.lastSavedHint = time;
         this.ui.savedHint();
+        const st = safeStorage();
+        if (st && !this.remote && !st.getItem('aschenthron.tip.save')) {
+          st.setItem('aschenthron.tip.save', '1');
+          this.ui.say('Das Spiel speichert von selbst. Mit F5 legst du einen eigenen Stand ab, mit F9 lädst du ihn wieder.');
+        }
       }
+    }
+    {
+      const me = this.player();
+      if (me && (me.path.length > 0 || me.targetId !== null)) this.lastActivity = time;
     }
     if (settings().autoPickup && time - this.lastAutoPick > 250) {
       this.lastAutoPick = time;
@@ -975,7 +994,11 @@ export class GameScene extends Phaser.Scene {
             this.sfx.pickup();
           }
           break;
-        case 'tooHeavy': say(`Zu schwer: ${e.item.name}`); break;
+        case 'tooHeavy': {
+          const me = this.player();
+          say(`Zu schwer: ${e.item.name} (Tragkraft ${carriedWeight(me).toFixed(1)} / ${carryCapacity(me)}). Verkaufe oder lagere etwas ein, oder steigere Kraft.`);
+          break;
+        }
         case 'cannotEquip': say(`${e.item.name}: ${e.reason}`); break;
         case 'xp': {
           const pos = this.bodyPos(this.player());
@@ -1069,7 +1092,8 @@ export class GameScene extends Phaser.Scene {
         }
         case 'deathPenalty':
           this.achBump('deaths');
-          say(`Du bist gestorben: −${e.xpLost} XP, ${e.dropped.length} Item(s) liegen an der Todesstelle (5 Min.).`);
+          say(`Du bist gestorben: −${e.xpLost} XP. ${e.dropped.length ? `${e.dropped.length} Gegenstand/Gegenstände aus dem Rucksack liegen an der Todesstelle – hol sie innerhalb von 5 Minuten zurück. ` : ''}Angelegte Ausrüstung bleibt immer erhalten.`);
+          if (this.achv.stats.deaths <= 1) say('Tipp: Du erwachst in der Stadt. Rasten (R) und Tränke (Q/E) retten dich im Kampf; fliehen ist keine Schande.');
           this.sfx.death();
           this.cameras.main.shake(300, 0.008);
           this.cameras.main.flash(500, 120, 0, 0);

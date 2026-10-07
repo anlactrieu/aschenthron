@@ -183,6 +183,8 @@ const CSS = `
 .a-slot.ok{box-shadow:inset 0 0 0 2px #5fd070,0 0 8px #5fd070}
 .a-slot.bad{box-shadow:inset 0 0 0 2px #d04a3a}
 .a-drop.ok{outline:2px dashed #5fd070;outline-offset:-3px;background:rgba(95,208,112,.08)}
+.pulse{animation:xpPulse 1.4s ease-in-out infinite}
+@keyframes xpPulse{0%,100%{box-shadow:0 0 0 0 rgba(216,162,74,0)}50%{box-shadow:0 0 10px 3px rgba(216,162,74,.85)}}
 .a-btn{background:linear-gradient(180deg,#4a3c2e,#2e251e);color:#f0e0c0;border:1px solid #8a7258;padding:3px 9px;cursor:pointer;font:12px Georgia,serif;border-radius:2px}
 .a-btn:hover{background:linear-gradient(180deg,#6a5640,#3e3226);color:#fff}
 .a-btn:disabled,.a-btn.off{opacity:.45;cursor:default}
@@ -455,7 +457,12 @@ export class Ui {
     const into = Math.max(0, p.xp - totalXpFor(p.level));
     const frac = p.level >= MAX_LEVEL ? 1 : Math.min(1, into / Math.max(1, span));
     this.xpFill.style.width = `${frac * 100}%`;
-    this.xpText.textContent = `Stufe ${p.level} · ${p.level >= MAX_LEVEL ? 'Maximum' : `${into} / ${span} XP`} · ${p.gold} Gold${p.statPoints ? ` · ${p.statPoints} Attributpunkte (C)` : ''}${p.skillPoints ? ` · ${p.skillPoints} Skillpunkte` : ''}`;
+    // offene Punkte: Leiste pulsiert, damit Neulinge sie nicht übersehen
+    this.xpBar.classList.toggle('pulse', p.statPoints > 0 || p.skillPoints > 0);
+    const load = carriedWeight(p) / Math.max(1, carryCapacity(p));
+    const heavy = load >= 0.9;
+    this.xpText.textContent = `Stufe ${p.level} · ${p.level >= MAX_LEVEL ? 'Maximum' : `${into} / ${span} XP`} · ${p.gold} Gold${p.statPoints ? ` · ${p.statPoints} Attributpunkte (C)` : ''}${p.skillPoints ? ` · ${p.skillPoints} Skillpunkte (K)` : ''}${heavy ? ` · Last ${carriedWeight(p).toFixed(0)}/${carryCapacity(p)}` : ''}`;
+    this.xpText.style.color = heavy ? '#ffb0a0' : '#fff';
 
     // Schnellleiste: Tränke (Q/E) und Skills (1–9); Elemente bleiben bestehen, nur Zustand wird aktualisiert
     const act = activeSkills(p);
@@ -1030,6 +1037,15 @@ export class Ui {
       mr.append(sv, ld);
       body.append(mr);
     }
+    body.append(el('div', 'a-sec', 'Tipps für den Anfang'));
+    for (const t of [
+      'Klick auf den Boden: laufen. Klick auf einen Gegner: angreifen. Pfeiltasten laufen auch.',
+      'Oben rechts steht dein nächster Schritt; „Hinlaufen“ führt dich dorthin.',
+      `C: Attribute verteilen · K: Fertigkeiten lernen · ${keyLabel(keyOf('heal'))}/${keyLabel(keyOf('mana'))}: Tränke · ${keyLabel(keyOf('rest'))}: rasten · 1–9: Fertigkeiten.`,
+      'Gegenstände im Rucksack: Doppelklick legt an oder benutzt, Ziehen verschiebt. Ein grünes ▲ zeigt eine Verbesserung.',
+      'Stirbst du, erwachst du in der Stadt; Rucksack-Beute liegt 5 Minuten an der Todesstelle, Angelegtes bleibt.',
+      'Ist der Rucksack zu schwer: verkaufen, einlagern (Lager-Truhe) oder Kraft steigern.',
+    ]) body.append(el('div', 'a-note', `• ${t}`));
     body.append(el('div', 'a-sec', 'Anzeige und Ton'));
     const row = (label: string, ctl: HTMLElement): void => {
       const r = el('div', 'a-row');
