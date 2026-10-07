@@ -12,9 +12,10 @@ import { isWalkable } from '../sim/path';
 import { toScreen, toTile } from './iso';
 import { DOOR_ICONS, TOWN_GID, WATER_PROP_GIDS, registerTownArt } from './town';
 import { Ui, describeItem, isUpgrade } from './ui';
+import type { Item } from '../sim/items';
 import type { Mood } from './music';
 import { AchievementTracker, type Stats } from './achievements';
-import { skillCursor } from './icons';
+import { itemIcon, skillCursor } from './icons';
 import { Sfx } from './audio';
 import { Minimap } from './minimap';
 import { Atmosphere, isDungeon } from './atmosphere';
@@ -1222,6 +1223,23 @@ export class GameScene extends Phaser.Scene {
     return avail ? '!' : '';
   }
 
+  /** Tränke und Edelsteine liegen mit ihrem eigenen Symbol am Boden (bis es geladen ist: Standard-Beutesymbol). */
+  private useItemTexture(img: Phaser.GameObjects.Image, it: Item): void {
+    if (it.slot !== 'potion' && it.slot !== 'gem') return;
+    const key = `lootitem_${it.templateId}`;
+    const apply = () => img.setTexture(key).setDisplaySize(30, 30);
+    if (this.textures.exists(key)) {
+      apply();
+      return;
+    }
+    const im = new Image();
+    im.onload = () => {
+      if (!this.textures.exists(key)) this.textures.addImage(key, im);
+      if (img.scene) apply();
+    };
+    im.src = itemIcon(it);
+  }
+
   private updateLoot(time: number, g: Phaser.GameObjects.Graphics): void {
     const live = new Set<number>();
     const p = this.player();
@@ -1234,6 +1252,7 @@ export class GameScene extends Phaser.Scene {
       if (!img) {
         img = this.add.image(sx, sy, `loot_${gi.item.rarity}`).setOrigin(0.5, 0.7);
         this.lootViews.set(gi.id, img);
+        this.useItemTexture(img, gi.item);
         this.lootBorn.set(gi.id, { t: time, dx: ((gi.id * 37) % 25) - 12 });
       }
       const born = this.lootBorn.get(gi.id)!;
