@@ -264,6 +264,8 @@ export class Ui {
   private dollUrl = '';
   private dollWidth = 104;
   private showSaveIo = false;
+  /** Laufende Tastenabfrage im Einstellungsfenster (wird beim Start einer neuen beendet) */
+  private cancelCapture: (() => void) | null = null;
   private bagFilter: BagFilter = 'all';
   private bagSort: BagSort = 'none';
 
@@ -313,6 +315,10 @@ export class Ui {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const a = actionFor(e.key);
       if (!a) return;
+      if (e.repeat && (a === 'quicksave' || a === 'quickload')) {
+        e.preventDefault();
+        return;
+      }
       if (a === 'inv') this.toggleTab('inv');
       else if (a === 'char') this.toggleTab('char');
       else if (a === 'skills') this.toggleTab('skills');
@@ -1058,12 +1064,16 @@ export class Ui {
       const b = el('button', 'a-btn', keyLabel(keyOf(a.id))) as HTMLButtonElement;
       b.style.minWidth = '64px';
       b.onclick = () => {
+        this.cancelCapture?.();
         b.textContent = 'Taste drücken …';
         setCapturing(true);
         const done = (e: KeyboardEvent): void => {
           e.preventDefault();
-          e.stopPropagation();
+          e.stopImmediatePropagation();
+          // reine Umschalttasten ignorieren und weiter auf die eigentliche Taste warten
+          if (['shift', 'control', 'alt', 'altgraph', 'meta', 'capslock', 'dead', 'os', 'fn'].includes(e.key.toLowerCase())) return;
           window.removeEventListener('keydown', done, true);
+          this.cancelCapture = null;
           setCapturing(false);
           if (e.key !== 'Escape') {
             const err = rebind(a.id, e.key);
@@ -1072,6 +1082,11 @@ export class Ui {
           this.key = '';
         };
         window.addEventListener('keydown', done, true);
+        this.cancelCapture = () => {
+          window.removeEventListener('keydown', done, true);
+          this.cancelCapture = null;
+          setCapturing(false);
+        };
       };
       r.append(el('span', '', a.label), b);
       grid.append(r);

@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, renameSync, copyFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer, type WebSocket, type RawData } from 'ws';
 import { buildWorld, type TiledMap } from '../src/sim/tiled';
@@ -46,9 +46,22 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   const map = JSON.parse(readFileSync(mapPath, 'utf8')) as TiledMap;
   const { world: w } = buildWorld(opts.seed ?? (Date.now() >>> 0), map, { player: false });
   w.pvp = opts.pvp ?? true;
-  const saves = new Map<string, string>(
-    opts.savePath && existsSync(opts.savePath) ? Object.entries(JSON.parse(readFileSync(opts.savePath, 'utf8')) as Record<string, string>) : [],
-  );
+  const loadSaves = (): [string, string][] => {
+    if (!opts.savePath || !existsSync(opts.savePath)) return [];
+    try {
+      const o = JSON.parse(readFileSync(opts.savePath, 'utf8')) as unknown;
+      if (!o || typeof o !== 'object') throw new Error('kein Objekt');
+      return Object.entries(o as Record<string, unknown>).filter((e): e is [string, string] => typeof e[1] === 'string');
+    } catch (e) {
+      // beschädigte Datei nicht überschreiben: Kopie anlegen, mit leerem Stand starten
+      console.error('Speicherdatei unlesbar, Kopie als .defekt angelegt:', (e as Error).message);
+      try {
+        copyFileSync(opts.savePath, `${opts.savePath}.defekt`);
+      } catch { /* Kopie nicht möglich */ }
+      return [];
+    }
+  };
+  const saves = new Map<string, string>(loadSaves());
   const clients = new Map<WebSocket, Client>();
   /** Getrennte Spieler, die nach einem Kampf noch kurz in der Welt bleiben: Name → Akteur und Ablauf-Tick */
   const lingering = new Map<string, { actorId: number; until: number }>();
@@ -62,19 +75,39 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     return JSON.stringify(d);
   };
 
-  const writeSaves = (): void => {
-    if (!opts.savePath || closed) return;
+  /** Obergrenze für gespeicherte Namen, damit wechselnde Namen die Datei nicht unbegrenzt wachsen lassen. */
+  const MAX_SAVES = 2000;
+  const putSave = (name: string, json: string): void => {
+    if (!saves.has(name) && saves.size >= MAX_SAVES) return;
+    saves.set(name, json);
+  };
+
+  /** Atomar schreiben (Temp-Datei + Umbenennen), damit ein Absturz mitten im Schreiben nie alle Stände zerstört. */
+  const flushSaves = (): void => {
+    if (!opts.savePath) return;
     try {
-      writeFileSync(opts.savePath, JSON.stringify(Object.fromEntries(saves)));
+      const tmp = `${opts.savePath}.tmp`;
+      writeFileSync(tmp, JSON.stringify(Object.fromEntries(saves)));
+      renameSync(tmp, opts.savePath);
     } catch (e) {
       console.error('Speichern fehlgeschlagen:', (e as Error).message);
     }
+  };
+  /** Schreiben bündeln: viele Beitritte/Austritte hintereinander ergeben nur einen Schreibvorgang (blockiert sonst den Tick). */
+  let writeTimer: ReturnType<typeof setTimeout> | null = null;
+  const writeSaves = (): void => {
+    if (!opts.savePath || closed || writeTimer) return;
+    writeTimer = setTimeout(() => {
+      writeTimer = null;
+      flushSaves();
+    }, 1000);
+    writeTimer.unref?.();
   };
 
   const persist = (): void => {
     for (const c of clients.values()) {
       const a = getActor(w, c.actorId);
-      if (a) saves.set(c.name, snapshotSave(a));
+      if (a) putSave(c.name, snapshotSave(a));
     }
     writeSaves();
   };
@@ -90,7 +123,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   /** Akteur endgültig aus der Welt nehmen und speichern. */
   const finalize = (name: string, actorId: number): void => {
     const a = getActor(w, actorId);
-    if (a) saves.set(name, snapshotSave(a));
+    if (a) putSave(name, snapshotSave(a));
     removePlayer(w, actorId);
     writeSaves();
   };
@@ -108,13 +141,13 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       lingering.set(c.name.toLowerCase(), { actorId: c.actorId, until: w.tick + linger * TICK_RATE });
       a.path = [];
       a.targetId = null;
-      saves.set(c.name, snapshotSave(a));
+      putSave(c.name, snapshotSave(a));
       writeSaves();
     } else finalize(c.name, c.actorId);
   };
 
   /** Rangliste: gespeicherte und aktive Spieler, nach XP absteigend (die ersten 10). */
-  const leaderboard = (): { name: string; level: number; xp: number }[] => {
+  const buildLeaderboard = (): { name: string; level: number; xp: number }[] => {
     const rows = new Map<string, { name: string; level: number; xp: number }>();
     for (const [name, json] of saves) {
       try {
@@ -128,6 +161,13 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     }
     return [...rows.values()].sort((x, y) => y.xp - x.xp).slice(0, 10);
   };
+  /** Rangliste höchstens alle 2 s neu berechnen (sonst parst jede Anfrage alle Spielstände). */
+  let boardCache: { at: number; rows: ReturnType<typeof buildLeaderboard> } | null = null;
+  const leaderboard = (): ReturnType<typeof buildLeaderboard> => {
+    const now = Date.now();
+    if (!boardCache || now - boardCache.at > 2000) boardCache = { at: now, rows: buildLeaderboard() };
+    return boardCache.rows;
+  };
 
   const send = (ws: WebSocket, msg: unknown): void => {
     if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg));
@@ -140,7 +180,10 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     ws.on('message', (data: RawData) => {
       let msg: { t?: string; name?: unknown; c?: unknown };
       try {
-        msg = JSON.parse(data.toString()) as typeof msg;
+        const parsed = JSON.parse(data.toString()) as unknown;
+        // `null`, Zahlen, Texte oder Listen sind keine gültige Nachricht (sonst wirft der Zugriff auf msg.t und beendet den Server)
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+        msg = parsed as typeof msg;
       } catch {
         return;
       }
@@ -234,10 +277,12 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       persist();
       for (const [key, g] of lingering) {
         const a = getActor(w, g.actorId);
-        if (a) saves.set(a.name, snapshotSave(a));
+        if (a) putSave(a.name, snapshotSave(a));
         lingering.delete(key);
       }
-      writeSaves();
+      if (writeTimer) clearTimeout(writeTimer);
+      writeTimer = null;
+      flushSaves();
       closed = true;
       for (const ws of clients.keys()) ws.close();
       await new Promise<void>((res) => wss.close(() => res()));

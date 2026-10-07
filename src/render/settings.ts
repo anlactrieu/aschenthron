@@ -20,7 +20,7 @@ export const ACTIONS: { id: Action; label: string; def: string }[] = [
 ];
 
 /** Feste Tasten, die nicht belegbar sind (Menü schließen, Ton, Karte, Laufen) */
-const RESERVED = new Set(['escape', 'm', 'u', 'n', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'enter', 'tab']);
+const RESERVED = new Set(['escape', 'm', 'u', 'n', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'enter', 'tab', 'shift', 'control', 'alt', 'altgraph', 'meta', 'capslock', 'dead', 'os', 'contextmenu', 'fn']);
 
 export interface Settings {
   /** Lautstärke 0–1 */

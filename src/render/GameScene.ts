@@ -29,8 +29,8 @@ import {
 const SAVE_BASE = 'aschenthron.save.v1';
 const SLOT_KEY = 'aschenthron.slot';
 const SLOTS = 3;
-/** Aktiver Speicherplatz (1–3); Platz 1 nutzt den bisherigen Schlüssel, damit alte Spielstände erhalten bleiben. */
-function activeSlot(): number {
+/** Gespeicherter Speicherplatz (1–3); Platz 1 nutzt den bisherigen Schlüssel, damit alte Spielstände erhalten bleiben. */
+function storedSlot(): number {
   try {
     const n = Number(window.localStorage.getItem(SLOT_KEY));
     return n >= 1 && n <= SLOTS ? n : 1;
@@ -38,8 +38,11 @@ function activeSlot(): number {
     return 1;
   }
 }
+/** Der Platz wird beim Laden des Tabs einmal festgehalten: ein Wechsel in einem anderen Tab darf den Autosave hier nicht umleiten. */
+const sessionSlot = storedSlot();
+const activeSlot = (): number => sessionSlot;
 const slotKey = (n: number): string => (n === 1 ? SAVE_BASE : `${SAVE_BASE}.s${n}`);
-const saveKey = (): string => slotKey(activeSlot());
+const saveKey = (): string => slotKey(sessionSlot);
 const VIEW = 30;
 /** Kamera-Zoom: Standard etwas weiter draußen als 1, per Mausrad zwischen ZOOM_MIN und ZOOM_MAX */
 const ZOOM_DEFAULT = 0.75;
@@ -241,8 +244,13 @@ export class GameScene extends Phaser.Scene {
   /** Tränke, Edelsteine und Pfeile in Reichweite automatisch aufheben (Ausrüstung bleibt liegen). */
   private autoPickup(time: number): void {
     const p = this.player();
-    if (!p?.alive || p.pickupId !== null) return;
-    for (const [id, at] of this.autoTried) if (time - at > 6000) this.autoTried.delete(id);
+    // nur im Leerlauf: sonst bricht das Aufheben einen Angriff oder Weg ab
+    if (!p?.alive || p.pickupId !== null || p.targetId !== null || p.path.length > 0) return;
+    // Versuche merken, solange die Beute in der Nähe liegt (kein Dauerversuch bei vollem Rucksack oder Übergewicht)
+    for (const id of [...this.autoTried.keys()]) {
+      const g = this.world.ground.find((x) => x.id === id);
+      if (!g || Math.hypot(g.x - p.x, g.y - p.y) > 4) this.autoTried.delete(id);
+    }
     for (const g of this.world.ground) {
       if (Math.hypot(g.x - p.x, g.y - p.y) > 1.6 || this.autoTried.has(g.id)) continue;
       const it = g.item;
@@ -313,8 +321,7 @@ export class GameScene extends Phaser.Scene {
   /** Spielstand aus Datei/Code übernehmen: prüfen, alten Stand als Sicherung behalten, neu laden. */
   private importSave(json: string): boolean {
     try {
-      const o = JSON.parse(json) as { player?: unknown };
-      if (!o || typeof o !== 'object' || !o.player || typeof o.player !== 'object') return false;
+      if (!this.validSave(json)) return false;
     } catch {
       return false;
     }
@@ -322,7 +329,7 @@ export class GameScene extends Phaser.Scene {
     if (!store) return false;
     try {
       const old = store.getItem(saveKey());
-      if (old) store.setItem(`${saveKey()}.backup`, old);
+      if (old && this.validSave(old)) store.setItem(`${saveKey()}.backup`, old);
       store.setItem(saveKey(), json);
     } catch {
       return false;
@@ -330,6 +337,16 @@ export class GameScene extends Phaser.Scene {
     this.resetting = true;
     location.reload();
     return true;
+  }
+
+  /** Grobe Prüfung eines Spielstands vor dem Überschreiben: Version, Spielerobjekt, Stufe. */
+  private validSave(json: string): boolean {
+    try {
+      const o = JSON.parse(json) as { v?: unknown; player?: { level?: unknown; inventory?: unknown } };
+      return !!o && typeof o === 'object' && o.v === 1 && !!o.player && typeof o.player === 'object' && typeof o.player.level === 'number' && (o.player.inventory === undefined || Array.isArray(o.player.inventory));
+    } catch {
+      return false;
+    }
   }
 
   private save(): void {
@@ -349,10 +366,14 @@ export class GameScene extends Phaser.Scene {
   private manualSave(): void {
     if (this.remote) return;
     const store = safeStorage();
+    if (!store) {
+      this.ui.say('Speichern nicht möglich (Browser-Speicher gesperrt).');
+      return;
+    }
     try {
       const json = exportPlayer(this.player());
-      store?.setItem(this.manualKey(), JSON.stringify({ at: Date.now(), json }));
-      store?.setItem(saveKey(), json);
+      store.setItem(this.manualKey(), JSON.stringify({ at: Date.now(), json }));
+      store.setItem(saveKey(), json);
       this.ui.savedHint('Spielstand gespeichert');
     } catch {
       this.ui.say('Speichern nicht möglich (Browser-Speicher voll oder gesperrt).');
@@ -385,6 +406,10 @@ export class GameScene extends Phaser.Scene {
     const m = this.manualRead();
     const store = safeStorage();
     if (!m || !store) return;
+    if (!this.validSave(m.json)) {
+      this.ui.say('Der gespeicherte Stand ist beschädigt und kann nicht geladen werden.');
+      return;
+    }
     try {
       store.setItem(saveKey(), m.json);
     } catch {
@@ -1711,6 +1736,20 @@ export class GameScene extends Phaser.Scene {
       }
     }
     for (const [id, v] of this.actorViews) if (!active.has(id)) v.img.setVisible(false);
+    // Figuren, die es in der Welt nicht mehr gibt (entfernte Beschwörungen, gegangene Spieler): Bild und Zwischenspeicher freigeben
+    if (this.frame % 120 === 0) {
+      const present = new Set(this.world.actors.map((x) => x.id));
+      for (const [id, v] of this.actorViews) {
+        if (present.has(id)) continue;
+        v.img.destroy();
+        this.actorViews.delete(id);
+        this.prevPos.delete(id);
+        this.interp.delete(id);
+        this.disp.delete(id);
+        this.kicks.delete(id);
+        this.flash.delete(id);
+      }
+    }
     this.cleanLabels(seen, ['a']);
   }
 
