@@ -1,5 +1,13 @@
 # HANDOFF – Aschenthron
 
+## Sitzungsstand (Zauber-Auswahl; uncommittet, tsc + 272 Tests grün, Optik nicht im Browser gesehen)
+- Letzter Commit/Push: 40de62a (Lebendige Welt, Zauber-Hinlaufen, Minimap B, Lagerhaus). Danach nur diese zwei Änderungen:
+- **Mauszeiger nur Motiv:** `skillCursor()` in `icons.ts` macht den vom Rand zusammenhängenden dunklen Kachelhintergrund (Helligkeit < 60) durchsichtig; 32 px, Hotspot 16/16 (`setArmed` in `GameScene.ts`).
+- **Auswahl-Logik** (`GameScene.ts`): Pfeiltasten-Laufen hebt die Auswahl nicht mehr auf; der nächste Klick (Monster, Boden, NPC, Truhe, Beute) beendet sie, Monsterklick wirkt zuerst (`onClick`: `setArmed(null)` dann `castAt`); Rechtsklick/Esc brechen ab.
+- **Entscheidungen (letzte 3):** (1) Hintergrund per Flood-Fill vom Rand statt Farbschlüssel, damit dunkle Motivpixel im Inneren bleiben. (2) Klick auf Nicht-Monster entwählt UND führt die normale Klickaktion aus (Laufen etc.), statt nur abzuwählen. (3) Ein Zauber-Klick auf Monster wählt danach ab (früher: blieb gewählt).
+- **Offen:** Cursor im Spiel prüfen (Schwelle 60 evtl. zu hoch/niedrig bei dunklen Zaubern); committen.
+- **Learnings:** `javascript_tool`-Import von `/src/render/icons.ts` im Preview hängt (Timeout) – Optik besser per echtem Zauber-Klick prüfen.
+
 ## Sitzungsstand (alles uncommittet; tsc + 272 Tests grün, nichts im Browser abgenommen)
 - **Zauber anwählen + hinlaufen** (`GameScene.ts`: `castAt`, `pendingCastStep`, `setArmed`/`armedCursor`, `updateHover`): Ziffer wählt Zauber, Cursor = Skill-Icon, Klick auf Monster zaubert oder läuft erst hin; Zauber bleibt gewählt, Esc/Rechtsklick bricht ab.
 - **Minimap** (`minimap.ts`): Deckkraft 0,7; Taste **B** wechselt Größe 100/70/45 % (localStorage `aschenthron.minimapSize`). M ist Ton, daher B.

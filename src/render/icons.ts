@@ -400,3 +400,40 @@ export function statusIcon(id: StatusId | 'poison'): string {
   statusCache.set(id, url);
   return url;
 }
+
+const cursorCache = new Map<string, string>();
+
+/** Mauszeiger-Bild eines Zaubers: nur das Motiv, ohne dunklen Kachelhintergrund (der vom Rand her zusammenhängende dunkle Bereich wird durchsichtig). */
+export function skillCursor(s: SkillDef): string {
+  const hit = cursorCache.get(s.id);
+  if (hit) return hit;
+  const img = SKILL_SPRITES[s.id] ? sprite(SKILL_SPRITES[s.id]!) : null;
+  if (!img) return skillIcon(s);
+  const n = 32;
+  const c = document.createElement('canvas');
+  c.width = c.height = n;
+  const x = c.getContext('2d')!;
+  x.imageSmoothingEnabled = false;
+  x.drawImage(img, 0, 0, n, n);
+  const im = x.getImageData(0, 0, n, n);
+  const d = im.data;
+  const bg = (i: number) => d[i + 3]! < 16 || (d[i]! + d[i + 1]! + d[i + 2]!) / 3 < 60;
+  const seen = new Uint8Array(n * n);
+  const stack: number[] = [];
+  for (let k = 0; k < n; k++) stack.push(k, (n - 1) * n + k, k * n, k * n + n - 1);
+  while (stack.length) {
+    const q = stack.pop()!;
+    if (seen[q] || !bg(q * 4)) continue;
+    seen[q] = 1;
+    d[q * 4 + 3] = 0;
+    const px = q % n;
+    if (px > 0) stack.push(q - 1);
+    if (px < n - 1) stack.push(q + 1);
+    if (q >= n) stack.push(q - n);
+    if (q < n * n - n) stack.push(q + n);
+  }
+  x.putImageData(im, 0, 0);
+  const url = c.toDataURL();
+  cursorCache.set(s.id, url);
+  return url;
+}

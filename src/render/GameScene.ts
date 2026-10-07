@@ -12,7 +12,7 @@ import { isWalkable } from '../sim/path';
 import { toScreen, toTile } from './iso';
 import { DOOR_ICONS, TOWN_GID, WATER_PROP_GIDS, registerTownArt } from './town';
 import { Ui, describeItem } from './ui';
-import { skillIcon } from './icons';
+import { skillCursor } from './icons';
 import { Sfx } from './audio';
 import { Minimap } from './minimap';
 import { Atmosphere, isDungeon } from './atmosphere';
@@ -230,7 +230,6 @@ export class GameScene extends Phaser.Scene {
         const y = oy + ty * k;
         if (isWalkable(w.grid, x, y)) {
           this.arrowActive = true;
-          this.setArmed(null);
           this.send({ type: 'moveTo', x, y });
           return;
         }
@@ -312,7 +311,7 @@ export class GameScene extends Phaser.Scene {
     this.ui.setArmed(id);
     const sk = id ? SKILLS.find((x) => x.id === id) : undefined;
     // Mauszeiger wird zum Zauber-Symbol (Mitte = Klickpunkt)
-    this.armedCursor = sk ? `url(${skillIcon(sk)}) 24 24, crosshair` : '';
+    this.armedCursor = sk ? `url(${skillCursor(sk)}) 16 16, crosshair` : '';
     this.cursor = '\0';
   }
 
@@ -359,7 +358,7 @@ export class GameScene extends Phaser.Scene {
     return best;
   }
 
-  /** Zauber auf Ziel: in Reichweite sofort wirken, sonst hinlaufen und danach wirken (Zauber bleibt gewählt). */
+  /** Zauber auf Ziel: in Reichweite sofort wirken, sonst hinlaufen und danach wirken (Auswahl endet nach dem Klick). */
   private castAt(skillId: string, target: Actor): void {
     const sk = SKILLS.find((x) => x.id === skillId)!;
     const p = this.player();
@@ -399,8 +398,9 @@ export class GameScene extends Phaser.Scene {
     const hit = this.pick(ptr.worldX, ptr.worldY);
     if (this.armedSkill) {
       if (ptr.rightButtonDown()) return this.setArmed(null);
-      if (hit?.actor) return this.castAt(this.armedSkill, hit.actor);
-      this.pendingCast = null;
+      const id = this.armedSkill;
+      this.setArmed(null);                                    // Auswahl endet mit dem nächsten Klick, egal worauf
+      if (hit?.actor) return this.castAt(id, hit.actor);
     }
     if (hit?.npc) {
       this.ui.toggle(true);
