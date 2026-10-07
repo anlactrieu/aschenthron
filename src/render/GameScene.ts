@@ -12,6 +12,7 @@ import { isWalkable } from '../sim/path';
 import { toScreen, toTile } from './iso';
 import { DOOR_ICONS, TOWN_GID, WATER_PROP_GIDS, registerTownArt } from './town';
 import { Ui, describeItem, isUpgrade } from './ui';
+import type { Mood } from './music';
 import { AchievementTracker, type Stats } from './achievements';
 import { skillCursor } from './icons';
 import { Sfx } from './audio';
@@ -83,6 +84,7 @@ export class GameScene extends Phaser.Scene {
   private chestViews = new Map<number, Phaser.GameObjects.Image>();
   private flash = new Map<number, number>();
   private acc = 0;
+  private zoneMood: Mood = 'town';
   private achv = new AchievementTracker();
   /** Hit-Stop: so viele ms bleibt die Simulation stehen (nur Einzelspieler), gibt Treffern Wucht */
   private hitStop = 0;
@@ -964,7 +966,15 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** Bossmusik, solange ein lebender Boss in der Nähe auf den Spieler zielt; sonst Stimmung der Zone. */
+  private applyMusic(): void {
+    const p = this.player();
+    const boss = this.world.actors.some((a) => a.kind === 'monster' && a.boss && a.alive && a.targetId === p.id && Math.hypot(a.x - p.x, a.y - p.y) < 14);
+    this.sfx.setMood(boss ? 'boss' : this.zoneMood);
+  }
+
   private updateRegion(p: Actor): void {
+    if (this.frame % 30 === 0) this.applyMusic();
     // Dungeons liegen innerhalb der Landkarte; kleinste passende Zone gewinnt
     const hit = regionAt(this.world, p.x, p.y);
     const name = hit?.name ?? '';
@@ -976,6 +986,8 @@ export class GameScene extends Phaser.Scene {
         : 'radial-gradient(ellipse at center,rgba(0,0,0,0) 58%,rgba(0,0,0,.45) 100%)';
       this.atmo.setRegion(name);
       const ash = name === 'Aschenöde' || name === 'Aschengrund' || name === 'Thron der Asche';
+      this.zoneMood = ash ? 'ash' : dungeon ? (name.includes('Moorhexe') || name === 'Katakomben' ? 'moor' : 'dungeon') : name === 'Aschenhafen' || name === 'Felsenwacht' ? 'town' : name === 'Moorlande' || name === 'Totenacker' ? 'moor' : 'field';
+      this.applyMusic();
       this.sfx.ambient(name === 'Moorlande' || name === 'Gruft der Moorhexe' ? 'wind' : ash ? 'embers' : dungeon ? 'cave' : null);
       if (hit) this.ui.banner(`${hit.name}${hit.levels && hit.levels !== 'Stadt' ? ` · Stufe ${hit.levels}` : ''}`);
     }

@@ -51,3 +51,4 @@
 - `player/hand_right/` (30): axe, axe_executioner_new, battleaxe, bow, bow_2, bow_3, bow_blue, club, dagger_new, dagger_slant_new, falchion_new, great_axe, great_bow, great_sword, hammer_2_new, hammer_new, hand_axe_new, heavy_sword, knife, long_sword, sabre, short_sword, staff_evil, staff_mage, staff_plain, staff_ring_blue, staff_ruby, staff_skull, sword_black, sword_thief
 - `player/head/` (6): cap_black_1, fhelm_horn_2, full_black, helm_plume, iron_1, iron_2
 - `player/legs/` (6): leg_armor_1, leg_armor_3, leg_armor_5, metal_gray, pants_black, pants_brown
+- Musik: generativ per WebAudio (src/render/music.ts), keine Dateien, keine Lizenz. Taste U = Musik an/aus, M = alles stumm.

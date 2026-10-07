@@ -1,3 +1,5 @@
+import { Music, type Mood } from './music';
+
 /**
  * Synthetische Soundeffekte (WebAudio, keine Dateien). Der AudioContext startet erst nach der
  * ersten Eingabe (Browser-Regel). M schaltet stumm.
@@ -12,6 +14,9 @@ export class Sfx {
   private bedKind: 'wind' | 'embers' | 'cave' | null = null;
   private rainGain: GainNode | null = null;
   private rainLevel = 0;
+  private music: Music | null = null;
+  private mood: Mood | null = null;
+  private musicOn = true;
 
   constructor() {
     const start = () => this.ensure();
@@ -19,9 +24,11 @@ export class Sfx {
     window.addEventListener('keydown', (e) => {
       start();
       if (e.key.toLowerCase() === 'm') this.toggleMute();
+      if (e.key.toLowerCase() === 'u') this.toggleMusic();
     });
     try {
       this.muted = window.localStorage.getItem('aschenthron.muted') === '1';
+      this.musicOn = window.localStorage.getItem('aschenthron.music') !== '0';
     } catch {
       /* ohne Speicher: Standard */
     }
@@ -41,6 +48,23 @@ export class Sfx {
     }
   }
 
+  /** U schaltet nur die Musik um, M alles. */
+  toggleMusic(): void {
+    this.musicOn = !this.musicOn;
+    this.music?.setEnabled(this.musicOn);
+    try {
+      window.localStorage.setItem('aschenthron.music', this.musicOn ? '1' : '0');
+    } catch {
+      /* egal */
+    }
+  }
+
+  /** Stimmung der Hintergrundmusik (null: keine). */
+  setMood(m: Mood | null): void {
+    this.mood = m;
+    this.music?.setMood(m);
+  }
+
   private ensure(): void {
     if (this.ctx) {
       if (this.ctx.state === 'suspended') void this.ctx.resume();
@@ -57,6 +81,9 @@ export class Sfx {
     const d = this.noiseBuf.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     this.startBed();
+    this.music = new Music(this.ctx, this.master, this.noiseBuf);
+    this.music.setEnabled(this.musicOn);
+    this.music.setMood(this.mood);
   }
 
   /** Dauerhafter Zonenton: gefiltertes Rauschen plus tiefer Brummton, Pegel und Klangfarbe folgen der Zone. */
