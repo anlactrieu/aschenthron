@@ -6,6 +6,8 @@ export const ATTR_NAME: Record<AttrKey, string> = {
 
 /** Attribut-Schwellen: ab diesem Wert gibt es einen festen Bonus (Prozent) */
 export const ATTR_THRESHOLD = 30;
+/** Zweite Schwelle: der Bonus gilt dann doppelt */
+export const ATTR_THRESHOLD_2 = 50;
 export const ATTR_THRESHOLD_BONUS: Record<AttrKey, { pct: number; text: string }> = {
   kraft: { pct: 5, text: 'Nahkampfschaden' },
   gewandtheit: { pct: 5, text: 'Angriffstempo' },
@@ -32,12 +34,23 @@ export const STAT_POINTS_PER_LEVEL = 5;
 export const SKILL_POINTS_START = 2;
 export const SKILL_POINTS_PER_LEVEL = 1;
 export const MAX_SKILL_RANK = 5;
+/** Meilensteine: zusätzliche Punkte beim Erreichen dieser Stufen (zählen beim Neuverteilen mit) */
+export const LEVEL_MILESTONES: Record<number, { stat: number; skill: number }> = {
+  10: { stat: 3, skill: 1 }, 15: { stat: 3, skill: 0 }, 20: { stat: 5, skill: 1 }, 25: { stat: 5, skill: 1 }, 30: { stat: 10, skill: 1 },
+};
+/** Summe der Meilenstein-Punkte bis einschließlich `level` */
+export function milestonePoints(level: number): { stat: number; skill: number } {
+  let stat = 0;
+  let skill = 0;
+  for (const [l, m] of Object.entries(LEVEL_MILESTONES)) if (Number(l) <= level) { stat += m.stat; skill += m.skill; }
+  return { stat, skill };
+}
 /** Rang-Wirkung: Schaden/Heilung +18 % je Rang, Mana +6 %, Abklingzeit −6 % */
 export const rankDamage = (rank: number): number => 1 + 0.18 * (rank - 1);
 export const rankMana = (rank: number): number => 1 + 0.06 * (rank - 1);
 export const rankCooldown = (rank: number): number => Math.max(0.6, 1 - 0.06 * (rank - 1));
 /** Stufe, ab der Rang `rank` möglich ist */
-export const rankLevelReq = (levelReq: number, rank: number): number => levelReq + (rank - 1) * 3;
+export const rankLevelReq = (levelReq: number, rank: number): number => Math.min(MAX_LEVEL, levelReq + (rank - 1) * 3);
 /** Goldkosten: Rang 1 = Lernpreis, danach halber Preis mal Rang */
 export const rankPrice = (price: number, rank: number): number => (rank <= 1 ? price : Math.round(price * 0.5 * rank));
 /** Umverteilen: teuer, aber möglich */

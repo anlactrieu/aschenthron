@@ -8,6 +8,7 @@ export interface Stats {
   chests: number;
   quests: number;
   level: number;
+  king: number;
 }
 
 export interface Achievement {
@@ -28,6 +29,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'k100', name: 'Erste Jagd', text: '100 Gegner erlegt', ...count('kills', 100) },
   { id: 'k1000', name: 'Schlächter von Aschental', text: '1.000 Gegner erlegt', ...count('kills', 1000) },
   { id: 'k5000', name: 'Geißel der Wildnis', text: '5.000 Gegner erlegt', ...count('kills', 5000) },
+  { id: 'king', name: 'Der Thron ist leer', text: 'Den Aschenkönig besiegt – das Ende der Herrschaft', ...count('king', 1) },
   { id: 'b1', name: 'Königsmörder', text: 'Ersten Boss besiegt', ...count('bosses', 1) },
   { id: 'b5', name: 'Bossjäger', text: '5 Bosse besiegt', ...count('bosses', 5) },
   { id: 'l10', name: 'Erprobt', text: 'Stufe 10 erreicht', ...count('level', 10) },
@@ -44,7 +46,7 @@ export const ACHIEVEMENTS: Achievement[] = [
 ];
 
 const KEY = 'aschenthron.ach.v1';
-const empty = (): Stats => ({ kills: 0, bosses: 0, deaths: 0, legendary: 0, rares: 0, chests: 0, quests: 0, level: 1 });
+const empty = (): Stats => ({ kills: 0, bosses: 0, deaths: 0, legendary: 0, rares: 0, chests: 0, quests: 0, level: 1, king: 0 });
 
 function store(): Storage | null {
   try { return window.localStorage; } catch { return null; }

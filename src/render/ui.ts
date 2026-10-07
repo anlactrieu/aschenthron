@@ -1,4 +1,4 @@
-import { SPECS, SPEC_LEVEL, NPC_ROLE, npcKeyOf, ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, STATUS_IDS, SCHOOL_NAME, schoolOf, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, uniqueDef, NPC_LORE, type QuestDef, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
+import { SPECS, SPEC_LEVEL, NPC_ROLE, npcKeyOf, ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_2, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, STATUS_IDS, SCHOOL_NAME, schoolOf, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, uniqueDef, NPC_LORE, type QuestDef, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
 import { POWER_TEXT, TEMPLATES, TIER_COLOR, GEM_COLOR, affixRange, gemAffix, gemName, handsOf, itemAffixes, itemReq, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
 import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
@@ -21,7 +21,9 @@ function affixText(a: { stat: keyof typeof STAT_NAME; value: number }): string {
   return `${a.value < 0 ? '−' : '+'}${Math.abs(a.value)} ${STAT_NAME[a.stat]}`;
 }
 
-const AFFIX_WEIGHT: Record<string, number> = { damage: 3, armor: 2, maxHp: 0.25, kraft: 2.5, maxMana: 0.2, haste: 4, crit: 5, regen: 6, accuracy: 0.8, evasion: 0.8, resFire: 0.8, resFrost: 0.8, resPoison: 0.8, spellFire: 2, spellFrost: 2, healPower: 1.5, manaCost: -1.5, ctrl: 1.5, move: 1.5, parry: 3 };
+const AFFIX_WEIGHT: Record<string, number> = { damage: 3, armor: 2, maxHp: 0.25, kraft: 2.5, maxMana: 0.2, haste: 4, procBurn: 1, procFrost: 1, crit: 5, regen: 6, accuracy: 0.8, evasion: 0.8, resFire: 0.8, resFrost: 0.8, resPoison: 0.8, spellFire: 2, spellFrost: 2, healPower: 1.5, manaCost: -1.5, ctrl: 1.5, move: 1.5, parry: 3 };
+
+const POWER_WEIGHT: Record<string, number> = { lifesteal: 3, crit: 1.5, thorns: 0.6, manaKill: 2, xpBonus: 1.2, goldBonus: 0.3, execute: 0.5, healKill: 1.5, burnHit: 1, frostHit: 0.8 };
 
 /** Grobe Gesamtwertung eines Ausrüstungsstücks (für den ▲-Hinweis auf Verbesserungen). */
 function gearScore(i: Item): number {
@@ -29,9 +31,16 @@ function gearScore(i: Item): number {
   if (i.damage) v += ((i.damage[0] + i.damage[1]) / 2) * (i.kind === 'bow' || i.kind === 'staff' ? 1.2 : 1.5);
   if (i.armor) v += i.armor * 2;
   for (const a of itemAffixes(i)) v += a.value * (AFFIX_WEIGHT[a.stat] ?? 1);
-  if (i.power) v += 12;
+  if (i.power) v += i.power.value * (POWER_WEIGHT[i.power.id] ?? 1);
   if (i.rarity === 'set') v += 8;
   return v;
+}
+
+/** Verschlechterung: lohnt nur, wenn die Anforderungen erfüllt sind und ein Stück im Slot liegt (deutlich schwächer). */
+export function isDowngrade(p: Actor, it: Item): boolean {
+  if (it.slot === 'potion' || it.slot === 'gem' || it.off === 'arrows') return false;
+  const cur = p.equipment[equipSlotFor(p, it)];
+  return !!cur && gearScore(it) < gearScore(cur) * 0.85;
 }
 
 export function isUpgrade(p: Actor, it: Item): boolean {
@@ -556,6 +565,18 @@ export class Ui {
       const h = el('div', '', `Verglichen mit: ${equipped.name}`);
       h.style.cssText = 'margin-top:6px;border-top:1px solid #4b3f3a;padding-top:4px;opacity:.7';
       box.append(h);
+      // Gesamturteil: grobe Wertung beider Stücke (Effekte zählen mit ihrer Stärke)
+      const sa = gearScore(it);
+      const sb = gearScore(equipped);
+      const pct = sb > 0 ? Math.round(((sa - sb) / sb) * 100) : 0;
+      const verdict = el('div', '', Math.abs(pct) < 5 ? 'Gesamt: etwa gleichwertig' : pct > 0 ? `Gesamt: Verbesserung (≈ +${pct} %)` : `Gesamt: Verschlechterung (≈ ${pct} %)`);
+      verdict.style.cssText = `font-weight:bold;color:${Math.abs(pct) < 5 ? '#d4c4a8' : pct > 0 ? '#6fe08a' : '#ff7a6a'}`;
+      box.append(verdict);
+      if (it.power?.id !== equipped.power?.id && (it.power || equipped.power)) {
+        const eff = el('div', '', `Effekt: ${equipped.power ? POWER_TEXT[equipped.power.id](equipped.power.value) : 'keiner'} → ${it.power ? POWER_TEXT[it.power.id](it.power.value) : 'keiner'}`);
+        eff.style.cssText = 'color:#e8c888;font-size:11px';
+        box.append(eff);
+      }
       for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
         const d = Math.round(((a[k] ?? 0) - (b[k] ?? 0)) * 10) / 10;
         if (d === 0) continue;
@@ -781,6 +802,10 @@ export class Ui {
           const up = el('div', 'n', '▲');
           up.style.cssText = 'right:auto;left:3px;bottom:auto;top:1px;color:#6fe08a;font-size:12px';
           s.append(up);
+        } else if (isDowngrade(p, it)) {
+          const dn = el('div', 'n', '▼');
+          dn.style.cssText = 'right:auto;left:3px;bottom:auto;top:1px;color:#ff7a6a;font-size:12px';
+          s.append(dn);
         }
         this.makeDraggable(s, { item: it, from: 'bag' }, equippedFor(p, it), () =>
           this.send(it.slot === 'potion' ? { type: 'usePotion', itemId: it.id } : { type: 'equip', itemId: it.id }),
@@ -824,7 +849,7 @@ export class Ui {
       const left = el('div');
       const th = ATTR_THRESHOLD_BONUS[k];
       const reached = attrBonus(p, k) > 0;
-      const thLine = el('div', 'a-note', `ab ${ATTR_THRESHOLD}: +${th.pct} % ${th.text}${reached ? ' (aktiv)' : ''}`);
+      const thLine = el('div', 'a-note', `ab ${ATTR_THRESHOLD}: +${th.pct} % ${th.text}${reached ? ' (aktiv)' : ''} · ab ${ATTR_THRESHOLD_2}: doppelt${p.attrs[k] >= ATTR_THRESHOLD_2 ? ' (aktiv)' : ''}`);
       thLine.style.color = reached ? '#6fe08a' : '#9a8a70';
       thLine.style.opacity = '1';
       left.append(el('div', '', `${ATTR_NAME[k]}: ${p.attrs[k]}`), el('div', 'a-note', help[k]), thLine);
@@ -1021,6 +1046,7 @@ export class Ui {
     const chained = new Set(questChains().flatMap((c) => c.quests.map((q) => q.id)));
     const active = QUESTS.filter((q) => !chained.has(q.id) && p.quests[q.id] && p.quests[q.id]!.state !== 'turned');
     body.append(el('div', 'a-sec', 'Aufgaben'));
+    body.append(el('div', 'a-note', 'Endziel: Besiege den Aschenkönig auf dem Thron der Asche (ab Stufe 28).'));
     if (!active.length) body.append(el('div', 'a-note', 'Keine. Questgeber (gelbes ! über dem Kopf) stehen in den Städten.'));
     for (const q of active) body.append(this.questCard(q, p, w));
     for (const chain of questChains()) {

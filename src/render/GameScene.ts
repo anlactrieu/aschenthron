@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 import mapJson from '../data/aschenthron.json';
 import { buildWorld, type TiledMap } from '../sim/tiled';
-import { DMG_COLOR, STATUS_COLOR, monsterKind, npcKeyOf, questById, SKILLS, STATUS_IDS } from '../sim/data';
-import { questAvailable, questMarks, type QuestMark } from '../sim/quests';
+import { DMG_COLOR, STATUS_COLOR, monsterKind, npcKeyOf, questById, QUESTS, SKILLS, STATUS_IDS } from '../sim/data';
+import { giverLocation, questAvailable, questMarks, type QuestMark } from '../sim/quests';
 import { exportPlayer, importPlayer } from '../sim/save';
 import {
   applyCommand, drainEvents, getActor, maxHpOf, maxManaOf, regionAt, tick, TICK_RATE, type Actor, type Chest, type Command, type Npc, type World,
@@ -85,6 +85,7 @@ export class GameScene extends Phaser.Scene {
   private chestViews = new Map<number, Phaser.GameObjects.Image>();
   private flash = new Map<number, number>();
   private acc = 0;
+  private lastHint = 0;
   private zoneMood: Mood = 'town';
   private achv = new AchievementTracker();
   /** Hit-Stop: so viele ms bleibt die Simulation stehen (nur Einzelspieler), gibt Treffern Wucht */
@@ -158,6 +159,10 @@ export class GameScene extends Phaser.Scene {
     }
     const saved = store?.getItem(SAVE_KEY);
     const p = this.player();
+    try {
+      const nm = store?.getItem('aschenthron.name');
+      if (nm && !this.remote) p.name = nm;
+    } catch { /* ohne Speicher: Standardname */ }
     this.ui = new Ui((c) => this.send(c), (i) => this.useSkillSlot(i), (k) => this.usePotionKind(k), () => this.newGame(), this.remote ? null : { export: () => exportPlayer(this.player()), import: (json) => this.importSave(json) });
     this.ui.ach = this.achv;
     this.sfx = new Sfx();
@@ -166,6 +171,7 @@ export class GameScene extends Phaser.Scene {
     if (this.remote) this.ui.say(`Verbunden als ${p.name}${this.remote.pvp ? ' – PvP außerhalb der Städte aktiv, Angreifer werden zu Mördern' : ''}. Klick auf Spieler greift an.`);
     else if (saved && importPlayer(this.world, p, saved)) this.ui.say('Spielstand geladen.');
     else {
+      this.showTitle(p);
       this.ui.banner('Aschental brennt. Der Thron der Asche ruft.', '#d8a24a');
       this.ui.say('Einst war Aschental ein Garten – dann verbrannte der Aschenkönig den Himmel. Du bist einer der Letzten, die noch gegen ihn ziehen. Dein Ziel: Stufe 30, der Thron der Asche.');
       this.ui.say('Willkommen im Hafen von Aschenhafen! Hafenmeister Joren (Haus mit Anker, links vom Platz) zeigt dir die Stadt: Lehrhaus (Buch), Kaufhaus (Münzen), Schmiede (Amboss), Lager (Truhe), Wache (Schild). Mit Startgold, Schwert oder Bogen geht es auf die Felder. C: Charakter (Attributpunkte verteilen!) · K: Fertigkeiten · Q/E: Tränke · R: Rasten · N: Karte · Pfeiltasten oder Klick: laufen · Klick auf Gegner: angreifen. Deine laufenden Aufgaben stehen oben rechts.');
@@ -428,6 +434,44 @@ export class GameScene extends Phaser.Scene {
     if (isWalkable(w.grid, x, y)) this.send({ type: 'moveTo', x, y });
   }
 
+  /** Titelbild für neue Spiele: Prämisse, Endziel und Namenswahl. */
+  private showTitle(p: Actor): void {
+    const box = document.createElement('div');
+    box.style.cssText = 'position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,rgba(20,10,8,.88),rgba(0,0,0,.96));color:#e8d9b0;font-family:Georgia,serif;text-align:center';
+    const inner = document.createElement('div');
+    inner.style.cssText = 'max-width:520px;padding:24px';
+    inner.innerHTML = `<div style="font-size:44px;letter-spacing:6px;color:#ffb14a;text-shadow:0 0 18px #b8501a">ASCHENTHRON</div>
+<p style="margin:18px 0 6px;line-height:1.55">Aschental war ein Garten, bis der Aschenkönig den Himmel verbrannte. Seitdem wandern Tote durch die Moore, Goblins und Räuber plündern die Straßen, und die Hafenstadt hält sich am letzten Licht.</p>
+<p style="margin:6px 0 18px;line-height:1.55;opacity:.9">Du bist eine der Letzten, die noch gegen ihn ziehen. Werde stärker, finde seltene Beute und bring den Aschenkönig auf seinem Thron zu Fall.</p>
+<div style="margin-bottom:14px">Dein Name: <input id="ttl-name" maxlength="16" value="Held" style="background:#120f16;border:1px solid #6b5a48;color:#e8d9b0;padding:6px 10px;font:16px Georgia,serif;text-align:center;width:180px"></div>
+<button id="ttl-go" style="background:#3a2f26;border:2px solid #d8a24a;color:#ffe8b0;padding:10px 26px;font:bold 16px Georgia,serif;cursor:pointer">Das Abenteuer beginnt</button>`;
+    box.append(inner);
+    document.body.append(box);
+    const go = (): void => {
+      const name = (box.querySelector<HTMLInputElement>('#ttl-name')!.value.trim() || 'Held').slice(0, 16);
+      p.name = name;
+      try { window.localStorage.setItem('aschenthron.name', name); } catch { /* egal */ }
+      box.remove();
+    };
+    box.querySelector<HTMLButtonElement>('#ttl-go')!.onclick = go;
+    box.querySelector<HTMLInputElement>('#ttl-name')!.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') go();
+    });
+  }
+
+  /** Wer keine laufende Aufgabe hat, bekommt alle 90 s einen Hinweis auf die nächste mögliche. */
+  private idleHint(time: number): void {
+    if (this.remote || this.frame % 60 !== 0 || time - this.lastHint < 90000) return;
+    const p = this.player();
+    if (Object.values(p.quests).some((q) => q.state !== 'turned')) { this.lastHint = time; return; }
+    const next = QUESTS.find((q) => !p.quests[q.id] && questAvailable(p, q));
+    this.lastHint = time;
+    if (!next) return;
+    const loc = giverLocation(this.world, next);
+    this.ui.say(`Keine laufende Aufgabe. Neu: „${next.name}“${loc ? ` – ${loc.text}` : ''}.`);
+  }
+
   /** Zähler für Erfolge (nur Einzelspieler); neue Erfolge werden eingeblendet. */
   private achBump(key: keyof Stats, by = 1): void {
     if (this.remote) return;
@@ -455,6 +499,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.now = time;
+    this.idleHint(time);
     this.arrowMove(time);
     this.pendingCastStep(time);
     this.handleEvents();
@@ -712,13 +757,17 @@ export class GameScene extends Phaser.Scene {
             }
             this.sfx.kill();
             this.achBump('kills');
-            if (dead?.boss) { this.achBump('bosses'); say(`${dead.name} besiegt.`); }
+            if (dead?.boss) { this.achBump('bosses'); if (dead.kindId === 'ash_king') { this.achBump('king'); this.ui.banner('Der Aschenkönig ist gefallen – Aschental atmet auf.', '#ffd23a'); this.sfx.fanfare(); } say(`${dead.name} besiegt.`); }
           }
           break;
         }
         case 'loot': {
           const r = e.item.rarity;
-          if (r === 'rare') this.achBump('rares');
+          if (r === 'rare') {
+            this.achBump('rares');
+            this.ui.banner(`Selten: ${e.item.name}`, '#f2c94c');
+            this.cameras.main.flash(160, 255, 220, 90);
+          }
           else if (r === 'legendary' || r === 'set') this.achBump('legendary');
           if (r === 'legendary' || r === 'set') {
             this.sfx.legendary();
@@ -913,7 +962,37 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.centerOn(Math.round(sx), Math.round(sy - 14));
     if (this.frame % 30 === 0) this.marks = questMarks(this.world, p);
     if (this.frame % 6 === 0) this.minimap.draw(p.x, p.y, this.marks);
+    this.updateCompass(g, p, time);
     this.updateRegion(p);
+  }
+
+  /** Pfeil um die Figur zum nächsten Aufgabenziel (erst ab 10 Feldern Abstand); Entfernung daneben. */
+  private updateCompass(g: Phaser.GameObjects.Graphics, p: Actor, time: number): void {
+    const seen = new Set<string>();
+    let best: QuestMark | null = null;
+    let bd = Infinity;
+    for (const m of this.marks) {
+      const d = Math.hypot(m.x - p.x, m.y - p.y);
+      if (d < bd) { bd = d; best = m; }
+    }
+    if (best && bd > 10) {
+      const me = toScreen(this.dispPos(p).x, this.dispPos(p).y);
+      const to = toScreen(best.x, best.y);
+      const ang = Math.atan2(to.sy - me.sy, to.sx - me.sx);
+      const r = 78 + Math.sin(time / 260) * 3;
+      const cx = me.sx + Math.cos(ang) * r;
+      const cy = me.sy - 14 + Math.sin(ang) * r * 0.6;
+      const col = best.done ? 0x6fe08a : 0xffe45a;
+      g.fillStyle(col, 0.9);
+      g.lineStyle(1.5, 0x000000, 0.9);
+      const tip = { x: cx + Math.cos(ang) * 9, y: cy + Math.sin(ang) * 9 };
+      const l = { x: cx + Math.cos(ang + 2.5) * 7, y: cy + Math.sin(ang + 2.5) * 7 };
+      const rr = { x: cx + Math.cos(ang - 2.5) * 7, y: cy + Math.sin(ang - 2.5) * 7 };
+      g.fillTriangle(tip.x, tip.y, l.x, l.y, rr.x, rr.y);
+      g.strokeTriangle(tip.x, tip.y, l.x, l.y, rr.x, rr.y);
+      this.label('z-compass', `${Math.round(bd)}`, cx, cy + 14, best.done ? '#6fe08a' : '#ffe45a', seen, 11);
+    }
+    this.cleanLabels(seen, ['z']);
   }
 
   /** Glitzern auf Wasser und pulsierende Lava (nur Darstellung, unter Props und Akteuren). */

@@ -199,3 +199,10 @@ Ziel: freie Builds statt Itemleiter, nur Prinzipien klassischer freier MMORPGs, 
 - **Meisterschaft:** ab Stufe 20 genau eine von 4 Richtungen (Kriegsherr, Jäger, Erzmagier, Wächter) als Zusatzwerte (`SPECS`, `Actor.spec`, Befehl `chooseSpec`); Neuverteilen beim Lehrer setzt sie zurück.
 - **Erfolge:** 16 Erfolge + Bestwerte (Taste O), nur clientseitig in localStorage (`aschenthron.ach.v1`). Echte Bestenliste braucht den Server: offen.
 - **Offen:** Pace-Lauf mit neuen Skills (Bot nutzt keine Skills), Balance der Meisterschaften und Powers im Spiel prüfen, Server-Rangliste.
+
+## D4O-Gefühl, Runde 2 (umgesetzt)
+- **Level-Meilensteine** (`LEVEL_MILESTONES`, `milestonePoints` in data.ts): Stufe 10 (+3 Attr, +1 Skill), 15 (+3), 20 (+5, +1), 25 (+5, +1), 30 (+10, +1); zählen beim Neuverteilen und im Save-Import. Zweite Attribut-Schwelle bei 50 verdoppelt den Bonus (`ATTR_THRESHOLD_2`). `rankLevelReq` ist auf `MAX_LEVEL` gedeckelt (Rang 5 ist so immer erreichbar).
+- **Upgrade-Bewertung** (`ui.ts` `gearScore`): Powers zählen mit ihrer Stärke (`POWER_WEIGHT`), Tooltip zeigt Gesamturteil in % und Effektwechsel, ▼ im Rucksack bei deutlicher Verschlechterung (`isDowngrade`).
+- **Orientierung:** Richtungspfeil mit Entfernung zum nächsten Aufgabenziel ab 10 Feldern (`updateCompass`), Hinweis alle 90 s ohne laufende Aufgabe (`idleHint`), Endziel im Aufgabenfenster.
+- **Titelbild** für neue Spiele mit Prämisse und Namenswahl (`showTitle`, Name in localStorage `aschenthron.name`); Erfolg und Banner beim Sturz des Aschenkönigs; Banner und Blitz bei Rare-Drops.
+- **Nicht gemacht:** Startschaden erhöhen (Golden-Tests und Balance hängen daran), Server-Rangliste (braucht Server-Persistenz), Legendär-Droprate/Duplikate.

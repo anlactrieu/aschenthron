@@ -5,7 +5,7 @@ import {
   ATTR_KEYS, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
   monsterKind, npcKeyOf, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
   FAMILY_RES, MELEE_SKILL_KRAFT_SCALE, MAX_RES, SLOW_FACTOR, STATUS_IDS, PASSIVE_CAP, DMG_NAME, type DmgType, type StatusId, type SkillDef, type PassiveKey,
-  ATTR_THRESHOLD, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, WILL_STATUS_PER_POINT, WILL_STATUS_CAP, GEM_MIN_LEVEL, GEM_DROP, GEM_SOCKET_COST, WORLD_BOSS_LOOT, type QuestDef,
+  ATTR_THRESHOLD, ATTR_THRESHOLD_2, ATTR_THRESHOLD_BONUS, LEVEL_MILESTONES, milestonePoints, WILL_RES_PER_2, WILL_STATUS_PER_POINT, WILL_STATUS_CAP, GEM_MIN_LEVEL, GEM_DROP, GEM_SOCKET_COST, WORLD_BOSS_LOOT, type QuestDef,
 } from './data';
 import { EFFECTS, cleanse, controlDr, dispel, mergeStatus } from './effects';
 
@@ -420,7 +420,7 @@ export function activeSetBonuses(a: Actor): { name: string; pieces: number; bonu
 
 /** Schwellenbonus eines Attributs in Prozent (ab ATTR_THRESHOLD, sonst 0). */
 export function attrBonus(a: Actor, k: AttrKey): number {
-  return a.attrs[k] >= ATTR_THRESHOLD ? ATTR_THRESHOLD_BONUS[k].pct : 0;
+  return (a.attrs[k] >= ATTR_THRESHOLD ? ATTR_THRESHOLD_BONUS[k].pct : 0) + (a.attrs[k] >= ATTR_THRESHOLD_2 ? ATTR_THRESHOLD_BONUS[k].pct : 0);
 }
 
 function affixSum(a: Actor, stat: Stat): number {
@@ -861,12 +861,12 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       a.gold -= price;
       a.freeRespec = false;
       for (const k of ATTR_KEYS) a.attrs[k] = 10;
-      a.statPoints = START_STAT_POINTS + STAT_POINTS_PER_LEVEL * (a.level - 1);
+      a.statPoints = START_STAT_POINTS + STAT_POINTS_PER_LEVEL * (a.level - 1) + milestonePoints(a.level).stat;
       a.skills = [];
       a.skillRanks = {};
       a.spec = undefined;
       a.skillCd = {};
-      a.skillPoints = SKILL_POINTS_START + SKILL_POINTS_PER_LEVEL * (a.level - 1);
+      a.skillPoints = SKILL_POINTS_START + SKILL_POINTS_PER_LEVEL * (a.level - 1) + milestonePoints(a.level).skill;
       // Ausrüstung, die nun die Anforderungen verfehlt, wandert in den Rucksack
       for (const slot of Object.keys(a.equipment) as EquipSlot[]) {
         const it = a.equipment[slot];
@@ -1601,6 +1601,12 @@ export function gainXp(w: World, a: Actor, amount: number): void {
     a.level++;
     a.statPoints += STAT_POINTS_PER_LEVEL;
     a.skillPoints += SKILL_POINTS_PER_LEVEL;
+    const ms = LEVEL_MILESTONES[a.level];
+    if (ms) {
+      a.statPoints += ms.stat;
+      a.skillPoints += ms.skill;
+      note(w, a, `Meilenstein Stufe ${a.level}: +${ms.stat} Attributpunkte${ms.skill ? ` und +${ms.skill} Skillpunkt` : ''}!`);
+    }
     a.maxHp += 10;
     a.hp = maxHpOf(a);
     a.mana = maxManaOf(a);

@@ -48,3 +48,18 @@ describe('Hohe Stufen und neue Effekte', () => {
     expect(powerOf(p, 'execute')).toBe(0);
   });
 });
+
+describe('Level-Meilensteine', () => {
+  it('Stufe 10 bringt Extrapunkte, Neuverteilen behält sie, Rang-Grenze liegt im Level-Cap', async () => {
+    const { gainXp } = await import('./world');
+    const { totalXpFor, milestonePoints, rankLevelReq, MAX_LEVEL } = await import('./data');
+    const w = createWorld(1, big());
+    const p = spawnPlayer(w, 10, 10);
+    const before = p.statPoints;
+    gainXp(w, p, totalXpFor(10) + 1);
+    expect(p.level).toBe(10);
+    expect(p.statPoints).toBe(before + 5 * 9 + milestonePoints(10).stat);
+    expect(milestonePoints(30).stat).toBe(26);
+    expect(rankLevelReq(22, 5)).toBe(Math.min(MAX_LEVEL, 34));
+  });
+});

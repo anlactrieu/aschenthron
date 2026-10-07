@@ -1,4 +1,4 @@
-import { ATTR_KEYS, MAP_VERSION, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, questById, skillById, totalXpFor } from './data';
+import { milestonePoints, ATTR_KEYS, MAP_VERSION, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, questById, skillById, totalXpFor } from './data';
 import { isWalkable } from './path';
 import { EQUIP_SLOT_LIST, GEM_KINDS, LEGENDARIES, SETS, TEMPLATES, handsOf, type Item } from './items';
 import { maxHpOf, maxManaOf, type Actor, type World } from './world';
@@ -68,7 +68,7 @@ export function importPlayer(w: World, p: Actor, json: string): boolean {
     const savedRanks = (s.skillRanks ?? {}) as Record<string, number>;
     for (const id of p.skills) p.skillRanks[id] = Math.min(MAX_SKILL_RANK, Math.max(1, Math.floor(num(savedRanks[id], 1))));
     const spent = Object.values(p.skillRanks).reduce((n, r) => n + r, 0);
-    const earned = SKILL_POINTS_START + SKILL_POINTS_PER_LEVEL * (p.level - 1);
+    const earned = SKILL_POINTS_START + SKILL_POINTS_PER_LEVEL * (p.level - 1) + milestonePoints(p.level).skill;
     p.skillPoints = typeof s.skillPoints === 'number' ? Math.max(0, Math.floor(s.skillPoints)) : Math.max(0, earned - spent);
     const rawCount = (Array.isArray(s.inventory) ? s.inventory.length : 0) + (Array.isArray(s.stash) ? s.stash.length : 0);
     p.inventory = Array.isArray(s.inventory) ? (s.inventory.map(migrateItem).filter(isItem) as Item[]) : [];
