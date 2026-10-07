@@ -1429,7 +1429,8 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
   }
   if (res > 0 && t.status.ward && dt !== 'physical') note(w, t, `Elementarschild mindert ${DMG_NAME[dt]}schaden (Widerstand ${Math.round(res)} %).`);
   const cursed = t.status.curse ? 1 + Math.min(35, t.statusMag?.curse ?? 0) / 100 : 1;
-  const amount = res >= 100 ? 0 : Math.max(1, Math.round(physical * (1 - res / 100) * cursed));
+  const exec = a.kind === 'player' && !noReflect && t.hp < t.maxHp * 0.3 ? 1 + powerOf(a, 'execute') / 100 : 1;
+  const amount = res >= 100 ? 0 : Math.max(1, Math.round(physical * (1 - res / 100) * cursed * exec));
   t.hp = Math.max(0, t.hp - amount);
   if (t.status.bandage && amount > 0) {
     delete t.status.bandage;
@@ -1466,6 +1467,13 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
       w.events.push({ type: 'pk', id: a.id });
     } else if (!selfDefense && a.pkUntil > w.tick) a.pkUntil = w.tick + TICK_RATE * 60 * 10;
     t.attackedBy = { id: a.id, at: w.tick };
+  }
+  // Brand-/Frosttreffer: eigener Zufallsstrom `fx` und nur mit passender Power, damit der Kampfwurf-Strom unverändert bleibt
+  if (a.kind === 'player' && t.kind === 'monster' && t.hp > 0 && !noReflect && amount > 0) {
+    const bh = powerOf(a, 'burnHit') + affixSum(a, 'procBurn');
+    if (bh > 0 && w.fx.next() * 100 < bh) applyStatus(w, t, 'burn', 3, 'fire', { perSec: Math.max(2, Math.round(2 + a.level * 0.5)), srcId: a.id });
+    const fh = powerOf(a, 'frostHit') + affixSum(a, 'procFrost');
+    if (fh > 0 && w.fx.next() * 100 < fh) applyStatus(w, t, 'slow', 3, 'frost');
   }
   if (a.kind === 'player' && a.alive && !noReflect) {
     const steal = powerOf(a, 'lifesteal');
@@ -1524,6 +1532,8 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
     gainXp(w, killer, Math.round(k.xp * (1 + powerOf(pl, 'xpBonus') / 100)));
     const mk = powerOf(pl, 'manaKill');
     if (mk > 0) pl.mana = Math.min(maxManaOf(killer), pl.mana + mk);
+    const hk = powerOf(pl, 'healKill');
+    if (hk > 0) pl.hp = Math.min(maxHpOf(pl), pl.hp + hk);
     const gold = Math.round(w.rng.int(k.gold[0], k.gold[1]) * m.rewardMult * (1 + powerOf(pl, 'goldBonus') / 100));
     pl.gold += gold;
     w.events.push({ type: 'gold', amount: gold, to: pl.id });

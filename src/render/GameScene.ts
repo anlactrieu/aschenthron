@@ -12,6 +12,7 @@ import { isWalkable } from '../sim/path';
 import { toScreen, toTile } from './iso';
 import { DOOR_ICONS, TOWN_GID, WATER_PROP_GIDS, registerTownArt } from './town';
 import { Ui, describeItem, isUpgrade } from './ui';
+import { AchievementTracker, type Stats } from './achievements';
 import { skillCursor } from './icons';
 import { Sfx } from './audio';
 import { Minimap } from './minimap';
@@ -82,6 +83,9 @@ export class GameScene extends Phaser.Scene {
   private chestViews = new Map<number, Phaser.GameObjects.Image>();
   private flash = new Map<number, number>();
   private acc = 0;
+  private achv = new AchievementTracker();
+  /** Hit-Stop: so viele ms bleibt die Simulation stehen (nur Einzelspieler), gibt Treffern Wucht */
+  private hitStop = 0;
   private autosave = 0;
   private frame = 0;
   private ui!: Ui;
@@ -152,6 +156,7 @@ export class GameScene extends Phaser.Scene {
     const saved = store?.getItem(SAVE_KEY);
     const p = this.player();
     this.ui = new Ui((c) => this.send(c), (i) => this.useSkillSlot(i), (k) => this.usePotionKind(k), () => this.newGame(), this.remote ? null : { export: () => exportPlayer(this.player()), import: (json) => this.importSave(json) });
+    this.ui.ach = this.achv;
     this.sfx = new Sfx();
     this.atmo = new Atmosphere(this, this.sfx);
     this.minimap = new Minimap(this.world, this.tiles);
@@ -420,6 +425,16 @@ export class GameScene extends Phaser.Scene {
     if (isWalkable(w.grid, x, y)) this.send({ type: 'moveTo', x, y });
   }
 
+  /** Zähler für Erfolge (nur Einzelspieler); neue Erfolge werden eingeblendet. */
+  private achBump(key: keyof Stats, by = 1): void {
+    if (this.remote) return;
+    for (const a of this.achv.bump(key, by)) {
+      this.ui.banner(`Erfolg: ${a.name}`, '#d8c070');
+      this.ui.say(`Erfolg freigeschaltet: ${a.name} – ${a.text}`);
+      this.sfx.quest();
+    }
+  }
+
   update(time: number, dt: number): void {
     if (this.remote) {
       if (this.remote.closed && !this.ended) {
@@ -427,7 +442,8 @@ export class GameScene extends Phaser.Scene {
         this.ui.say('Verbindung zum Server verloren. Seite neu laden.');
       }
     } else {
-      this.acc += Math.min(dt, 250);
+      if (this.hitStop > 0) this.hitStop -= dt;
+      else this.acc += Math.min(dt, 250);
       const step = 1000 / TICK_RATE;
       while (this.acc >= step) {
         this.acc -= step;
@@ -544,6 +560,7 @@ export class GameScene extends Phaser.Scene {
               const len = Math.hypot(sxv, syv) || 1;
               this.kick(tg.id, (sxv / len) * 5, (syv / len) * 5);
             }
+            if (fromPlayer && !this.remote && (e.crit || tg?.boss)) this.hitStop = Math.max(this.hitStop, e.crit ? 55 : 30);
             if (e.crit || (tg?.boss && fromPlayer)) this.cameras.main.shake(70, e.crit ? 0.004 : 0.0025);
             if (toPlayer) this.cameras.main.shake(60, 0.002);
             if (fromPlayer) {
@@ -691,12 +708,15 @@ export class GameScene extends Phaser.Scene {
               }
             }
             this.sfx.kill();
-            if (dead?.boss) say(`${dead.name} besiegt.`);
+            this.achBump('kills');
+            if (dead?.boss) { this.achBump('bosses'); say(`${dead.name} besiegt.`); }
           }
           break;
         }
         case 'loot': {
           const r = e.item.rarity;
+          if (r === 'rare') this.achBump('rares');
+          else if (r === 'legendary' || r === 'set') this.achBump('legendary');
           if (r === 'legendary' || r === 'set') {
             this.sfx.legendary();
             this.ui.banner(`${r === 'legendary' ? 'Legendär' : 'Set-Teil'}: ${e.item.name}`, r === 'legendary' ? '#ff8a2a' : '#5fd070');
@@ -711,6 +731,7 @@ export class GameScene extends Phaser.Scene {
         case 'note': say(e.text); break;
         case 'respecced': say('Alles neu verteilt: Attribute und Fertigkeiten sind zurückgesetzt.'); this.sfx.quest(); break;
         case 'chestOpened': {
+          this.achBump('chests');
           this.sfx.chest();
           const ch = w.chests.find((c) => c.id === e.chestId);
           if (ch) {
@@ -743,6 +764,7 @@ export class GameScene extends Phaser.Scene {
           break;
         }
         case 'levelUp': {
+          this.achBump('level', e.level);
           say(`LEVEL ${e.level}! +5 Attributpunkte (C), +1 Skillpunkt`);
           this.sfx.levelUp();
           const pos = this.bodyPos(this.player());
@@ -783,6 +805,7 @@ export class GameScene extends Phaser.Scene {
         case 'questProgress': say(`Aufgabe: ${e.progress}/${e.count}`); break;
         case 'questDone': say(`Aufgabe erfüllt: ${questById(e.questId)?.name} – beim Auftraggeber abgeben!`); this.sfx.quest(); break;
         case 'questTurned': {
+          this.achBump('quests');
           const def = questById(e.questId);
           say(`Aufgabe abgegeben: +${e.xp} XP, +${e.gold} Gold${e.item ? `, ${e.item.name}` : ''}`);
           if (def?.outro) say(def.outro);
@@ -820,6 +843,7 @@ export class GameScene extends Phaser.Scene {
           break;
         }
         case 'deathPenalty':
+          this.achBump('deaths');
           say(`Du bist gestorben: −${e.xpLost} XP, ${e.dropped.length} Item(s) liegen an der Todesstelle (5 Min.).`);
           this.sfx.death();
           this.cameras.main.shake(300, 0.008);

@@ -7,6 +7,8 @@ import {
 } from '../sim/world';
 import { buildProfile } from '../sim/build';
 import { itemIcon, potionIcon, skillIcon, statusIcon } from './icons';
+import type { AchievementTracker } from './achievements';
+import { ACHIEVEMENTS } from './achievements';
 import { giverLocation, questAvailable, questChains, questWhere, targetName } from '../sim/quests';
 import { lookKey, lookOf, playerPortrait } from './art';
 import { initCredits, toggleCredits } from './credits';
@@ -47,6 +49,7 @@ const STAT_NAME = {
   damage: 'Schaden', armor: 'Rüstung', maxHp: 'Leben', kraft: 'Kraft', maxMana: 'Mana', haste: '% Angriffstempo', crit: '% Kritisch', regen: 'Leben/s',
   accuracy: 'Treffsicherheit', evasion: 'Ausweichen', resFire: '% Feuerwiderstand', resFrost: '% Frostwiderstand', resPoison: '% Giftwiderstand',
   spellFire: '% Feuerzauberschaden', spellFrost: '% Frostzauberschaden', healPower: '% Heilung', manaCost: '% Manakosten', ctrl: '% Kontrolldauer', move: '% Bewegungstempo', parry: '% Parieren',
+  procBurn: '% Chance auf Brand', procFrost: '% Chance auf Verlangsamung',
 } as const;
 const BAG_COLS = 8;
 
@@ -163,7 +166,7 @@ const CSS = `
 .hb .cnt{position:absolute;right:3px;bottom:0;font:bold 12px system-ui;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000}
 `;
 
-type Tab = 'inv' | 'char' | 'skills' | 'quests';
+type Tab = 'inv' | 'char' | 'skills' | 'quests' | 'ach';
 
 interface Drag {
   item: Item;
@@ -174,6 +177,7 @@ interface Drag {
 
 export class Ui {
   open = false;
+  ach: AchievementTracker | null = null;
   private tab: Tab = 'inv';
   private main = el('div', 'a-win');
   private side = el('div', 'a-win');
@@ -249,6 +253,7 @@ export class Ui {
       if (k === 'c') this.toggleTab('char');
       if (k === 'k') this.toggleTab('skills');
       if (k === 'j') this.toggleTab('quests');
+      if (k === 'o') this.toggleTab('ach');
       if (k === 'escape') this.toggle(false);
       if (k >= '1' && k <= '9') this.useSkillSlot(Number(k) - 1);
       if (k === 'r') this.send({ type: 'rest' });
@@ -311,7 +316,7 @@ export class Ui {
     this.updateHud(p, target);
     this.updateTracker(w, p);
     const near = w.npcs.filter((n) => Math.hypot(n.x - p.x, n.y - p.y) <= NPC_RANGE);
-    const key = JSON.stringify([this.open, this.tab, p.inventory, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.freeRespec, p.gold, p.level, near.map((n) => n.id), p.quests, p.xp > 0]);
+    const key = JSON.stringify([this.open, this.tab, p.inventory, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.freeRespec, p.gold, p.level, near.map((n) => n.id), p.quests, p.xp > 0, this.ach?.unlocked.size, this.ach?.stats.kills]);
     if (key === this.key || this.dragging) return;
     this.key = key;
     if (this.open) this.renderMain(p);
@@ -656,7 +661,7 @@ export class Ui {
 
   private renderMain(p: Actor): void {
     const tabs = el('div', 'a-tabs');
-    for (const [id, label] of [['inv', 'Inventar (I)'], ['char', 'Charakter (C)'], ['skills', 'Fertigkeiten (K)'], ['quests', 'Aufgaben (J)']] as [Tab, string][]) {
+    for (const [id, label] of [['inv', 'Inventar (I)'], ['char', 'Charakter (C)'], ['skills', 'Fertigkeiten (K)'], ['quests', 'Aufgaben (J)'], ['ach', 'Erfolge (O)']] as [Tab, string][]) {
       const t = el('div', `a-tab${this.tab === id ? ' on' : ''}`, label);
       t.onclick = () => {
         this.tab = id;
@@ -668,6 +673,7 @@ export class Ui {
     if (this.tab === 'inv') this.renderInventory(body, p);
     else if (this.tab === 'char') this.renderChar(body, p);
     else if (this.tab === 'skills') this.renderSkills(body, p);
+    else if (this.tab === 'ach') this.renderAch(body);
     else this.renderQuests(body, p);
     const title = el('h3', '', `${p.name} · Stufe ${p.level}`);
     this.main.replaceChildren(title, tabs, body);
@@ -940,6 +946,23 @@ export class Ui {
     const rew = `Belohnung ${def.xp} XP, ${def.gold} Gold${def.reward ? (def.reward === 'unique' ? ', Unikat/Set-Teil' : ', seltener Gegenstand') : ''}`;
     c.append(bar, el('div', 'a-note', st.state === 'done' ? 'Fertig – beim Auftraggeber abgeben!' : rew));
     return c;
+  }
+
+  private renderAch(body: HTMLElement): void {
+    const t = this.ach;
+    if (!t) { body.append(el('div', 'a-note', 'Erfolge gibt es nur im Einzelspielermodus.')); return; }
+    body.append(el('div', 'a-sec', `Erfolge ${t.unlocked.size}/${ACHIEVEMENTS.length}`));
+    const st = t.stats;
+    body.append(el('div', 'a-note', `Bestwerte: ${st.kills} Gegner · ${st.bosses} Bosse · ${st.rares} seltene und ${st.legendary} legendäre Funde · ${st.chests} Truhen · ${st.quests} Aufgaben · ${st.deaths} Tode`));
+    for (const a of ACHIEVEMENTS) {
+      const got = t.unlocked.has(a.id);
+      const c = el('div', 'a-card');
+      c.style.display = 'block';
+      c.style.opacity = got ? '1' : '.6';
+      const pr = a.prog?.(t.stats);
+      c.append(el('div', '', `${got ? '✔ ' : ''}${a.name}`), el('div', 'a-note', a.text + (!got && pr ? ` (${pr[0]}/${pr[1]})` : '')));
+      body.append(c);
+    }
   }
 
   private renderQuests(body: HTMLElement, p: Actor): void {

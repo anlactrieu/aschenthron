@@ -12,9 +12,11 @@ export type ItemSlot = Slot | 'potion' | 'gem';
 export type Rarity = 'normal' | 'magic' | 'rare' | 'set' | 'legendary';
 export type Stat = 'damage' | 'armor' | 'maxHp' | 'kraft' | 'maxMana' | 'haste' | 'crit' | 'regen' | 'accuracy' | 'evasion' | 'resFire' | 'resFrost' | 'resPoison'
   /** Stufe 6: Build-Werte (Prozent, negativ = Nachteil) */
-  | 'spellFire' | 'spellFrost' | 'healPower' | 'manaCost' | 'ctrl' | 'move' | 'parry';
+  | 'spellFire' | 'spellFrost' | 'healPower' | 'manaCost' | 'ctrl' | 'move' | 'parry'
+  /** Proc-Werte (Prozent Chance je Treffer, siehe `dealDamage`) */
+  | 'procBurn' | 'procFrost';
 /** Besondere Effekte legendärer Gegenstände und Set-Boni */
-export type PowerId = 'lifesteal' | 'crit' | 'thorns' | 'manaKill' | 'xpBonus' | 'goldBonus';
+export type PowerId = 'lifesteal' | 'crit' | 'thorns' | 'manaKill' | 'xpBonus' | 'goldBonus' | 'execute' | 'healKill' | 'burnHit' | 'frostHit';
 export interface Power {
   id: PowerId;
   value: number;
@@ -26,6 +28,10 @@ export const POWER_TEXT: Record<PowerId, (v: number) => string> = {
   manaKill: (v) => `+${v} Mana pro Kill`,
   xpBonus: (v) => `+${v} % Erfahrung`,
   goldBonus: (v) => `+${v} % Gold`,
+  execute: (v) => `+${v} % Schaden gegen Gegner unter 30 % Leben`,
+  healKill: (v) => `+${v} Leben pro Kill`,
+  burnHit: (v) => `${v} % Chance, das Ziel in Brand zu setzen`,
+  frostHit: (v) => `${v} % Chance, das Ziel zu verlangsamen`,
 };
 
 /** Anforderungen an den Träger (Stufe und Attribute), wie in klassischen RPGs. */
@@ -243,6 +249,11 @@ export const TEMPLATES: ItemTemplate[] = [
  * und einen Build-Hinweis; sie ersetzen kein Standardstück, sondern stützen einen Spielstil. */
 const B = (t: Omit<ItemTemplate, 'reqKraft'> & { reqKraft?: number }): ItemTemplate => ({ reqKraft: 0, ...t });
 TEMPLATES.push(
+  // Proc-Waffen: Chance auf Brand bzw. Verlangsamung bei jedem Treffer, dafür weniger Grundschaden
+  B({ id: 'cinder_blade', name: 'Glutklinge', slot: 'weapon', weight: 8, damage: [7, 12], reqKraft: 14, base: [{ stat: 'procBurn', value: 10 }], hint: 'Nahkämpfer: Treffer setzen manchmal in Brand, dafür weniger Schaden.', value: 150, minLevel: 8 }),
+  B({ id: 'rime_blade', name: 'Raureifklinge', slot: 'weapon', weight: 8, damage: [7, 12], reqKraft: 14, base: [{ stat: 'procFrost', value: 12 }], hint: 'Nahkämpfer: Treffer verlangsamen manchmal, dafür weniger Schaden.', value: 150, minLevel: 8 }),
+  B({ id: 'pyre_blade', name: 'Scheiterhaufenklinge', slot: 'weapon', weight: 11, damage: [16, 26], reqKraft: 26, base: [{ stat: 'procBurn', value: 16 }], hint: 'Nahkämpfer: häufiger Brand, dafür weniger Schaden.', value: 420, minLevel: 18 }),
+  B({ id: 'glacier_blade', name: 'Gletscherklinge', slot: 'weapon', weight: 11, damage: [16, 26], reqKraft: 26, base: [{ stat: 'procFrost', value: 20 }], hint: 'Nahkämpfer: häufiges Verlangsamen, dafür weniger Schaden.', value: 420, minLevel: 18 }),
   // Elementarmagier: Feuer gegen Frostschutz und umgekehrt
   B({ id: 'pyre_staff', name: 'Pyromantenstab', slot: 'weapon', kind: 'staff', hands: 2, weight: 4, damage: [7, 12], req: { verstand: 22 }, base: [{ stat: 'maxMana', value: 28 }, { stat: 'spellFire', value: 12 }, { stat: 'resFrost', value: -8 }], hint: 'Elementarmagier (Feuer): stärkere Feuerzauber, schwächerer Frostschutz.', value: 190, minLevel: 11 }),
   B({ id: 'ash_igniter', name: 'Aschenzünder', slot: 'weapon', kind: 'staff', hands: 2, weight: 5, damage: [14, 24], req: { verstand: 34 }, base: [{ stat: 'maxMana', value: 60 }, { stat: 'spellFire', value: 20 }, { stat: 'resFrost', value: -12 }], hint: 'Elementarmagier (Feuer): stärkere Feuerzauber, schwächerer Frostschutz.', value: 680, minLevel: 21 }),
@@ -593,6 +604,12 @@ export const LEGENDARIES: LegendaryDef[] = [
   { id: 'abyss_edge', name: 'Schneide des Abgrunds', base: 'ash_saber', minLevel: 28, affixes: [{ stat: 'damage', min: 14, max: 18 }, { stat: 'haste', min: 4, max: 6 }], power: { id: 'lifesteal', value: 7 } },
   { id: 'warden_aegis', name: 'Ägide des Wächters', base: 'ash_shield', minLevel: 28, affixes: [{ stat: 'armor', min: 10, max: 14 }, { stat: 'maxHp', min: 90, max: 130 }], power: { id: 'thorns', value: 30 } },
   { id: 'ash_crown', name: 'Aschenkrone', base: 'ash_visor', minLevel: 26, affixes: [{ stat: 'armor', min: 8, max: 12 }, { stat: 'maxHp', min: 100, max: 150 }], power: { id: 'xpBonus', value: 15 }, source: 'ash_king' },
+  { id: 'reaper_axe', name: 'Henkersbeil', base: 'cinder_axe', minLevel: 13, affixes: [{ stat: 'damage', min: 8, max: 11 }], power: { id: 'execute', value: 25 } },
+  { id: 'frost_tooth', name: 'Frostzahn', base: 'steel_sword', minLevel: 14, affixes: [{ stat: 'damage', min: 6, max: 9 }, { stat: 'resFrost', min: 8, max: 12 }], power: { id: 'frostHit', value: 25 } },
+  { id: 'soul_band', name: 'Seelenband', base: 'ember_ring', minLevel: 12, affixes: [{ stat: 'maxHp', min: 25, max: 40 }, { stat: 'damage', min: 2, max: 4 }], power: { id: 'healKill', value: 8 } },
+  { id: 'ash_fang', name: 'Aschenfang', base: 'war_blade', minLevel: 18, affixes: [{ stat: 'damage', min: 9, max: 13 }, { stat: 'resFire', min: 8, max: 12 }], power: { id: 'burnHit', value: 22 } },
+  { id: 'grave_seal', name: 'Siegel der Grabwacht', base: 'silver_ring', minLevel: 20, affixes: [{ stat: 'maxMana', min: 25, max: 35 }, { stat: 'maxHp', min: 30, max: 50 }], power: { id: 'healKill', value: 14 } },
+  { id: 'harvest_saber', name: 'Schnitter', base: 'ash_saber', minLevel: 28, affixes: [{ stat: 'damage', min: 15, max: 20 }, { stat: 'crit', min: 3, max: 5 }], power: { id: 'execute', value: 40 } },
 ];
 
 export function legendaryById(id: string): LegendaryDef {
