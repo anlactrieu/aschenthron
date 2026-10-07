@@ -829,7 +829,7 @@ function spritePlayer(look: Look, frame: number, scale: number = SPRITE_SCALE.no
     // Seitenansicht: Körper schmaler, Beine schwingen entlang der Laufrichtung (Vorderansicht → Profil)
     if (profile) {
       x.translate(SP / 2, 0);
-      x.scale(0.72, 1);
+      x.scale(0.88, 1);
       x.translate(-SP / 2, 0);
     }
     const HIP = 20;
@@ -837,7 +837,7 @@ function spritePlayer(look: Look, frame: number, scale: number = SPRITE_SCALE.no
     const legOff = (left: boolean): [number, number] => {
       if (profile) {
         if (walking) {
-          const dx = (left ? 1 : -1) * side * 4;
+          const dx = (left ? 1 : -1) * side * 3;
           return [dx, dx > 0 ? -1 : 0];
         }
         if (frame === FRAME_STRIKE && kind === 'melee') return left ? [3, 0] : [-3, 0];
