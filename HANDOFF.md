@@ -1,10 +1,10 @@
 # HANDOFF – Aschenthron
 
-## AKTUELL (2026-10-07): Blickrichtung der Figuren – umgesetzt (Rückenansicht abgedunkelt, NPCs laufen mit Richtung); Rest der Zeilen unten ist der Plan
-- **Stand:** main == origin/main (6829e89, Schriftrollen-Icon neu). Nur `SPEC.md` (Abschnitt "Blickrichtung der Figuren") ist uncommittet ergänzt. 285 Tests grün.
-- **Letzte 3 Entscheidungen:** (1) Schriftrollen-Icon prozedural neu gezeichnet (`icons.ts` ~99), weil kein DCSS-Scroll-Sprite im Asset-Ordner und Download Freigabe braucht. (2) Blickrichtung: Spiegeln für Seite + abgedunkelter Rücken, keine neuen Assets (User-Wahl, geringer Aufwand). (3) Umfang: Spieler + NPCs + Monster.
-- **TODO:** `back` in `spritePlayer`/`spriteMonster` (`art.ts:729, 806`) auswerten; `playerCanvas`/`monsterCanvas` (`art.ts:740, 990`) kehren bisher vor der Rückenzeichnung zurück; NPCs prüfen; im Browser abnehmen (links/rechts/hoch/runter). Umsetzung in frischer Session mit SPEC.md.
-- **Learnings:** `GameScene.ts` ~1425 setzt `view.flip` (Bildschirm-x) und `view.up` schon; nur der Sprite-Pfad nutzt `back` nicht. Online-Rangliste: Erfolge-Fenster (Taste O), nur mit Server.
+## AKTUELL (2026-10-07): Blickrichtung – Umsetzung c1b0317 gefällt dem User NICHT, Neuentscheidung offen
+- **Stand:** origin/main = c1b0317 (Rückenansicht = abgedunkelter Sprite + Gesicht überdeckt, NPC-Spiegeln; `backShade` in `art.ts`, `npcDir` in `GameScene.updateNpcs`). User: "sieht komisch aus" bei Monstern und Figuren. 285 Tests grün.
+- **Letzte 3 Entscheidungen:** (1) User wählte "echte 4-Richtungs-Sprites" statt Rückbau. (2) Recherche: LPC (CC-BY-SA/GPL) ist die einzige modulare Quelle mit Rücken/Seite/Front (64px, 9 Laufbilder, Zeilen: hoch, links, runter, rechts); Basispaket hat nur Körper/Hose/Haare/Soldat + 10 Monster (Fledermaus, Biene, Würmer, Auge, Geist, Pflanze, Kürbis, Schleim, Schlange). (3) User sagte "1" = LPC komplett für den Spieler (Generator mit Ebenen) – danach Download gestartet, User brach Wartebefehl ab und fragte nach dem Stand.
+- **Offen:** Download `Universal-LPC-Spritesheet-Character-Generator` (1,5 GB Repo, Sparse-Clone von body/hair/torso/legs/feet/hat/weapon/shield/cape/arms in `scratchpad/lpcgen`) läuft/hängt; User muss entscheiden: weiter warten, abbrechen + Abdunkeln zurücknehmen, oder Spieler-Richtungen selbst im DCSS-Stil zeichnen. Monster bekommen mit LPC keine Richtungen (fehlende Arten).
+- **Learnings:** LPC-Zip Basis: `https://opengameart.org/sites/default/files/lpc_base_assets.zip` (713 KB), liegt in `scratchpad/lpc`. Teil-Clone des Generators dauert >10 min (viele Blobs). Lizenz verlangt Credits + gleiche Lizenz für Ableitungen. Playerrenderer `spritePlayer` (art.ts ~806) ist auf 32px-DCSS-Ebenen ausgelegt, LPC wäre Umbau mit 64px-Frames.
 
 ## Sitzungsstand (Audit "D4O-Gefuehl"; umgesetzt, tsc + 272 Tests gruen)
 - Auftrag: Subagents pruefen Progression/Builds, Loot/Items, Welt/Kampf/Ziele; danach Luecken umsetzen. Bericht Welt/Kampf/Ziele liegt vor, die zwei anderen (Progression, Loot) laufen noch.
