@@ -902,6 +902,10 @@ export class GameScene extends Phaser.Scene {
           this.cameras.main.flash(500, 120, 0, 0);
           this.ui.banner('Du bist gefallen', '#c43a3a');
           break;
+        case 'teleported':
+          this.cameras.main.flash(500, 180, 200, 255);
+          this.sfx.levelUp();
+          break;
         case 'respawned': say('Du erwachst in der Stadt.'); break;
         case 'fail': say(e.reason); break;
         default: break;

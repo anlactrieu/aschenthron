@@ -71,6 +71,7 @@ export function describeItem(i: Item): string {
     base.push(`In Waffen: ${gemEffect(i.gem, 'weapon')}`, `In Rüstung und Schilden: ${gemEffect(i.gem, 'chest')}`, 'Einsetzen beim Schmied');
   }
   if (i.off === 'arrows') base.push(`Pfeile (+${i.arrowBonus ?? 0} Schaden bei Fernkampf-Skills)`);
+  if (i.town) base.push(`Teleportiert dich nach ${i.town} (3 s Lesezeit, nicht im Kampf; Bewegen oder Treffer bricht ab)`);
   if (i.heal) base.push(`Heilt ${i.heal} LP`);
   if (i.mana) base.push(`Stellt ${i.mana} MP wieder her`);
   if (i.damage) base.push(`Schaden ${i.damage[0]}-${i.damage[1]}`);

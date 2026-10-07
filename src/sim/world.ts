@@ -138,6 +138,8 @@ export interface Actor {
   freeRespec?: boolean;
   /** Spieler: gewählte Meisterschaft (`SPECS`), wird beim Neuverteilen zurückgesetzt */
   spec?: string;
+  /** Spieler: gerade gelesene Teleport-Schriftrolle (Wirkzeit, Abbruch bei Bewegung oder Treffer) */
+  tele?: { at: number; from: number; x: number; y: number; town: string; itemId: number };
   /** Monster: frühester Tick für den nächsten Schutz-/Bannzauber */
   buffAt?: number;
   /** Kontroll-Verkürzung: letzter Treffer und Wiederholungszähler je Effekt */
@@ -237,6 +239,7 @@ type GameEventBase =
   | { type: 'learned'; skillId: string; rank?: number }
   | { type: 'deathPenalty'; xpLost: number; dropped: Item[] }
   | { type: 'respawned' }
+  | { type: 'teleported' }
   | { type: 'potion'; item: Item }
   | { type: 'questProgress'; questId: string; progress: number; count: number }
   | { type: 'questDone'; questId: string }
@@ -272,7 +275,7 @@ export interface World {
   npcs: Npc[];
   start: Pt;
   /** Wiedererwachen nach dem Tod: nächste Stadt */
-  towns: Pt[];
+  towns: (Pt & { name?: string })[];
   /** Benannte Zonen (nur Anzeige) */
   regions: (Rect & { name: string; levels: string })[];
   /** Spieler dürfen einander außerhalb von Städten angreifen (Server-Einstellung) */
@@ -802,6 +805,17 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
     case 'usePotion': {
       const it = a.inventory.find((i) => i.id === cmd.itemId);
       if (!it || it.slot !== 'potion') return;
+      if (it.town) {
+        const dest = w.towns.find((t) => t.name === it.town);
+        if (!dest) return fail(w, 'Das Ziel der Schriftrolle ist unbekannt.');
+        if (a.tele) return fail(w, 'Du liest bereits eine Schriftrolle.');
+        if (a.targetId !== null || w.tick - a.lastHitAt < TICK_RATE * 3) return fail(w, 'Mitten im Kampf kannst du die Schriftrolle nicht lesen.');
+        if (Math.hypot(dest.x - a.x, dest.y - a.y) < 25) return fail(w, `Du bist schon in ${it.town}.`);
+        a.tele = { at: w.tick + TELEPORT_TICKS, from: w.tick, x: a.x, y: a.y, town: it.town, itemId: it.id };
+        a.path = [];
+        note(w, a, `Du liest die Schriftrolle (${TELEPORT_TICKS / TICK_RATE} s) – nicht bewegen, nicht kämpfen.`);
+        break;
+      }
       if (a.potionCd > 0) return fail(w, 'Du musst kurz warten.');
       const needHp = it.heal !== undefined && a.hp < maxHpOf(a);
       const needMana = it.mana !== undefined && a.mana < maxManaOf(a);
@@ -1662,6 +1676,31 @@ export function drainEvents(w: World): GameEvent[] {
   return e;
 }
 
+const TELEPORT_TICKS = 3 * TICK_RATE;
+
+/** Teleport-Schriftrolle: bricht bei Bewegung, Treffer oder Tod ab, sonst Ankunft in der Zielstadt; die Rolle verbraucht sich erst dann. */
+function updateTeleport(w: World, a: Actor): void {
+  const t = a.tele!;
+  if (!a.alive || a.lastHitAt >= t.from || Math.hypot(a.x - t.x, a.y - t.y) > 0.4 || a.path.length > 0 || a.targetId !== null) {
+    a.tele = undefined;
+    note(w, a, 'Die Schriftrolle wirkt nicht: Du wurdest unterbrochen.');
+    return;
+  }
+  if (w.tick < t.at) return;
+  a.tele = undefined;
+  const dest = w.towns.find((x) => x.name === t.town);
+  const scroll = a.inventory.find((i) => i.id === t.itemId);
+  if (!dest || !scroll) return;
+  a.inventory = a.inventory.filter((i) => i.id !== t.itemId);
+  a.x = dest.x;
+  a.y = dest.y;
+  a.path = [];
+  a.targetId = null;
+  a.pickupId = null;
+  w.events.push({ type: 'teleported', to: a.id });
+  note(w, a, `Du erreichst ${t.town}.`);
+}
+
 export function tick(w: World): void {
   w.tick++;
   if (w.tick % 100 === 0) cleanupSummons(w);
@@ -1681,6 +1720,7 @@ export function tick(w: World): void {
     }
     if (a.cooldownLeft > 0) a.cooldownLeft--; // darf knapp unter 0 fallen (Rest, s. startCooldown)
     if (a.potionCd > 0) a.potionCd--;
+    if (a.tele) updateTeleport(w, a);
     if (a.dot) {
       if (w.tick % TICK_RATE === 0) {
         const src = getActor(w, a.dot.srcId) ?? a;

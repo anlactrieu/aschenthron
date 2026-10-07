@@ -52,6 +52,8 @@ export interface ItemTemplate {
   weight: number;
   heal?: number;
   mana?: number;
+  /** Schriftrolle: Ziel-Stadt (Name der Stadt), teleportiert beim Lesen */
+  town?: string;
   /** Basiswerte (Waffe: Schaden min/max, Rüstung: Rüstung) */
   damage?: [number, number];
   armor?: number;
@@ -101,6 +103,7 @@ export interface Item {
   weight: number;
   heal?: number;
   mana?: number;
+  town?: string;
   damage?: [number, number];
   armor?: number;
   reqKraft: number;
@@ -236,6 +239,8 @@ export const TEMPLATES: ItemTemplate[] = [
   { id: 'bone_legs', name: 'Knochenbeinlinge', slot: 'legs', weight: 9, armor: 8, reqKraft: 22, value: 250, minLevel: 16 },
   { id: 'dread_legs', name: 'Schreckensbeinlinge', slot: 'legs', weight: 11, armor: 12, reqKraft: 28, value: 500, minLevel: 21 },
   { id: 'ash_legs', name: 'Aschenbeinlinge', slot: 'legs', weight: 13, armor: 17, reqKraft: 34, value: 920, minLevel: 27 },
+  { id: 'scroll_hafen', name: 'Schriftrolle nach Aschenhafen', slot: 'potion', weight: 0.1, town: 'Aschenhafen', reqKraft: 0, value: 60, minLevel: 1 },
+  { id: 'scroll_wacht', name: 'Schriftrolle nach Felsenwacht', slot: 'potion', weight: 0.1, town: 'Felsenwacht', reqKraft: 0, value: 90, minLevel: 6 },
   { id: 'heal_small', name: 'Kleiner Heiltrank', slot: 'potion', weight: 0.3, heal: 50, reqKraft: 0, value: 8, minLevel: 1 },
   { id: 'heal_mid', name: 'Heiltrank', slot: 'potion', weight: 0.4, heal: 130, reqKraft: 0, value: 25, minLevel: 6 },
   { id: 'heal_big', name: 'Großer Heiltrank', slot: 'potion', weight: 0.5, heal: 280, reqKraft: 0, value: 70, minLevel: 11 },
@@ -542,6 +547,7 @@ export function generateItem(rng: Rng, id: number, templateId: string, rarityIn:
     armor: t.armor,
     heal: t.heal,
     mana: t.mana,
+    ...(t.town ? { town: t.town } : {}),
     reqKraft: t.reqKraft,
     req: t.slot === 'potion' || t.slot === 'gem' ? undefined : reqOfTemplate(t),
     kind: t.kind,

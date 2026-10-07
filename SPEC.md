@@ -207,3 +207,7 @@ Ziel: freie Builds statt Itemleiter, nur Prinzipien klassischer freier MMORPGs, 
 - **Titelbild** für neue Spiele mit Prämisse und Namenswahl (`showTitle`, Name in localStorage `aschenthron.name`); Erfolg und Banner beim Sturz des Aschenkönigs; Banner und Blitz bei Rare-Drops.
 - **Nicht gemacht:** Startschaden erhöhen (Golden-Tests und Balance hängen daran), Server-Rangliste (braucht Server-Persistenz), Legendär-Droprate/Duplikate.
 - **Pace-Kontrolle nach Runde 2:** Bot-Lauf Level 5 nach 13 min, 10 nach 50 min, 20 nach 188 min, 30 nach 504 min (8,4 h, 8 Tode). Entspricht den früheren Messungen, `XP_LATE_FACTOR = 1.0` passt also. Der Bot nutzt keine Skills; die Balance der neuen Skills bleibt per Hand zu prüfen.
+
+## Teleport-Schriftrollen (Goldsenke)
+- Zwei Rollen (`scroll_hafen` Stufe 1, 60 Wert; `scroll_wacht` Stufe 6, 90 Wert) als Verbrauchsgegenstand (Slot `potion`, Feld `town`), bei den Händlern `basic` und `advanced` kaufbar; Kaufpreis = 2 × Wert (120 bzw. 180 Gold), fallen nicht als Beute.
+- Lesen: 3 s Wirkzeit (`TELEPORT_TICKS`, `Actor.tele`, `updateTeleport` in world.ts); Bewegung, Treffer, Kampf oder Tod brechen ab, die Rolle bleibt dann erhalten. Nicht lesbar im Kampf und nicht, wenn man schon in der Zielstadt ist (< 25 Felder). Stadtname kommt aus der Tiled-Karte (`world.towns[].name`).

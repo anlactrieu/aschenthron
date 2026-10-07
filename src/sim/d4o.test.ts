@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Grid } from './path';
 import { SKILLS, SPECS, SPEC_LEVEL } from './data';
-import { LEGENDARIES, POWER_TEXT, TEMPLATES } from './items';
-import { applyCommand, armorOf, createWorld, maxHpOf, powerOf, spawnPlayer, type World } from './world';
+import { LEGENDARIES, POWER_TEXT, TEMPLATES, generateItem } from './items';
+import { applyCommand, armorOf, createWorld, maxHpOf, powerOf, spawnPlayer, tick, type World } from './world';
 import { exportPlayer, importPlayer } from './save';
 
 const big = (): Grid => ({ w: 40, h: 40, walkable: new Array(1600).fill(true) });
@@ -61,5 +61,34 @@ describe('Level-Meilensteine', () => {
     expect(p.statPoints).toBe(before + 5 * 9 + milestonePoints(10).stat);
     expect(milestonePoints(30).stat).toBe(26);
     expect(rankLevelReq(22, 5)).toBe(Math.min(MAX_LEVEL, 34));
+  });
+});
+
+describe('Teleport-Schriftrollen', () => {
+  const setup = () => {
+    const w = createWorld(1, { w: 120, h: 120, walkable: new Array(14400).fill(true) });
+    w.towns.push({ x: 100, y: 100, name: 'Felsenwacht' }, { x: 10, y: 10, name: 'Aschenhafen' });
+    const p = spawnPlayer(w, 60, 60);
+    const scroll = makeScroll(w, 'scroll_hafen');
+    p.inventory.push(scroll);
+    return { w, p, scroll };
+  };
+  const makeScroll = (w: World, id: string) => generateItem(w.rng, 9000, id, 'normal');
+  it('braucht 3 s, bringt in die Stadt und verbraucht die Rolle', () => {
+    const { w, p, scroll } = setup();
+    applyCommand(w, p.id, { type: 'usePotion', itemId: scroll.id });
+    expect(p.tele).toBeDefined();
+    for (let i = 0; i < 70; i++) tick(w);
+    expect(Math.round(p.x)).toBe(10);
+    expect(p.inventory.some((i) => i.id === scroll.id)).toBe(false);
+  });
+  it('Bewegung bricht ab und die Rolle bleibt erhalten', () => {
+    const { w, p, scroll } = setup();
+    applyCommand(w, p.id, { type: 'usePotion', itemId: scroll.id });
+    p.x += 2;
+    for (let i = 0; i < 70; i++) tick(w);
+    expect(p.tele).toBeUndefined();
+    expect(Math.round(p.x)).toBe(62);
+    expect(p.inventory.some((i) => i.id === scroll.id)).toBe(true);
   });
 });
