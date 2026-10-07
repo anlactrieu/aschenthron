@@ -1,10 +1,10 @@
-import { milestonePoints, ATTR_KEYS, MAP_VERSION, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, questById, skillById, totalXpFor } from './data';
+import { monsterKind, milestonePoints, ATTR_KEYS, MAP_VERSION, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, questById, skillById, totalXpFor } from './data';
 import { isWalkable } from './path';
 import { EQUIP_SLOT_LIST, GEM_KINDS, LEGENDARIES, SETS, TEMPLATES, handsOf, type Item } from './items';
 import { maxHpOf, maxManaOf, type Actor, type World } from './world';
 
 const KEYS = [
-  'x', 'y', 'hp', 'mana', 'level', 'xp', 'statPoints', 'attrs', 'gold', 'skills', 'inventory', 'equipment', 'stash', 'maxHp', 'quests', 'skillRanks', 'skillPoints', 'freeRespec', 'spec',
+  'x', 'y', 'hp', 'mana', 'level', 'xp', 'statPoints', 'attrs', 'gold', 'skills', 'inventory', 'equipment', 'stash', 'maxHp', 'quests', 'skillRanks', 'skillPoints', 'freeRespec', 'spec', 'bounties', 'bountyDay',
 ] as const;
 
 
@@ -32,6 +32,8 @@ function migrateItem(i: unknown): unknown {
   }
   return it;
 }
+
+const monsterKindExists = (id: string): boolean => { try { monsterKind(id); return true; } catch { return false; } };
 
 const isItem = (i: unknown): i is Item => {
   if (!i || typeof i !== 'object') return false;
@@ -109,6 +111,13 @@ export function importPlayer(w: World, p: Actor, json: string): boolean {
     // Altstände (ohne Merker): einmal kostenlos neu verteilen, damit die neuen Fertigkeiten ausprobiert werden können
     p.freeRespec = typeof s.freeRespec === 'boolean' ? s.freeRespec : true;
     p.spec = typeof s.spec === 'string' && SPECS.some((x) => x.id === s.spec) && p.level >= SPEC_LEVEL ? s.spec : undefined;
+    p.bountyDay = typeof s.bountyDay === 'number' && Number.isFinite(s.bountyDay) ? Math.floor(s.bountyDay) : undefined;
+    p.bounties = Array.isArray(s.bounties)
+      ? (s.bounties as unknown as Record<string, unknown>[]).slice(0, 3).filter((b) => b && typeof b.target === 'string' && monsterKindExists(b.target as string)).map((b, i) => ({
+          id: i + 1, target: b.target as string, count: Math.max(1, Math.min(30, Math.floor(num(b.count, 10)))), progress: Math.max(0, Math.floor(num(b.progress, 0))),
+          gold: Math.max(0, Math.floor(num(b.gold, 0))), xp: Math.max(0, Math.floor(num(b.xp, 0))), ...(b.claimed ? { claimed: true } : {}),
+        }))
+      : undefined;
     p.skillCd = {};
     p.path = [];
     p.targetId = null;

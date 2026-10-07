@@ -1,5 +1,5 @@
 import { SPECS, SPEC_LEVEL, NPC_ROLE, npcKeyOf, ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_2, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, STATUS_IDS, SCHOOL_NAME, schoolOf, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, uniqueDef, NPC_LORE, type QuestDef, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
-import { POWER_TEXT, TEMPLATES, TIER_COLOR, GEM_COLOR, affixRange, gemAffix, gemName, handsOf, itemAffixes, itemReq, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
+import { POWER_TEXT, TEMPLATES, SETS, TIER_COLOR, GEM_COLOR, affixRange, gemAffix, gemName, handsOf, itemAffixes, itemReq, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
 import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
   bulkSellable, sellPrice, critChance, attrBonus, equipSlotFor, socketCost, maxHpOf, maxManaOf, missingReq, nearNpc, trainerTeaches, powerOf, resistOf, type Actor, type Command, type Npc, type World,
@@ -361,7 +361,7 @@ export class Ui {
     this.updateHud(p, target);
     this.updateTracker(w, p);
     const near = w.npcs.filter((n) => Math.hypot(n.x - p.x, n.y - p.y) <= NPC_RANGE);
-    const key = JSON.stringify([this.open, this.tab, p.inventory, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.freeRespec, p.gold, p.level, p.spec, near.map((n) => n.id), p.quests, p.xp > 0, this.ach?.unlocked.size, this.ach?.stats.kills]);
+    const key = JSON.stringify([this.open, this.tab, p.inventory, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.freeRespec, p.gold, p.level, p.spec, near.map((n) => n.id), p.quests, p.bounties, p.xp > 0, this.ach?.unlocked.size, this.ach?.stats.kills]);
     if (key === this.key || this.dragging) return;
     this.key = key;
     if (this.open) this.renderMain(p);
@@ -747,7 +747,10 @@ export class Ui {
     else if (this.tab === 'char') this.renderChar(body, p);
     else if (this.tab === 'skills') this.renderSkills(body, p);
     else if (this.tab === 'ach') this.renderAch(body);
-    else this.renderQuests(body, p);
+    else {
+      this.renderQuests(body, p);
+      this.renderHunts(body, p);
+    }
     const title = titleBar(`${p.name} · Stufe ${p.level}`, this.main, () => this.toggle(false));
     this.main.replaceChildren(title, tabs, body);
   }
@@ -1077,6 +1080,59 @@ export class Ui {
       if (cur) body.append(this.questCard(cur, p, w));
       else if (done === chain.quests.length) body.append(el('div', 'a-note', 'Abgeschlossen.'));
       else if (next) body.append(el('div', 'a-note', `Nächstes Kapitel „${next.name}“ ab Stufe ${next.minLevel}${next.requires ? ' – beim Auftraggeber abholen' : ''}${w && giverLocation(w, next) ? `: ${giverLocation(w, next)!.text}` : ''}.`));
+    }
+  }
+
+  /** Kopfgelder (täglicher Aushang) und Set-Jagd: Ziele für die Beute-Jagd. */
+  private renderHunts(body: HTMLElement, p: Actor): void {
+    const w = this.lastW;
+    body.append(el('div', 'a-sec', 'Kopfgelder'));
+    const inTown = !!w?.safe.some((r) => p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h);
+    const day = Math.floor(Date.now() / 86400000);
+    const fresh = p.bountyDay === day && !!p.bounties?.length;
+    if (!fresh) {
+      body.append(el('div', 'a-note', inTown ? 'Am Aushang hängen heute neue Kopfgelder.' : 'Der Aushang hängt in den Städten. Dort gibt es täglich 3 neue Kopfgelder für deine Stufe.'));
+      if (inTown) {
+        const b = el('button', 'a-btn', 'Aushang ansehen');
+        b.onclick = () => this.send({ type: 'bountyBoard', day });
+        body.append(b);
+      }
+    }
+    for (const b of p.bounties ?? []) {
+      const c = el('div', 'a-card');
+      c.style.display = 'block';
+      let name = b.target;
+      try { name = monsterKind(b.target).name; } catch { /* unbekannt */ }
+      const done = b.progress >= b.count;
+      c.append(el('div', '', `${b.claimed ? '✔ ' : ''}Erlege ${b.count}× ${name} (${Math.min(b.progress, b.count)}/${b.count})`), el('div', 'a-note', `Belohnung ${b.xp} XP, ${b.gold} Gold, 30 % Chance auf einen seltenen Gegenstand`));
+      const bar = el('div', 'a-bar');
+      const f = el('div');
+      f.style.cssText = `width:${Math.min(100, (b.progress / b.count) * 100)}%;background:${done ? '#6fe08a' : '#d8a24a'}`;
+      bar.append(f);
+      c.append(bar);
+      if (done && !b.claimed) {
+        const claim = el('button', 'a-btn', inTown ? 'Abholen' : 'Abholen (nur in der Stadt)');
+        claim.onclick = () => this.send({ type: 'claimBounty', id: b.id });
+        c.append(claim);
+      }
+      body.append(c);
+    }
+    // Set-Jagd: Sets, von denen du schon Teile besitzt
+    const owned = new Set<string>();
+    for (const it of [...p.inventory, ...p.stash, ...Object.values(p.equipment)]) if (it?.setId) owned.add(`${it.setId}:${it.name}`);
+    const sets = SETS.filter((s) => s.pieces.some((pc) => owned.has(`${s.id}:${pc.name}`)));
+    if (sets.length) {
+      body.append(el('div', 'a-sec', 'Set-Jagd'));
+      for (const st of sets) {
+        const have = st.pieces.filter((pc) => owned.has(`${st.id}:${pc.name}`));
+        const missing = st.pieces.filter((pc) => !owned.has(`${st.id}:${pc.name}`));
+        const c = el('div', 'a-card');
+        c.style.display = 'block';
+        c.append(el('div', '', `${st.name}: ${have.length}/${st.pieces.length} Teile`));
+        c.append(el('div', 'a-note', missing.length ? `Fehlt: ${missing.map((m) => m.name).join(', ')}` : 'Komplett – der volle Set-Bonus ist aktiv, wenn alles angelegt ist.'));
+        if (missing.length) c.append(el('div', 'a-note', `Fundorte: Mini-Bosse („Gesucht“, oft Set-Teil), seltene Beute von Gegnern der Stufe ${st.minLevel}–${st.minLevel + 9}, Truhen.`));
+        body.append(c);
+      }
     }
   }
 

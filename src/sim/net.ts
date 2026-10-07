@@ -31,6 +31,10 @@ export function validateCommand(w: World, c: unknown): Command | null {
       return EQUIP_SLOT_LIST.includes(o.slot as never) ? { type: 'unequip', slot: o.slot as 'weapon' } : null;
     case 'spendStat':
       return ATTR_KEYS.includes(o.attr as never) ? { type: 'spendStat', attr: o.attr as never } : null;
+    case 'bountyBoard':
+      return typeof o.day === 'number' && Number.isFinite(o.day) ? { type: 'bountyBoard', day: o.day } : null;
+    case 'claimBounty':
+      return typeof o.id === 'number' ? { type: 'claimBounty', id: o.id } : null;
     case 'chooseSpec':
       return str(o.spec) ? { type: 'chooseSpec', spec: o.spec } : null;
     case 'learnSkill': case 'trainSkill':

@@ -117,3 +117,35 @@ describe('Roter Faden und Mit-Jagen', () => {
     expect(s === null || ['story', 'zone', 'quest', 'hunt', 'turnin'].includes(s.kind)).toBe(true);
   });
 });
+
+describe('Kopfgelder', () => {
+  it('Aushang nur in der Stadt, 3 Stück, Fortschritt zählt, Abholen zahlt aus', async () => {
+    const { spawnMonster } = await import('./world');
+    const w = createWorld(1, big());
+    w.safe.push({ x: 5, y: 5, w: 10, h: 10 });
+    const p = spawnPlayer(w, 8, 8);
+    p.level = 3;
+    spawnMonster(w, 30, 30, 'field_rat');
+    spawnMonster(w, 31, 30, 'giant_rat');
+    spawnMonster(w, 32, 30, 'feral_hound');
+    applyCommand(w, p.id, { type: 'bountyBoard', day: 100 });
+    expect(p.bounties?.length).toBeGreaterThan(0);
+    const again = p.bounties;
+    applyCommand(w, p.id, { type: 'bountyBoard', day: 100 });
+    expect(p.bounties).toBe(again);
+    const b = p.bounties![0]!;
+    b.progress = b.count;
+    const gold = p.gold;
+    applyCommand(w, p.id, { type: 'claimBounty', id: b.id });
+    expect(p.gold).toBe(gold + b.gold);
+    expect(b.claimed).toBe(true);
+    applyCommand(w, p.id, { type: 'claimBounty', id: b.id });
+    expect(p.gold).toBe(gold + b.gold);
+  });
+  it('Außerhalb der Stadt gibt es keinen Aushang', () => {
+    const w = createWorld(1, big());
+    const p = spawnPlayer(w, 8, 8);
+    applyCommand(w, p.id, { type: 'bountyBoard', day: 1 });
+    expect(p.bounties).toBeUndefined();
+  });
+});

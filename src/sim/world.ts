@@ -2,7 +2,7 @@ import { Rng } from './rng';
 import { findPath, isWalkable, type Grid, type Pt } from './path';
 import { itemReq, itemAffixes, gemTemplateId, handsOf, weaponSpeedOf, rollGem, rollUniqueSpecial, rollWorldDrop, rollWorldSpecial, rollDrop, rollPotion, rollSpecial, templateById, generateItem, rerollAffixes, extendAffixes, SETS, type GemInfo, type Item, type PowerId, type SetBonus, type EquipSlot, type Stat } from './items';
 import {
-  ATTR_KEYS, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
+  ATTR_KEYS, xpToNext, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
   monsterKind, npcKeyOf, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
   FAMILY_RES, MELEE_SKILL_KRAFT_SCALE, MAX_RES, SLOW_FACTOR, STATUS_IDS, PASSIVE_CAP, DMG_NAME, type DmgType, type StatusId, type SkillDef, type PassiveKey,
   ATTR_THRESHOLD, ATTR_THRESHOLD_2, ATTR_THRESHOLD_BONUS, LEVEL_MILESTONES, milestonePoints, WILL_RES_PER_2, WILL_STATUS_PER_POINT, WILL_STATUS_CAP, GEM_MIN_LEVEL, GEM_DROP, GEM_SOCKET_COST, WORLD_BOSS_LOOT, type QuestDef,
@@ -45,6 +45,18 @@ const NPC_WANDER_SPEED = 0.04;
 const SLEEP_DIST = 32;
 const REPATH_TICKS = 8;
 
+/** Kopfgeld (täglich wechselnder Auftrag vom Aushang): Gegnerart, Anzahl, Fortschritt, Belohnung */
+export interface Bounty {
+  id: number;
+  target: string;
+  count: number;
+  progress: number;
+  gold: number;
+  xp: number;
+  /** abgeholt */
+  claimed?: boolean;
+}
+
 export type Command =
   | { type: 'moveTo'; x: number; y: number }
   | { type: 'attack'; targetId: number }
@@ -55,6 +67,8 @@ export type Command =
   | { type: 'usePotion'; itemId: number }
   | { type: 'spendStat'; attr: AttrKey }
   | { type: 'chooseSpec'; spec: string }
+  | { type: 'bountyBoard'; day: number }
+  | { type: 'claimBounty'; id: number }
   | { type: 'learnSkill'; skillId: string }
   | { type: 'trainSkill'; skillId: string }
   | { type: 'respec' }
@@ -138,6 +152,9 @@ export interface Actor {
   freeRespec?: boolean;
   /** Spieler: gewählte Meisterschaft (`SPECS`), wird beim Neuverteilen zurückgesetzt */
   spec?: string;
+  /** Spieler: heutige Kopfgelder (Aushang in der Stadt) und der Tag, für den sie gelten */
+  bounties?: Bounty[];
+  bountyDay?: number;
   /** Spieler: gerade gelesene Teleport-Schriftrolle (Wirkzeit, Abbruch bei Bewegung oder Treffer) */
   tele?: { at: number; from: number; x: number; y: number; town: string; itemId: number };
   /** Monster: frühester Tick für den nächsten Schutz-/Bannzauber */
@@ -825,6 +842,34 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       a.inventory = a.inventory.filter((i) => i.id !== it.id);
       a.potionCd = POTION_COOLDOWN_TICKS;
       w.events.push({ type: 'potion', item: it, to: a.id });
+      break;
+    }
+    case 'bountyBoard': {
+      if (!w.safe.some((r) => a.x >= r.x && a.x <= r.x + r.w && a.y >= r.y && a.y <= r.y + r.h)) return fail(w, 'Der Aushang hängt nur in den Städten.');
+      if (!Number.isFinite(cmd.day)) return;
+      if (a.bountyDay === cmd.day && a.bounties?.length) return;
+      a.bountyDay = Math.floor(cmd.day);
+      a.bounties = rollBounties(w, a);
+      note(w, a, 'Neue Kopfgelder hängen am Aushang.');
+      break;
+    }
+    case 'claimBounty': {
+      const b = a.bounties?.find((x) => x.id === cmd.id);
+      if (!b || b.claimed) return;
+      if (b.progress < b.count) return fail(w, 'Das Kopfgeld ist noch nicht erfüllt.');
+      if (!w.safe.some((r) => a.x >= r.x && a.x <= r.x + r.w && a.y >= r.y && a.y <= r.y + r.h)) return fail(w, 'Kopfgelder werden nur in der Stadt ausgezahlt.');
+      b.claimed = true;
+      a.gold += b.gold;
+      let item: Item | undefined;
+      if (w.fx.next() < 0.3) {
+        item = rollDrop(w.rng, () => w.nextId++, a.level, 'rare');
+        if (carriedWeight(a) + item.weight > carryCapacity(a)) {
+          w.ground.push({ id: w.nextId++, x: Math.round(a.x), y: Math.round(a.y), item, expiresAt: null });
+          w.events.push({ type: 'fail', reason: 'Rucksack zu schwer – Belohnung liegt am Boden.', to: a.id });
+        } else a.inventory.push(item);
+      }
+      w.events.push({ type: 'questTurned', questId: `bounty:${b.id}`, xp: b.xp, gold: b.gold, ...(item ? { item } : {}), to: a.id });
+      gainXp(w, a, b.xp);
       break;
     }
     case 'chooseSpec': {
@@ -1549,6 +1594,7 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
         note(w, pl, `Aufgabe „${q.name}“ läuft jetzt mit – deine Kills zählen.`);
       }
     }
+    if (m.kindId && !m.summoned) for (const b of pl.bounties ?? []) if (b.target === m.kindId && b.progress < b.count) b.progress++;
     for (const q of QUESTS) {
       const st = pl.quests[q.id];
       if (st?.state !== 'active') continue;
@@ -1683,6 +1729,23 @@ export function drainEvents(w: World): GameEvent[] {
   const e = w.events;
   w.events = [];
   return e;
+}
+
+/** Drei Kopfgelder passend zur Stufe: Gegnerarten aus der Welt (keine Bosse), mit dem Zufallsstrom `fx`. */
+function rollBounties(w: World, p: Actor): Bounty[] {
+  const kinds = new Map<string, number>();
+  for (const m of w.actors) {
+    if (m.kind !== 'monster' || !m.kindId || m.boss || m.unique || m.summoned || !m.home) continue;
+    if (Math.abs(m.level - p.level) <= 3 || (p.level < 4 && m.level <= 4)) kinds.set(m.kindId, m.level);
+  }
+  const pool = [...kinds.keys()].sort();
+  const out: Bounty[] = [];
+  for (let i = 0; i < 3 && pool.length; i++) {
+    const t = pool.splice(w.fx.int(0, pool.length - 1), 1)[0]!;
+    const count = w.fx.int(8, 14);
+    out.push({ id: i + 1, target: t, count, progress: 0, gold: Math.round(count * (6 + p.level * 2)), xp: Math.round(xpToNext(p.level) * 0.1) });
+  }
+  return out;
 }
 
 const TELEPORT_TICKS = 3 * TICK_RATE;
