@@ -1,10 +1,10 @@
-import { ATTR_KEYS, MAP_VERSION, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, questById, skillById, totalXpFor } from './data';
+import { ATTR_KEYS, MAP_VERSION, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, questById, skillById, totalXpFor } from './data';
 import { isWalkable } from './path';
 import { EQUIP_SLOT_LIST, GEM_KINDS, LEGENDARIES, SETS, TEMPLATES, handsOf, type Item } from './items';
 import { maxHpOf, maxManaOf, type Actor, type World } from './world';
 
 const KEYS = [
-  'x', 'y', 'hp', 'mana', 'level', 'xp', 'statPoints', 'attrs', 'gold', 'skills', 'inventory', 'equipment', 'stash', 'maxHp', 'quests', 'skillRanks', 'skillPoints', 'freeRespec',
+  'x', 'y', 'hp', 'mana', 'level', 'xp', 'statPoints', 'attrs', 'gold', 'skills', 'inventory', 'equipment', 'stash', 'maxHp', 'quests', 'skillRanks', 'skillPoints', 'freeRespec', 'spec',
 ] as const;
 
 
@@ -108,6 +108,7 @@ export function importPlayer(w: World, p: Actor, json: string): boolean {
     }
     // Altstände (ohne Merker): einmal kostenlos neu verteilen, damit die neuen Fertigkeiten ausprobiert werden können
     p.freeRespec = typeof s.freeRespec === 'boolean' ? s.freeRespec : true;
+    p.spec = typeof s.spec === 'string' && SPECS.some((x) => x.id === s.spec) && p.level >= SPEC_LEVEL ? s.spec : undefined;
     p.skillCd = {};
     p.path = [];
     p.targetId = null;

@@ -2,7 +2,7 @@ import { Rng } from './rng';
 import { findPath, isWalkable, type Grid, type Pt } from './path';
 import { itemReq, itemAffixes, gemTemplateId, handsOf, weaponSpeedOf, rollGem, rollUniqueSpecial, rollWorldDrop, rollWorldSpecial, rollDrop, rollPotion, rollSpecial, templateById, generateItem, rerollAffixes, extendAffixes, SETS, type GemInfo, type Item, type PowerId, type SetBonus, type EquipSlot, type Stat } from './items';
 import {
-  ATTR_KEYS, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
+  ATTR_KEYS, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
   monsterKind, npcKeyOf, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
   FAMILY_RES, MELEE_SKILL_KRAFT_SCALE, MAX_RES, SLOW_FACTOR, STATUS_IDS, PASSIVE_CAP, DMG_NAME, type DmgType, type StatusId, type SkillDef, type PassiveKey,
   ATTR_THRESHOLD, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, WILL_STATUS_PER_POINT, WILL_STATUS_CAP, GEM_MIN_LEVEL, GEM_DROP, GEM_SOCKET_COST, WORLD_BOSS_LOOT, type QuestDef,
@@ -54,6 +54,7 @@ export type Command =
   | { type: 'drop'; itemId: number }
   | { type: 'usePotion'; itemId: number }
   | { type: 'spendStat'; attr: AttrKey }
+  | { type: 'chooseSpec'; spec: string }
   | { type: 'learnSkill'; skillId: string }
   | { type: 'trainSkill'; skillId: string }
   | { type: 'respec' }
@@ -135,6 +136,8 @@ export interface Actor {
   statusMag?: Partial<Record<StatusId, number>>;
   /** Spieler: ein kostenloses Neuverteilen offen (einmalig nach dem Skill-Update, wird gespeichert) */
   freeRespec?: boolean;
+  /** Spieler: gewählte Meisterschaft (`SPECS`), wird beim Neuverteilen zurückgesetzt */
+  spec?: string;
   /** Monster: frühester Tick für den nächsten Schutz-/Bannzauber */
   buffAt?: number;
   /** Kontroll-Verkürzung: letzter Treffer und Wiederholungszähler je Effekt */
@@ -421,7 +424,7 @@ export function attrBonus(a: Actor, k: AttrKey): number {
 }
 
 function affixSum(a: Actor, stat: Stat): number {
-  let sum = 0;
+  let sum = a.spec ? (SPECS.find((x) => x.id === a.spec)?.bonus[stat] ?? 0) : 0;
   for (const it of equippedItems(a)) for (const f of itemAffixes(it)) if (f.stat === stat) sum += f.value;
   for (const set of activeSetBonuses(a)) for (const [, b] of set.bonuses) for (const f of b.affixes ?? []) if (f.stat === stat) sum += f.value;
   return sum;
@@ -810,6 +813,14 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       w.events.push({ type: 'potion', item: it, to: a.id });
       break;
     }
+    case 'chooseSpec': {
+      if (a.level < SPEC_LEVEL) return fail(w, `Meisterschaft ab Stufe ${SPEC_LEVEL}.`);
+      if (a.spec) return fail(w, 'Du hast bereits eine Meisterschaft (Neuverteilen beim Lehrer setzt sie zurück).');
+      if (!SPECS.some((x) => x.id === cmd.spec)) return;
+      a.spec = cmd.spec;
+      note(w, a, `Meisterschaft gewählt: ${SPECS.find((x) => x.id === cmd.spec)!.name}.`);
+      break;
+    }
     case 'spendStat':
       if (a.statPoints <= 0 || !ATTR_KEYS.includes(cmd.attr)) return;
       a.statPoints--;
@@ -853,6 +864,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       a.statPoints = START_STAT_POINTS + STAT_POINTS_PER_LEVEL * (a.level - 1);
       a.skills = [];
       a.skillRanks = {};
+      a.spec = undefined;
       a.skillCd = {};
       a.skillPoints = SKILL_POINTS_START + SKILL_POINTS_PER_LEVEL * (a.level - 1);
       // Ausrüstung, die nun die Anforderungen verfehlt, wandert in den Rucksack

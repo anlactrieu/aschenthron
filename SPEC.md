@@ -190,3 +190,12 @@ Ziel: freie Builds statt Itemleiter, nur Prinzipien klassischer freier MMORPGs, 
 - **Handelsstraße:** Monster-freier Streifen `SAFE_R = 12` (Aggro 6 + Patrouille 5 + Puffer).
 - **Stadtbewohner:** alle NPCs innerhalb der Sicherheitszone (außer der Truhe) schlendern in 2 Feldern Umkreis (`Npc.wander`), halten an, sobald jemand in Gesprächsreichweite ist. Nur Einzelspieler (`World.npcWander`), online bleiben NPCs am Platz, weil Clients nur den Heimatplatz kennen.
 - Zufall für Verhalten nutzt den eigenen Strom `World.fx`, damit Kampf und Beute der Simulation unverändert deterministisch bleiben.
+
+## D4O-Gefühl: Orientierung, Wucht, Tiefe (umgesetzt)
+- **Orientierung:** Quest-Tracker oben rechts (bis 3 Aufgaben, Ziel + Ort), Intro-Banner mit Prämisse (Aschental, Aschenkönig, Ziel Stufe 30).
+- **Kampfgefühl:** Crit-Sound, Hit-Stop (nur Einzelspieler, 55 ms Crit / 30 ms Boss), roter Todesblitz mit Banner.
+- **Loot:** Rare-Drop-Sound, ▲ am Bodenlabel bei Verbesserung; neue Powers `execute`, `healKill`, `burnHit`, `frostHit` (Proc-Würfe nur mit eigenem Zufallsstrom `fx`), 6 neue Legendäre, 4 Proc-Waffen (Stat `procBurn`/`procFrost`).
+- **Skills:** 12 neue Meisterfertigkeiten (Stufe 15–30, Lehrer Stufe 2, kein neuer Lehrer nötig) schließen die Lücke nach Blitzschlag.
+- **Meisterschaft:** ab Stufe 20 genau eine von 4 Richtungen (Kriegsherr, Jäger, Erzmagier, Wächter) als Zusatzwerte (`SPECS`, `Actor.spec`, Befehl `chooseSpec`); Neuverteilen beim Lehrer setzt sie zurück.
+- **Erfolge:** 16 Erfolge + Bestwerte (Taste O), nur clientseitig in localStorage (`aschenthron.ach.v1`). Echte Bestenliste braucht den Server: offen.
+- **Offen:** Pace-Lauf mit neuen Skills (Bot nutzt keine Skills), Balance der Meisterschaften und Powers im Spiel prüfen, Server-Rangliste.

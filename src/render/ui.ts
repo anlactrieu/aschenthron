@@ -1,4 +1,4 @@
-import { NPC_ROLE, npcKeyOf, ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, STATUS_IDS, SCHOOL_NAME, schoolOf, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, uniqueDef, NPC_LORE, type QuestDef, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
+import { SPECS, SPEC_LEVEL, NPC_ROLE, npcKeyOf, ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, STATUS_IDS, SCHOOL_NAME, schoolOf, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, uniqueDef, NPC_LORE, type QuestDef, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
 import { POWER_TEXT, TEMPLATES, TIER_COLOR, GEM_COLOR, affixRange, gemAffix, gemName, handsOf, itemAffixes, itemReq, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
 import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
@@ -316,7 +316,7 @@ export class Ui {
     this.updateHud(p, target);
     this.updateTracker(w, p);
     const near = w.npcs.filter((n) => Math.hypot(n.x - p.x, n.y - p.y) <= NPC_RANGE);
-    const key = JSON.stringify([this.open, this.tab, p.inventory, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.freeRespec, p.gold, p.level, near.map((n) => n.id), p.quests, p.xp > 0, this.ach?.unlocked.size, this.ach?.stats.kills]);
+    const key = JSON.stringify([this.open, this.tab, p.inventory, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.freeRespec, p.gold, p.level, p.spec, near.map((n) => n.id), p.quests, p.xp > 0, this.ach?.unlocked.size, this.ach?.stats.kills]);
     if (key === this.key || this.dragging) return;
     this.key = key;
     if (this.open) this.renderMain(p);
@@ -800,6 +800,24 @@ export class Ui {
       b.onclick = () => p.statPoints > 0 && this.send({ type: 'spendStat', attr: k });
       row.append(b);
       body.append(row);
+    }
+    // Meisterschaft (ab Stufe 20): eine dauerhafte Weichenstellung
+    if (p.level >= SPEC_LEVEL) {
+      body.append(el('div', 'a-sec', 'Meisterschaft'));
+      if (p.spec) {
+        const cur = SPECS.find((x) => x.id === p.spec);
+        body.append(el('div', '', cur?.name ?? ''), el('div', 'a-note', `${cur?.text ?? ''} Zurücksetzen beim Lehrer (Neuverteilen).`));
+      } else {
+        body.append(el('div', 'a-note', 'Wähle einen Pfad. Die Wahl gilt, bis du beim Lehrer alles neu verteilst.'));
+        for (const sp of SPECS) {
+          const c = el('div', 'a-card');
+          c.style.display = 'block';
+          const b = el('button', 'a-btn', `${sp.name} wählen`);
+          b.onclick = () => this.send({ type: 'chooseSpec', spec: sp.id });
+          c.append(el('div', '', sp.name), el('div', 'a-note', sp.text), b);
+          body.append(c);
+        }
+      }
     }
     // Buildprofil: Einschätzung, welchem Archetyp der Charakter ähnelt (keine Klassen, nur Hinweis)
     const prof = buildProfile(p);
