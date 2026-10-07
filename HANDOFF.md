@@ -1,5 +1,10 @@
 # HANDOFF – Aschenthron
 
+## AKTUELL (2026-10-08): Komfort-Paket umgesetzt (tsc, 285 Tests, Lint grün; Einstellungen/Tasten/Filter im Browser gesehen)
+- **Stand:** Siehe SPEC.md "Umsetzungsstand Komfort-Paket". Neu: `src/render/settings.ts`, Reiter "Einstellungen" (P) in `ui.ts`, `autoPickup`/`slotList`/`switchSlot` in `GameScene.ts`, `Sfx.setVolume` in `audio.ts`.
+- **Offen:** Handy-Version (SPEC.md "Handy-Version"), Second-Brain-Notiz zum Download-Gotcha (Dienst war nicht erreichbar), Gang von Monstern/NPCs im Profil im Spiel prüfen, Schnell aufheben und Speicherplatzwechsel im echten Spiel testen.
+- **Learnings:** Tag/Nacht und Spielstand-Export existierten schon; erst Code lesen, dann bauen. Eigene Variablennamen in langen Funktionen (`bar`, `lastHint`) kollidieren leicht.
+
 ## AKTUELL (2026-10-07): Spieler-Seitenansicht (uncommittet, tsc läuft/ungeprüft, im Browser nicht gesehen)
 - **Stand:** Rückseite gefällt dem User. Neu: Profil beim seitlichen Laufen (`spritePlayer(..., back, profile)` in art.ts: Körper x0.72 schmaler, Beine schwingen ±4 entlang der Laufrichtung statt zu spreizen; `lookKey/playerCanvas` haben 4. Param `profile`, Key-Suffix `s`). `GameScene`: `view.side = |screenDx| > 1.5·|screenDy|`, Rücken (`view.up`) nur ohne `side`. Monster/NPCs unverändert (nur Spiegeln). Vorher gepusht: 1bbecdb.
 - **Entscheidungen:** (1) LPC verworfen (Stilbruch, kaum Monster, Download legte den Mac lahm; Memory `feedback-grosse-downloads`). (2) Profil aus der Vorderansicht gebaut statt neuer Assets. (3) Seitenansicht nur bei überwiegend waagerechter Bildschirmbewegung, damit der gelobte Rücken bei Achsen-Schritten (Diagonale im Bild) bleibt.

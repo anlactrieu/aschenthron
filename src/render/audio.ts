@@ -8,6 +8,7 @@ export class Sfx {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private muted = false;
+  private vol = 1;
   private last: Record<string, number> = {};
   private noiseBuf: AudioBuffer | null = null;
   private bed: { noise: GainNode; lp: BiquadFilterNode; drone: GainNode; osc: OscillatorNode } | null = null;
@@ -34,13 +35,19 @@ export class Sfx {
     }
   }
 
+  /** Lautstärke 0–1 (aus den Einstellungen) */
+  setVolume(v: number): void {
+    this.vol = Math.min(1, Math.max(0, v));
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.35 * this.vol;
+  }
+
   get isMuted(): boolean {
     return this.muted;
   }
 
   toggleMute(): void {
     this.muted = !this.muted;
-    if (this.master) this.master.gain.value = this.muted ? 0 : 0.35;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.35 * this.vol;
     try {
       window.localStorage.setItem('aschenthron.muted', this.muted ? '1' : '0');
     } catch {
@@ -74,7 +81,7 @@ export class Sfx {
     if (!AC) return;
     this.ctx = new AC();
     this.master = this.ctx.createGain();
-    this.master.gain.value = this.muted ? 0 : 0.35;
+    this.master.gain.value = this.muted ? 0 : 0.35 * this.vol;
     this.master.connect(this.ctx.destination);
     const len = this.ctx.sampleRate;
     this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);

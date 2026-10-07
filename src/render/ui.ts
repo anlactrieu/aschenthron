@@ -7,6 +7,7 @@ import {
 } from '../sim/world';
 import { buildProfile } from '../sim/build';
 import { itemIcon, potionIcon, skillIcon, statusIcon } from './icons';
+import { ACTIONS, actionFor, keyLabel, keyOf, rebind, resetKeys, setCapturing, setSetting, settings } from './settings';
 import type { AchievementTracker } from './achievements';
 import { ACHIEVEMENTS } from './achievements';
 import { type NextStep, giverLocation, questAvailable, questChains, questWhere, targetName } from '../sim/quests';
@@ -208,7 +209,9 @@ const CSS = `
 .hb .cnt{position:absolute;right:3px;bottom:0;font:bold 12px system-ui;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000}
 `;
 
-type Tab = 'inv' | 'char' | 'skills' | 'quests' | 'ach';
+type Tab = 'inv' | 'char' | 'skills' | 'quests' | 'ach' | 'set';
+type BagFilter = 'all' | 'weapon' | 'armor' | 'potion' | 'other';
+type BagSort = 'none' | 'slot' | 'rarity' | 'value';
 
 interface Drag {
   item: Item;
@@ -244,6 +247,8 @@ export class Ui {
   /** Nächster Schritt (von der Szene alle 0,5 s gesetzt) */
   step: NextStep | null = null;
   private bannerTimer = 0;
+  private hintEl = el('div', '', 'Gespeichert');
+  private hintTimer = 0;
   private tip = el('div');
   private msgs: string[] = [];
   private key = '';
@@ -258,6 +263,8 @@ export class Ui {
   private dollKey = '';
   private dollUrl = '';
   private dollWidth = 104;
+  private bagFilter: BagFilter = 'all';
+  private bagSort: BagSort = 'none';
 
   constructor(
     private send: (c: Command) => void,
@@ -265,6 +272,7 @@ export class Ui {
     private usePotionKind: (kind: 'heal' | 'mana') => void,
     private newGame: () => void,
     private saveIo: { export: () => string; import: (json: string) => boolean } | null = null,
+    private slotIo: { list: () => { n: number; label: string; exists: boolean; active: boolean }[]; switchTo: (n: number) => void } | null = null,
   ) {
     const style = document.createElement('style');
     style.textContent = CSS;
@@ -291,21 +299,28 @@ export class Ui {
     this.tracker.style.cssText = 'position:fixed;right:12px;top:12px;max-width:260px;text-align:right;color:#e8d9b0;font:13px Georgia,serif;text-shadow:0 1px 4px #000,0 0 2px #000;background:rgba(10,8,6,.45);border-right:2px solid #d8a24a;padding:6px 10px;pointer-events:auto;z-index:5;display:none';
     this.bannerEl.style.cssText = 'position:fixed;left:50%;top:70px;transform:translateX(-50%);color:#e8d9b0;font:bold 24px Georgia,serif;text-shadow:0 2px 8px #000,0 0 2px #000;letter-spacing:1.5px;opacity:0;transition:opacity .6s;pointer-events:none;z-index:6;text-align:center';
     this.tip.style.cssText = 'position:fixed;z-index:50;max-width:270px;background:rgba(10,8,14,.97);border:1px solid #8a7258;color:#d4c4a8;font:12px/1.45 Georgia,serif;padding:8px 10px;pointer-events:none;display:none;box-shadow:0 4px 16px #000';
-    document.body.append(this.main, this.side, this.hud, this.tracker, this.target, this.toast, this.bannerEl, this.tip);
+    this.hintEl.style.cssText = 'position:fixed;left:12px;top:12px;z-index:5;color:#a8d8a0;font:12px Georgia,serif;text-shadow:0 1px 3px #000;opacity:0;transition:opacity .5s;pointer-events:none';
+    document.body.append(this.main, this.side, this.hud, this.tracker, this.target, this.toast, this.bannerEl, this.tip, this.hintEl);
 
     initCredits();
     window.addEventListener('keydown', (e) => {
       const k = e.key.toLowerCase();
-      if (k === 'i') this.toggleTab('inv');
-      if (k === 'c') this.toggleTab('char');
-      if (k === 'k') this.toggleTab('skills');
-      if (k === 'j') this.toggleTab('quests');
-      if (k === 'o') this.toggleTab('ach');
       if (k === 'escape') this.toggle(false);
-      if (k >= '1' && k <= '9') this.useSkillSlot(Number(k) - 1);
-      if (k === 'r') this.send({ type: 'rest' });
-      if (k === 'q') this.usePotionKind('heal');
-      if (k === 'e') this.usePotionKind('mana');
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const a = actionFor(e.key);
+      if (!a) return;
+      if (a === 'inv') this.toggleTab('inv');
+      else if (a === 'char') this.toggleTab('char');
+      else if (a === 'skills') this.toggleTab('skills');
+      else if (a === 'quests') this.toggleTab('quests');
+      else if (a === 'ach') this.toggleTab('ach');
+      else if (a === 'settings') this.toggleTab('set');
+      else if (a === 'rest') this.send({ type: 'rest' });
+      else if (a === 'heal') this.usePotionKind('heal');
+      else if (a === 'mana') this.usePotionKind('mana');
+      else this.useSkillSlot(Number(a.slice(5)) - 1);
     });
   }
 
@@ -363,7 +378,7 @@ export class Ui {
     this.updateHud(p, target);
     this.updateTracker(w, p);
     const near = w.npcs.filter((n) => Math.hypot(n.x - p.x, n.y - p.y) <= NPC_RANGE);
-    const key = JSON.stringify([this.open, this.tab, p.inventory, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.freeRespec, p.gold, p.level, p.spec, near.map((n) => n.id), p.quests, p.bounties, p.xp > 0, this.board?.map((r) => r.name + r.xp).join(), this.ach?.unlocked.size, this.ach?.stats.kills]);
+    const key = JSON.stringify([this.open, this.tab, p.inventory, this.bagFilter, this.bagSort, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.freeRespec, p.gold, p.level, p.spec, near.map((n) => n.id), p.quests, p.bounties, p.xp > 0, this.board?.map((r) => r.name + r.xp).join(), this.ach?.unlocked.size, this.ach?.stats.kills]);
     if (key === this.key || this.dragging) return;
     this.key = key;
     if (this.open) this.renderMain(p);
@@ -736,7 +751,7 @@ export class Ui {
 
   private renderMain(p: Actor): void {
     const tabs = el('div', 'a-tabs');
-    for (const [id, label] of [['inv', 'Inventar (I)'], ['char', 'Charakter (C)'], ['skills', 'Fertigkeiten (K)'], ['quests', 'Aufgaben (J)'], ['ach', 'Erfolge (O)']] as [Tab, string][]) {
+    for (const [id, label] of [['inv', `Inventar (${keyLabel(keyOf('inv'))})`], ['char', `Charakter (${keyLabel(keyOf('char'))})`], ['skills', `Fertigkeiten (${keyLabel(keyOf('skills'))})`], ['quests', `Aufgaben (${keyLabel(keyOf('quests'))})`], ['ach', `Erfolge (${keyLabel(keyOf('ach'))})`], ['set', `Einstellungen (${keyLabel(keyOf('settings'))})`]] as [Tab, string][]) {
       const t = el('div', `a-tab${this.tab === id ? ' on' : ''}`, label);
       t.onclick = () => {
         this.tab = id;
@@ -749,6 +764,7 @@ export class Ui {
     else if (this.tab === 'char') this.renderChar(body, p);
     else if (this.tab === 'skills') this.renderSkills(body, p);
     else if (this.tab === 'ach') this.renderAch(body);
+    else if (this.tab === 'set') this.renderSettings(body);
     else {
       this.renderQuests(body, p);
       this.renderHunts(body, p);
@@ -806,11 +822,37 @@ export class Ui {
 
     // Rucksack
     body.append(el('div', 'a-sec', 'Rucksack'));
+    const bagBar = el('div');
+    bagBar.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap;margin:2px 0 6px';
+    const FILTERS: [BagFilter, string][] = [['all', 'Alle'], ['weapon', 'Waffen'], ['armor', 'Rüstung'], ['potion', 'Tränke'], ['other', 'Sonstiges']];
+    for (const [id, label] of FILTERS) {
+      const b = el('button', `a-btn${this.bagFilter === id ? ' off' : ''}`, label) as HTMLButtonElement;
+      b.onclick = () => {
+        this.bagFilter = id;
+        this.key = '';
+      };
+      bagBar.append(b);
+    }
+    const SORTS: [BagSort, string][] = [['none', 'Sortieren: aus'], ['slot', 'Sortieren: Art'], ['rarity', 'Sortieren: Seltenheit'], ['value', 'Sortieren: Wert']];
+    const sb = el('button', 'a-btn', SORTS.find((x) => x[0] === this.bagSort)![1]) as HTMLButtonElement;
+    sb.onclick = () => {
+      this.bagSort = SORTS[(SORTS.findIndex((x) => x[0] === this.bagSort) + 1) % SORTS.length]![0];
+      this.key = '';
+    };
+    bagBar.append(sb);
+    body.append(bagBar);
     const grid = el('div', 'a-grid a-drop');
     grid.dataset.drop = 'bag';
     // Tränke gleicher Art stapeln (ein Slot, Anzahl als Zahl)
     const stacks: { item: Item; n: number }[] = [];
-    for (const it of p.inventory) {
+    const RARITY_RANK: Record<string, number> = { normal: 0, magic: 1, rare: 2, set: 3, legendary: 4 };
+    const kindOf = (it: Item): BagFilter =>
+      it.slot === 'potion' ? 'potion' : it.slot === 'weapon' ? 'weapon' : ['head', 'chest', 'legs', 'hands', 'feet', 'cloak', 'belt', 'offhand'].includes(it.slot) ? 'armor' : 'other';
+    const shown = p.inventory.filter((it) => this.bagFilter === 'all' || kindOf(it) === this.bagFilter);
+    if (this.bagSort === 'slot') shown.sort((a, b) => a.slot.localeCompare(b.slot) || b.value - a.value);
+    else if (this.bagSort === 'rarity') shown.sort((a, b) => (RARITY_RANK[b.rarity] ?? 0) - (RARITY_RANK[a.rarity] ?? 0) || b.value - a.value);
+    else if (this.bagSort === 'value') shown.sort((a, b) => b.value - a.value);
+    for (const it of shown) {
       const st = it.slot === 'potion' ? stacks.find((s) => s.item.templateId === it.templateId) : undefined;
       if (st) st.n++;
       else stacks.push({ item: it, n: 1 });
@@ -954,6 +996,93 @@ export class Ui {
     cb.onclick = () => toggleCredits();
     body.append(nb, cb);
     if (this.saveIo) this.renderSaveIo(body);
+  }
+
+  private renderSettings(body: HTMLElement): void {
+    const cfg = settings();
+    body.append(el('div', 'a-sec', 'Anzeige und Ton'));
+    const row = (label: string, ctl: HTMLElement): void => {
+      const r = el('div', 'a-row');
+      r.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:8px;margin:4px 0';
+      r.append(el('span', '', label), ctl);
+      body.append(r);
+    };
+    const toggle = (label: string, on: boolean, set: (v: boolean) => void): void => {
+      const b = el('button', 'a-btn', on ? 'An' : 'Aus') as HTMLButtonElement;
+      b.onclick = () => {
+        set(!on);
+        this.key = '';
+      };
+      row(label, b);
+    };
+    const vol = Object.assign(document.createElement('input'), { type: 'range', min: '0', max: '100', value: String(Math.round(cfg.volume * 100)) });
+    vol.oninput = () => setSetting('volume', Number(vol.value) / 100);
+    row('Lautstärke', vol);
+    toggle('Schadenszahlen', cfg.dmgNumbers, (v) => setSetting('dmgNumbers', v));
+    toggle('Namen über Figuren', cfg.labels, (v) => setSetting('labels', v));
+    toggle('Schnell aufheben (Tränke, Edelsteine, Pfeile)', cfg.autoPickup, (v) => setSetting('autoPickup', v));
+
+    body.append(el('div', 'a-sec', 'Tastenbelegung'));
+    body.append(el('div', 'a-note', 'Auf eine Taste klicken, dann die neue Taste drücken. Esc bricht ab. M (Ton), U (Musik), N (Karte) und die Pfeiltasten sind fest.'));
+    const msg = el('div', 'a-note');
+    msg.style.color = '#ff9a8a';
+    const grid = el('div');
+    grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-top:6px';
+    for (const a of ACTIONS) {
+      const r = el('div');
+      r.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:6px';
+      const b = el('button', 'a-btn', keyLabel(keyOf(a.id))) as HTMLButtonElement;
+      b.style.minWidth = '64px';
+      b.onclick = () => {
+        b.textContent = 'Taste drücken …';
+        setCapturing(true);
+        const done = (e: KeyboardEvent): void => {
+          e.preventDefault();
+          e.stopPropagation();
+          window.removeEventListener('keydown', done, true);
+          setCapturing(false);
+          if (e.key !== 'Escape') {
+            const err = rebind(a.id, e.key);
+            msg.textContent = err ?? '';
+          }
+          this.key = '';
+        };
+        window.addEventListener('keydown', done, true);
+      };
+      r.append(el('span', '', a.label), b);
+      grid.append(r);
+    }
+    body.append(grid, msg);
+    const rs = el('button', 'a-btn', 'Tasten zurücksetzen') as HTMLButtonElement;
+    rs.style.marginTop = '6px';
+    rs.onclick = () => {
+      resetKeys();
+      this.key = '';
+    };
+    body.append(rs);
+
+    if (this.slotIo) {
+      body.append(el('div', 'a-sec', 'Speicherplätze'));
+      body.append(el('div', 'a-note', 'Jeder Platz hat einen eigenen Spielstand. Beim Wechsel wird der aktuelle zuerst gesichert und die Seite neu geladen.'));
+      const sl = this.slotIo;
+      for (const s of sl.list()) {
+        const r = el('div');
+        r.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:8px;margin:4px 0';
+        r.append(el('span', '', `Platz ${s.n}: ${s.label}${s.active ? ' (aktiv)' : ''}`));
+        const b = el('button', `a-btn${s.active ? ' off' : ''}`, s.active ? 'Aktiv' : s.exists ? 'Laden' : 'Neu beginnen') as HTMLButtonElement;
+        if (!s.active) b.onclick = () => sl.switchTo(s.n);
+        r.append(b);
+        body.append(r);
+      }
+    }
+    if (this.saveIo) this.renderSaveIo(body);
+  }
+
+  /** Kurzer Hinweis oben links, dass gespeichert wurde. */
+  savedHint(): void {
+    this.hintEl.style.opacity = '1';
+    window.clearTimeout(this.hintTimer);
+    this.hintTimer = window.setTimeout(() => (this.hintEl.style.opacity = '0'), 1400);
   }
 
   /** Spielstand liegt nur im Browser: Sicherung als Datei oder Code, damit er mit Browserwechsel/Inkognito mitzieht. */

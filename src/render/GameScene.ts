@@ -20,12 +20,26 @@ import { Sfx } from './audio';
 import { Minimap } from './minimap';
 import { Atmosphere, isDungeon } from './atmosphere';
 import { Fx } from './fx';
+import { onSettings, settings } from './settings';
 import type { RemoteSession } from '../net/client';
 import {
   ensureTexture, tileBase, FEET_ORIGIN_Y, FRAME_STEP_L, FRAME_STEP_R, FRAME_WIND, FRAME_STRIKE, lookKey, lookOf, npcTextureKey, BIPED, monsterCanvas, npcCanvas, playerCanvas, registerStaticArt, tileCanvas, TILE_H, TILE_VARIANTS, TILE_W, WALL_VARIANTS,
 } from './art';
 
-const SAVE_KEY = 'aschenthron.save.v1';
+const SAVE_BASE = 'aschenthron.save.v1';
+const SLOT_KEY = 'aschenthron.slot';
+const SLOTS = 3;
+/** Aktiver Speicherplatz (1–3); Platz 1 nutzt den bisherigen Schlüssel, damit alte Spielstände erhalten bleiben. */
+function activeSlot(): number {
+  try {
+    const n = Number(window.localStorage.getItem(SLOT_KEY));
+    return n >= 1 && n <= SLOTS ? n : 1;
+  } catch {
+    return 1;
+  }
+}
+const slotKey = (n: number): string => (n === 1 ? SAVE_BASE : `${SAVE_BASE}.s${n}`);
+const saveKey = (): string => slotKey(activeSlot());
 const VIEW = 30;
 /** Kamera-Zoom: Standard etwas weiter draußen als 1, per Mausrad zwischen ZOOM_MIN und ZOOM_MAX */
 const ZOOM_DEFAULT = 0.75;
@@ -96,6 +110,10 @@ export class GameScene extends Phaser.Scene {
   /** Hit-Stop: so viele ms bleibt die Simulation stehen (nur Einzelspieler), gibt Treffern Wucht */
   private hitStop = 0;
   private autosave = 0;
+  private lastSavedHint = 0;
+  private lastAutoPick = 0;
+  /** Beute-IDs, die schon einmal automatisch angesteuert wurden (kein Dauerversuch bei vollem Rucksack) */
+  private autoTried = new Map<number, number>();
   private frame = 0;
   private ui!: Ui;
   private sfx!: Sfx;
@@ -157,20 +175,22 @@ export class GameScene extends Phaser.Scene {
     const store = this.remote ? null : safeStorage();
     const params = new URLSearchParams(location.search);
     if (!this.remote && params.has('neu')) {
-      store?.removeItem(SAVE_KEY);
+      store?.removeItem(saveKey());
       params.delete('neu');
       const rest = params.toString();
       history.replaceState(null, '', location.pathname + (rest ? `?${rest}` : ''));
     }
-    const saved = store?.getItem(SAVE_KEY);
+    const saved = store?.getItem(saveKey());
     const p = this.player();
     try {
       const nm = store?.getItem('aschenthron.name');
       if (nm && !this.remote) p.name = nm;
     } catch { /* ohne Speicher: Standardname */ }
-    this.ui = new Ui((c) => this.send(c), (i) => this.useSkillSlot(i), (k) => this.usePotionKind(k), () => this.newGame(), this.remote ? null : { export: () => exportPlayer(this.player()), import: (json) => this.importSave(json) });
+    this.ui = new Ui((c) => this.send(c), (i) => this.useSkillSlot(i), (k) => this.usePotionKind(k), () => this.newGame(), this.remote ? null : { export: () => exportPlayer(this.player()), import: (json) => this.importSave(json) }, this.remote ? null : { list: () => this.slotList(), switchTo: (n) => this.switchSlot(n) });
     this.ui.ach = this.achv;
     this.sfx = new Sfx();
+    this.sfx.setVolume(settings().volume);
+    onSettings(() => this.sfx.setVolume(settings().volume));
     this.atmo = new Atmosphere(this, this.sfx);
     this.minimap = new Minimap(this.world, this.tiles);
     if (this.remote) this.ui.say(`Verbunden als ${p.name}${this.remote.pvp ? ' – PvP außerhalb der Städte aktiv, Angreifer werden zu Mördern' : ''}. Klick auf Spieler greift an.`);
@@ -216,6 +236,21 @@ export class GameScene extends Phaser.Scene {
     window.addEventListener('beforeunload', () => {
       if (!this.resetting) this.save();
     });
+  }
+
+  /** Tränke, Edelsteine und Pfeile in Reichweite automatisch aufheben (Ausrüstung bleibt liegen). */
+  private autoPickup(time: number): void {
+    const p = this.player();
+    if (!p?.alive || p.pickupId !== null) return;
+    for (const [id, at] of this.autoTried) if (time - at > 6000) this.autoTried.delete(id);
+    for (const g of this.world.ground) {
+      if (Math.hypot(g.x - p.x, g.y - p.y) > 1.6 || this.autoTried.has(g.id)) continue;
+      const it = g.item;
+      if (it.slot !== 'potion' && it.slot !== 'gem' && it.off !== 'arrows') continue;
+      this.autoTried.set(g.id, time);
+      this.send({ type: 'pickup', groundId: g.id });
+      return;
+    }
   }
 
   private player(): Actor {
@@ -271,7 +306,7 @@ export class GameScene extends Phaser.Scene {
 
   private newGame(): void {
     this.resetting = true;
-    safeStorage()?.removeItem(SAVE_KEY);
+    safeStorage()?.removeItem(saveKey());
     location.reload();
   }
 
@@ -286,9 +321,9 @@ export class GameScene extends Phaser.Scene {
     const store = safeStorage();
     if (!store) return false;
     try {
-      const old = store.getItem(SAVE_KEY);
-      if (old) store.setItem(`${SAVE_KEY}.backup`, old);
-      store.setItem(SAVE_KEY, json);
+      const old = store.getItem(saveKey());
+      if (old) store.setItem(`${saveKey()}.backup`, old);
+      store.setItem(saveKey(), json);
     } catch {
       return false;
     }
@@ -300,10 +335,45 @@ export class GameScene extends Phaser.Scene {
   private save(): void {
     if (this.resetting || this.remote) return;
     try {
-      safeStorage()?.setItem(SAVE_KEY, exportPlayer(this.player()));
+      safeStorage()?.setItem(saveKey(), exportPlayer(this.player()));
     } catch {
       /* Speicher voll oder gesperrt: Spiel läuft ohne Speichern weiter */
     }
+  }
+
+  /** Übersicht der Speicherplätze für das Einstellungsfenster. */
+  private slotList(): { n: number; label: string; exists: boolean; active: boolean }[] {
+    const store = safeStorage();
+    const out: { n: number; label: string; exists: boolean; active: boolean }[] = [];
+    for (let n = 1; n <= SLOTS; n++) {
+      let raw: string | null = null;
+      try {
+        raw = store?.getItem(slotKey(n)) ?? null;
+      } catch { /* kein Zugriff */ }
+      let label = 'leer';
+      if (raw) {
+        label = 'Spielstand';
+        try {
+          const o = JSON.parse(raw) as { player?: { name?: string; level?: number } };
+          if (o.player) label = `${o.player.name ?? 'Held'}, Stufe ${o.player.level ?? 1}`;
+        } catch { /* Format unbekannt */ }
+      }
+      out.push({ n, label, exists: !!raw, active: n === activeSlot() });
+    }
+    return out;
+  }
+
+  /** Speicherplatz wechseln: aktuellen Stand sichern, Platz merken, neu laden. */
+  private switchSlot(n: number): void {
+    if (n === activeSlot() || n < 1 || n > SLOTS) return;
+    this.save();
+    try {
+      window.localStorage.setItem(SLOT_KEY, String(n));
+    } catch {
+      return;
+    }
+    this.resetting = true;
+    location.reload();
   }
 
   /** Klassische Menüführung: Fertigkeit wählen (1–9 oder Leiste), dann Ziel anklicken. Selbstzauber wirken sofort. */
@@ -526,6 +596,14 @@ export class GameScene extends Phaser.Scene {
     if (this.autosave > 5000) {
       this.autosave = 0;
       this.save();
+      if (time - this.lastSavedHint > 30000) {
+        this.lastSavedHint = time;
+        this.ui.savedHint();
+      }
+    }
+    if (settings().autoPickup && time - this.lastAutoPick > 250) {
+      this.lastAutoPick = time;
+      this.autoPickup(time);
     }
     const p = this.player();
     if (!p) return;
@@ -609,7 +687,9 @@ export class GameScene extends Phaser.Scene {
               const poison = e.skill === 'dot' && !e.crit;
               const txt = e.amount === 0 ? 'immun' : e.crit ? `${e.amount}!` : String(e.amount);
               const dcol = e.dt ? DMG_COLOR[e.dt] : undefined;
-              if (toPlayer) this.fx.floatText(pos.x, pos.y - 30, txt, dcol ?? '#ff6a5a', 18);
+              if (!settings().dmgNumbers) {
+                /* Schadenszahlen aus */
+              } else if (toPlayer) this.fx.floatText(pos.x, pos.y - 30, txt, dcol ?? '#ff6a5a', 18);
               else if (fromPlayer) this.fx.floatText(pos.x, pos.y - 26, txt, e.crit ? '#ffe45a' : poison ? '#8fe070' : dcol ?? '#ffffff', e.crit ? 22 : 15);
               else this.fx.floatText(pos.x, pos.y - 26, txt, dcol ?? '#cfcfcf', 12);
               this.fx.burst(pos.x, pos.y, toPlayer ? 0xff5a4a : e.crit ? 0xffe45a : 0xffffff, 260);
@@ -1631,7 +1711,7 @@ export class GameScene extends Phaser.Scene {
       this.labels.set(id, t);
     }
     if (t.text !== text) t.setText(text);
-    t.setPosition(Math.round(x), Math.round(y)).setVisible(true);
+    t.setPosition(Math.round(x), Math.round(y)).setVisible(settings().labels || id[0] === 'm' || size > 12);
   }
 
   private cleanLabels(seen: Set<string>, prefixes: string[]): void {
