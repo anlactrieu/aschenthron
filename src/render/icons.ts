@@ -99,14 +99,22 @@ export function itemIcon(it: Item): string {
   if (it.town) {
     const seal = it.town === 'Felsenwacht' ? 0x5a7ad8 : 0xc83a3a;
     url = make((c) => {
-      r(c, 3, 3, 10, 10, 0xe8d8a8);
-      r(c, 3, 3, 10, 1, 0xf6ecc8);
-      r(c, 3, 12, 10, 1, 0xb89c60);
-      r(c, 2, 4, 1, 8, 0xc8b078);
-      r(c, 13, 4, 1, 8, 0xc8b078);
-      for (let y = 5; y < 10; y += 2) r(c, 5, y, 6, 1, 0x8a6a42);
-      r(c, 6, 9, 4, 3, seal);
-      r(c, 7, 10, 2, 1, 0xffffff);
+      // Papier zwischen zwei Rollen, Schnur und Siegel in der Mitte
+      r(c, 3, 5, 10, 6, 0xe8d8a8);
+      r(c, 4, 6, 3, 1, 0x8a6a42);
+      r(c, 4, 8, 3, 1, 0x8a6a42);
+      r(c, 9, 6, 3, 1, 0x8a6a42);
+      r(c, 9, 8, 3, 1, 0x8a6a42);
+      for (const y of [2, 11]) {
+        r(c, 2, y, 12, 3, 0xd8c288);
+        r(c, 2, y, 12, 1, 0xf6ecc8);
+        r(c, 2, y + 2, 12, 1, 0xa88c54);
+        r(c, 1, y + 1, 1, 1, 0x8a6a42);
+        r(c, 14, y + 1, 1, 1, 0x8a6a42);
+      }
+      r(c, 7, 5, 2, 6, shade(seal, 0.7));
+      r(c, 6, 7, 4, 3, seal);
+      r(c, 7, 8, 1, 1, 0xffffff);
     });
   } else if (it.slot === 'potion') {
     const liquid = it.heal ? 0xd83a4a : 0x3a6ae0;
