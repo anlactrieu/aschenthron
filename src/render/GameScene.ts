@@ -1541,6 +1541,15 @@ export class GameScene extends Phaser.Scene {
       } else img.setAlpha(0.85);
       if (!c.opened) img.setAlpha(1);
     }
+    // Fundstücke offener Suchaufgaben funkeln (nur in Sichtweite, nur ungefundene)
+    if (this.frame % 40 === 0) {
+      for (const f of this.world.finds) {
+        const st = me.quests[f.quest];
+        if (st?.state !== 'active' || st.found?.includes(f.id) || Math.abs(f.x - px) > VIEW || Math.abs(f.y - py) > VIEW) continue;
+        const { sx, sy } = toScreen(f.x, f.y);
+        this.fx.sparkle(sx, sy, 0xffe9a0, 1200);
+      }
+    }
     this.cleanLabels(seen, ['c']);
   }
 

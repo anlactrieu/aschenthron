@@ -1385,6 +1385,7 @@ export class Ui {
       case 'visit': return `Betritt: ${def.place}`;
       case 'talk': return `Sprich mit ${targetName(def)}`;
       case 'camp': return `Säubere: ${targetName(def)}`;
+      case 'find': return `Suche ${def.item} (${prog}) – achte auf Funkeln am Boden`;
       case 'chest': return `Öffne Truhen (${prog})`;
       case 'champion': return `Besiege Champions (${prog})`;
       case 'unique': return def.target ? `Besiege den Weltboss (${prog})` : `Besiege benannte Gegner (${prog})`;
@@ -1402,7 +1403,7 @@ export class Ui {
     const f = el('div');
     f.style.cssText = `width:${Math.min(100, (st.progress / def.count) * 100)}%;background:${st.state === 'done' ? '#6fe08a' : '#d8a24a'}`;
     bar.append(f);
-    const rew = `Belohnung ${def.xp} XP, ${def.gold} Gold${def.reward ? (def.reward === 'unique' ? ', Wahl: 3 Stücke (Unikat/Set möglich)' : ', Wahl: 1 von 3 seltenen Stücken') : ''}`;
+    const rew = `Belohnung ${def.xp} XP, ${def.gold} Gold${def.choices ? ', je nach Entscheidung' : def.reward ? (def.reward === 'unique' ? ', Wahl: 3 Stücke (Unikat/Set möglich)' : ', Wahl: 1 von 3 seltenen Stücken') : ''}`;
     c.append(bar, el('div', 'a-note', st.state === 'done' ? 'Fertig – beim Auftraggeber abgeben!' : rew));
     return c;
   }
@@ -1695,6 +1696,12 @@ export class Ui {
         c.append(t);
         if (def.chain) c.append(el('div', 'a-note', `Kette: ${def.chain}`));
         c.append(el('div', 'a-note', def.text), el('div', 'a-note', `Belohnung: ${def.xp} XP, ${def.gold} Gold${def.reward ? (def.reward === 'unique' ? ', Unikat/Set-Teil' : ', seltener Gegenstand') : ''}`));
+        if (def.reward && st?.state !== 'turned') {
+          const names = questRewardChoices(def).map((it) => it.name);
+          const pv = el('div', 'a-note', `Zu holen: ${names.join(' · ')}`);
+          pv.style.color = '#ffd23a';
+          c.append(pv);
+        }
         if (!st) {
           const b = el('button', `a-btn${questAvailable(p, def) ? '' : ' off'}`, 'Annehmen');
           b.onclick = () => this.send({ type: 'acceptQuest', questId: id });
@@ -1702,7 +1709,19 @@ export class Ui {
         } else if (st.state === 'active') c.append(el('i', 'a-note', this.questGoal(def, p)));
         else if (st.state === 'done') {
           const choices = questRewardChoices(def);
-          if (choices.length) {
+          if (def.choices) {
+            c.append(el('div', 'a-note', 'Entscheide dich:'));
+            def.choices.forEach((o, pick) => {
+              const b = el('button', 'a-btn', `${o.label} – ${o.item ? `${o.xp} XP + ${choices[0]!.name}` : `${o.gold} Gold, ${o.xp} XP`}`);
+              b.style.cssText = 'display:block;margin:2px 0;text-align:left';
+              if (o.item) {
+                b.onmouseenter = (ev) => this.showTip(choices[0]!, equippedFor(p, choices[0]!), ev);
+                b.onmouseleave = () => (this.tip.style.display = 'none');
+              }
+              b.onclick = () => { this.tip.style.display = 'none'; this.send({ type: 'turnInQuest', questId: id, pick }); };
+              c.append(b);
+            });
+          } else if (choices.length) {
             c.append(el('div', 'a-note', 'Wähle deine Belohnung:'));
             choices.forEach((it, pick) => {
               const b = el('button', 'a-btn');

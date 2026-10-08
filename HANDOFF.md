@@ -1,5 +1,11 @@
 # HANDOFF – Aschenthron
 
+## AKTUELL (2026-10-08): „Abwechslung statt Grind“ umgesetzt (committet, nicht gepusht; tsc, 293 Tests, Build grün; Pace 10,9 h; im Spiel/Browser nicht gesehen)
+- **Stand:** Siehe SPEC.md „Umsetzungsstand Abwechslung statt Grind“. Neu: `src/sim/camp.test.ts`; `world.ts`: `Camp`, `Find`, `questRewardChoices`, `campClearedBy`, `wildEvents`, `checkVisits` (find); `data.ts`: `qc`/`qf`, `QuestDef.choices`; `gen_map.py`: Blöcke „Lager zum Erobern“ + „Fundstücke“ + „Auflockern“ (Mindestbestand 6 je Gegnerart; Aschengrund ausgenommen); `ui.ts`: Wahl-Knöpfe beim Abgeben; `GameScene.ts`: Funkeln der Fundstücke, Banner `wildEvent`.
+- **Entscheidungen:** (1) Belohnungswahl deterministisch pro Aufgabe (kein gespeicherter Zustand, kein `w.rng`). (2) Lager patrouillieren nicht (`campId` in `setupPatrols` ausgenommen), rufen sich über gemeinsame Rudel-Id. (3) Zufallsereignisse nur bei `w.npcWander` (Einzelspieler), eigener Strom `w.fx`.
+- **Offen:** Push (User fragen); im Spiel prüfen: Lager-Besatzung stark genug, Funkeln sichtbar, Wahl-UI am Handy; Pace 10,9 h evtl. durch kürzeren Respawn (jetzt 120 s) angleichen; fahrender Händler; Mehrspieler-Snapshot für `camps/finds`.
+- **Learnings:** `gen_map.py` hat die NPC-Aufgabenlisten zweimal (Zeile ~216 und nach dem Stadtumbau ~672): Änderungen an beiden vornehmen, sonst fehlt der Aufgabengeber. `str.replace(...,1)` in Hilfsskripten trifft nur die erste Stelle.
+
 ## AKTUELL (2026-10-08): Monster-Dichte und Respawn (uncommittet; tsc, 287 Tests grün; im Spiel nicht gesehen)
 - **Stand:** `MONSTER_RESPAWN_TICKS` in `world.ts` 45 s → 120 s (Test `game.test.ts` "respawnt nach Wartezeit" auf 121 s). `scripts/gen_map.py`: neuer Block "Auflockern" vor dem JSON-Dump: nur Rudel mit Goblin-Mehrheit bleiben Rudel (≤3), alle anderen werden Einzelgänger (`pack=0`), Gruppen < `SPREAD_GAP` (10) Felder voneinander fliegen raus; Bosse/Uniques/Dungeon-Rudel (nicht in `PACK_META`) unberührt. Monster 563 → 370. `src/data/aschenthron.json` neu erzeugt.
 - **Entscheidungen:** (1) Ausdünnen als Nachbearbeitung statt `PACK_DENSITY`/`place_ok` ändern, damit der Zufallsstrom und die Karte sonst identisch bleiben. (2) Goblin = Kind enthält "goblin" und Mehrheit im Rudel. (3) Respawn global, nicht pro Art.

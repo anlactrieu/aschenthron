@@ -59,6 +59,17 @@ export function questTarget(w: World, p: Actor, def: QuestDef, done: boolean): {
       const n = w.npcs.find((x) => npcKeyOf(x.name) === def.target);
       return n ? { x: n.x, y: n.y } : undefined;
     }
+    case 'find': {
+      const st = p.quests[def.id];
+      let best: { x: number; y: number } | undefined;
+      let bd = Infinity;
+      for (const f of w.finds) {
+        if (f.quest !== def.id || st?.found?.includes(f.id)) continue;
+        const d = Math.hypot(f.x - p.x, f.y - p.y);
+        if (d < bd) { bd = d; best = { x: f.x, y: f.y }; }
+      }
+      return best;
+    }
     case 'camp': {
       const c = w.camps.find((x) => x.id === def.target);
       return c ? { x: Math.round(c.x + c.w / 2), y: Math.round(c.y + c.h / 2) } : undefined;
@@ -98,6 +109,11 @@ export function questMarks(w: World, p: Actor): QuestMark[] {
 export function questWhere(w: World, def: QuestDef, done = false): string {
   if (done) return giverLocation(w, def)?.text ?? '';
   if (def.kind === 'champion') return 'Champions in der Wildnis (Gegner mit Aura)';
+  if (def.kind === 'find') {
+    const names = new Set<string>();
+    for (const f of w.finds) if (f.quest === def.id) names.add(regionAt(w, f.x, f.y)?.name ?? '?');
+    return [...names].join(', ');
+  }
   if (def.kind === 'camp') {
     const c = w.camps.find((x) => x.id === def.target);
     return c ? `${c.name} (${regionAt(w, c.x + c.w / 2, c.y + c.h / 2)?.name ?? '?'})` : '';

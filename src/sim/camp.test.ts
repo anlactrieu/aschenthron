@@ -104,4 +104,30 @@ describe('Lager erobern', () => {
     expect(events).toBeGreaterThanOrEqual(1);
     expect(events).toBeLessThanOrEqual(2);
   });
+
+  it('Suchaufgabe: Fundstücke einsammeln, je Fund einmal, und die Entscheidung bestimmt die Belohnung', () => {
+    const { world: w, playerId } = buildWorld(1, map);
+    const p = w.actors.find((a) => a.id === playerId)!;
+    const q = QUESTS.find((x) => x.id === 'q_find_cargo')!;
+    const finds = w.finds.filter((f) => f.quest === q.id);
+    expect(finds).toHaveLength(q.count);
+    p.level = 30;
+    p.hp = p.maxHp = 99999;
+    p.quests[q.id] = { state: 'active', progress: 0 };
+    for (const f of finds) {
+      p.x = f.x;
+      p.y = f.y;
+      for (let i = 0; i < 10; i++) tick(w);
+    }
+    expect(p.quests[q.id]!.state).toBe('done');
+    expect(p.quests[q.id]!.progress).toBe(q.count);
+    const giver = w.npcs.find((n) => n.quests?.includes(q.id))!;
+    p.x = giver.x + 1;
+    p.y = giver.y;
+    const gold0 = p.gold;
+    const inv0 = p.inventory.length;
+    applyCommand(w, p.id, { type: 'turnInQuest', questId: q.id, pick: 0 });
+    expect(p.gold - gold0).toBe(q.choices![0]!.gold);
+    expect(p.inventory).toHaveLength(inv0);
+  });
 });

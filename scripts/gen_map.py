@@ -213,7 +213,7 @@ npc("Lehrer Varn", 7, 6, t1x, t1y, kind="trainer", tier=1)
 npc("Händlerin Mirel", 11, 6, t1x, t1y, kind="merchant", shop="basic")
 npc("Truhe", 9, 10, t1x, t1y, kind="stash")
 npc("Schmiedin Ilse", 14, 9, t1x, t1y, kind="smith")
-npc("Hauptmann Brandt", 16, 6, t1x, t1y, kind="quest", quests="q_rats,q_chests1,q_hounds,q_goblins,q_bandits,q_spiders,q_goblin_scouts,q_unique1,q_camp_farm,q_camp_forest,q_camp_bandit")
+npc("Hauptmann Brandt", 16, 6, t1x, t1y, kind="quest", quests="q_rats,q_chests1,q_hounds,q_goblins,q_bandits,q_spiders,q_goblin_scouts,q_unique1,q_camp_farm,q_camp_forest,q_camp_bandit,q_find_cargo,q_find_smuggler")
 npc("Kräuterfrau Odda", 4, 9, t1x, t1y, kind="quest", quests="q_herbs,q_ghouls,q_camp_swamp")
 npc("Meisterin Kjorra", 5, 7, t2x, t2y, kind="trainer", tier=2, field="Kampf")
 npc("Erzmagier Orvan", 8, 9, t2x, t2y, kind="trainer", tier=2, field="Magie")
@@ -669,7 +669,7 @@ npc_at("Magierin Selka", 'magier', kind="trainer", tier=1, field="Magie")
 npc_at("Händlerin Mirel", 'haendler', kind="merchant", shop="basic", quests="c_arr3")
 npc_at("Schmiedin Ilse", 'schmied', kind="smith", quests="c_arr4")
 npc_at("Lagerverwalter Ottmar", 'lager', kind="stash", quests="c_arr5")
-npc_at("Hauptmann Brandt", 'wache', kind="quest", quests="q_rats,q_chests1,q_hounds,q_goblins,q_bandits,q_spiders,q_goblin_scouts,q_unique1,q_camp_farm,q_camp_forest,q_camp_bandit")
+npc_at("Hauptmann Brandt", 'wache', kind="quest", quests="q_rats,q_chests1,q_hounds,q_goblins,q_bandits,q_spiders,q_goblin_scouts,q_unique1,q_camp_farm,q_camp_forest,q_camp_bandit,q_find_cargo,q_find_smuggler")
 npc_at("Kräuterfrau Odda", 'kraeuter', kind="quest", quests="q_herbs,q_ghouls,q_camp_swamp")
 npc_at("Händler Wenzel", 'ausruester', kind="merchant", shop="artisan")
 npc_at("Chronistin Maren", 'chronik', kind="quest", quests="c_gob1,c_thr1,c_thr2,c_thr6")
@@ -811,6 +811,21 @@ for cid, cname, zn, gnd, kinds, lead, clv, ctier in CAMPS:
         if i == 0: obj(kd, "monster", mx, my, kind=kd, pack=0, camp=cid, champ=crng.choice(['swift', 'armored', 'fiery', 'vampiric', 'thorned']))
         else: obj(kd, "monster", mx, my, kind=kd, pack=0, camp=cid)
     obj("Lagertruhe", "chest", cx, cy + 3, level=clv, tier=ctier, camp=cid)
+# Fundstücke für die Suchaufgaben: abseits der Wege, erreichbar, nicht in Lagern
+FINDS = [("q_find_cargo", 'farm', (4,), 3, "Du findest ein Frachtstück: eine aufgebrochene Kiste mit Stoffballen."),
+         ("q_find_smuggler", 'forest', (4,), 3, "Du findest eine Schmugglerkiste unter einem Busch.")]
+for qid, zn, gnd, n, ftext in FINDS:
+    x0, y0, x1, y1 = ZONES[zn]
+    got = []
+    for _ in range(6000):
+        if len(got) >= n: break
+        fx, fy = crng.randint(x0 + 2, x1 - 2), crng.randint(y0 + 2, y1 - 2)
+        if g[fy][fx] not in gnd or (fx, fy) not in seen or in_safe(fx, fy, 14): continue
+        if any(abs(fx - a) < 14 and abs(fy - b) < 14 for a, b in got): continue
+        if any(abs(fx - c[0]) <= 6 and abs(fy - c[1]) <= 6 for c in camp_taken): continue
+        got.append((fx, fy))
+    if len(got) < n: sys.exit("zu wenige Fundorte für " + qid)
+    for fx, fy in got: obj("Fundstück", "find", fx, fy, quest=qid, text=ftext)
 print("Lager:", len(camp_taken), file=sys.stderr)
 
 # Auflockern (nachträglich, Zufallsstrom bleibt gleich): Nur Goblins ziehen im Rudel (bis 3); alle anderen Tiere stehen einzeln,

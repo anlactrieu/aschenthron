@@ -120,7 +120,7 @@ export interface Actor {
   skillPoints: number;
   skillCd: Record<string, number>;
   potionCd: number;
-  quests: Record<string, { state: 'active' | 'done' | 'turned'; progress: number }>;
+  quests: Record<string, { state: 'active' | 'done' | 'turned'; progress: number; found?: string[] }>;
   inventory: Item[];
   equipment: Partial<Record<EquipSlot, Item>>;
   stash: Item[];
@@ -234,6 +234,14 @@ export interface Camp {
   cleared: boolean;
 }
 /** Nach dem Säubern kommt die Besatzung erst nach 30 Minuten wieder */
+/** Fundstück in der Welt für eine Suchaufgabe (beim Näherkommen eingesammelt, je Spieler einmal) */
+export interface Find {
+  id: string;
+  quest: string;
+  x: number;
+  y: number;
+  text: string;
+}
 export const CAMP_RESPAWN_TICKS = 20 * 60 * 30;
 
 export type NpcKind = 'trainer' | 'merchant' | 'stash' | 'quest' | 'smith';
@@ -317,6 +325,7 @@ export interface World {
   pvp: boolean;
   chests: Chest[];
   camps: Camp[];
+  finds: Find[];
   telegraphs: { id: number; x: number; y: number; r: number; at: number; dmg: number; src: number }[];
   /** Akteur des gerade ausgeführten Befehls (für `fail`-Ereignisse) */
   cmdActor: number | null;
@@ -339,7 +348,7 @@ export interface PackPatrol {
 }
 
 export function createWorld(seed: number, grid: Grid, safe: Rect[] = []): World {
-  return { tick: 0, grid, rng: new Rng(seed), actors: [], nextId: 1, events: [], ground: [], safe, npcs: [], start: { x: 1, y: 1 }, towns: [], regions: [], pvp: false, chests: [], camps: [], telegraphs: [], cmdActor: null, packs: new Map(), npcWander: false, fx: new Rng((seed ^ 0x9e3779b9) >>> 0) };
+  return { tick: 0, grid, rng: new Rng(seed), actors: [], nextId: 1, events: [], ground: [], safe, npcs: [], start: { x: 1, y: 1 }, towns: [], regions: [], pvp: false, chests: [], camps: [], finds: [], telegraphs: [], cmdActor: null, packs: new Map(), npcWander: false, fx: new Rng((seed ^ 0x9e3779b9) >>> 0) };
 }
 
 export function addNpc(w: World, kind: NpcKind, name: string, x: number, y: number, extra: Partial<Npc> = {}): Npc {
@@ -744,19 +753,23 @@ function finishQuest(w: World, a: Actor, def: QuestDef, pick = 0): void {
   const st = a.quests[def.id];
   if (!st) return;
   st.state = 'turned';
-  a.gold += def.gold;
+  // Entscheidungsaufgabe: die gewählte Option bestimmt Gold, Erfahrung und ob es den Gegenstand gibt
+  const opt = def.choices?.[Math.max(0, Math.min(def.choices.length - 1, Math.floor(pick)))];
+  const goldGain = opt?.gold ?? def.gold;
+  const xpGain = opt?.xp ?? def.xp;
+  a.gold += goldGain;
   let item: Item | undefined;
-  if (def.reward) {
+  if (def.reward && (!opt || opt.item)) {
     const choices = questRewardChoices(def);
-    item = { ...choices[Math.max(0, Math.min(choices.length - 1, Math.floor(pick)))]!, id: w.nextId++ };
+    item = { ...choices[opt ? 0 : Math.max(0, Math.min(choices.length - 1, Math.floor(pick)))]!, id: w.nextId++ };
     if (carriedWeight(a) + item.weight > carryCapacity(a)) {
       // Belohnung nie verlieren: zu schwer → als Bodenbeute neben den Spieler legen
       w.ground.push({ id: w.nextId++, x: Math.round(a.x), y: Math.round(a.y), item, expiresAt: null });
       w.events.push({ type: 'fail', reason: 'Rucksack zu schwer – Belohnung liegt am Boden.', to: a.id });
     } else a.inventory.push(item);
   }
-  w.events.push({ type: 'questTurned', questId: def.id, xp: def.xp, gold: def.gold, ...(item ? { item } : {}), to: a.id });
-  gainXp(w, a, def.xp);
+  w.events.push({ type: 'questTurned', questId: def.id, xp: xpGain, gold: goldGain, ...(item ? { item } : {}), to: a.id });
+  gainXp(w, a, xpGain);
 }
 
 function fail(w: World, reason: string): void {
@@ -2019,6 +2032,21 @@ export function tick(w: World): void {
 
 /** Besuchsaufgaben: erfüllt, sobald der Spieler die Region betritt (alle 0,5 s geprüft). */
 function checkVisits(w: World, pl: Actor): void {
+  for (const q of QUESTS) {
+    const st = pl.quests[q.id];
+    if (q.kind !== 'find' || st?.state !== 'active') continue;
+    for (const f of w.finds) {
+      if (f.quest !== q.id || st.found?.includes(f.id) || Math.hypot(f.x - pl.x, f.y - pl.y) > 1.8) continue;
+      (st.found ??= []).push(f.id);
+      st.progress = st.found.length;
+      note(w, pl, f.text);
+      w.events.push({ type: 'questItem', questId: q.id, item: q.item ?? 'Fundstück', progress: st.progress, count: q.count, to: pl.id });
+      if (st.progress >= q.count) {
+        st.state = 'done';
+        w.events.push({ type: 'questDone', questId: q.id, to: pl.id });
+      }
+    }
+  }
   for (const q of QUESTS) {
     if (q.kind !== 'visit' || pl.quests[q.id]?.state !== 'active') continue;
     const r = w.regions.find((x) => x.name === q.place);

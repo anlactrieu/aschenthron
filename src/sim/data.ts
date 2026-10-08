@@ -479,7 +479,7 @@ export const POTION_COOLDOWN_TICKS = 100;
 export const ARMOR_K = 30;
 
 /** kill: Monsterart; chest: Truhen; champion/unique: Champions bzw. Mini-Bosse (unique mit `target`: ein bestimmter); visit: Region betreten; bring: Gegenstand von Monstern/Truhen sammeln; talk: mit einem NPC sprechen */
-export type QuestKind = 'kill' | 'chest' | 'champion' | 'unique' | 'visit' | 'bring' | 'talk' | 'camp';
+export type QuestKind = 'kill' | 'chest' | 'champion' | 'unique' | 'visit' | 'bring' | 'talk' | 'camp' | 'find';
 
 export interface QuestDef {
   id: string;
@@ -506,6 +506,8 @@ export interface QuestDef {
   chestRegion?: string;
   /** Belohnung zusätzlich zu XP/Gold: ein seltener Gegenstand oder ein Unikat/Set-Teil */
   reward?: 'rare' | 'unique';
+  /** Entscheidung bei der Abgabe: jede Option gibt eigenes Gold/XP, `item` zusätzlich den Gegenstand (braucht `reward`) */
+  choices?: { label: string; gold: number; xp: number; item?: boolean }[];
   /** Abschlusstext (Chatzeile bei Abgabe) */
   outro?: string;
 }
@@ -555,6 +557,23 @@ QUESTS.push(
   qc('q_camp_grave', 'Der Knochenhain', 'Auf dem Totenacker versammeln sich Untote um einen alten Hain. Zerschlage sie und hol die Grabbeigaben.', 12, 'knochenhain', 1.6),
   qc('q_camp_hills', 'Die Trollhöhle', 'Ein Trollclan hat im Hochland eine Höhle bezogen. Vertreibe ihn und nimm seinen Hort.', 16, 'trollhoehle', 1.6),
   qc('q_camp_ash', 'Das Glutlager', 'In der Aschenöde lagert eine Schar von Aschenwesen um eine Feuerstelle. Lösche sie aus.', 22, 'glutlager', 1.6),
+);
+
+/** Suchaufgabe mit Entscheidung: Fundstücke in der Welt einsammeln (Karte: Objekte vom Typ find), bei der Abgabe zwischen zwei Wegen wählen. */
+const qf = (id: string, name: string, text: string, minLevel: number, item: string, count: number, mult: number, ethical: string, greedy: string): QuestDef => {
+  const base = qv(id, name, text, minLevel, 'find', count, mult);
+  return {
+    ...base, item, reward: 'rare',
+    choices: [
+      { label: ethical, gold: Math.round(base.gold * 2.2), xp: Math.round(base.xp * 1.3) },
+      { label: greedy, gold: 0, xp: base.xp, item: true },
+    ],
+  };
+};
+
+QUESTS.push(
+  qf('q_find_cargo', 'Die verlorene Karawane', 'Eine Händlerkarawane wurde auf den Roggenfeldern überfallen. Finde 3 Frachtstücke, die im Gelände verstreut liegen (Funkeln am Boden). Dann entscheide, was du damit tust.', 2, 'Frachtstück', 3, 2, 'Der Karawane zurückgeben (viel Gold)', 'Behalten und verkaufen (seltener Gegenstand)'),
+  qf('q_find_smuggler', 'Die Kisten des Schmugglers', 'Im Düsterwald hat jemand Kisten versteckt. Finde 3 Schmugglerkisten (Funkeln am Boden) und entscheide dann, ob du die Wache informierst.', 5, 'Schmugglerkiste', 3, 2, 'Die Wache informieren (viel Gold und Ansehen)', 'Schweigen und den Inhalt behalten (seltener Gegenstand)'),
 );
 
 QUESTS.push(

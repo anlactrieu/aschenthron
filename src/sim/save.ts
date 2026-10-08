@@ -105,7 +105,7 @@ export function importPlayer(w: World, p: Actor, json: string): boolean {
     const qs = s.quests as Record<string, { state?: string; progress?: number }> | undefined;
     for (const [id, st] of Object.entries(qs ?? {})) {
       if (questById(id) && st && ['active', 'done', 'turned'].includes(st.state ?? '')) {
-        p.quests[id] = { state: st.state as 'active' | 'done' | 'turned', progress: Math.max(0, Math.floor(num(st.progress, 0))) };
+        p.quests[id] = { state: st.state as 'active' | 'done' | 'turned', progress: Math.max(0, Math.floor(num(st.progress, 0))), ...(Array.isArray((st as { found?: unknown }).found) ? { found: ((st as { found: unknown[] }).found).filter((x): x is string => typeof x === 'string').slice(0, 12) } : {}) };
       }
     }
     // Altstände (ohne Merker): einmal kostenlos neu verteilen, damit die neuen Fertigkeiten ausprobiert werden können
