@@ -280,6 +280,7 @@ type GameEventBase =
   | { type: 'questTurned'; questId: string; xp: number; gold: number; item?: Item }
   | { type: 'questItem'; questId: string; item: string; progress: number; count: number }
   | { type: 'talk'; npcId: number }
+  | { type: 'wildEvent'; text: string; color: string; to: number }
   | { type: 'worldBoss'; id: number; name: string; state: 'spawn' | 'dead'; where: string }
   | { type: 'enraged'; id: number }
   | { type: 'fail'; reason: string }
@@ -1725,6 +1726,72 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
   if (special) drop(special);
 }
 
+/** Zufallsereignisse unterwegs (nur Einzelspieler): nach etwa 90 Feldern Weg draußen ein Hinterhalt, ein wandernder Elite oder eine verlorene Fracht. */
+const WILD_STEPS = 90;
+const WILD_COOLDOWN = TICK_RATE * 120;
+const WILD_NOT_IN = ['Goblinbau', 'Spinnennest', 'Aschengrund', 'Gruft der Moorhexe', 'Katakomben', 'Tiefenmine', 'Thron der Asche'];
+const wildState = new WeakMap<Actor, { x: number; y: number; walked: number; at: number }>();
+
+function wildEvents(w: World, pl: Actor): void {
+  const s = wildState.get(pl);
+  if (!s) {
+    wildState.set(pl, { x: pl.x, y: pl.y, walked: 0, at: w.tick - WILD_COOLDOWN });
+    return;
+  }
+  const d = Math.hypot(pl.x - s.x, pl.y - s.y);
+  s.x = pl.x;
+  s.y = pl.y;
+  if (d > 6 || inSafeZone(w, pl.x, pl.y)) return; // Teleport oder Stadt zählt nicht
+  s.walked += d;
+  const region = regionAt(w, pl.x, pl.y)?.name;
+  if (s.walked < WILD_STEPS || w.tick - s.at < WILD_COOLDOWN || pl.targetId !== null || (region && WILD_NOT_IN.includes(region))) return;
+  const near = w.actors.filter((m) => m.kind === 'monster' && m.alive && !m.boss && !m.unique && !m.campId && !m.summonedBy && m.kindId && Math.hypot(m.x - pl.x, m.y - pl.y) <= 30);
+  if (!near.length) return;
+  s.walked = 0;
+  s.at = w.tick;
+  const base = near[w.fx.int(0, near.length - 1)]!;
+  const spotAround = (r: number): { x: number; y: number } | undefined => {
+    for (let i = 0; i < 12; i++) {
+      const ang = w.fx.next() * Math.PI * 2;
+      const x = Math.round(pl.x + Math.cos(ang) * r);
+      const y = Math.round(pl.y + Math.sin(ang) * r);
+      if (isWalkable(w.grid, x, y) && !inSafeZone(w, x, y)) return { x, y };
+    }
+    return undefined;
+  };
+  const say = (text: string, color: string) => w.events.push({ type: 'wildEvent', text, color, to: pl.id });
+  const roll = w.fx.next();
+  if (roll < 0.45) {
+    let n = 0;
+    for (let i = 0; i < 3; i++) {
+      const sp = spotAround(7);
+      if (!sp) break;
+      const m = spawnMonster(w, sp.x, sp.y, base.kindId!);
+      m.respawnTicks = 1e9; // verschwindet nach dem Tod
+      m.targetId = pl.id;
+      n++;
+    }
+    if (n) say('Hinterhalt! Aus dem Gebüsch stürmen Gegner auf dich zu.', '#ff6a4a');
+  } else if (roll < 0.75) {
+    const sp = spotAround(11);
+    if (!sp) return;
+    const keys = Object.keys(CHAMPION_MODS);
+    const m = spawnMonster(w, sp.x, sp.y, base.kindId!, { champ: keys[w.fx.int(0, keys.length - 1)]! });
+    m.respawnTicks = 1e9;
+    m.aggroRange = Math.max(m.aggroRange, 14);
+    say(`Ein wandernder Anführer streift durch die Gegend: ${m.name}! Gute Beute.`, '#ffd23a');
+  } else {
+    const sp = spotAround(5);
+    if (!sp) return;
+    const nid = () => w.nextId++;
+    const lv = Math.max(1, Math.min(base.level + 1, pl.level + 3));
+    const drop = (item: Item) => w.ground.push({ id: w.nextId++, x: sp.x, y: sp.y, item, expiresAt: w.tick + TICK_RATE * 300 });
+    drop(rollDrop(w.fx, nid, lv, w.fx.next() < 0.3 ? 'rare' : 'magic'));
+    drop(rollPotion(w.fx, nid, lv));
+    say('Ein umgestürzter Händlerkarren: Verlorene Fracht liegt am Wegrand.', '#6fd0ff');
+  }
+}
+
 /** Fällt der letzte Gegner eines Lagers, ist es gesäubert: Besatzung wartet 30 Minuten, Lagertruhe geht auf. */
 function campClearedBy(w: World, m: Actor): Camp | undefined {
   if (!m.campId) return undefined;
@@ -1867,6 +1934,7 @@ export function tick(w: World): void {
   const players = w.actors.filter((x) => x.kind === 'player' && x.alive);
   if (w.npcWander) npcWanderStep(w, players);
   if (w.tick % 10 === 0) for (const pl of players) checkVisits(w, pl);
+  if (w.tick % TICK_RATE === 0 && w.npcWander) for (const pl of players) wildEvents(w, pl);
   for (const a of w.actors) {
     if (a.kind === 'monster' && a.alive && a.targetId === null && a.path.length === 0 && a.hp >= a.maxHp) {
       if (!players.some((pl) => Math.abs(pl.x - a.x) < SLEEP_DIST && Math.abs(pl.y - a.y) < SLEEP_DIST)) continue;

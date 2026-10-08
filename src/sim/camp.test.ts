@@ -86,4 +86,22 @@ describe('Lager erobern', () => {
     expect(p.inventory).toHaveLength(before + 1);
     expect(p.inventory.at(-1)!.name).toBe(a[2]!.name);
   });
+
+  it('Zufallsereignis: nach etwa 90 Feldern Weg draußen passiert etwas, danach Ruhe (Abklingzeit)', () => {
+    const { world: w, playerId } = buildWorld(1, map);
+    w.npcWander = true;
+    const p = w.actors.find((a) => a.id === playerId)!;
+    const m = w.actors.find((a) => a.kind === 'monster' && !a.boss && !a.unique && !a.campId && a.kindId === 'goblin')!;
+    p.x = m.x + 3;
+    p.y = m.y;
+    p.hp = p.maxHp = 99999;
+    let events = 0;
+    for (let sec = 0; sec < 120; sec++) {
+      p.x += sec % 2 ? 2 : -2; // pendeln: zählt als Weg
+      for (let i = 0; i < 20; i++) tick(w);
+      events += drainEvents(w).filter((e) => e.type === 'wildEvent').length;
+    }
+    expect(events).toBeGreaterThanOrEqual(1);
+    expect(events).toBeLessThanOrEqual(2);
+  });
 });

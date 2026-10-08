@@ -1087,6 +1087,11 @@ export class GameScene extends Phaser.Scene {
         }
         case 'questItem': say(`${e.item} gefunden (${e.progress}/${e.count})`); this.sfx.pickup(); break;
         case 'talk': this.sfx.quest(); break;
+        case 'wildEvent':
+          say(e.text);
+          this.ui.banner(e.text.split(/[!:.]/)[0] + '!', e.color);
+          this.sfx.boss();
+          break;
         case 'worldBoss': {
           // Banner/Ton nur in der Nähe (Entfernung zum Boss), sonst nur eine dezente Chatzeile
           const wb = getActor(w, e.id);
