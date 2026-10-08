@@ -717,8 +717,13 @@ export function sellPrice(i: Item): number {
   return Math.max(1, Math.floor((i.value + gems) * 0.5));
 }
 
+/** Anteil der normalen Monster-Drops, die Waffen enthalten können (Waffen kauft man; Bosse und Mini-Bosse haben eigene) */
+export const WEAPON_SHARE_MONSTER = 0.12;
+
 export function buyPrice(templateId: string): number {
-  return templateById(templateId).value * 2;
+  const t = templateById(templateId);
+  // Waffen ab Stufe 11 kosten deutlich mehr: das Gold soll in die Waffe fließen
+  return Math.round(t.value * 2 * (t.slot === 'weapon' && t.minLevel >= 11 ? 1.6 : 1));
 }
 
 export function getActor(w: World, id: number): Actor | undefined {
@@ -1733,11 +1738,11 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
     w.events.push({ type: 'loot', item, x, y });
   };
   if (k.boss || w.rng.next() <= k.dropChance * GEAR_DROP_FACTOR) {
-    drop(rollDrop(w.rng, () => w.nextId++, k.level, k.boss ? 'rare' : undefined));
+    drop(rollDrop(w.rng, () => w.nextId++, k.level, k.boss ? 'rare' : undefined, k.boss ? 0.6 : WEAPON_SHARE_MONSTER));
   }
   if (w.rng.next() <= POTION_DROP_CHANCE) drop(rollPotion(w.rng, () => w.nextId++, k.level));
   if (k.level >= GEM_MIN_LEVEL && w.rng.next() < (k.boss ? GEM_DROP.boss : m.unique ? GEM_DROP.unique : m.champ ? GEM_DROP.champion : GEM_DROP.normal)) drop(rollGem(w.rng, () => w.nextId++, k.level));
-  if (m.champ) drop(rollDrop(w.rng, () => w.nextId++, k.level, w.rng.next() < 0.25 ? 'rare' : 'magic'));
+  if (m.champ) drop(rollDrop(w.rng, () => w.nextId++, k.level, w.rng.next() < 0.25 ? 'rare' : 'magic', 0.4));
   const wb = m.unique ? uniqueDef(m.unique) : undefined;
   if (wb?.world) {
     // Weltboss: garantierte seltene Stücke mit hohen Affix-Stufen, bessere Edelsteine, oft Unikat/Set-Teil
@@ -1756,7 +1761,7 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
     if (sp) drop(sp);
     drop(rollPotion(w.rng, () => w.nextId++, k.level));
   }
-  const special = rollSpecial(w.rng, () => w.nextId++, k.level, k.id, !!k.boss);
+  const special = rollSpecial(w.rng, () => w.nextId++, k.level, m.unique ?? k.id, !!k.boss);
   if (special) drop(special);
 }
 
@@ -1823,7 +1828,7 @@ function wildEvents(w: World, pl: Actor): void {
     const nid = () => w.nextId++;
     const lv = Math.max(1, Math.min(base.level + 1, pl.level + 3));
     const drop = (item: Item) => w.ground.push({ id: w.nextId++, x: sp.x, y: sp.y, item, expiresAt: w.tick + TICK_RATE * 300 });
-    drop(rollDrop(w.fx, nid, lv, w.fx.next() < 0.3 ? 'rare' : 'magic'));
+    drop(rollDrop(w.fx, nid, lv, w.fx.next() < 0.3 ? 'rare' : 'magic', 0.3));
     drop(rollPotion(w.fx, nid, lv));
     say('Ein umgestürzter Händlerkarren: Verlorene Fracht liegt am Wegrand.', '#6fd0ff');
   }
@@ -2384,7 +2389,7 @@ function openChest(w: World, a: Actor, c: Chest): void {
   for (let i = 0; i < gear; i++) {
     const r = w.rng.next();
     const rarity = c.tier === 'gold' ? (r < 0.35 ? 'rare' : 'magic') : c.tier === 'iron' ? (r < 0.15 ? 'rare' : r < 0.7 ? 'magic' : 'normal') : r < 0.05 ? 'rare' : r < 0.35 ? 'magic' : 'normal';
-    drop(rollDrop(w.rng, () => w.nextId++, c.level, rarity));
+    drop(rollDrop(w.rng, () => w.nextId++, c.level, rarity, 0.35));
   }
   for (let i = 0; i < (c.tier === 'wood' ? 1 : 2); i++) drop(rollPotion(w.rng, () => w.nextId++, c.level));
   if (c.level >= GEM_MIN_LEVEL && w.rng.next() < GEM_DROP.chest[c.tier]) drop(rollGem(w.rng, () => w.nextId++, c.level));

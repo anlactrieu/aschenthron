@@ -564,8 +564,10 @@ export function generateItem(rng: Rng, id: number, templateId: string, rarityIn:
   };
 }
 
-export function rollDrop(rng: Rng, nextId: () => number, monsterLevel: number, forceRarity?: Rarity): Item {
-  const pool = TEMPLATES.filter((t) => t.slot !== 'potion' && t.slot !== 'gem' && (!forceRarity || t.off !== 'arrows') && t.minLevel <= monsterLevel && t.minLevel >= monsterLevel - 8);
+/** `weaponShare` (0–1): Wahrscheinlichkeit, dass Waffen überhaupt im Wurf-Pool sind. Waffen kauft man beim Händler; Beute bringt vor allem Rüstung und Schmuck, Boss-Waffen kommen aus `rollSpecial`. */
+export function rollDrop(rng: Rng, nextId: () => number, monsterLevel: number, forceRarity?: Rarity, weaponShare = 1): Item {
+  const noWeapons = weaponShare < 1 && rng.next() >= weaponShare;
+  const pool = TEMPLATES.filter((t) => t.slot !== 'potion' && t.slot !== 'gem' && !(noWeapons && t.slot === 'weapon') && (!forceRarity || t.off !== 'arrows') && t.minLevel <= monsterLevel && t.minLevel >= monsterLevel - 8);
   const t = pool[rng.int(0, pool.length - 1)]!;
   return generateItem(rng, nextId(), t.id, forceRarity ?? rollRarity(rng));
 }
@@ -618,6 +620,30 @@ export const LEGENDARIES: LegendaryDef[] = [
   { id: 'ash_fang', name: 'Aschenfang', base: 'war_blade', minLevel: 18, affixes: [{ stat: 'damage', min: 9, max: 13 }, { stat: 'resFire', min: 8, max: 12 }], power: { id: 'burnHit', value: 22 } },
   { id: 'grave_seal', name: 'Siegel der Grabwacht', base: 'silver_ring', minLevel: 20, affixes: [{ stat: 'maxMana', min: 25, max: 35 }, { stat: 'maxHp', min: 30, max: 50 }], power: { id: 'healKill', value: 14 } },
   { id: 'harvest_saber', name: 'Schnitter', base: 'ash_saber', minLevel: 28, affixes: [{ stat: 'damage', min: 15, max: 20 }, { stat: 'crit', min: 3, max: 5 }], power: { id: 'execute', value: 40 } },
+  { id: 'nagezahn', name: 'Nagezahn', base: 'iron_dagger', minLevel: 3, affixes: [{ stat: 'damage', min: 2, max: 3 }, { stat: 'haste', min: 2, max: 3 }], power: { id: 'goldBonus', value: 20 }, source: 'rat_king' },
+  { id: 'fleckenzahn', name: 'Fleckenzahn', base: 'bone_club', minLevel: 4, affixes: [{ stat: 'damage', min: 3, max: 4 }, { stat: 'maxHp', min: 10, max: 15 }], power: { id: 'lifesteal', value: 3 }, source: 'spotted_beast' },
+  { id: 'grix_hackebeil', name: 'Grix\' Hackebeil', base: 'battle_axe', minLevel: 10, affixes: [{ stat: 'damage', min: 6, max: 9 }, { stat: 'kraft', min: 1, max: 2 }], power: { id: 'crit', value: 12 }, source: 'goblin_king' },
+  { id: 'brakk_stab', name: 'Brakks Knochenstab', base: 'bone_staff', minLevel: 10, affixes: [{ stat: 'maxMana', min: 30, max: 40 }, { stat: 'spellFire', min: 10, max: 14 }], power: { id: 'manaKill', value: 5 }, source: 'goblin_shaman_brakk' },
+  { id: 'zischel_bogen', name: 'Zischels Giftbogen', base: 'yew_bow', minLevel: 9, affixes: [{ stat: 'damage', min: 5, max: 7 }, { stat: 'accuracy', min: 6, max: 9 }], power: { id: 'lifesteal', value: 4 }, source: 'venom_mother' },
+  { id: 'kolm_hammer', name: 'Kolms Streithammer', base: 'war_hammer', minLevel: 12, affixes: [{ stat: 'damage', min: 8, max: 11 }, { stat: 'kraft', min: 2, max: 3 }], power: { id: 'execute', value: 20 }, source: 'captain_kolm' },
+  { id: 'gluck_keule', name: 'Glucks Moorkeule', base: 'war_hammer', minLevel: 14, affixes: [{ stat: 'damage', min: 9, max: 12 }, { stat: 'maxHp', min: 30, max: 45 }], power: { id: 'thorns', value: 12 }, source: 'bog_brute' },
+  { id: 'irva_stab', name: 'Irvas Hexenstab', base: 'crystal_staff', minLevel: 14, affixes: [{ stat: 'maxMana', min: 40, max: 55 }, { stat: 'spellFrost', min: 12, max: 16 }], power: { id: 'frostHit', value: 25 }, source: 'hexmaster_irva' },
+  { id: 'morrik_zepter', name: 'Morriks Knochenzepter', base: 'bone_staff', minLevel: 14, affixes: [{ stat: 'maxMana', min: 35, max: 50 }, { stat: 'healPower', min: 10, max: 15 }], power: { id: 'healKill', value: 10 }, source: 'bone_lord' },
+  { id: 'veshra_dorn', name: 'Veshras Dorn', base: 'steel_dagger', minLevel: 16, affixes: [{ stat: 'damage', min: 8, max: 11 }, { stat: 'haste', min: 4, max: 6 }], power: { id: 'lifesteal', value: 7 }, source: 'bog_queen' },
+  { id: 'ormund_schwert', name: 'Ormunds Grabschwert', base: 'war_blade', minLevel: 16, affixes: [{ stat: 'damage', min: 10, max: 14 }, { stat: 'armor', min: 3, max: 5 }], power: { id: 'execute', value: 30 }, source: 'crypt_ormund' },
+  { id: 'sael_floestern', name: 'Saels Flüstern', base: 'bone_dagger', minLevel: 17, affixes: [{ stat: 'damage', min: 10, max: 14 }, { stat: 'crit', min: 3, max: 5 }], power: { id: 'frostHit', value: 30 }, source: 'ghost_lord_sael' },
+  { id: 'drogg_keule', name: 'Droggs Trollkeule', base: 'great_axe', minLevel: 17, affixes: [{ stat: 'damage', min: 12, max: 16 }, { stat: 'maxHp', min: 50, max: 70 }], power: { id: 'lifesteal', value: 5 }, source: 'troll_chief_drogg' },
+  { id: 'fenrik_reisszahn', name: 'Fenriks Reißzahn', base: 'bone_dagger', minLevel: 17, affixes: [{ stat: 'damage', min: 9, max: 13 }, { stat: 'evasion', min: 6, max: 9 }], power: { id: 'crit', value: 14 }, source: 'alpha_fenrik' },
+  { id: 'vyrra_netz', name: 'Netzspanner', base: 'war_bow', minLevel: 18, affixes: [{ stat: 'damage', min: 12, max: 16 }, { stat: 'accuracy', min: 8, max: 12 }], power: { id: 'frostHit', value: 22 }, source: 'spider_queen' },
+  { id: 'koloss_brecher', name: 'Kolossbrecher', base: 'doom_hammer', minLevel: 20, affixes: [{ stat: 'damage', min: 18, max: 24 }, { stat: 'kraft', min: 3, max: 5 }], power: { id: 'thorns', value: 15 }, source: 'stone_colossus' },
+  { id: 'skarra_stab', name: 'Skarras Seidenstab', base: 'cinder_staff', minLevel: 23, affixes: [{ stat: 'maxMana', min: 60, max: 80 }, { stat: 'spellFrost', min: 15, max: 20 }], power: { id: 'manaKill', value: 9 }, source: 'web_mother' },
+  { id: 'zarkesh_klinge', name: 'Zarkeshs Glutklinge', base: 'dread_blade', minLevel: 25, affixes: [{ stat: 'damage', min: 16, max: 22 }, { stat: 'resFire', min: 10, max: 14 }], power: { id: 'burnHit', value: 30 }, source: 'cinder_lord_zarkesh' },
+  { id: 'valdor_schreckensklinge', name: 'Valdors Schreckensklinge', base: 'dread_cleaver', minLevel: 25, affixes: [{ stat: 'damage', min: 20, max: 26 }, { stat: 'crit', min: 3, max: 5 }], power: { id: 'execute', value: 45 }, source: 'dread_valdor' },
+  { id: 'gurrak_zahn', name: 'Gurraks Moorzahn', base: 'dread_cleaver', minLevel: 26, affixes: [{ stat: 'damage', min: 20, max: 27 }, { stat: 'maxHp', min: 60, max: 90 }], power: { id: 'lifesteal', value: 8 }, source: 'bog_titan' },
+  { id: 'thurgrim_hammer', name: 'Thurgrims Bergbrecher', base: 'doom_hammer', minLevel: 28, affixes: [{ stat: 'damage', min: 24, max: 32 }, { stat: 'kraft', min: 4, max: 6 }], power: { id: 'thorns', value: 22 }, source: 'mountain_king' },
+  { id: 'morvath_urteil', name: 'Morvaths Urteil', base: 'ash_greatsword', minLevel: 32, affixes: [{ stat: 'damage', min: 28, max: 38 }, { stat: 'kraft', min: 5, max: 8 }], power: { id: 'lifesteal', value: 10 }, source: 'abyss_warden' },
+  { id: 'aschenkoenig_bogen', name: 'Todesschwinge', base: 'ash_bow', minLevel: 30, affixes: [{ stat: 'damage', min: 20, max: 26 }, { stat: 'crit', min: 4, max: 6 }, { stat: 'accuracy', min: 10, max: 14 }], power: { id: 'execute', value: 35 }, source: 'ash_king' },
+  { id: 'aschenkoenig_zepter', name: 'Zepter der Asche', base: 'void_staff', minLevel: 30, affixes: [{ stat: 'maxMana', min: 90, max: 120 }, { stat: 'spellFire', min: 20, max: 26 }], power: { id: 'manaKill', value: 14 }, source: 'ash_king' },
 ];
 
 export function legendaryById(id: string): LegendaryDef {

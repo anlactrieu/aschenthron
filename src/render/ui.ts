@@ -1,6 +1,6 @@
 import { assignHotbar, HOTBAR_SLOTS, hotbarFor } from './hotbar';
 import { skillReq, SPECS, SPEC_LEVEL, NPC_ROLE, npcKeyOf, ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_2, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, STATUS_IDS, SCHOOL_NAME, schoolOf, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, uniqueDef, NPC_LORE, type QuestDef, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
-import { POWER_TEXT, TEMPLATES, SETS, TIER_COLOR, GEM_COLOR, affixRange, gemAffix, gemName, handsOf, itemAffixes, itemReq, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
+import { LEGENDARIES, POWER_TEXT, TEMPLATES, SETS, TIER_COLOR, GEM_COLOR, affixRange, gemAffix, gemName, handsOf, itemAffixes, itemReq, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
 import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
   bulkSellable, sellPrice, critChance, attrBonus, equipSlotFor, socketCost, maxHpOf, maxManaOf, missingReq, nearNpc, trainerTeaches, powerOf, resistOf, type Actor, type Command, type Npc, type World,
@@ -1546,6 +1546,22 @@ export class Ui {
         c.append(row);
       }
       c.append(el('div', 'a-note', `Fundorte: Mini-Bosse („Gesucht“, ca. jedes dritte Mal ein Set-Teil), Weltbosse, Aufgaben-Belohnungen zur Wahl (Unikat-Aufgaben) und selten bei Gegnern der Stufe ${st.minLevel - 1}–${st.minLevel + 9}.`));
+      body.append(c);
+    }
+    // Boss-Waffen: feste Spezialwaffen der Bosse und Mini-Bosse (Waffen kauft man beim Händler, die besten holt man sich)
+    body.append(el('div', 'a-sec', 'Boss-Waffen'));
+    body.append(el('div', 'a-note', 'Normale Gegner lassen kaum Waffen fallen. Gute Waffen kaufst du beim Händler; die besten tragen Bosse und Mini-Bosse bei sich (jeder Kill hat eine gute Chance).'));
+    const bossWeapons = LEGENDARIES.filter((d) => d.source && templateById(d.base).slot === 'weapon').sort((a, b) => a.minLevel - b.minLevel);
+    for (const d of bossWeapons) {
+      let from = d.source!;
+      try { from = uniqueDef(d.source!)?.name ?? monsterKind(d.source!).name; } catch { /* Name unbekannt */ }
+      const c = el('div', 'a-card');
+      c.style.display = 'block';
+      const t = templateById(d.base);
+      const owned = [...p.inventory, ...p.stash, ...Object.values(p.equipment)].some((x) => x?.unique === d.id);
+      const hd = el('div', '', `${owned ? '✔ ' : ''}${d.name} (Stufe ${d.minLevel}, ${t.name})`);
+      hd.style.color = '#ff8a2a';
+      c.append(hd, el('div', 'a-note', `Von: ${from} · ${POWER_TEXT[d.power.id](d.power.value)}`));
       body.append(c);
     }
   }

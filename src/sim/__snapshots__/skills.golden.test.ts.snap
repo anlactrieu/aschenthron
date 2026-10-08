@@ -1283,7 +1283,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 15`] = `
       "type": "loot",
     },
     {
-      "amount": 135,
+      "amount": 143,
       "attackerId": 1,
       "crit": false,
       "skill": "multishot",
@@ -1293,7 +1293,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 15`] = `
   ],
   "hp": 5000,
   "mana": 4986,
-  "next": 0.831733848201111,
+  "next": 0.5399471158161759,
   "target": 5,
   "victims": [
     {
@@ -1306,7 +1306,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 15`] = `
     {
       "burn": null,
       "dot": null,
-      "hp": 40,
+      "hp": 32,
       "status": {},
       "target": 1,
     },
@@ -1947,7 +1947,10 @@ exports[`Skills golden > fireball Rang 1 1`] = `
       "type": "loot",
     },
     {
-      "amount": 231,
+      "type": "loot",
+    },
+    {
+      "amount": 247,
       "attackerId": 1,
       "crit": false,
       "dt": "fire",
@@ -1958,7 +1961,7 @@ exports[`Skills golden > fireball Rang 1 1`] = `
   ],
   "hp": 5000,
   "mana": 4976,
-  "next": 0.013821420492604375,
+  "next": 0.28811587928794324,
   "target": 3,
   "victims": [
     {
@@ -1989,11 +1992,11 @@ exports[`Skills golden > fireball Rang 1 1`] = `
     },
     {
       "burn": {
-        "perSec": 23,
+        "perSec": 25,
         "srcId": 1,
       },
       "dot": null,
-      "hp": 711,
+      "hp": 695,
       "status": {
         "burn": 60,
       },

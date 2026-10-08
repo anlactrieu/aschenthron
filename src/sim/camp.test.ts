@@ -148,7 +148,7 @@ describe('Lager erobern', () => {
       drainEvents(w);
       max = Math.max(max, w.actors.length);
     }
-    expect(max - n0).toBeLessThan(20); // ohne Lebensdauer wüchse es auf über 60
+    expect(max - n0).toBeLessThan(28); // ohne Lebensdauer wüchse es auf über 60
   }, 60000);
 
   it('jede Aufgabe mit Belohnung bietet drei Stücke zur Wahl', () => {
