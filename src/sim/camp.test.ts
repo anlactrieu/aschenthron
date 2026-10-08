@@ -154,4 +154,23 @@ describe('Lager erobern', () => {
   it('jede Aufgabe mit Belohnung bietet drei Stücke zur Wahl', () => {
     for (const q of QUESTS.filter((x) => x.reward)) expect(questRewardChoices(q), q.id).toHaveLength(3);
   });
+
+  it('Lager lässt sich auch langsam säubern: früh erschlagene Besatzer stehen nicht nach 2 Minuten wieder auf', () => {
+    const { world: w, playerId } = buildWorld(1, map);
+    const p = w.actors.find((a) => a.id === playerId)!;
+    const camp = w.camps[0]!;
+    const crew = w.actors.filter((a) => a.campId === camp.id);
+    p.damage = [9999, 9999];
+    p.hp = p.maxHp = 99999;
+    const first = crew[0]!;
+    p.x = first.x + 1;
+    p.y = first.y;
+    applyCommand(w, p.id, { type: 'attack', targetId: first.id });
+    for (let i = 0; i < 120 && first.alive; i++) tick(w);
+    expect(first.alive).toBe(false);
+    p.x = w.start.x;
+    p.y = w.start.y;
+    for (let i = 0; i < 20 * 150; i++) tick(w);
+    expect(first.alive).toBe(false);
+  });
 });

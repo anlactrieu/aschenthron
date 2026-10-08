@@ -1,5 +1,5 @@
 import type { Grid } from './path';
-import { addNpc, createWorld, giveStarterKit, inSafeZone, setupPatrols, spawnMonster, spawnPlayer, type NpcKind, type Rect, type TrainerField, type World } from './world';
+import { CAMP_RESPAWN_TICKS, addNpc, createWorld, giveStarterKit, inSafeZone, setupPatrols, spawnMonster, spawnPlayer, type NpcKind, type Rect, type TrainerField, type World } from './world';
 
 interface TiledProp {
   name: string;
@@ -74,7 +74,7 @@ export function buildWorld(seed: number, map: TiledMap, opts: { player?: boolean
     if (o.type === 'chest') {
       world.chests.push({ id: world.nextId++, x: o.x / ts, y: o.y / ts, level: Number(prop(o, 'level') ?? 1), tier: (prop(o, 'tier') ?? 'wood') as 'wood', opened: false, respawnAt: 0, ...(prop(o, 'camp') ? { camp: prop(o, 'camp') } : {}) });
     }
-    if (o.type === 'find') world.finds.push({ id: `${prop(o, 'quest')}:${world.finds.length}`, quest: prop(o, 'quest')!, x: o.x / ts, y: o.y / ts, text: prop(o, 'text') ?? o.name });
+    if (o.type === 'find') world.finds.push({ id: `${prop(o, 'quest')}:${Math.round(o.x / ts)},${Math.round(o.y / ts)}`, quest: prop(o, 'quest')!, x: o.x / ts, y: o.y / ts, text: prop(o, 'text') ?? o.name });
     if (o.type === 'camp') world.camps.push({ id: prop(o, 'id')!, name: o.name, x: o.x / ts, y: o.y / ts, w: o.width / ts, h: o.height / ts, cleared: false });
     if (o.type === 'townstart') world.towns.push({ x: o.x / ts, y: o.y / ts, name: o.name });
     if (o.type === 'monster') {
@@ -84,6 +84,7 @@ export function buildWorld(seed: number, map: TiledMap, opts: { player?: boolean
       if (campId) {
         // Besatzung eines Lagers: ruft sich gegenseitig (gemeinsame Rudel-Id), patrouilliert aber nicht
         m.campId = campId;
+        m.respawnTicks = CAMP_RESPAWN_TICKS;
         m.packId = 100000 + [...campId].reduce((n, ch) => (n * 31 + ch.charCodeAt(0)) % 90000, 7);
       }
     }

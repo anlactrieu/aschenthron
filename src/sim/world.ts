@@ -235,7 +235,6 @@ export interface Camp {
   h: number;
   cleared: boolean;
 }
-/** Nach dem Säubern kommt die Besatzung erst nach 30 Minuten wieder */
 /** Fundstück in der Welt für eine Suchaufgabe (beim Näherkommen eingesammelt, je Spieler einmal) */
 export interface Find {
   id: string;
@@ -244,6 +243,7 @@ export interface Find {
   y: number;
   text: string;
 }
+/** Besatzung eines Lagers kommt nach einem Tod erst nach 30 Minuten wieder (sonst ließe sich ein Lager nie in Ruhe säubern) */
 export const CAMP_RESPAWN_TICKS = 20 * 60 * 30;
 
 export type NpcKind = 'trainer' | 'merchant' | 'stash' | 'quest' | 'smith';
@@ -727,10 +727,12 @@ export function getActor(w: World, id: number): Actor | undefined {
 
 /* ---------- Befehle ---------- */
 
-/** Gibt eine erfüllte Aufgabe ab: Gold, XP, optional ein seltener Gegenstand oder ein Unikat/Set-Teil (landet im Rucksack). */
 /** Drei feste Belohnungen zur Wahl (je Aufgabe immer dieselben: Zufallsstrom nur aus der Aufgaben-Kennung, `w.rng` bleibt unberührt). */
+const rewardCache = new Map<string, Item[]>();
 export function questRewardChoices(def: QuestDef): Item[] {
   if (!def.reward) return [];
+  const cached = rewardCache.get(def.id);
+  if (cached) return cached;
   let seed = 2166136261;
   for (const ch of def.id) seed = Math.imul(seed ^ ch.charCodeAt(0), 16777619);
   const rng = new Rng(seed >>> 0);
@@ -748,8 +750,11 @@ export function questRewardChoices(def: QuestDef): Item[] {
     const it = rollDrop(rng, ids, lv, 'rare');
     if (tries >= 40 || !out.some((o) => o.templateId === it.templateId)) out.push(it);
   }
+  rewardCache.set(def.id, out);
   return out;
 }
+
+/** Gibt eine erfüllte Aufgabe ab: Gold, XP, optional ein seltener Gegenstand oder ein Unikat/Set-Teil (landet im Rucksack). */
 
 function finishQuest(w: World, a: Actor, def: QuestDef, pick = 0): void {
   const st = a.quests[def.id];
@@ -763,7 +768,7 @@ function finishQuest(w: World, a: Actor, def: QuestDef, pick = 0): void {
   let item: Item | undefined;
   if (def.reward && (!opt || opt.item)) {
     const choices = questRewardChoices(def);
-    item = { ...choices[opt ? 0 : Math.max(0, Math.min(choices.length - 1, Math.floor(pick)))]!, id: w.nextId++ };
+    item = { ...structuredClone(choices[opt ? 0 : Math.max(0, Math.min(choices.length - 1, Math.floor(pick)))]!), id: w.nextId++ };
     if (carriedWeight(a) + item.weight > carryCapacity(a)) {
       // Belohnung nie verlieren: zu schwer → als Bodenbeute neben den Spieler legen
       w.ground.push({ id: w.nextId++, x: Math.round(a.x), y: Math.round(a.y), item, expiresAt: null });
@@ -2041,7 +2046,7 @@ function checkVisits(w: World, pl: Actor): void {
     const st = pl.quests[q.id];
     if (q.kind !== 'find' || st?.state !== 'active') continue;
     for (const f of w.finds) {
-      if (f.quest !== q.id || st.found?.includes(f.id) || Math.hypot(f.x - pl.x, f.y - pl.y) > 1.8) continue;
+      if (f.quest !== q.id || st.found?.includes(f.id) || Math.hypot(f.x - pl.x, f.y - pl.y) > 2.5) continue;
       (st.found ??= []).push(f.id);
       st.progress = st.found.length;
       note(w, pl, f.text);
