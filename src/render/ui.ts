@@ -13,7 +13,7 @@ import { ACHIEVEMENTS } from './achievements';
 import { type NextStep, giverLocation, questAvailable, questChains, questWhere, targetName } from '../sim/quests';
 import { lookKey, lookOf, playerPortrait } from './art';
 import { initCredits, toggleCredits } from './credits';
-import { isTouch } from './touch';
+import { goFullscreen, isFullscreen, isTouch } from './touch';
 
 const RARITY_COLOR: Record<Item['rarity'], string> = { normal: '#c9c4bd', magic: '#7f9fff', rare: '#f2c94c', set: '#5fd070', legendary: '#ff8a2a' };
 const SLOT_NAME: Record<EquipSlot, string> = { weapon: 'Waffe', head: 'Kopf', chest: 'Brust', hands: 'Hände', feet: 'Füße', ring: 'Ring', ring2: 'Ring', amulet: 'Amulett', offhand: 'Nebenhand', belt: 'Gürtel', cloak: 'Umhang', legs: 'Beine' };
@@ -671,6 +671,10 @@ export class Ui {
       mk('Aufgaben', win('quests')), mk('Erfolge', win('ach')),
       mk('Karte', () => window.dispatchEvent(new CustomEvent('aschenthron:map'))), mk('Einstellungen', win('set')),
       mk('Speichern', () => this.manualIo?.save()), mk('Laden', () => this.confirmLoad()),
+      mk('Vollbild', () => {
+        if (isFullscreen()) this.say('Schon im Vollbild.');
+        else if (!goFullscreen()) this.say('iPhone: In Safari auf Teilen tippen, „Zum Home-Bildschirm“ wählen und das Spiel von dort starten – dann ohne Adressleiste.');
+      }),
       mk('Zoom +', () => window.dispatchEvent(new CustomEvent('aschenthron:zoom', { detail: 1.2 }))),
       mk('Zoom −', () => window.dispatchEvent(new CustomEvent('aschenthron:zoom', { detail: 1 / 1.2 }))),
     );

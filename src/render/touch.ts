@@ -80,5 +80,24 @@ export function initTouch(): void {
   rot.innerHTML = '<b>⟳</b><div>Bitte das Gerät drehen –<br>Aschenthron wird im Querformat gespielt.</div>';
   document.body.appendChild(rot);
   // iOS: Pinch-Zoom der Seite und Langdruck-Menü unterbinden (Pinch gehört der Spielkamera)
+  // Erste Berührung: Vollbild anfordern (nur mit Geste erlaubt), damit die Adressleiste verschwindet
+  const first = (): void => {
+    document.removeEventListener('pointerup', first);
+    if (!isFullscreen()) goFullscreen();
+  };
+  document.addEventListener('pointerup', first);
   for (const ev of ['gesturestart', 'gesturechange', 'gestureend', 'contextmenu']) document.addEventListener(ev, (e) => e.preventDefault());
+}
+
+/** Läuft die Seite schon als installierte App (Home-Bildschirm) oder im Vollbild? */
+export function isFullscreen(): boolean {
+  return !!document.fullscreenElement || window.matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true;
+}
+
+/** Vollbild per Browser (Android/iPad). Auf dem iPhone gibt es das nicht: dort hilft nur „Zum Home-Bildschirm“. */
+export function goFullscreen(): boolean {
+  const el = document.documentElement;
+  if (!document.fullscreenEnabled || !el.requestFullscreen) return false;
+  void el.requestFullscreen({ navigationUI: 'hide' }).then(() => (screen.orientation as { lock?: (o: string) => Promise<void> }).lock?.('landscape').catch(() => undefined)).catch(() => undefined);
+  return true;
 }
