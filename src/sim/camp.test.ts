@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import mapJson from '../data/aschenthron.json';
 import { buildWorld, type TiledMap } from './tiled';
 import { QUESTS } from './data';
-import { applyCommand, drainEvents, maxHpOf, tick, type World } from './world';
+import { applyCommand, drainEvents, maxHpOf, questRewardChoices, tick, type World } from './world';
 
 const map = mapJson as unknown as TiledMap;
 
@@ -66,5 +66,24 @@ describe('Lager erobern', () => {
     p.y = giver.y;
     applyCommand(w, p.id, { type: 'acceptQuest', questId: q.id });
     expect(p.quests[q.id]!.state).toBe('done');
+  });
+
+  it('Belohnung zur Wahl: drei feste Stücke, die gewählte landet im Rucksack', () => {
+    const { world: w, playerId } = buildWorld(1, map);
+    const p = w.actors.find((a) => a.id === playerId)!;
+    const q = QUESTS.find((x) => x.kind === 'camp')!;
+    const a = questRewardChoices(q);
+    expect(a).toHaveLength(3);
+    expect(questRewardChoices(q).map((i) => i.name)).toEqual(a.map((i) => i.name));
+    const giver = w.npcs.find((n) => n.quests?.includes(q.id))!;
+    p.x = giver.x + 1;
+    p.y = giver.y;
+    p.level = 30;
+    p.quests[q.id] = { state: 'done', progress: 1 };
+    const before = p.inventory.length;
+    applyCommand(w, p.id, { type: 'turnInQuest', questId: q.id, pick: 2 });
+    expect(p.quests[q.id]!.state).toBe('turned');
+    expect(p.inventory).toHaveLength(before + 1);
+    expect(p.inventory.at(-1)!.name).toBe(a[2]!.name);
   });
 });

@@ -3,7 +3,7 @@ import { POWER_TEXT, TEMPLATES, SETS, TIER_COLOR, GEM_COLOR, affixRange, gemAffi
 import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
   bulkSellable, sellPrice, critChance, attrBonus, equipSlotFor, socketCost, maxHpOf, maxManaOf, missingReq, nearNpc, trainerTeaches, powerOf, resistOf, type Actor, type Command, type Npc, type World,
-  activeSkills, gearStat, parryChance, passiveSum,
+  activeSkills, gearStat, parryChance, passiveSum, questRewardChoices,
 } from '../sim/world';
 import { buildProfile } from '../sim/build';
 import { itemIcon, potionIcon, skillIcon, statusIcon } from './icons';
@@ -1402,7 +1402,7 @@ export class Ui {
     const f = el('div');
     f.style.cssText = `width:${Math.min(100, (st.progress / def.count) * 100)}%;background:${st.state === 'done' ? '#6fe08a' : '#d8a24a'}`;
     bar.append(f);
-    const rew = `Belohnung ${def.xp} XP, ${def.gold} Gold${def.reward ? (def.reward === 'unique' ? ', Unikat/Set-Teil' : ', seltener Gegenstand') : ''}`;
+    const rew = `Belohnung ${def.xp} XP, ${def.gold} Gold${def.reward ? (def.reward === 'unique' ? ', Wahl: 3 Stücke (Unikat/Set möglich)' : ', Wahl: 1 von 3 seltenen Stücken') : ''}`;
     c.append(bar, el('div', 'a-note', st.state === 'done' ? 'Fertig – beim Auftraggeber abgeben!' : rew));
     return c;
   }
@@ -1701,9 +1701,25 @@ export class Ui {
           c.append(b);
         } else if (st.state === 'active') c.append(el('i', 'a-note', this.questGoal(def, p)));
         else if (st.state === 'done') {
-          const b = el('button', 'a-btn', 'Abgeben');
-          b.onclick = () => this.send({ type: 'turnInQuest', questId: id });
-          c.append(b);
+          const choices = questRewardChoices(def);
+          if (choices.length) {
+            c.append(el('div', 'a-note', 'Wähle deine Belohnung:'));
+            choices.forEach((it, pick) => {
+              const b = el('button', 'a-btn');
+              b.style.cssText = 'display:flex;align-items:center;gap:6px;margin:2px 4px 2px 0;text-align:left';
+              const nm = el('span', '', it.name);
+              nm.style.color = RARITY_COLOR[it.rarity];
+              b.append(Object.assign(el('img'), { src: itemIcon(it) }), nm);
+              b.onmouseenter = (ev) => this.showTip(it, equippedFor(p, it), ev);
+              b.onmouseleave = () => (this.tip.style.display = 'none');
+              b.onclick = () => { this.tip.style.display = 'none'; this.send({ type: 'turnInQuest', questId: id, pick }); };
+              c.append(b);
+            });
+          } else {
+            const b = el('button', 'a-btn', 'Abgeben');
+            b.onclick = () => this.send({ type: 'turnInQuest', questId: id });
+            c.append(b);
+          }
         } else c.append(el('i', 'a-note', 'erledigt'));
         body.append(c);
       }

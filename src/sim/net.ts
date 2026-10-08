@@ -50,7 +50,7 @@ export function validateCommand(w: World, c: unknown): Command | null {
     case 'talk':
       return int(o.npcId) ? { type: 'talk', npcId: o.npcId } : null;
     case 'acceptQuest': case 'turnInQuest':
-      return str(o.questId) ? ({ type: o.type, questId: o.questId } as Command) : null;
+      return str(o.questId) ? ({ type: o.type, questId: o.questId, ...(o.type === 'turnInQuest' && int(o.pick) && o.pick >= 0 && o.pick < 3 ? { pick: o.pick } : {}) } as Command) : null;
     case 'craft':
       return int(o.itemId) && ['upgrade', 'reroll', 'extend'].includes(o.op as string) ? { type: 'craft', itemId: o.itemId, op: o.op as 'upgrade' } : null;
     case 'socket':

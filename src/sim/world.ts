@@ -81,7 +81,7 @@ export type Command =
   | { type: 'stashTake'; itemId: number }
   | { type: 'openChest'; chestId: number }
   | { type: 'acceptQuest'; questId: string }
-  | { type: 'turnInQuest'; questId: string }
+  | { type: 'turnInQuest'; questId: string; pick?: number }
   | { type: 'talk'; npcId: number }
   | { type: 'craft'; itemId: number; op: 'upgrade' | 'reroll' | 'extend' }
   | { type: 'socket'; gemId: number; itemId: number; index?: number };
@@ -716,18 +716,38 @@ export function getActor(w: World, id: number): Actor | undefined {
 /* ---------- Befehle ---------- */
 
 /** Gibt eine erfüllte Aufgabe ab: Gold, XP, optional ein seltener Gegenstand oder ein Unikat/Set-Teil (landet im Rucksack). */
-function finishQuest(w: World, a: Actor, def: QuestDef): void {
+/** Drei feste Belohnungen zur Wahl (je Aufgabe immer dieselben: Zufallsstrom nur aus der Aufgaben-Kennung, `w.rng` bleibt unberührt). */
+export function questRewardChoices(def: QuestDef): Item[] {
+  if (!def.reward) return [];
+  let seed = 2166136261;
+  for (const ch of def.id) seed = Math.imul(seed ^ ch.charCodeAt(0), 16777619);
+  const rng = new Rng(seed >>> 0);
+  let n = 0;
+  const ids = () => ++n;
+  const lv = def.minLevel + 2;
+  const out: Item[] = [];
+  if (def.reward === 'unique') {
+    for (let i = 0; i < 8 && !out.length; i++) {
+      const sp = i % 2 ? rollWorldSpecial(rng, ids, lv) : rollUniqueSpecial(rng, ids, lv);
+      if (sp) out.push(sp);
+    }
+  }
+  while (out.length < 3) {
+    const it = rollDrop(rng, ids, lv, 'rare');
+    if (!out.some((o) => o.templateId === it.templateId)) out.push(it);
+  }
+  return out;
+}
+
+function finishQuest(w: World, a: Actor, def: QuestDef, pick = 0): void {
   const st = a.quests[def.id];
   if (!st) return;
   st.state = 'turned';
   a.gold += def.gold;
   let item: Item | undefined;
   if (def.reward) {
-    const lv = def.minLevel + 2;
-    const ids = () => w.nextId++;
-    let special: Item | null = null;
-    if (def.reward === 'unique') for (let i = 0; i < 8 && !special; i++) special = i % 2 ? rollWorldSpecial(w.rng, ids, lv) : rollUniqueSpecial(w.rng, ids, lv);
-    item = special ?? rollDrop(w.rng, ids, lv, 'rare');
+    const choices = questRewardChoices(def);
+    item = { ...choices[Math.max(0, Math.min(choices.length - 1, Math.floor(pick)))]!, id: w.nextId++ };
     if (carriedWeight(a) + item.weight > carryCapacity(a)) {
       // Belohnung nie verlieren: zu schwer → als Bodenbeute neben den Spieler legen
       w.ground.push({ id: w.nextId++, x: Math.round(a.x), y: Math.round(a.y), item, expiresAt: null });
@@ -1032,7 +1052,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       const giver = w.npcs.find((n) => n.quests?.includes(cmd.questId) && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
       if (!def || !st || !giver) return fail(w, 'Hier gibt es nichts abzugeben.');
       if (st.state !== 'done') return fail(w, 'Aufgabe noch nicht erfüllt.');
-      finishQuest(w, a, def);
+      finishQuest(w, a, def, cmd.pick ?? 0);
       break;
     }
     case 'talk': {
