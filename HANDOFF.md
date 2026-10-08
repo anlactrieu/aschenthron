@@ -1,5 +1,11 @@
 # HANDOFF – Aschenthron
 
+## AKTUELL (2026-10-08): Handy-Bugfix Laufen + Meldungen (committet und gepusht als e769601; tsc, Lint, 304 Tests grün; nicht auf echtem Gerät geprüft)
+- **Stand:** `GameScene.ts`: `fingers` (Set aus nativen `pointerdown/up/cancel`) ersetzt `pointer2.isDown` in `onClick` und `pinchZoom`; Reset bei `blur`/`visibilitychange`. `ui.ts`: `say()` zeigt am Handy max. 3 Zeilen, `toastTimer`/`say2()` lassen Meldungen nach 6 s (dann je 2,5 s) auslaufen; Toast 26vw, 11px.
+- **Entscheidungen:** (1) Finger selbst zählen statt Phasers `pointer2` (blieb nach abgebrochenen Touches hängen, blockierte alle Bodenklicks). (2) Meldungen nur am Handy auslaufen lassen, Desktop unverändert. (3) Narrower Toast statt Verschieben, damit Spielfläche links frei bleibt.
+- **Offen:** Test auf echtem Handy (`npm run dev:lan`); ggf. weitere linke Elemente (Tracker/Fenster) kürzen, falls noch zu viel Platz; `/code-review` lief nicht.
+- **Learnings:** Phaser `pointerN.isDown` ist bei Multitouch unzuverlässig (kein `pointerup` bei Abbruch), native Events mit `pointerId` nutzen.
+
 ## AKTUELL (2026-10-08): Zauber ohne Rang + Attribut-Anforderungen + 24 neue Zauber (committet, nicht gepusht; tsc, Lint, ~300 Tests, Build grün; Lernen/Skill-Fenster im Browser gesehen)
 - **Stand:** Siehe SPEC.md „Umsetzungsstand Attribut-Anforderungen / Zauber ohne Rang“. Code: `data.ts` (`skillReq`, `skillMainAttr`, `skillRankOf`, `ACTIVE_POWER`, 24 neue `SKILLS`), `world.ts` (`missingSkillReq`, `learnSkill`/`trainSkill`), `save.ts` (Migration), `render/hotbar.ts` (neu), `ui.ts` (`skillCard`, Leisten-Auswahl), `GameScene.ts` (`learned`-Ereignis), Test `skills.req.test.ts`.
 - **Entscheidungen:** (1) Rang nur für Passive; aktive Zauber einmal lernen (Gold, Stufe, Attribut), Skillpunkte nur für Passive. (2) Anforderung automatisch aus Skill-Art und Stufe (8 + 1,2 × Stufe), nur Hauptattribut. (3) Schnellleiste nur im Browser (localStorage), 9 Plätze.
