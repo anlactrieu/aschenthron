@@ -271,6 +271,7 @@ export class Ui {
   private hintTimer = 0;
   private tip = el('div');
   private msgs: string[] = [];
+  private toastTimer = 0;
   private key = '';
   private hotKey = '';
   private armedId: string | null = null;
@@ -338,7 +339,7 @@ export class Ui {
         this.trackerOpen = !this.trackerOpen;
         this.trackerKey = '';
       };
-      Object.assign(this.toast.style, { width: '34vw', bottom: '84px', font: '12px/1.3 Georgia,serif' });
+      Object.assign(this.toast.style, { width: '26vw', bottom: '84px', font: '11px/1.25 Georgia,serif' });
       this.tracker.style.top = 'max(8px,env(safe-area-inset-top))';
       this.tracker.style.right = 'max(8px,env(safe-area-inset-right))';
       this.bannerEl.style.fontSize = '18px';
@@ -426,8 +427,19 @@ export class Ui {
 
   say(m: string): void {
     this.msgs.push(m);
-    this.msgs = this.msgs.slice(-6);
+    this.msgs = this.msgs.slice(isTouch ? -3 : -6);
     this.toast.replaceChildren(...this.msgs.map((t) => el('div', '', t)));
+    // Handy: Meldungen verschwinden nach einigen Sekunden, sonst blockieren sie dauerhaft die linke Bildschirmseite
+    if (isTouch) {
+      window.clearTimeout(this.toastTimer);
+      this.toastTimer = window.setTimeout(() => this.say2(), 6000);
+    }
+  }
+
+  private say2(): void {
+    this.msgs.shift();
+    this.toast.replaceChildren(...this.msgs.map((t) => el('div', '', t)));
+    if (this.msgs.length) this.toastTimer = window.setTimeout(() => this.say2(), 2500);
   }
 
   /* -------------------------------------------------------------- HUD */

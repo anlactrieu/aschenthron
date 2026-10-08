@@ -230,6 +230,13 @@ export class GameScene extends Phaser.Scene {
     this.input.on('wheel', (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => this.setZoom(this.cameras.main.zoom * (dy > 0 ? 0.92 : 1.08)));
     this.input.mouse?.disableContextMenu();
     if (isTouch) {
+      // Aktive Finger selbst mitzählen: Phasers pointer2.isDown bleibt nach abgebrochenen Touches gern hängen und blockiert dann jedes Laufen
+      const drop = (e: PointerEvent): void => void this.fingers.delete(e.pointerId);
+      window.addEventListener('pointerdown', (e) => this.fingers.add(e.pointerId), true);
+      window.addEventListener('pointerup', drop, true);
+      window.addEventListener('pointercancel', drop, true);
+      window.addEventListener('blur', () => this.fingers.clear());
+      document.addEventListener('visibilitychange', () => this.fingers.clear());
       // Handy: zwei Finger zoomen die Kamera, die Zoom-Knöpfe im Menü auch
       this.input.addPointer(1);
       window.addEventListener('aschenthron:zoom', (e) => this.setZoom(this.cameras.main.zoom * ((e as CustomEvent<number>).detail || 1)));
@@ -579,10 +586,12 @@ export class GameScene extends Phaser.Scene {
   /** Handy: Abstand der zwei Finger (0 = nicht zwei Finger) und Zoom beim Start der Geste */
   private pinch = { dist: 0, zoom: 1 };
 
+  private fingers = new Set<number>();
+
   private pinchZoom(): boolean {
     const a = this.input.pointer1;
     const b = this.input.pointer2;
-    if (!a?.isDown || !b?.isDown) {
+    if (this.fingers.size < 2 || !a?.isDown || !b?.isDown) {
       this.pinch.dist = 0;
       return false;
     }
@@ -593,7 +602,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onClick(ptr: Phaser.Input.Pointer): void {
-    if (isTouch && this.input.pointer2?.isDown && this.input.pointer1?.isDown) return;       // zweiter Finger = Zoom, kein Befehl
+    if (isTouch && this.fingers.size >= 2) return;       // zweiter Finger = Zoom, kein Befehl
     const t = toTile(ptr.worldX, ptr.worldY);
     const w = this.world;
     const hit = this.pick(ptr.worldX, ptr.worldY);
