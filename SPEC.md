@@ -284,3 +284,30 @@ Schmerzpunkte (User): gleiche Gegner wiederholen · kein Warum · nur Laufen und
 - **Umgesetzt:** (a) Kill-Zahlen halbiert (XP/Gold je Aufgabe bleiben), Kopfgelder 4–7; (b) **Lager** (`camp`): 7 Lager (`CAMPS` in `gen_map.py`, Karte: Objekt `camp` + Besatzung mit `camp=<id>` + verschlossene Lagertruhe), Sim `World.camps`, `Actor.campId`, `campClearedBy`, 30 min Ruhe (`CAMP_RESPAWN_TICKS`), 7 Lageraufgaben `q_camp_*`; (c) **Belohnung zur Wahl**: `questRewardChoices(def)` (3 feste Stücke je Aufgabe, eigener Zufallsstrom), Befehl `turnInQuest.pick`, Auswahl im Aufgabenfenster, Vorschau „Zu holen“; (d) **Zufallsereignisse** (`wildEvents`, nur Einzelspieler): nach ~90 Feldern Weg draußen Hinterhalt / wandernder Anführer / verlorene Fracht, 2 min Abklingzeit; (e) **Suchen & Entscheiden** (`find`): Fundstücke (Karte: Objekt `find`, Funkeln im Spiel), `QuestDef.choices` (zwei Wege mit eigenem Gold/XP/Gegenstand), Aufgaben `q_find_cargo`, `q_find_smuggler`.
 - **Nicht umgesetzt:** fahrender Händler (NPC müsste zur Laufzeit erscheinen/verschwinden), Lagerzustand im Mehrspieler (Server kennt `camps/finds` nicht im Snapshot), feste Beutetabellen je Lager (Beute kommt aus Standard-Truhen/Quest-Wahl), Aschengrund bleibt als Elite-Zone dicht (nicht ausgedünnt).
 - **Messung:** Pace-Lauf des Bots jetzt 10,9 h bis Stufe 30 (vorher 8,4 h): Bot macht nur Kills, langsamere Respawns und weniger/vereinzelte Monster bremsen ihn; echte Spieler bekommen zusätzlich XP aus Lagern, Suchen, Ereignissen.
+
+## Attribut-Anforderungen für Waffen, Zauber und Skills (geplant, Entscheidung 2026-10-08, noch NICHT umgesetzt)
+Auftrag: Waffen, Zauber und Skills sollen Attribute als Anforderung haben wie in T4C. Entscheidungen des Users: **hart** (ohne die Werte nicht benutzbar bzw. nicht lernbar), Zuordnung **klassisch**; Rangfrage vom User nicht verstanden → Standard gewählt: **pro Rang steigend** (siehe unten). Umsetzung in frischer Session mit dieser Spezifikation.
+
+**Ist-Stand:** Gegenstände haben `Req {level, kraft, gewandtheit, ausdauer, verstand, willenskraft}` (`items.ts`: `reqOfTemplate`, `itemReq`; Prüfung `missingReq` in `world.ts`; Anzeige im Tooltip). Waffen/Rüstung: nur `reqKraft` plus abgeleitet Gewandtheit (Waffen ≥ Kraft 14: 40 %) bzw. Ausdauer (Rüstung: 55 %). Skills/Zauber (`SkillDef` in `data.ts`, 41 Stück) haben nur `levelReq` und Rang-Stufenanforderung `rankLevelReq`; keine Attribute.
+
+**1. Waffen (klassisch):**
+- Nahkampf (Schwert/Axt/Keule): Kraft wie bisher; leichte/schnelle Waffen zusätzlich Gewandtheit; Zweihänder deutlich mehr Kraft.
+- Bögen: Gewandtheit (kein Kraftwert nötig außer kleiner Zugkraft, ca. 30 % der Gewandtheitsforderung).
+- Stäbe: Verstand (Hauptwert), Willenskraft als Nebenwert.
+- `req` je Vorlage in `TEMPLATES` explizit setzen statt nur abzuleiten (Tabelle im Code, Werte an `minLevel` koppeln: Hauptattribut ≈ 8 + 1,4 × Stufe, Nebenattribut ≈ 40 % davon); Tooltip zeigt fehlende Werte rot (existiert).
+- **Hart:** Waffe, deren Anforderung nicht erfüllt ist, lässt sich nicht anlegen (Anlegen scheitert mit Meldung; `missingReq` schon vorhanden, prüfen ob Anlegen es erzwingt).
+
+**2. Skills und Zauber (klassisch, Feld `req?: Partial<Record<AttrKey, number>>` an `SkillDef`):**
+- Nahkampf: Kraft (Wirbelhieb, Schädelspalter, Titanenhieb …), Parieren/Schildbeherrschung: Gewandtheit bzw. Ausdauer.
+- Fernkampf: Gewandtheit; Giftpfeil/Giftregen zusätzlich Verstand klein.
+- Magie: Verstand für Schadenszauber (Feuer/Frost/Blitz …); Willenskraft für Heilung, Schutz, Läuterung, Entzaubern, Fluch, Verstummen.
+- Überleben: Ausdauer (Erste Hilfe, Überleben), Gewandtheit (Schleichen).
+- Höhe: Hauptattribut ≈ 6 + 1,3 × `levelReq` (Stufe 30 → ca. 45), Nebenattribut ≈ 40 %.
+- **Hart:** Lernen beim Lehrer (`learnSkill`) und Rang-Erhöhung (`rankUp`) scheitern, wenn die Anforderung fehlt. **Pro Rang steigend:** Rang 1 braucht den Grundwert, jeder weitere Rang +10 % (wie `rankLevelReq` die Stufe erhöht).
+- Bereits gelernte Skills in alten Spielständen bleiben nutzbar (Bestandsschutz), nur neues Lernen/Hochstufen prüft.
+- UI: Skill-Karte beim Lehrer und in der Fertigkeiten-Liste zeigt Anforderung (rot, was fehlt), Sperrgrund bei Klick.
+
+**3. Folgen für Balance/Tests:** `skills.golden.test.ts` und Build-Tests (`build.ts`, `builds.bench.test.ts`) prüfen, ob die Bot-Builds die Anforderungen mit ihren Punkten erfüllen (Attributpunktverteilung im Pace-Bot `pace.sim.ts` anpassen, sonst bricht der Lauf); Respec bleibt kostenlos wie bisher. Neuer Test: je Skill/Waffe Anforderung erreichbar, Lernen scheitert mit Mangel, klappt mit genügend Punkten.
+
+**Reihenfolge:** (a) `req` an Waffenvorlagen + Anlegen erzwingen, (b) `SkillDef.req` + Prüfung in `learnSkill`/`rankUp` + Meldungen, (c) UI-Anzeige, (d) Pace-Bot und Tests anpassen, Pace-Lauf messen.
+**Offen:** Genaue Zahlen je Skill (Tabelle im Code), ob Attributpunkte pro Stufe (heute 5?) für hartes System reichen (Pace-Lauf entscheidet).
