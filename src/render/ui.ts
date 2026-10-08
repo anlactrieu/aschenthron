@@ -1,9 +1,10 @@
+import { assignHotbar, HOTBAR_SLOTS, hotbarFor } from './hotbar';
 import { skillReq, SPECS, SPEC_LEVEL, NPC_ROLE, npcKeyOf, ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_2, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, STATUS_IDS, SCHOOL_NAME, schoolOf, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, uniqueDef, NPC_LORE, type QuestDef, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
 import { POWER_TEXT, TEMPLATES, SETS, TIER_COLOR, GEM_COLOR, affixRange, gemAffix, gemName, handsOf, itemAffixes, itemReq, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
 import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
   bulkSellable, sellPrice, critChance, attrBonus, equipSlotFor, socketCost, maxHpOf, maxManaOf, missingReq, nearNpc, trainerTeaches, powerOf, resistOf, type Actor, type Command, type Npc, type World,
-  activeSkills, gearStat, parryChance, passiveSum, questRewardChoices, missingSkillReq,
+  gearStat, parryChance, passiveSum, questRewardChoices, missingSkillReq,
 } from '../sim/world';
 import { buildProfile } from '../sim/build';
 import { itemIcon, potionIcon, skillIcon, statusIcon } from './icons';
@@ -448,7 +449,7 @@ export class Ui {
     this.updateHud(p, target);
     this.updateTracker(w, p);
     const near = w.npcs.filter((n) => Math.hypot(n.x - p.x, n.y - p.y) <= NPC_RANGE);
-    const key = JSON.stringify([this.open, this.tab, p.inventory, this.bagFilter, this.bagSort, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.freeRespec, p.gold, p.level, p.spec, near.map((n) => n.id), p.quests, p.bounties, p.xp > 0, this.board?.map((r) => r.name + r.xp).join(), this.ach?.unlocked.size, this.ach?.stats.kills, this.sel?.d.item.id, this.sel?.d.templateId, this.touchMain]);
+    const key = JSON.stringify([settings().hotbar, this.open, this.tab, p.inventory, this.bagFilter, this.bagSort, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.freeRespec, p.gold, p.level, p.spec, near.map((n) => n.id), p.quests, p.bounties, p.xp > 0, this.board?.map((r) => r.name + r.xp).join(), this.ach?.unlocked.size, this.ach?.stats.kills, this.sel?.d.item.id, this.sel?.d.templateId, this.touchMain]);
     if (key === this.key || this.dragging) return;
     this.key = key;
     if (isTouch && this.sel && !this.selValid(p)) this.sel = null;
@@ -524,7 +525,7 @@ export class Ui {
     this.xpText.style.color = heavy ? '#ffb0a0' : '#fff';
 
     // Schnellleiste: Tränke (Q/E) und Skills (1–9); Elemente bleiben bestehen, nur Zustand wird aktualisiert
-    const act = activeSkills(p);
+    const act = hotbarFor(p);
     const hk = act.join(',');
     if (hk !== this.hotKey || !this.potionBtns) {
       this.hotKey = hk;
@@ -539,6 +540,14 @@ export class Ui {
       this.potionBtns = { heal: mkPotion('heal', 'Q'), mana: mkPotion('mana', 'E') };
       this.hotbar.append(this.potionBtns.heal);
       this.hotButtons = act.map((id, i) => {
+        if (!id) {
+          const e = el('div', 'hb');
+          e.style.opacity = '.35';
+          e.title = 'Leer – im Fertigkeiten-Fenster (K) einen Zauber auf diesen Platz legen';
+          e.append(el('div', 'k', String(i + 1)));
+          this.hotbar.append(e);
+          return { el: e, cd: el('div'), txt: el('div') };
+        }
         const s = SKILLS.find((x) => x.id === id)!;
         const b = el('div', 'hb');
         b.title = `${s.name} – ${s.desc}`;
@@ -559,6 +568,7 @@ export class Ui {
       this.potionBtns![k].style.opacity = n ? '1' : '.45';
     }
     act.forEach((id, i) => {
+      if (!id) return;
       const s = SKILLS.find((x) => x.id === id)!;
       const cd = p.skillCd[id] ?? 0;
       const hb = this.hotButtons[i]!;
@@ -1362,14 +1372,38 @@ export class Ui {
   private renderSkills(body: HTMLElement, p: Actor): void {
     body.append(el('div', 'a-sec', `Gelernte Fertigkeiten – ${p.skillPoints} Skillpunkte übrig (nur für Passive)`));
     if (!p.skills.length) body.append(el('div', 'a-note', 'Noch keine – Lehrer in den Städten bringen dir Fertigkeiten bei.'));
-    const act = activeSkills(p);
+    const barNow = hotbarFor(p);
     p.skills.forEach((id) => {
       const s = SKILLS.find((x) => x.id === id)!;
-      const i = act.indexOf(id);
+      const i = barNow.indexOf(id);
       const c = el('div', 'a-card');
       c.append(Object.assign(el('img'), { src: skillIcon(s) }));
       const t = el('div');
       t.append(el('div', '', `${s.name}${i >= 0 && i < 9 ? ` [${i + 1}]` : ''}${s.passive ? ' (passiv)' : ''} · ${s.area}${s.passive ? ` · Rang ${p.skillRanks[s.id] ?? 1}` : ''}`), el('div', 'a-note', `${SCHOOL_NAME[schoolOf(s)]}${s.passive ? '' : ` · ${s.mana} Mana · ${Math.round(s.cooldown / TICK_RATE)} s Abklingzeit`}`), el('div', 'a-note', s.desc), ...skillInfo(s));
+      if (!s.passive) {
+        const bar = hotbarFor(p);
+        const sel = document.createElement('select');
+        sel.title = 'Platz auf der Schnellleiste';
+        sel.style.cssText = 'background:#1a1620;color:#fff;border:1px solid #4b3f3a;border-radius:3px;margin-left:8px';
+        const none = document.createElement('option');
+        none.value = '';
+        none.textContent = 'Leiste: –';
+        sel.append(none);
+        for (let n = 0; n < HOTBAR_SLOTS; n++) {
+          const o = document.createElement('option');
+          o.value = String(n);
+          o.textContent = `Leiste: ${n + 1}`;
+          sel.append(o);
+        }
+        sel.value = bar.indexOf(s.id) >= 0 ? String(bar.indexOf(s.id)) : '';
+        sel.onchange = () => {
+          if (sel.value === '') {
+            const at = bar.indexOf(s.id);
+            if (at >= 0) assignHotbar(p, at, null);
+          } else assignHotbar(p, Number(sel.value), s.id);
+        };
+        c.append(sel);
+      }
       c.append(t);
       body.append(c);
     });
@@ -1632,7 +1666,7 @@ export class Ui {
         };
         body.append(rs);
       }
-      for (const s of SKILLS.filter((x) => trainerTeaches(trainer, x))) body.append(this.skillCard(s, p));
+      for (const s of SKILLS.filter((x) => trainerTeaches(trainer, x)).sort((a, b) => a.levelReq - b.levelReq)) body.append(this.skillCard(s, p));
     }
     if (smith) {
       body.append(el('div', 'a-sec', `${smith.name} – Schmiede`));

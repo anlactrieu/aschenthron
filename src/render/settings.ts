@@ -32,10 +32,12 @@ export interface Settings {
   /** Tränke, Edelsteine und Pfeile beim Darüberlaufen einsammeln */
   autoPickup: boolean;
   keys: Partial<Record<Action, string>>;
+  /** Schnellleiste: Fertigkeit je Platz 1–9 ('' = leer); nur im Browser gespeichert */
+  hotbar: string[];
 }
 
 const KEY = 'aschenthron.settings';
-const DEFAULTS: Settings = { volume: 1, dmgNumbers: true, labels: true, autoPickup: true, keys: {} };
+const DEFAULTS: Settings = { volume: 1, dmgNumbers: true, labels: true, autoPickup: true, keys: {}, hotbar: [] };
 
 function load(): Settings {
   try {
@@ -53,12 +55,13 @@ function load(): Settings {
         labels: o.labels !== false,
         autoPickup: o.autoPickup !== false,
         keys,
+        hotbar: Array.isArray(o.hotbar) ? o.hotbar.slice(0, 9).map((x) => (typeof x === 'string' ? x : '')) : [],
       };
     }
   } catch {
     /* ohne Speicher oder beschädigt: Standard */
   }
-  return { ...DEFAULTS, keys: {} };
+  return { ...DEFAULTS, keys: {}, hotbar: [] };
 }
 
 let cur = load();
@@ -81,8 +84,13 @@ export function onSettings(fn: () => void): void {
   listeners.add(fn);
 }
 
-export function setSetting<K extends Exclude<keyof Settings, 'keys'>>(k: K, v: Settings[K]): void {
+export function setSetting<K extends Exclude<keyof Settings, 'keys' | 'hotbar'>>(k: K, v: Settings[K]): void {
   cur = { ...cur, [k]: v };
+  persist();
+}
+
+export function setHotbarSlot(slots: string[]): void {
+  cur = { ...cur, hotbar: slots.slice(0, 9) };
   persist();
 }
 

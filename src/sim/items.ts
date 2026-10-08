@@ -419,9 +419,11 @@ export function reqOfTemplate(t: ItemTemplate): Req {
   const r: Req = { level: Math.max(1, t.minLevel - 1), ...t.req };
   if (t.reqKraft > 0) r.kraft = t.reqKraft;
   if (t.slot !== 'potion' && t.slot !== 'gem' && t.slot !== 'ring' && t.slot !== 'amulet' && t.reqKraft >= 14) {
-    if (t.slot === 'weapon' && r.gewandtheit === undefined) r.gewandtheit = Math.round(t.reqKraft * 0.4);
+    if (t.slot === 'weapon' && r.gewandtheit === undefined) r.gewandtheit = Math.round(t.reqKraft * ((t.speed ?? 1) < 1 ? 0.7 : 0.4)); // leichte, schnelle Waffen (Dolche) verlangen mehr Gewandtheit
     else if (t.slot !== 'weapon' && r.ausdauer === undefined) r.ausdauer = Math.round(t.reqKraft * 0.55);
   }
+  // Stäbe: neben Verstand etwas Willenskraft (Konzentration)
+  if (t.kind === 'staff' && (r.verstand ?? 0) >= 14 && r.willenskraft === undefined) r.willenskraft = Math.round(r.verstand! * 0.4);
   return r;
 }
 

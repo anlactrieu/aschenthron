@@ -1,12 +1,12 @@
 import Phaser from 'phaser';
 import mapJson from '../data/aschenthron.json';
+import { assignHotbar, hotbarFor } from './hotbar';
 import { buildWorld, type TiledMap } from '../sim/tiled';
 import { DMG_COLOR, STATUS_COLOR, monsterKind, npcKeyOf, questById, QUESTS, SKILLS, STATUS_IDS } from '../sim/data';
 import { giverLocation, nextStep, type NextStep, questAvailable, questMarks, type QuestMark } from '../sim/quests';
 import { exportPlayer, importPlayer } from '../sim/save';
 import {
   applyCommand, carriedWeight, carryCapacity, drainEvents, getActor, maxHpOf, maxManaOf, regionAt, tick, TICK_RATE, type Actor, type Chest, type Command, type Npc, type World,
-  activeSkills,
 } from '../sim/world';
 import { isWalkable } from '../sim/path';
 import { toScreen, toTile } from './iso';
@@ -467,7 +467,7 @@ export class GameScene extends Phaser.Scene {
   /** Klassische Menüführung: Fertigkeit wählen (1–9 oder Leiste), dann Ziel anklicken. Selbstzauber wirken sofort. */
   private useSkillSlot(i: number): void {
     const p = this.player();
-    const id = activeSkills(p)[i];
+    const id = hotbarFor(p)[i];
     if (!id) return;
     const s = SKILLS.find((x) => x.id === id)!;
     if (s.heal !== undefined || s.aoeSelf || s.target === 'self') {
@@ -1047,7 +1047,21 @@ export class GameScene extends Phaser.Scene {
           this.ui.banner(`Stufe ${e.level}!`, '#ffe45a');
           break;
         }
-        case 'learned': say(`${SKILLS.find((s) => s.id === e.skillId)?.name}: Rang ${e.rank ?? 1}`); this.sfx.quest(); break;
+        case 'learned': {
+          const sk = SKILLS.find((s) => s.id === e.skillId);
+          say(sk?.passive ? `${sk.name}: Rang ${e.rank ?? 1}` : `${sk?.name} gelernt!`);
+          this.sfx.quest();
+          // neuer aktiver Zauber landet im ersten freien Platz der Schnellleiste
+          if (sk && !sk.passive) {
+            const p = this.player();
+            const bar = hotbarFor(p);
+            if (!bar.includes(sk.id)) {
+              const free = bar.indexOf(null);
+              if (free >= 0) assignHotbar(p, free, sk.id);
+            }
+          }
+          break;
+        }
         case 'enraged': {
           const boss = getActor(w, e.id);
           const pos = this.bodyPos(boss);
