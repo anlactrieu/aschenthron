@@ -130,4 +130,28 @@ describe('Lager erobern', () => {
     expect(p.gold - gold0).toBe(q.choices![0]!.gold);
     expect(p.inventory).toHaveLength(inv0);
   });
+
+  it('Zufallsereignis-Gegner verschwinden wieder: über 40 Minuten Pendeln bleibt die Monsterzahl beschränkt', () => {
+    const { world: w, playerId } = buildWorld(1, map);
+    w.npcWander = true;
+    const p = w.actors.find((a) => a.id === playerId)!;
+    const m = w.actors.find((a) => a.kind === 'monster' && !a.boss && !a.unique && !a.campId && a.kindId === 'goblin')!;
+    p.x = m.x + 3;
+    p.y = m.y;
+    p.hp = p.maxHp = 99999;
+    const n0 = w.actors.length;
+    let max = 0;
+    for (let sec = 0; sec < 2400; sec++) {
+      p.x += sec % 2 ? 2 : -2;
+      p.targetId = null;
+      for (let i = 0; i < 20; i++) tick(w);
+      drainEvents(w);
+      max = Math.max(max, w.actors.length);
+    }
+    expect(max - n0).toBeLessThan(20); // ohne Lebensdauer wüchse es auf über 60
+  });
+
+  it('jede Aufgabe mit Belohnung bietet drei Stücke zur Wahl', () => {
+    for (const q of QUESTS.filter((x) => x.reward)) expect(questRewardChoices(q), q.id).toHaveLength(3);
+  });
 });

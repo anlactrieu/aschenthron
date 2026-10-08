@@ -183,6 +183,8 @@ export interface Actor {
   summoned: boolean;
   /** Beschworener Helfer: Kennung des Beschwörers (wird beim Wiedererscheinen des Bosses entfernt) */
   summonedBy?: number;
+  /** Zufallsereignis-Gegner: verschwinden nach dieser Zeit, sobald sie nicht kämpfen */
+  expireAt?: number;
   /** Wartezeit bis zum Wiedererscheinen (Ticks) */
   respawnTicks: number;
   /** Faktor auf XP, Gold und Beute */
@@ -742,9 +744,9 @@ export function questRewardChoices(def: QuestDef): Item[] {
       if (sp) out.push(sp);
     }
   }
-  while (out.length < 3) {
+  for (let tries = 0; out.length < 3; tries++) {
     const it = rollDrop(rng, ids, lv, 'rare');
-    if (!out.some((o) => o.templateId === it.templateId)) out.push(it);
+    if (tries >= 40 || !out.some((o) => o.templateId === it.templateId)) out.push(it);
   }
   return out;
 }
@@ -1742,6 +1744,7 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
 /** Zufallsereignisse unterwegs (nur Einzelspieler): nach etwa 90 Feldern Weg draußen ein Hinterhalt, ein wandernder Elite oder eine verlorene Fracht. */
 const WILD_STEPS = 90;
 const WILD_COOLDOWN = TICK_RATE * 120;
+const WILD_LIFE = TICK_RATE * 240;
 const WILD_NOT_IN = ['Goblinbau', 'Spinnennest', 'Aschengrund', 'Gruft der Moorhexe', 'Katakomben', 'Tiefenmine', 'Thron der Asche'];
 const wildState = new WeakMap<Actor, { x: number; y: number; walked: number; at: number }>();
 
@@ -1781,6 +1784,7 @@ function wildEvents(w: World, pl: Actor): void {
       if (!sp) break;
       const m = spawnMonster(w, sp.x, sp.y, base.kindId!);
       m.respawnTicks = 1e9; // verschwindet nach dem Tod
+      m.expireAt = w.tick + WILD_LIFE;
       m.targetId = pl.id;
       n++;
     }
@@ -1791,6 +1795,7 @@ function wildEvents(w: World, pl: Actor): void {
     const keys = Object.keys(CHAMPION_MODS);
     const m = spawnMonster(w, sp.x, sp.y, base.kindId!, { champ: keys[w.fx.int(0, keys.length - 1)]! });
     m.respawnTicks = 1e9;
+    m.expireAt = w.tick + WILD_LIFE;
     m.aggroRange = Math.max(m.aggroRange, 14);
     say(`Ein wandernder Anführer streift durch die Gegend: ${m.name}! Gute Beute.`, '#ffd23a');
   } else {
@@ -2060,6 +2065,18 @@ function checkVisits(w: World, pl: Actor): void {
 }
 
 function cleanupSummons(w: World): void {
+  // Zufallsereignis-Gegner ziehen ab, wenn ihre Zeit um ist und sie nicht kämpfen (sonst Aufschub)
+  if (w.tick % TICK_RATE === 0) {
+    const gone = (a: Actor) => {
+      if (a.expireAt === undefined || w.tick < a.expireAt) return false;
+      if (a.alive && a.targetId !== null) {
+        a.expireAt = w.tick + TICK_RATE * 30;
+        return false;
+      }
+      return true;
+    };
+    if (w.actors.some((a) => a.expireAt !== undefined && w.tick >= a.expireAt)) w.actors = w.actors.filter((a) => !gone(a));
+  }
   let any = false;
   for (const a of w.actors) {
     if (a.kind === 'monster' && !a.alive && a.respawnTicks >= 1e9 && w.tick - a.diedAt > TICK_RATE * 6) {
