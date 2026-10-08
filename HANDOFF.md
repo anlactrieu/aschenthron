@@ -1,5 +1,11 @@
 # HANDOFF – Aschenthron
 
+## AKTUELL (2026-10-08): Zauber ohne Rang + Attribut-Anforderungen + 24 neue Zauber (committet, nicht gepusht; tsc, Lint, ~300 Tests, Build grün; Lernen/Skill-Fenster im Browser gesehen)
+- **Stand:** Siehe SPEC.md „Umsetzungsstand Attribut-Anforderungen / Zauber ohne Rang“. Code: `data.ts` (`skillReq`, `skillMainAttr`, `skillRankOf`, `ACTIVE_POWER`, 24 neue `SKILLS`), `world.ts` (`missingSkillReq`, `learnSkill`/`trainSkill`), `save.ts` (Migration), `render/hotbar.ts` (neu), `ui.ts` (`skillCard`, Leisten-Auswahl), `GameScene.ts` (`learned`-Ereignis), Test `skills.req.test.ts`.
+- **Entscheidungen:** (1) Rang nur für Passive; aktive Zauber einmal lernen (Gold, Stufe, Attribut), Skillpunkte nur für Passive. (2) Anforderung automatisch aus Skill-Art und Stufe (8 + 1,2 × Stufe), nur Hauptattribut. (3) Schnellleiste nur im Browser (localStorage), 9 Plätze.
+- **Offen:** Push (User fragen); Pace-Lauf nach der Änderung (lief im Hintergrund), Zauberbalance im Spiel; Golden-Snapshots wurden bewusst neu geschrieben (`vitest -u`: Schaden × `ACTIVE_POWER`); eigene Icons (Download braucht Freigabe); Nebenattribute; Skillpunkte für Passive reichen? (1 pro Stufe + Meilensteine).
+- **Learnings:** Tests, die `learnSkill` aufrufen, brauchen jetzt genug Attribute (`p.attrs = {...}`); `learnSkill` für Aktive verbraucht keine Skillpunkte. `npm run pace` läuft >2 min: im Hintergrund starten.
+
 ## AKTUELL (2026-10-08): „Abwechslung statt Grind“ umgesetzt (committet, nicht gepusht; tsc, 293 Tests, Build grün; Pace 10,9 h; im Spiel/Browser nicht gesehen)
 - **Stand:** Siehe SPEC.md „Umsetzungsstand Abwechslung statt Grind“. Neu: `src/sim/camp.test.ts`; `world.ts`: `Camp`, `Find`, `questRewardChoices`, `campClearedBy`, `wildEvents`, `checkVisits` (find); `data.ts`: `qc`/`qf`, `QuestDef.choices`; `gen_map.py`: Blöcke „Lager zum Erobern“ + „Fundstücke“ + „Auflockern“ (Mindestbestand 6 je Gegnerart; Aschengrund ausgenommen); `ui.ts`: Wahl-Knöpfe beim Abgeben; `GameScene.ts`: Funkeln der Fundstücke, Banner `wildEvent`.
 - **Entscheidungen:** (1) Belohnungswahl deterministisch pro Aufgabe (kein gespeicherter Zustand, kein `w.rng`). (2) Lager patrouillieren nicht (`campId` in `setupPatrols` ausgenommen), rufen sich über gemeinsame Rudel-Id. (3) Zufallsereignisse nur bei `w.npcWander` (Einzelspieler), eigener Strom `w.fx`.
