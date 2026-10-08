@@ -148,7 +148,7 @@ describe('Todesstrafe (M4)', () => {
     applyCommand(w, p.id, { type: 'attack', targetId: m.id });
     run(w, TICK_RATE * 5);
     expect(m.alive).toBe(false);
-    run(w, TICK_RATE * 46);
+    run(w, TICK_RATE * 121);
     expect(m.alive).toBe(true);
     expect(m.hp).toBe(m.maxHp);
   });

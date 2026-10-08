@@ -770,6 +770,29 @@ if bad:
     ids = {o["id"] for o in keep}; objs[:] = [o for o in objs if o["id"] not in ids]
     print("entfernt:", len(keep), "unerreichbare Objekte", file=sys.stderr)
 
+# Auflockern (nachträglich, Zufallsstrom bleibt gleich): Nur Goblins ziehen im Rudel (bis 3); alle anderen Tiere stehen einzeln,
+# und Gruppen halten Abstand zueinander. Bosse, Mini-Bosse und Dungeon-Rudel bleiben unberührt.
+SPREAD_GAP = 10
+def _prop(o, k): return next((p["value"] for p in o["properties"] if p["name"] == k), None)
+packs = collections.defaultdict(list)
+for o in objs:
+    if o["type"] == "monster" and _prop(o, "unique") is None:
+        pid = int(_prop(o, "pack") or 0)
+        if pid in PACK_META: packs[pid].append(o)
+anchors, dropped, singled = [], 0, 0
+for pid in sorted(packs):
+    mem = packs[pid]
+    if sum(1 for o in mem if "goblin" in _prop(o, "kind")) * 2 <= len(mem):
+        for o in mem[1:]: objs.remove(o); dropped += 1
+        mem = mem[:1]; singled += 1
+        for p in mem[0]["properties"]:
+            if p["name"] == "pack": p["value"] = "0"
+    cx, cy = mem[0]["x"] // TS, mem[0]["y"] // TS
+    if any(abs(cx - a) < SPREAD_GAP and abs(cy - b) < SPREAD_GAP for a, b in anchors):
+        for o in mem: objs.remove(o); dropped += 1
+    else: anchors.append((cx, cy))
+print("Auflockern: %d Monster entfernt, %d Rudel zu Einzelgängern" % (dropped, singled), file=sys.stderr)
+
 data = [g[y][x] for y in range(H) for x in range(W)]
 tmj = {"compressionlevel": -1, "height": H, "width": W, "infinite": False, "orientation": "orthogonal", "renderorder": "right-down",
        "tilewidth": TS, "tileheight": TS, "type": "map", "version": "1.10", "nextlayerid": 3, "nextobjectid": oid[0], "tilesets": [],
