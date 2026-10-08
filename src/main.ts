@@ -48,6 +48,12 @@ async function boot(): Promise<void> {
     scene: [],
   });
   game.scene.add('game', scene, true, { session });
+  // iOS meldet Größenänderungen (Leisten ein/aus, Drehen, Vollbild) oft nur über visualViewport oder verspätet: Fläche nachziehen
+  const refit = () => { game.scale.refresh(); window.setTimeout(() => game.scale.refresh(), 300); };
+  window.visualViewport?.addEventListener('resize', refit);
+  window.addEventListener('orientationchange', refit);
+  document.addEventListener('fullscreenchange', refit);
+  window.addEventListener('pageshow', refit);
   if (import.meta.env.DEV) (window as unknown as { __game: Phaser.Game }).__game = game;
 }
 

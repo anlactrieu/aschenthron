@@ -16,7 +16,7 @@ const TOUCH_CSS = `
 html.touch,html.touch body{overscroll-behavior:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;position:fixed;inset:0;width:100%;height:100%}
 html.touch canvas,html.touch #game{touch-action:none}
 /* Spielfläche = ganzer Bildschirm inklusive Notch-/Statusleisten-Bereich (sonst bleibt oben ein schwarzer Balken) */
-html.touch #game{position:fixed;inset:0;width:100%;height:100%}
+html.touch #game{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh}
 html.touch canvas{display:block}
 html.touch .hb,html.touch .orb,html.touch .a-tab,html.touch .a-tabs,html.touch .a-slot,html.touch .a-x,html.touch .a-btn{touch-action:manipulation}
 html.touch input,html.touch textarea{-webkit-user-select:text;user-select:text}
