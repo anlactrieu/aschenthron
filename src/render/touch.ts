@@ -15,6 +15,9 @@ export const isTouch = detect();
 const TOUCH_CSS = `
 html.touch,html.touch body{overscroll-behavior:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;position:fixed;inset:0;width:100%;height:100%}
 html.touch canvas,html.touch #game{touch-action:none}
+/* Spielfläche = ganzer Bildschirm inklusive Notch-/Statusleisten-Bereich (sonst bleibt oben ein schwarzer Balken) */
+html.touch #game{position:fixed;inset:0;width:100%;height:100%}
+html.touch canvas{display:block}
 html.touch .hb,html.touch .orb,html.touch .a-tab,html.touch .a-tabs,html.touch .a-slot,html.touch .a-x,html.touch .a-btn{touch-action:manipulation}
 html.touch input,html.touch textarea{-webkit-user-select:text;user-select:text}
 /* Fenster: rechts, volle Höhe, Spielwelt links bleibt sichtbar; nicht verschiebbar, dafür einklappbar */
@@ -72,9 +75,6 @@ export function initTouch(): void {
   const style = document.createElement('style');
   style.textContent = TOUCH_CSS;
   document.head.appendChild(style);
-  // Viewport: kein Zoomen, Notch-Bereiche nutzen
-  const meta = document.querySelector<HTMLMetaElement>('meta[name=viewport]');
-  if (meta) meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
   const rot = document.createElement('div');
   rot.id = 't-rot';
   rot.innerHTML = '<b>⟳</b><div>Bitte das Gerät drehen –<br>Aschenthron wird im Querformat gespielt.</div>';
