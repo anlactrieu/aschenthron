@@ -1758,8 +1758,8 @@ function rollBounties(w: World, p: Actor): Bounty[] {
   const out: Bounty[] = [];
   for (let i = 0; i < 3 && pool.length; i++) {
     const t = pool.splice(w.fx.int(0, pool.length - 1), 1)[0]!;
-    const count = w.fx.int(8, 14);
-    out.push({ id: i + 1, target: t, count, progress: 0, gold: Math.round(count * (6 + p.level * 2)), xp: Math.round(xpToNext(p.level) * 0.1) });
+    const count = w.fx.int(4, 7);
+    out.push({ id: i + 1, target: t, count, progress: 0, gold: Math.round(count * 2 * (6 + p.level * 2)), xp: Math.round(xpToNext(p.level) * 0.1) });
   }
   return out;
 }

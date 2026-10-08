@@ -523,22 +523,22 @@ const qv = (id: string, name: string, text: string, minLevel: number, kind: Ques
 });
 
 export const QUESTS: QuestDef[] = [
-  q('q_rats', 'Rattenplage', 'Die Felder sind voller Ratten. Erlege 8 Feldratten.', 1, 'field_rat', 8, 1.5, 1.5),
-  q('q_hounds', 'Wilde Hunde', 'Wildhunde reißen unser Vieh. Erlege 8 davon.', 2, 'wild_hound', 8, 1.5, 1.5),
-  q('q_goblins', 'Goblinplage', 'Goblins plündern die Höfe am Waldrand. Vertreibe 10 Goblins.', 3, 'goblin', 10, 1.5, 1.5),
-  q('q_goblin_scouts', 'Späher im Unterholz', 'Goblinkundschafter spähen unsere Wege aus. Töte 8.', 5, 'goblin_scout', 8, 1.5, 1.5),
+  q('q_rats', 'Rattenplage', 'Die Felder sind voller Ratten. Erlege 4 Feldratten.', 1, 'field_rat', 4, 3.0, 3.0),
+  q('q_hounds', 'Wilde Hunde', 'Wildhunde reißen unser Vieh. Erlege 4 davon.', 2, 'wild_hound', 4, 3.0, 3.0),
+  q('q_goblins', 'Goblinplage', 'Goblins plündern die Höfe am Waldrand. Vertreibe 5 Goblins.', 3, 'goblin', 5, 3.0, 3.0),
+  q('q_goblin_scouts', 'Späher im Unterholz', 'Goblinkundschafter spähen unsere Wege aus. Töte 4.', 5, 'goblin_scout', 4, 3.0, 3.0),
   q('q_goblin_king', 'Der Goblinkönig', 'Grix sammelt ein Heer im Goblinbau nördlich des Räuberlagers. Erschlage ihn.', 10, 'goblin_king', 1, 1.5, 2),
-  q('q_bandits', 'Lehrlinge des Bösen', 'Räuberlehrlinge lauern an den Wegen. Besiege 8.', 3, 'bandit_novice', 8, 1.5, 1.5),
-  q('q_spiders', 'Netze im Wald', 'Der Düsterwald ist voller Waldspinnen. Töte 10.', 4, 'forest_spider', 10, 1.5, 1.5),
-  q('q_herbs', 'Sumpfkraut', 'Ohne Ghule im Moor kann ich Kräuter sammeln. Besiege 6 Sumpfghule.', 5, 'bog_ghoul', 6, 1.5, 1.5),
-  q('q_ghouls', 'Ghulplage', 'Die Ghule werden mehr. Besiege 12 Sumpfghule.', 7, 'bog_ghoul', 12, 1.4, 1.5),
-  q('q_wraiths', 'Unruhige Tote', 'Auf dem Totenacker spuken Geister. Banne 12 Friedhofsgeister.', 9, 'wraith', 12, 1.4, 1.5),
+  q('q_bandits', 'Lehrlinge des Bösen', 'Räuberlehrlinge lauern an den Wegen. Besiege 4.', 3, 'bandit_novice', 4, 3.0, 3.0),
+  q('q_spiders', 'Netze im Wald', 'Der Düsterwald ist voller Waldspinnen. Töte 5.', 4, 'forest_spider', 5, 3.0, 3.0),
+  q('q_herbs', 'Sumpfkraut', 'Ohne Ghule im Moor kann ich Kräuter sammeln. Besiege 3 Sumpfghule.', 5, 'bog_ghoul', 3, 3.0, 3.0),
+  q('q_ghouls', 'Ghulplage', 'Die Ghule werden mehr. Besiege 6 Sumpfghule.', 7, 'bog_ghoul', 6, 2.8, 2.8),
+  q('q_wraiths', 'Unruhige Tote', 'Auf dem Totenacker spuken Geister. Banne 6 Friedhofsgeister.', 9, 'wraith', 6, 2.8, 2.8),
   q('q_harkon', 'Der Räuberfürst', 'Harkon terrorisiert die Straßen. Erschlage ihn in seinem Lager im Nordwesten.', 10, 'bandit_lord', 1, 1.5, 2),
-  q('q_katacombs', 'Knochenritter', 'In den Katakomben marschieren Knochenritter. Zerschlage 12.', 12, 'bone_knight', 12, 1.4, 1.5),
-  q('q_trolls', 'Bergtrolle', 'Trolle bedrohen den Pass im Hochland. Töte 12.', 14, 'hill_troll', 12, 1.4, 1.5),
+  q('q_katacombs', 'Knochenritter', 'In den Katakomben marschieren Knochenritter. Zerschlage 6.', 12, 'bone_knight', 6, 2.8, 2.8),
+  q('q_trolls', 'Bergtrolle', 'Trolle bedrohen den Pass im Hochland. Töte 6.', 14, 'hill_troll', 6, 2.8, 2.8),
   q('q_veshra', 'Die Moorhexe', 'Veshra herrscht in der Gruft nördlich der Stadt. Töte sie.', 14, 'bog_queen', 1, 1.5, 2),
   q('q_mine', 'Der Steinkoloss', 'Ein Koloss erwacht in der Tiefenmine. Zerstöre ihn.', 18, 'stone_colossus', 1, 1.5, 2),
-  q('q_ash', 'Asche und Glut', 'Aschenwandler ziehen aus der Öde. Besiege 15.', 21, 'ash_walker', 15, 1.4, 1.5),
+  q('q_ash', 'Asche und Glut', 'Aschenwandler ziehen aus der Öde. Besiege 8.', 21, 'ash_walker', 8, 2.62, 2.62),
   q('q_king', 'Der Aschenkönig', 'Der Aschenkönig sitzt auf seinem Thron. Beende seine Herrschaft.', 28, 'ash_king', 1, 1.5, 2),
 ];
 
@@ -578,7 +578,7 @@ QUESTS.push(
 
   chainQ(CHAIN_MOOR, 2, { id: 'c_moor1', kind: 'talk', name: 'Der Eremit im Moor', text: 'Torwache Haldor erzählt von einem Einsiedler in den Moorlanden, der die Hexe kennt. Sprich mit Eremit Olm.', minLevel: 6, target: 'olm', outro: 'Olm blinzelt aus tiefen Höhlen der Augen. „Setz dich, Fremder. Das Moor flüstert.“' }),
   chainQ(CHAIN_MOOR, 2, { id: 'c_moor2', kind: 'bring', name: 'Irrlichtkraut', text: 'Bring Olm 5 Büschel Irrlichtkraut. Es wächst nur dort, wo Ghule und Moorleichen liegen.', minLevel: 7, requires: 'c_moor1', item: 'Irrlichtkraut', monsters: ['bog_ghoul', 'marsh_corpse'], chance: 0.45, count: 5, outro: 'Olm riecht an dem Kraut und lächelt dünn. „Genug für einen Trank der Klarsicht.“' }),
-  chainQ(CHAIN_MOOR, 2, { id: 'c_moor3', kind: 'kill', name: 'Hexen des Moors', text: 'Die Sumpfhexen hören Veshras Ruf. Töte 6 von ihnen, damit ihr Singen leiser wird.', minLevel: 10, requires: 'c_moor2', target: 'bog_witch', count: 6, outro: 'Olm lauscht in die Nacht. „Leiser. Aber nicht still.“' }),
+  chainQ(CHAIN_MOOR, 2, { id: 'c_moor3', kind: 'kill', name: 'Hexen des Moors', text: 'Die Sumpfhexen hören Veshras Ruf. Töte 4 von ihnen, damit ihr Singen leiser wird.', minLevel: 10, requires: 'c_moor2', target: 'bog_witch', count: 4, outro: 'Olm lauscht in die Nacht. „Leiser. Aber nicht still.“' }),
   chainQ(CHAIN_MOOR, 3, { id: 'c_moor4', kind: 'kill', name: 'Veshras Ende', text: 'Dringe in die Gruft der Moorhexe vor und töte Veshra. Olm hat sie einst gekannt.', minLevel: 14, requires: 'c_moor3', target: 'bog_queen', reward: 'unique', outro: 'Olm weint, ohne dass sich sein Gesicht bewegt. „Danke. Endlich ruht sie.“' }),
 
   chainQ(CHAIN_OATH, 2, { id: 'c_eid1', kind: 'talk', name: 'Der Sterbende Ritter', text: 'Haldor spricht von einem Ritter, der in der Aschenöde liegt und nicht sterben will. Finde Aldric und höre ihn an.', minLevel: 20, target: 'aldric', outro: 'Aldrics Atem rasselt. „Kommst du … von Thron und Krone?“' }),
