@@ -256,3 +256,26 @@ Sechs kleine Verbesserungen, nur Client (Sim und Golden-Tests unberührt). Umset
 - **Umgesetzt:** `src/render/settings.ts` (Einstellungen + Tastenbelegung, `localStorage` `aschenthron.settings`), neuer Reiter "Einstellungen" (Taste P) in `ui.ts` (`renderSettings`): Lautstärke (`Sfx.setVolume`), Schadenszahlen, Namen, Schnell aufheben, Tastenbelegung mit Konflikt-Prüfung und Zurücksetzen, 3 Speicherplätze (`GameScene.slotList/switchSlot`, Platz 1 = alter Schlüssel `aschenthron.save.v1`), Export/Import bleibt unten im Reiter. Rucksack: Filter (Alle/Waffen/Rüstung/Tränke/Sonstiges) und Sortierung (aus/Art/Seltenheit/Wert) nur als Ansicht. Schnell aufheben: `GameScene.autoPickup` (Tränke, Edelsteine, Pfeile in 1,6 Feldern, jede Beute höchstens alle 6 s erneut). "Gespeichert"-Hinweis (`Ui.savedHint`) höchstens alle 30 s.
 - **Schon vorhanden, nicht neu gebaut:** Tag und Nacht (`atmosphere.ts`: Tageszeit, Wetter, Licht), Export/Import als Datei und Code.
 - **Nicht gemacht:** Speicherplatz-Auswahl im Titelbild (nur im Einstellungs-Reiter), Skill-Tasten über 1-9 hinaus.
+
+## Abwechslung statt Grind (geplant, Entscheidung 2026-10-08, noch NICHT umgesetzt)
+Anlass: „Es ist langweilig: ich renne durch die Aufgaben immer zu denselben Monstern, zu viel Grind, und ich weiß nicht wofür.“
+Schmerzpunkte (User): gleiche Gegner wiederholen · kein Warum · nur Laufen und Hauen. Großes Ziel: **Beute-/Build-Jagd** (Diablo-Gefühl). Umsetzung in frischer Session mit dieser Spezifikation.
+
+**Ist-Stand:** 17 Aufgaben in `QUESTS` (`data.ts`), Arten `kill|chest|champion|unique|visit|bring|talk`; dazu Kopfgelder, Hauptfaden „Chronik der Asche“, Set-Jagd, Mit-Jagen, `nextStep` (siehe oben). Kill-Aufgaben verlangen 8–10 Stück einer Art.
+
+**1. Weniger Grind**
+- Kill-Zahlen in `QUESTS` und Kopfgeldern auf **3–5** kürzen (Kopfgeld bisher 8–14); XP/Gold je Aufgabe nicht senken, sondern auf die Aufgabenanzahl umlegen. Pace-Lauf (`pace.sim.ts`, vitest.pace.config.ts) danach prüfen: Spielzeit bis Stufe 30 soll nicht einbrechen, also dafür mehr Aufgaben/Ereignisse als XP-Quelle.
+- Gemischte Ziele statt einer Art: Aufgaben mit 2 Gegnerarten oder „Anführer des Rudels“ (`champion`/Rudel-Leader) statt Massenkill.
+
+**2. Neue Aufgabentypen (neue `QuestKind`)**
+- **`camp` Lager erobern:** Karte markiert Lager (Region + Rudel dort, z. B. Goblinlager, Banditenlager). Aufgabe fertig, wenn alle Monster der Region tot sind; danach respawnt das Lager nicht mehr (oder erst viel später) und eine Lagertruhe erscheint. Braucht: Regionsliste je Lager in `gen_map.py`, Zähler „Region geräumt“ in der Sim, Speicherung im Spielstand (`save.ts`, Version erhöhen).
+- **`find` Suchen & Entscheiden:** Fundstücke/Orte in der Welt (Objekt im Tiled-Layer, Tippen/E zum Untersuchen), Rätsel-Truhen, und Aufgaben mit **zwei Lösungen** (z. B. Schmuggler laufen lassen oder verraten) mit unterschiedlicher Belohnung (Gold vs. Gegenstand). Entscheidung wird im Spielstand gemerkt.
+- **Zufallsereignisse:** unterwegs seltene Auslöser (nur über `w.fx`, nie `w.rng`): Hinterhalt (Rudel taucht auf), wandernder Elite-Boss mit Beute, Notruf eines NPCs (kurze Aufgabe), fahrender Händler mit seltener Ware. Cooldown, nie in Städten oder auf Stufe-1-Gebiet.
+
+**3. Das Warum: Beute-/Build-Jagd**
+- Jede Aufgabe/jedes Lager nennt im Text **was es dort zu holen gibt** (Set-Teil, Legendär, Skill-Punkt-Wendepunkt) und die Karte/der Tracker zeigt es („Lager Rotfang: Set Wolfsjäger Teil 2/5 möglich“).
+- Lager und Elite-Orte bekommen feste Beutetabellen (Sets/Legendäre pro Gebiet), Abgabe-Belohnung ist ein **wählbarer Gegenstand** (3 zur Auswahl) statt reinem Gold/XP.
+- Build-Wendepunkte: bei bestimmten Stufen ein klarer Anlass (neue Passive/Spezialisierung, siehe Meisterschaft Lvl 20), im Hauptfaden als Kapitelbelohnung.
+
+**Reihenfolge (jeweils mit Tests, Pace-Lauf, Golden-Tests unberührt halten):** (a) Kill-Zahlen kürzen + Beutehinweise im Text, (b) `camp`, (c) wählbare Belohnung, (d) Zufallsereignisse, (e) `find` mit Entscheidungen.
+**Offen/Annahmen:** Anzahl Lager (Vorschlag 1 je Gebiet, 6–8 gesamt); ob geräumte Lager je Spielstand dauerhaft bleiben; Server/Mehrspieler zählt Lagerzustand pro Spieler (Vorschlag: ja, in `Actor`).
