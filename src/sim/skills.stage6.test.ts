@@ -49,7 +49,7 @@ describe('Stufe 6: Skills und Zauber (Phase 2)', () => {
     for (const id of ['power_strike', 'quick_shot', 'ember_bolt', 'healing_hand', 'poison_shot', 'whirlwind', 'frost_nova', 'multishot', 'fireball', 'skull_split', 'lightning']) expect(skillById(id)).toBeDefined();
   });
 
-  it('Elementarschild: senkt Elementar-, nicht physischen Schaden, wirkt auf Brand, ersetzt nur Schwächeres, Rang stärkt', () => {
+  it('Elementarschild: senkt Elementar-, nicht physischen Schaden, wirkt auf Brand, ersetzt nur Schwächeres, Rang spielt keine Rolle', () => {
     const { w, p } = fresh();
     learn(p, 'elemental_ward', 1);
     const base = resistOf(p, 'fire');
@@ -64,13 +64,13 @@ describe('Stufe 6: Skills und Zauber (Phase 2)', () => {
     cast(w, p, 'elemental_ward');
     expect(p.statusMag!.ward).toBe(50);
     expect(until).toBeGreaterThan(0);
-    // Rang 5: 30 + 16
+    // aktive Zauber haben keinen Rang: auch ein hoher Eintrag in skillRanks verstärkt nichts
     p.status = {};
     p.statusMag = {};
     p.skillCd = {};
     learn(p, 'elemental_ward', 5);
     cast(w, p, 'elemental_ward');
-    expect(p.statusMag!.ward).toBe(46);
+    expect(p.statusMag!.ward).toBe(30);
     // Obergrenze der Gesamtresistenz 75
     p.statusMag!.ward = 200;
     expect(resistOf(p, 'frost')).toBe(75);

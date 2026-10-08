@@ -1,9 +1,9 @@
-import { SPECS, SPEC_LEVEL, NPC_ROLE, npcKeyOf, ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_2, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, STATUS_IDS, SCHOOL_NAME, schoolOf, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, uniqueDef, NPC_LORE, type QuestDef, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
+import { skillReq, SPECS, SPEC_LEVEL, NPC_ROLE, npcKeyOf, ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_2, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, STATUS_IDS, SCHOOL_NAME, schoolOf, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, uniqueDef, NPC_LORE, type QuestDef, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
 import { POWER_TEXT, TEMPLATES, SETS, TIER_COLOR, GEM_COLOR, affixRange, gemAffix, gemName, handsOf, itemAffixes, itemReq, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
 import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
   bulkSellable, sellPrice, critChance, attrBonus, equipSlotFor, socketCost, maxHpOf, maxManaOf, missingReq, nearNpc, trainerTeaches, powerOf, resistOf, type Actor, type Command, type Npc, type World,
-  activeSkills, gearStat, parryChance, passiveSum, questRewardChoices,
+  activeSkills, gearStat, parryChance, passiveSum, questRewardChoices, missingSkillReq,
 } from '../sim/world';
 import { buildProfile } from '../sim/build';
 import { itemIcon, potionIcon, skillIcon, statusIcon } from './icons';
@@ -1360,7 +1360,7 @@ export class Ui {
   }
 
   private renderSkills(body: HTMLElement, p: Actor): void {
-    body.append(el('div', 'a-sec', `Gelernte Fertigkeiten – ${p.skillPoints} Skillpunkte übrig`));
+    body.append(el('div', 'a-sec', `Gelernte Fertigkeiten – ${p.skillPoints} Skillpunkte übrig (nur für Passive)`));
     if (!p.skills.length) body.append(el('div', 'a-note', 'Noch keine – Lehrer in den Städten bringen dir Fertigkeiten bei.'));
     const act = activeSkills(p);
     p.skills.forEach((id) => {
@@ -1369,7 +1369,7 @@ export class Ui {
       const c = el('div', 'a-card');
       c.append(Object.assign(el('img'), { src: skillIcon(s) }));
       const t = el('div');
-      t.append(el('div', '', `${s.name}${i >= 0 && i < 9 ? ` [${i + 1}]` : ''}${s.passive ? ' (passiv)' : ''} · ${s.area} · Rang ${p.skillRanks[s.id] ?? 1}`), el('div', 'a-note', `${SCHOOL_NAME[schoolOf(s)]}${s.passive ? '' : ` · ${s.mana} Mana · ${Math.round(s.cooldown / TICK_RATE)} s Abklingzeit`}`), el('div', 'a-note', s.desc), ...skillInfo(s));
+      t.append(el('div', '', `${s.name}${i >= 0 && i < 9 ? ` [${i + 1}]` : ''}${s.passive ? ' (passiv)' : ''} · ${s.area}${s.passive ? ` · Rang ${p.skillRanks[s.id] ?? 1}` : ''}`), el('div', 'a-note', `${SCHOOL_NAME[schoolOf(s)]}${s.passive ? '' : ` · ${s.mana} Mana · ${Math.round(s.cooldown / TICK_RATE)} s Abklingzeit`}`), el('div', 'a-note', s.desc), ...skillInfo(s));
       c.append(t);
       body.append(c);
     });
@@ -1774,20 +1774,33 @@ export class Ui {
     c.append(Object.assign(el('img'), { src: skillIcon(s) }));
     const t = el('div');
     t.style.flex = '1';
-    const head = el('div', '', `${s.name} · ${s.area}${known ? ` · Rang ${rank}/${MAX_SKILL_RANK}` : ''}`);
+    // Aktive Zauber/Kampf-Skills haben keinen Rang; nur Passive werden gesteigert
+    const head = el('div', '', `${s.name} · ${s.area}${known && s.passive ? ` · Rang ${rank}/${MAX_SKILL_RANK}` : ''}${known && !s.passive ? ' · gelernt' : ''}`);
     t.append(head, el('div', 'a-note', `${SCHOOL_NAME[schoolOf(s)]}${s.passive ? ' · passiv' : ''}`), el('div', 'a-note', `${s.desc} Ab Stufe ${s.levelReq}.`), ...skillInfo(s));
     c.append(t);
-    if (rank >= MAX_SKILL_RANK) c.append(el('i', 'a-note', 'Maximum'));
-    else {
-      const next = rank + 1;
-      const price = rankPrice(s.price, next);
-      const lvl = rankLevelReq(s.levelReq, next);
-      const can = p.level >= lvl && p.gold >= price && p.skillPoints >= 1;
-      const b = el('button', `a-btn${can ? '' : ' off'}`, known ? `Rang ${next}: 1 Pkt · ${price}g` : `Lernen: 1 Pkt · ${price}g`);
-      b.title = p.level < lvl ? `Benötigt Stufe ${lvl}` : p.skillPoints < 1 ? 'Keine Skillpunkte' : p.gold < price ? 'Nicht genug Gold' : '';
-      b.onclick = () => this.send({ type: known ? 'trainSkill' : 'learnSkill', skillId: s.id });
-      c.append(b);
+    if (!s.passive && known) return c;
+    if (rank >= MAX_SKILL_RANK) {
+      c.append(el('i', 'a-note', 'Maximum'));
+      return c;
     }
+    const next = rank + 1;
+    const price = rankPrice(s.price, next);
+    const lvl = s.passive ? rankLevelReq(s.levelReq, next) : s.levelReq;
+    const lacking = missingSkillReq(p, s, next);
+    // Anforderung ans Attribut: rot, was fehlt
+    const need = Object.entries(skillReq(s, next)) as [keyof typeof ATTR_NAME, number][];
+    if (need.length) {
+      const rq = el('div', 'a-note', `Braucht: ${need.map(([k, v]) => `${ATTR_NAME[k]} ${v}`).join(', ')}`);
+      rq.style.color = lacking.length ? '#ff6a4a' : '#9be37a';
+      t.append(rq);
+    }
+    const points = s.passive ? p.skillPoints >= 1 : true;
+    const can = p.level >= lvl && p.gold >= price && points && !lacking.length;
+    const label = known ? `Rang ${next}: 1 Pkt · ${price}g` : s.passive ? `Lernen: 1 Pkt · ${price}g` : `Lernen: ${price}g`;
+    const b = el('button', `a-btn${can ? '' : ' off'}`, label);
+    b.title = p.level < lvl ? `Benötigt Stufe ${lvl}` : lacking.length ? `Dir fehlt: ${lacking.join(', ')}` : !points ? 'Keine Skillpunkte' : p.gold < price ? 'Nicht genug Gold' : '';
+    b.onclick = () => this.send({ type: known ? 'trainSkill' : 'learnSkill', skillId: s.id });
+    c.append(b);
     return c;
   }
 }

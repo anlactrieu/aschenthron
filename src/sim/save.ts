@@ -68,10 +68,11 @@ export function importPlayer(w: World, p: Actor, json: string): boolean {
     // Ränge: alte Spielstände ohne Ränge bekommen Rang 1 für jeden gelernten Skill
     p.skillRanks = {};
     const savedRanks = (s.skillRanks ?? {}) as Record<string, number>;
-    for (const id of p.skills) p.skillRanks[id] = Math.min(MAX_SKILL_RANK, Math.max(1, Math.floor(num(savedRanks[id], 1))));
-    const spent = Object.values(p.skillRanks).reduce((n, r) => n + r, 0);
+    // Aktive Zauber/Skills haben keinen Rang mehr (alte Ränge verfallen, ihre Skillpunkte kommen zurück); nur Passive behalten ihren Rang
+    for (const id of p.skills) p.skillRanks[id] = skillById(id)!.passive ? Math.min(MAX_SKILL_RANK, Math.max(1, Math.floor(num(savedRanks[id], 1)))) : 1;
+    const spent = p.skills.reduce((n, id) => n + (skillById(id)!.passive ? p.skillRanks[id]! : 0), 0);
     const earned = SKILL_POINTS_START + SKILL_POINTS_PER_LEVEL * (p.level - 1) + milestonePoints(p.level).skill;
-    p.skillPoints = typeof s.skillPoints === 'number' ? Math.max(0, Math.floor(s.skillPoints)) : Math.max(0, earned - spent);
+    p.skillPoints = Math.max(0, earned - spent);
     const rawCount = (Array.isArray(s.inventory) ? s.inventory.length : 0) + (Array.isArray(s.stash) ? s.stash.length : 0);
     p.inventory = Array.isArray(s.inventory) ? (s.inventory.map(migrateItem).filter(isItem) as Item[]) : [];
     p.stash = Array.isArray(s.stash) ? (s.stash.map(migrateItem).filter(isItem) as Item[]) : [];

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   LEGENDARIES, SETS, extendAffixes, generateItem, generateLegendary, generateSetPiece, rerollAffixes, rollDrop, rollSpecial,
 } from './items';
-import { SKILLS, MAX_LEVEL } from './data';
+import { SKILLS, MAX_LEVEL, skillReq, skillMainAttr } from './data';
 import {
   activeSetBonuses, addNpc, applyCommand, armorOf, craftCost, createWorld, damageRange, drainEvents, gainXp, maxHpOf, maxManaOf,
   powerOf, spawnMonster, spawnPlayer, tick, TICK_RATE, type World,
@@ -523,59 +523,63 @@ describe('Skillpunkte, Ränge und Neuverteilen', () => {
     return f;
   };
 
-  it('Skills kosten Punkte und Gold, Ränge steigern sich bis 5 mit Stufenanforderung', () => {
+  it('Aktive Zauber: Gold, Stufe und Attribut, aber keine Skillpunkte und kein Rang; Passive steigern sich bis 5', () => {
     const { w, p } = town();
     p.gold = 100000;
     p.level = 30;
     p.skillPoints = 10;
+    p.attrs.verstand = 10;
     applyCommand(w, p.id, { type: 'trainSkill', skillId: 'ember_bolt' });
     expect(p.skills).toEqual([]); // erst lernen
     applyCommand(w, p.id, { type: 'learnSkill', skillId: 'ember_bolt' });
-    expect(p.skillRanks['ember_bolt']).toBe(1);
-    for (let i = 0; i < 6; i++) applyCommand(w, p.id, { type: 'trainSkill', skillId: 'ember_bolt' });
-    expect(p.skillRanks['ember_bolt']).toBe(5);
-    expect(p.skillPoints).toBe(10 - 5);
+    expect(p.skills).toEqual([]); // Verstand zu niedrig
+    p.attrs.verstand = 40;
     applyCommand(w, p.id, { type: 'learnSkill', skillId: 'ember_bolt' });
-    expect(p.skillRanks['ember_bolt']).toBe(5);
+    expect(p.skills).toEqual(['ember_bolt']);
+    expect(p.skillPoints).toBe(10); // Zauber kosten keine Punkte
+    applyCommand(w, p.id, { type: 'trainSkill', skillId: 'ember_bolt' });
+    expect(p.skillRanks['ember_bolt']).toBe(1); // aktive Zauber haben keinen Rang
+    p.attrs.kraft = 40;
+    applyCommand(w, p.id, { type: 'learnSkill', skillId: 'parry' });
+    for (let i = 0; i < 6; i++) applyCommand(w, p.id, { type: 'trainSkill', skillId: 'parry' });
+    expect(p.skillRanks['parry']).toBe(5);
+    expect(p.skillPoints).toBe(10 - 5);
   });
 
-  it('ohne Punkte, Gold oder Stufe geht es nicht', () => {
+  it('ohne Gold, Stufe oder (bei Passiven) Skillpunkte geht es nicht', () => {
     const { w, p } = town();
-    p.skillPoints = 0;
-    applyCommand(w, p.id, { type: 'learnSkill', skillId: 'power_strike' });
-    expect(p.skills).toEqual([]);
-    p.skillPoints = 3;
     p.gold = 0;
     p.level = 5;
+    p.skillPoints = 0;
     applyCommand(w, p.id, { type: 'learnSkill', skillId: 'power_strike' });
     expect(p.skills).toEqual([]);
     p.gold = 500;
     applyCommand(w, p.id, { type: 'learnSkill', skillId: 'power_strike' });
-    applyCommand(w, p.id, { type: 'trainSkill', skillId: 'power_strike' }); // Rang 2 braucht Stufe 5, ok
-    applyCommand(w, p.id, { type: 'trainSkill', skillId: 'power_strike' }); // Rang 3 braucht Stufe 8
-    expect(p.skillRanks['power_strike']).toBe(2);
+    expect(p.skills).toEqual(['power_strike']); // aktiv: keine Punkte nötig
+    p.attrs.kraft = 40;
+    applyCommand(w, p.id, { type: 'learnSkill', skillId: 'parry' });
+    expect(p.skills).toEqual(['power_strike']); // Passive brauchen einen Skillpunkt
+    p.skillPoints = 3;
+    applyCommand(w, p.id, { type: 'learnSkill', skillId: 'parry' });
+    applyCommand(w, p.id, { type: 'trainSkill', skillId: 'parry' }); // Rang 2 braucht Stufe 8: zu niedrig
+    expect(p.skillRanks['parry']).toBe(1);
   });
 
-  it('höhere Ränge machen mehr Schaden', () => {
-    const dmg = (rank: number) => {
-      const { w, p } = fresh();
-      p.level = 10;
-      p.skills.push('ember_bolt');
-      p.skillRanks['ember_bolt'] = rank;
-      let total = 0;
-      for (let i = 0; i < 40; i++) {
-        const m = spawnMonster(w, 14, 10, 'wild_hound');
-        m.aggroRange = 0;
-        m.maxHp = 99999;
-        m.hp = 99999;
-        p.mana = 500;
-        p.skillCd = {};
-        applyCommand(w, p.id, { type: 'useSkill', skillId: 'ember_bolt', targetId: m.id });
-        total += 99999 - m.hp;
-      }
-      return total;
-    };
-    expect(dmg(5)).toBeGreaterThan(dmg(1) * 1.5);
+  it('stärkere Zauber derselben Schule verlangen mehr vom Hauptattribut', () => {
+    const fire = SKILLS.filter((s) => s.area === 'Magie' && s.dmgType === 'fire' && !s.passive).sort((x, y) => x.levelReq - y.levelReq);
+    expect(fire.length).toBeGreaterThanOrEqual(4);
+    const need = fire.map((s) => skillReq(s)[skillMainAttr(s)] ?? 0);
+    for (let i = 1; i < need.length; i++) expect(need[i]!).toBeGreaterThanOrEqual(need[i - 1]!);
+    expect(need.at(-1)!).toBeGreaterThan(need[0]! + 10);
+    const { w, p } = town();
+    p.gold = 100000;
+    p.level = 30;
+    p.attrs.verstand = 20;
+    applyCommand(w, p.id, { type: 'learnSkill', skillId: 'fireball' });
+    expect(p.skills).toEqual([]);
+    p.attrs.verstand = 40;
+    applyCommand(w, p.id, { type: 'learnSkill', skillId: 'fireball' });
+    expect(p.skills).toEqual(['fireball']);
   });
 
   it('Neuverteilen kostet Gold, setzt Attribute und Skills zurück und gibt alle Punkte', () => {
@@ -609,13 +613,13 @@ describe('Skillpunkte, Ränge und Neuverteilen', () => {
     expect(p.statPoints).toBe(0); // zu wenig Gold
   });
 
-  it('alter Spielstand: gelernte Skills werden Rang 1, übrige Punkte werden erstattet', async () => {
+  it('alter Spielstand: Zauber verlieren ihren Rang, die Punkte werden erstattet; Passive behalten ihn', async () => {
     const { importPlayer } = await import('./save');
     const { w, p } = fresh();
-    const old = JSON.stringify({ v: 1, player: { level: 5, skills: ['power_strike', 'ember_bolt'] } });
+    const old = JSON.stringify({ v: 1, player: { level: 5, skills: ['power_strike', 'ember_bolt', 'parry'], skillRanks: { power_strike: 3, ember_bolt: 2, parry: 2 }, skillPoints: 0 } });
     importPlayer(w, p, old);
-    expect(p.skillRanks).toEqual({ power_strike: 1, ember_bolt: 1 });
-    expect(p.skillPoints).toBe(2 + 4 - 2);
+    expect(p.skillRanks).toEqual({ power_strike: 1, ember_bolt: 1, parry: 2 });
+    expect(p.skillPoints).toBe(2 + 4 - 2); // nur die zwei Ränge des Passiven sind ausgegeben
   });
 });
 

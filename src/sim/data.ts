@@ -366,7 +366,32 @@ export interface SkillDef {
   /** Sonderwirkung ohne Schaden: Läuterung (Debuffs und Kontrolle von dir entfernen) oder Bannung (Verstärkungen des Ziels entfernen) */
   action?: 'cleanse' | 'dispel';
   info?: SkillInfo;
+  /** Attribut-Anforderung zum Lernen (Standard: aus Skill-Art und Stufe abgeleitet, siehe `skillReq`) */
+  req?: Partial<Record<AttrKey, number>>;
 }
+
+/** Hauptattribut eines Skills: ausdrücklich `scales`, sonst nach Gebiet (Magie: Schutz, Schwächung, Kontrolle, Bannung, Mana → Willenskraft, sonst Verstand). */
+export function skillMainAttr(s: SkillDef): AttrKey {
+  if (s.scales) return s.scales;
+  if (s.area === 'Nahkampf') return 'kraft';
+  if (s.area === 'Fernkampf') return 'gewandtheit';
+  if (s.area === 'Überleben') return s.id === 'stealth' ? 'gewandtheit' : 'ausdauer';
+  return ['protect', 'debuff', 'control', 'dispel', 'resource', 'buff'].includes(schoolOf(s)) ? 'willenskraft' : 'verstand';
+}
+
+/** Attribut-Anforderung: Hauptattribut ≈ 8 + 1,2 × Stufe des Skills (Stufe 30 → 44); Passive verlangen je Rang 10 % mehr. */
+export function skillReq(s: SkillDef, rank = 1): Partial<Record<AttrKey, number>> {
+  if (s.req) return s.req;
+  const v = Math.round((8 + 1.2 * s.levelReq) * (1 + 0.1 * (Math.max(1, rank) - 1)));
+  return v > 10 ? { [skillMainAttr(s)]: v } : {};
+}
+
+/** Aktive Fertigkeiten haben keinen Rang (immer 1); nur Passive werden gesteigert. */
+export function skillRankOf(s: SkillDef, ranks: Record<string, number>): number {
+  return s.passive ? (ranks[s.id] ?? 1) : 1;
+}
+/** Ausgleich dafür, dass aktive Fertigkeiten keine Ränge mehr steigern (früher im Schnitt Rang 3 → +36 %) */
+export const ACTIVE_POWER = 1.3;
 
 /** Passive Wirkungen (Prozent bzw. Punkte je Rang, siehe `passiveSum` in `world.ts`) */
 export type PassiveKey = 'parry' | 'evade' | 'crit' | 'armorPen' | 'shieldArmor' | 'manaCost' | 'manaRegen' | 'stealth' | 'fieldRegen' | 'carry' | 'stunProc' | 'mightProc';

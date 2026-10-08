@@ -157,6 +157,7 @@ describe('Lehrer nach Fachgebiet', () => {
     const w2 = buildWorld(2, map, { player: false }).world;
     const p = spawnPlayer(w2, 1, 1, 'Test');
     p.level = 30; p.gold = 99999; p.skillPoints = 10;
+    p.attrs = { kraft: 60, gewandtheit: 60, ausdauer: 60, verstand: 60, willenskraft: 60 };
     return { w2, p };
   };
   const at = (w2: typeof w, p: ReturnType<typeof spawnPlayer>, name: string) => {

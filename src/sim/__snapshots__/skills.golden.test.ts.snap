@@ -104,7 +104,7 @@ exports[`Skills golden > Fehlerpfade: Bogen fehlt, Pfeile fehlen, Stab-Bonus, Zw
   },
   "ev": [
     {
-      "amount": 105,
+      "amount": 137,
       "attackerId": 1,
       "crit": false,
       "dt": "fire",
@@ -120,11 +120,11 @@ exports[`Skills golden > Fehlerpfade: Bogen fehlt, Pfeile fehlen, Stab-Bonus, Zw
   "victims": [
     {
       "burn": {
-        "perSec": 11,
+        "perSec": 14,
         "srcId": 1,
       },
       "dot": null,
-      "hp": 138,
+      "hp": 106,
       "status": {
         "burn": 60,
       },
@@ -163,7 +163,7 @@ exports[`Skills golden > Fehlerpfade: Bogen fehlt, Pfeile fehlen, Stab-Bonus, Zw
   },
   "ev": [
     {
-      "amount": 105,
+      "amount": 137,
       "attackerId": 1,
       "crit": false,
       "dt": "fire",
@@ -179,11 +179,11 @@ exports[`Skills golden > Fehlerpfade: Bogen fehlt, Pfeile fehlen, Stab-Bonus, Zw
   "victims": [
     {
       "burn": {
-        "perSec": 11,
+        "perSec": 14,
         "srcId": 1,
       },
       "dot": null,
-      "hp": 138,
+      "hp": 106,
       "status": {
         "burn": 60,
       },
@@ -410,7 +410,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 4`] = `
 {
   "auto": true,
   "cd": {
-    "whirlwind": 82,
+    "whirlwind": 100,
   },
   "ev": [
     {
@@ -420,7 +420,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 4`] = `
     },
   ],
   "hp": 5000,
-  "mana": 4981,
+  "mana": 4984,
   "next": 0.9683778982143849,
   "target": 4,
   "victims": [
@@ -460,11 +460,11 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 5`] = `
 {
   "auto": true,
   "cd": {
-    "whirlwind": 82,
+    "whirlwind": 100,
   },
   "ev": [
     {
-      "amount": 177,
+      "amount": 150,
       "attackerId": 1,
       "crit": false,
       "skill": "whirlwind",
@@ -473,14 +473,14 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 5`] = `
     },
   ],
   "hp": 5000,
-  "mana": 4981,
+  "mana": 4984,
   "next": 0.6308333419729024,
   "target": 4,
   "victims": [
     {
       "burn": null,
       "dot": null,
-      "hp": 66,
+      "hp": 93,
       "status": {},
       "target": 1,
     },
@@ -513,11 +513,11 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 6`] = `
 {
   "auto": true,
   "cd": {
-    "whirlwind": 82,
+    "whirlwind": 100,
   },
   "ev": [
     {
-      "amount": 179,
+      "amount": 151,
       "attackerId": 1,
       "crit": false,
       "skill": "whirlwind",
@@ -526,14 +526,14 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 6`] = `
     },
   ],
   "hp": 5000,
-  "mana": 4981,
+  "mana": 4984,
   "next": 0.481180417817086,
   "target": 4,
   "victims": [
     {
       "burn": null,
       "dot": null,
-      "hp": 64,
+      "hp": 92,
       "status": {},
       "target": 1,
     },
@@ -566,11 +566,11 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 7`] = `
 {
   "auto": false,
   "cd": {
-    "frost_nova": 115,
+    "frost_nova": 140,
   },
   "ev": [
     {
-      "amount": 189,
+      "amount": 159,
       "attackerId": 1,
       "crit": false,
       "dt": "frost",
@@ -579,7 +579,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 7`] = `
       "type": "hit",
     },
     {
-      "amount": 416,
+      "amount": 352,
       "attackerId": 1,
       "crit": true,
       "dt": "frost",
@@ -603,14 +603,14 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 7`] = `
     },
   ],
   "hp": 5000,
-  "mana": 4979,
+  "mana": 4982,
   "next": 0.13893358339555562,
   "target": 4,
   "victims": [
     {
       "burn": null,
       "dot": null,
-      "hp": 54,
+      "hp": 84,
       "status": {
         "slow": 80,
       },
@@ -645,11 +645,11 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 8`] = `
 {
   "auto": false,
   "cd": {
-    "frost_nova": 115,
+    "frost_nova": 140,
   },
   "ev": [
     {
-      "amount": 179,
+      "amount": 151,
       "attackerId": 1,
       "crit": false,
       "dt": "frost",
@@ -658,7 +658,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 8`] = `
       "type": "hit",
     },
     {
-      "amount": 203,
+      "amount": 172,
       "attackerId": 1,
       "crit": false,
       "dt": "frost",
@@ -668,14 +668,14 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 8`] = `
     },
   ],
   "hp": 5000,
-  "mana": 4979,
+  "mana": 4982,
   "next": 0.4992015736643225,
   "target": 4,
   "victims": [
     {
       "burn": null,
       "dot": null,
-      "hp": 64,
+      "hp": 92,
       "status": {
         "slow": 80,
       },
@@ -691,7 +691,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 8`] = `
     {
       "burn": null,
       "dot": null,
-      "hp": 10,
+      "hp": 41,
       "status": {
         "slow": 80,
       },
@@ -712,11 +712,11 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 9`] = `
 {
   "auto": false,
   "cd": {
-    "frost_nova": 115,
+    "frost_nova": 140,
   },
   "ev": [
     {
-      "amount": 378,
+      "amount": 318,
       "attackerId": 1,
       "crit": true,
       "dt": "frost",
@@ -739,7 +739,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 9`] = `
       "type": "gold",
     },
     {
-      "amount": 348,
+      "amount": 294,
       "attackerId": 1,
       "crit": true,
       "dt": "frost",
@@ -763,7 +763,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 9`] = `
     },
   ],
   "hp": 5000,
-  "mana": 4979,
+  "mana": 4982,
   "next": 0.28674706909805536,
   "target": 4,
   "victims": [
@@ -803,11 +803,11 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 10`] = `
 {
   "auto": false,
   "cd": {
-    "fireball": 74,
+    "fireball": 90,
   },
   "ev": [
     {
-      "amount": 271,
+      "amount": 229,
       "attackerId": 1,
       "crit": false,
       "dt": "fire",
@@ -816,23 +816,9 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 10`] = `
       "type": "hit",
     },
     {
-      "id": 4,
-      "type": "died",
-    },
-    {
-      "amount": 149,
-      "to": 1,
-      "type": "xp",
-    },
-    {
-      "amount": 27,
-      "to": 1,
-      "type": "gold",
-    },
-    {
-      "amount": 372,
+      "amount": 722,
       "attackerId": 1,
-      "crit": false,
+      "crit": true,
       "dt": "fire",
       "skill": "fireball",
       "targetId": 5,
@@ -848,17 +834,14 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 10`] = `
       "type": "xp",
     },
     {
-      "amount": 15,
+      "amount": 22,
       "to": 1,
       "type": "gold",
     },
     {
-      "type": "loot",
-    },
-    {
-      "amount": 494,
+      "amount": 209,
       "attackerId": 1,
-      "crit": true,
+      "crit": false,
       "dt": "fire",
       "skill": "fireball",
       "targetId": 7,
@@ -866,16 +849,21 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 10`] = `
     },
   ],
   "hp": 5000,
-  "mana": 4972,
-  "next": 0.42738195578567684,
+  "mana": 4976,
+  "next": 0.24752389639616013,
   "target": 4,
   "victims": [
     {
-      "burn": null,
+      "burn": {
+        "perSec": 23,
+        "srcId": 1,
+      },
       "dot": null,
-      "hp": 0,
-      "status": {},
-      "target": null,
+      "hp": 14,
+      "status": {
+        "burn": 60,
+      },
+      "target": 1,
     },
     {
       "burn": null,
@@ -893,11 +881,11 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 10`] = `
     },
     {
       "burn": {
-        "perSec": 25,
+        "perSec": 21,
         "srcId": 1,
       },
       "dot": null,
-      "hp": 448,
+      "hp": 733,
       "status": {
         "burn": 60,
       },
@@ -911,11 +899,11 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 11`] = `
 {
   "auto": false,
   "cd": {
-    "fireball": 74,
+    "fireball": 90,
   },
   "ev": [
     {
-      "amount": 257,
+      "amount": 217,
       "attackerId": 1,
       "crit": false,
       "dt": "fire",
@@ -924,23 +912,9 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 11`] = `
       "type": "hit",
     },
     {
-      "id": 4,
-      "type": "died",
-    },
-    {
-      "amount": 149,
-      "to": 1,
-      "type": "xp",
-    },
-    {
-      "amount": 26,
-      "to": 1,
-      "type": "gold",
-    },
-    {
-      "amount": 815,
+      "amount": 356,
       "attackerId": 1,
-      "crit": true,
+      "crit": false,
       "dt": "fire",
       "skill": "fireball",
       "targetId": 5,
@@ -956,14 +930,14 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 11`] = `
       "type": "xp",
     },
     {
-      "amount": 19,
+      "amount": 20,
       "to": 1,
       "type": "gold",
     },
     {
-      "amount": 610,
+      "amount": 225,
       "attackerId": 1,
-      "crit": true,
+      "crit": false,
       "dt": "fire",
       "skill": "fireball",
       "targetId": 7,
@@ -971,16 +945,21 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 11`] = `
     },
   ],
   "hp": 5000,
-  "mana": 4972,
-  "next": 0.9151977864094079,
+  "mana": 4976,
+  "next": 0.5813204094301909,
   "target": 4,
   "victims": [
     {
-      "burn": null,
+      "burn": {
+        "perSec": 22,
+        "srcId": 1,
+      },
       "dot": null,
-      "hp": 0,
-      "status": {},
-      "target": null,
+      "hp": 26,
+      "status": {
+        "burn": 60,
+      },
+      "target": 1,
     },
     {
       "burn": null,
@@ -998,11 +977,11 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 11`] = `
     },
     {
       "burn": {
-        "perSec": 31,
+        "perSec": 23,
         "srcId": 1,
       },
       "dot": null,
-      "hp": 332,
+      "hp": 717,
       "status": {
         "burn": 60,
       },
@@ -1016,11 +995,11 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 12`] = `
 {
   "auto": false,
   "cd": {
-    "fireball": 74,
+    "fireball": 90,
   },
   "ev": [
     {
-      "amount": 532,
+      "amount": 450,
       "attackerId": 1,
       "crit": true,
       "dt": "fire",
@@ -1043,7 +1022,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 12`] = `
       "type": "gold",
     },
     {
-      "amount": 692,
+      "amount": 585,
       "attackerId": 1,
       "crit": true,
       "dt": "fire",
@@ -1066,7 +1045,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 12`] = `
       "type": "gold",
     },
     {
-      "amount": 257,
+      "amount": 217,
       "attackerId": 1,
       "crit": false,
       "dt": "fire",
@@ -1076,7 +1055,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 12`] = `
     },
   ],
   "hp": 5000,
-  "mana": 4972,
+  "mana": 4976,
   "next": 0.5264285774901509,
   "target": 4,
   "victims": [
@@ -1103,11 +1082,11 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 12`] = `
     },
     {
       "burn": {
-        "perSec": 26,
+        "perSec": 22,
         "srcId": 1,
       },
       "dot": null,
-      "hp": 685,
+      "hp": 725,
       "status": {
         "burn": 60,
       },
@@ -1121,7 +1100,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 13`] = `
 {
   "auto": false,
   "cd": {
-    "multishot": 57,
+    "multishot": 70,
   },
   "ev": [
     {
@@ -1130,7 +1109,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 13`] = `
       "type": "miss",
     },
     {
-      "amount": 155,
+      "amount": 131,
       "attackerId": 1,
       "crit": false,
       "skill": "multishot",
@@ -1144,7 +1123,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 13`] = `
     },
   ],
   "hp": 5000,
-  "mana": 4983,
+  "mana": 4986,
   "next": 0.45527112716808915,
   "target": 5,
   "victims": [
@@ -1165,7 +1144,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 13`] = `
     {
       "burn": null,
       "dot": null,
-      "hp": 58,
+      "hp": 82,
       "status": {},
       "target": 1,
     },
@@ -1184,11 +1163,11 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 14`] = `
 {
   "auto": false,
   "cd": {
-    "multishot": 57,
+    "multishot": 70,
   },
   "ev": [
     {
-      "amount": 165,
+      "amount": 139,
       "attackerId": 1,
       "crit": false,
       "skill": "multishot",
@@ -1196,7 +1175,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 14`] = `
       "type": "hit",
     },
     {
-      "amount": 165,
+      "amount": 139,
       "attackerId": 1,
       "crit": false,
       "skill": "multishot",
@@ -1204,7 +1183,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 14`] = `
       "type": "hit",
     },
     {
-      "amount": 302,
+      "amount": 254,
       "attackerId": 1,
       "crit": true,
       "skill": "multishot",
@@ -1227,14 +1206,14 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 14`] = `
     },
   ],
   "hp": 5000,
-  "mana": 4983,
+  "mana": 4986,
   "next": 0.971613448113203,
   "target": 5,
   "victims": [
     {
       "burn": null,
       "dot": null,
-      "hp": 78,
+      "hp": 104,
       "status": {},
       "target": 1,
     },
@@ -1248,7 +1227,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 14`] = `
     {
       "burn": null,
       "dot": null,
-      "hp": 48,
+      "hp": 74,
       "status": {},
       "target": 1,
     },
@@ -1267,11 +1246,11 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 15`] = `
 {
   "auto": false,
   "cd": {
-    "multishot": 57,
+    "multishot": 70,
   },
   "ev": [
     {
-      "amount": 151,
+      "amount": 127,
       "attackerId": 1,
       "crit": false,
       "skill": "multishot",
@@ -1279,7 +1258,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 15`] = `
       "type": "hit",
     },
     {
-      "amount": 330,
+      "amount": 278,
       "attackerId": 1,
       "crit": true,
       "skill": "multishot",
@@ -1304,7 +1283,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 15`] = `
       "type": "loot",
     },
     {
-      "amount": 160,
+      "amount": 135,
       "attackerId": 1,
       "crit": false,
       "skill": "multishot",
@@ -1313,21 +1292,21 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 15`] = `
     },
   ],
   "hp": 5000,
-  "mana": 4983,
+  "mana": 4986,
   "next": 0.831733848201111,
   "target": 5,
   "victims": [
     {
       "burn": null,
       "dot": null,
-      "hp": 92,
+      "hp": 116,
       "status": {},
       "target": 1,
     },
     {
       "burn": null,
       "dot": null,
-      "hp": 15,
+      "hp": 40,
       "status": {},
       "target": 1,
     },
@@ -1353,7 +1332,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 16`] = `
 {
   "auto": false,
   "cd": {
-    "poison_shot": 49,
+    "poison_shot": 60,
   },
   "ev": [
     {
@@ -1363,7 +1342,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 16`] = `
     },
   ],
   "hp": 5000,
-  "mana": 4989,
+  "mana": 4991,
   "next": 0.281103502959013,
   "target": 5,
   "victims": [
@@ -1403,11 +1382,11 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 17`] = `
 {
   "auto": false,
   "cd": {
-    "poison_shot": 49,
+    "poison_shot": 60,
   },
   "ev": [
     {
-      "amount": 142,
+      "amount": 119,
       "attackerId": 1,
       "crit": false,
       "dt": "poison",
@@ -1417,18 +1396,18 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 17`] = `
     },
   ],
   "hp": 5000,
-  "mana": 4989,
+  "mana": 4991,
   "next": 0.4992015736643225,
   "target": 5,
   "victims": [
     {
       "burn": null,
       "dot": {
-        "perSec": 28,
+        "perSec": 24,
         "srcId": 1,
         "until": 160,
       },
-      "hp": 101,
+      "hp": 124,
       "status": {},
       "target": 1,
     },
@@ -1461,11 +1440,11 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 18`] = `
 {
   "auto": false,
   "cd": {
-    "poison_shot": 49,
+    "poison_shot": 60,
   },
   "ev": [
     {
-      "amount": 132,
+      "amount": 112,
       "attackerId": 1,
       "crit": false,
       "dt": "poison",
@@ -1475,18 +1454,18 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 18`] = `
     },
   ],
   "hp": 5000,
-  "mana": 4989,
+  "mana": 4991,
   "next": 0.48672957462258637,
   "target": 5,
   "victims": [
     {
       "burn": null,
       "dot": {
-        "perSec": 26,
+        "perSec": 22,
         "srcId": 1,
         "until": 160,
       },
-      "hp": 111,
+      "hp": 131,
       "status": {},
       "target": 1,
     },
@@ -1519,11 +1498,11 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 19`] = `
 {
   "auto": false,
   "cd": {
-    "lightning": 98,
+    "lightning": 120,
   },
   "ev": [
     {
-      "amount": 470,
+      "amount": 397,
       "attackerId": 1,
       "crit": false,
       "skill": "lightning",
@@ -1546,7 +1525,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 19`] = `
     },
   ],
   "hp": 5000,
-  "mana": 4965,
+  "mana": 4970,
   "next": 0.45527112716808915,
   "target": 4,
   "victims": [
@@ -1586,11 +1565,11 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 20`] = `
 {
   "auto": false,
   "cd": {
-    "lightning": 98,
+    "lightning": 120,
   },
   "ev": [
     {
-      "amount": 431,
+      "amount": 364,
       "attackerId": 1,
       "crit": false,
       "skill": "lightning",
@@ -1613,7 +1592,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 20`] = `
     },
   ],
   "hp": 5000,
-  "mana": 4965,
+  "mana": 4970,
   "next": 0.7858669895213097,
   "target": 4,
   "victims": [
@@ -1653,11 +1632,11 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 21`] = `
 {
   "auto": false,
   "cd": {
-    "lightning": 98,
+    "lightning": 120,
   },
   "ev": [
     {
-      "amount": 922,
+      "amount": 778,
       "attackerId": 1,
       "crit": true,
       "skill": "lightning",
@@ -1680,7 +1659,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 21`] = `
     },
   ],
   "hp": 5000,
-  "mana": 4965,
+  "mana": 4970,
   "next": 0.19491625181399286,
   "target": 4,
   "victims": [
@@ -1720,17 +1699,17 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 22`] = `
 {
   "auto": true,
   "cd": {
-    "healing_hand": 164,
+    "healing_hand": 200,
   },
   "ev": [
     {
-      "amount": 462,
+      "amount": 390,
       "to": 1,
       "type": "healed",
     },
   ],
-  "hp": 562,
-  "mana": 4983,
+  "hp": 490,
+  "mana": 4986,
   "next": 0.5274470399599522,
   "target": null,
   "victims": [
@@ -1770,17 +1749,17 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 23`] = `
 {
   "auto": true,
   "cd": {
-    "healing_hand": 164,
+    "healing_hand": 200,
   },
   "ev": [
     {
-      "amount": 462,
+      "amount": 390,
       "to": 1,
       "type": "healed",
     },
   ],
-  "hp": 562,
-  "mana": 4983,
+  "hp": 490,
+  "mana": 4986,
   "next": 0.28529605525545776,
   "target": null,
   "victims": [
@@ -1820,17 +1799,17 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 24`] = `
 {
   "auto": true,
   "cd": {
-    "healing_hand": 164,
+    "healing_hand": 200,
   },
   "ev": [
     {
-      "amount": 462,
+      "amount": 390,
       "to": 1,
       "type": "healed",
     },
   ],
-  "hp": 562,
-  "mana": 4983,
+  "hp": 490,
+  "mana": 4986,
   "next": 0.4561921926215291,
   "target": null,
   "victims": [
@@ -1874,7 +1853,7 @@ exports[`Skills golden > ember_bolt Rang 1 1`] = `
   },
   "ev": [
     {
-      "amount": 112,
+      "amount": 145,
       "attackerId": 1,
       "crit": false,
       "dt": "fire",
@@ -1890,11 +1869,11 @@ exports[`Skills golden > ember_bolt Rang 1 1`] = `
   "victims": [
     {
       "burn": {
-        "perSec": 11,
+        "perSec": 15,
         "srcId": 1,
       },
       "dot": null,
-      "hp": 131,
+      "hp": 98,
       "status": {
         "burn": 60,
       },
@@ -1933,7 +1912,7 @@ exports[`Skills golden > fireball Rang 1 1`] = `
   },
   "ev": [
     {
-      "amount": 184,
+      "amount": 239,
       "attackerId": 1,
       "crit": false,
       "dt": "fire",
@@ -1942,7 +1921,7 @@ exports[`Skills golden > fireball Rang 1 1`] = `
       "type": "hit",
     },
     {
-      "amount": 223,
+      "amount": 290,
       "attackerId": 1,
       "crit": false,
       "dt": "fire",
@@ -1968,7 +1947,7 @@ exports[`Skills golden > fireball Rang 1 1`] = `
       "type": "loot",
     },
     {
-      "amount": 178,
+      "amount": 231,
       "attackerId": 1,
       "crit": false,
       "dt": "fire",
@@ -1984,11 +1963,11 @@ exports[`Skills golden > fireball Rang 1 1`] = `
   "victims": [
     {
       "burn": {
-        "perSec": 18,
+        "perSec": 24,
         "srcId": 1,
       },
       "dot": null,
-      "hp": 59,
+      "hp": 4,
       "status": {
         "burn": 60,
       },
@@ -2010,11 +1989,11 @@ exports[`Skills golden > fireball Rang 1 1`] = `
     },
     {
       "burn": {
-        "perSec": 18,
+        "perSec": 23,
         "srcId": 1,
       },
       "dot": null,
-      "hp": 764,
+      "hp": 711,
       "status": {
         "burn": 60,
       },
@@ -2032,7 +2011,7 @@ exports[`Skills golden > frost_nova Rang 1 1`] = `
   },
   "ev": [
     {
-      "amount": 124,
+      "amount": 161,
       "attackerId": 1,
       "crit": false,
       "dt": "frost",
@@ -2041,7 +2020,7 @@ exports[`Skills golden > frost_nova Rang 1 1`] = `
       "type": "hit",
     },
     {
-      "amount": 108,
+      "amount": 141,
       "attackerId": 1,
       "crit": false,
       "dt": "frost",
@@ -2058,7 +2037,7 @@ exports[`Skills golden > frost_nova Rang 1 1`] = `
     {
       "burn": null,
       "dot": null,
-      "hp": 119,
+      "hp": 82,
       "status": {
         "slow": 80,
       },
@@ -2074,7 +2053,7 @@ exports[`Skills golden > frost_nova Rang 1 1`] = `
     {
       "burn": null,
       "dot": null,
-      "hp": 105,
+      "hp": 72,
       "status": {
         "slow": 80,
       },
@@ -2099,12 +2078,12 @@ exports[`Skills golden > healing_hand Rang 1 1`] = `
   },
   "ev": [
     {
-      "amount": 300,
+      "amount": 390,
       "to": 1,
       "type": "healed",
     },
   ],
-  "hp": 400,
+  "hp": 490,
   "mana": 4986,
   "next": 0.7727432732935995,
   "target": null,
@@ -2149,7 +2128,7 @@ exports[`Skills golden > lightning Rang 1 1`] = `
   },
   "ev": [
     {
-      "amount": 323,
+      "amount": 419,
       "attackerId": 1,
       "crit": false,
       "skill": "lightning",
@@ -2219,7 +2198,7 @@ exports[`Skills golden > multishot Rang 1 1`] = `
   },
   "ev": [
     {
-      "amount": 90,
+      "amount": 117,
       "attackerId": 1,
       "crit": false,
       "skill": "multishot",
@@ -2227,7 +2206,7 @@ exports[`Skills golden > multishot Rang 1 1`] = `
       "type": "hit",
     },
     {
-      "amount": 87,
+      "amount": 113,
       "attackerId": 1,
       "crit": false,
       "skill": "multishot",
@@ -2235,7 +2214,7 @@ exports[`Skills golden > multishot Rang 1 1`] = `
       "type": "hit",
     },
     {
-      "amount": 102,
+      "amount": 133,
       "attackerId": 1,
       "crit": false,
       "skill": "multishot",
@@ -2251,21 +2230,21 @@ exports[`Skills golden > multishot Rang 1 1`] = `
     {
       "burn": null,
       "dot": null,
-      "hp": 153,
-      "status": {},
-      "target": 1,
-    },
-    {
-      "burn": null,
-      "dot": null,
-      "hp": 73,
-      "status": {},
-      "target": 1,
-    },
-    {
-      "burn": null,
-      "dot": null,
       "hp": 126,
+      "status": {},
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 42,
+      "status": {},
+      "target": 1,
+    },
+    {
+      "burn": null,
+      "dot": null,
+      "hp": 100,
       "status": {},
       "target": 1,
     },
@@ -2288,7 +2267,7 @@ exports[`Skills golden > poison_shot Rang 1 1`] = `
   },
   "ev": [
     {
-      "amount": 78,
+      "amount": 101,
       "attackerId": 1,
       "crit": false,
       "dt": "poison",
@@ -2305,11 +2284,11 @@ exports[`Skills golden > poison_shot Rang 1 1`] = `
     {
       "burn": null,
       "dot": {
-        "perSec": 16,
+        "perSec": 20,
         "srcId": 1,
         "until": 160,
       },
-      "hp": 165,
+      "hp": 142,
       "status": {},
       "target": 1,
     },
@@ -2394,7 +2373,7 @@ exports[`Skills golden > quick_shot Rang 1 1`] = `
   },
   "ev": [
     {
-      "amount": 81,
+      "amount": 105,
       "attackerId": 1,
       "crit": false,
       "skill": "quick_shot",
@@ -2410,7 +2389,7 @@ exports[`Skills golden > quick_shot Rang 1 1`] = `
     {
       "burn": null,
       "dot": null,
-      "hp": 162,
+      "hp": 138,
       "status": {},
       "target": 1,
     },
@@ -2495,7 +2474,7 @@ exports[`Skills golden > whirlwind Rang 1 1`] = `
   },
   "ev": [
     {
-      "amount": 131,
+      "amount": 170,
       "attackerId": 1,
       "crit": false,
       "skill": "whirlwind",
@@ -2511,7 +2490,7 @@ exports[`Skills golden > whirlwind Rang 1 1`] = `
     {
       "burn": null,
       "dot": null,
-      "hp": 112,
+      "hp": 73,
       "status": {},
       "target": 1,
     },

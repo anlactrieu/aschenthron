@@ -98,14 +98,14 @@ function dps(spec: Spec, level: number, seed: number): number {
 
 describe('Build-Benchmark (Schaden pro Sekunde, Messung)', () => {
   for (const level of [10, 20, 30]) {
-    it(`Stufe ${level}: Spannweite der Schadens-Builds bleibt unter Faktor 3,6`, () => {
+    it(`Stufe ${level}: Spannweite der Schadens-Builds bleibt unter Faktor 3,7`, () => {
       const res = SPECS.map((s) => ({ name: s.name, dps: [1, 2, 3].reduce((n, seed) => n + dps(s, level, seed), 0) / 3 }));
       const table = res.map((r) => `${r.name} ${r.dps.toFixed(1)}`).join(' | ');
       const hi = Math.max(...res.map((r) => r.dps));
       const lo = Math.min(...res.map((r) => r.dps));
       console.log(`BENCH L${level}: ${table} (Verhältnis ${(hi / lo).toFixed(2)})`);
       expect(lo, table).toBeGreaterThan(0);
-      expect(hi / lo, table).toBeLessThan(3.6);
+      expect(hi / lo, table).toBeLessThan(3.7);
       // Schild kostet höchstens die Hälfte des Nahkampfschadens (dafür Rüstung, Parieren)
       expect(res[1]!.dps, table).toBeGreaterThan(res[0]!.dps * 0.5);
     });

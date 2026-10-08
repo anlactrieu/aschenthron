@@ -2,7 +2,7 @@ import { Rng } from './rng';
 import { findPath, isWalkable, type Grid, type Pt } from './path';
 import { itemReq, itemAffixes, gemTemplateId, handsOf, weaponSpeedOf, rollGem, rollUniqueSpecial, rollWorldDrop, rollWorldSpecial, rollDrop, rollPotion, rollSpecial, templateById, generateItem, rerollAffixes, extendAffixes, SETS, type GemInfo, type Item, type PowerId, type SetBonus, type EquipSlot, type Stat } from './items';
 import {
-  ATTR_KEYS, xpToNext, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
+  ATTR_KEYS, ATTR_NAME, xpToNext, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, skillReq, skillRankOf, ACTIVE_POWER, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
   monsterKind, npcKeyOf, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
   FAMILY_RES, MELEE_SKILL_KRAFT_SCALE, MAX_RES, SLOW_FACTOR, STATUS_IDS, PASSIVE_CAP, DMG_NAME, type DmgType, type StatusId, type SkillDef, type PassiveKey,
   ATTR_THRESHOLD, ATTR_THRESHOLD_2, ATTR_THRESHOLD_BONUS, LEVEL_MILESTONES, milestonePoints, WILL_RES_PER_2, WILL_STATUS_PER_POINT, WILL_STATUS_CAP, GEM_MIN_LEVEL, GEM_DROP, GEM_SOCKET_COST, WORLD_BOSS_LOOT, type QuestDef,
@@ -779,6 +779,15 @@ function finishQuest(w: World, a: Actor, def: QuestDef, pick = 0): void {
   gainXp(w, a, xpGain);
 }
 
+/** Attribute, die für das Lernen eines Skills (bei Passiven: für den nächsten Rang) noch fehlen, als Text („Verstand 31“). */
+export function missingSkillReq(a: Actor, s: SkillDef, rank = 1): string[] {
+  const out: string[] = [];
+  for (const [k, need] of Object.entries(skillReq(s, rank)) as [AttrKey, number][]) {
+    if (a.attrs[k] < need) out.push(`${ATTR_NAME[k]} ${need}`);
+  }
+  return out;
+}
+
 function fail(w: World, reason: string): void {
   w.events.push({ type: 'fail', reason, to: w.cmdActor ?? undefined });
 }
@@ -956,16 +965,21 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       }
       const known = a.skills.includes(s.id);
       const rank = known ? (a.skillRanks[s.id] ?? 1) : 0;
-      if (cmd.type === 'learnSkill' && known) return fail(w, 'Bereits gelernt – Ränge steigerst du mit dem Plus.');
+      if (cmd.type === 'learnSkill' && known) return fail(w, s.passive ? 'Bereits gelernt – Ränge steigerst du mit dem Plus.' : 'Diesen Zauber kennst du schon.');
       if (cmd.type === 'trainSkill' && !known) return fail(w, 'Erst lernen.');
+      // Aktive Zauber und Kampf-Skills haben keinen Rang: einmal lernen (Gold, Stufe, Attribute), keine Skillpunkte
+      if (cmd.type === 'trainSkill' && !s.passive) return fail(w, 'Aktive Fertigkeiten haben keinen Rang.');
       if (rank >= MAX_SKILL_RANK) return fail(w, 'Höchster Rang erreicht.');
       const next = rank + 1;
-      if (a.level < rankLevelReq(s.levelReq, next)) return fail(w, `Rang ${next} benötigt Stufe ${rankLevelReq(s.levelReq, next)}.`);
-      if (a.skillPoints < 1) return fail(w, 'Keine Skillpunkte übrig.');
+      const lvlNeed = s.passive ? rankLevelReq(s.levelReq, next) : s.levelReq;
+      if (a.level < lvlNeed) return fail(w, s.passive ? `Rang ${next} benötigt Stufe ${lvlNeed}.` : `Benötigt Stufe ${lvlNeed}.`);
+      const lacking = missingSkillReq(a, s, next);
+      if (lacking.length) return fail(w, `Dir fehlt: ${lacking.join(', ')}.`);
+      if (s.passive && a.skillPoints < 1) return fail(w, 'Keine Skillpunkte übrig.');
       const price = rankPrice(s.price, next);
       if (a.gold < price) return fail(w, 'Nicht genug Gold.');
       a.gold -= price;
-      a.skillPoints--;
+      if (s.passive) a.skillPoints--;
       a.skillRanks[s.id] = next;
       if (!known) a.skills.push(s.id);
       w.events.push({ type: 'learned', skillId: s.id, rank: next, to: a.id });
@@ -1182,7 +1196,7 @@ function castHeal(w: World, a: Actor, s: SkillDef, rank: number, manaCost: numbe
   const lvl = 1 + a.level * 0.1;
   const scale = s.scales ? Math.max(0, a.attrs[s.scales] - 10) * 3 : 0;
   const healMod = affixSum(a, 'healPower');
-  const amount = Math.round((s.heal! + scale) * lvl * rankDamage(rank) * (healMod !== 0 ? Math.max(0.2, 1 + healMod / 100) : 1));
+  const amount = Math.round((s.heal! + scale) * lvl * rankDamage(rank) * ACTIVE_POWER * (healMod !== 0 ? Math.max(0.2, 1 + healMod / 100) : 1));
   a.mana -= manaCost;
   a.skillCd[s.id] = Math.round(s.cooldown * rankCooldown(rank));
   const before = a.hp;
@@ -1206,7 +1220,7 @@ function skillRawDamage(w: World, a: Actor, s: SkillDef, rank: number, arrows: I
   if (s.mult) {
     const [lo, hi] = damageRange(a);
     const kraft = Math.max(0, a.attrs.kraft - 10) * (1 + a.level * 0.08) * MELEE_SKILL_KRAFT_SCALE;
-    return Math.round((w.rng.int(lo, hi) + kraft) * s.mult * rankDamage(rank));
+    return Math.round((w.rng.int(lo, hi) + kraft) * s.mult * rankDamage(rank) * ACTIVE_POWER);
   }
   const lvl = 1 + a.level * 0.1;
   const [lo, hi] = s.base!;
@@ -1217,7 +1231,7 @@ function skillRawDamage(w: World, a: Actor, s: SkillDef, rank: number, arrows: I
   const spell = s.area === 'Magie' ? 1 + attrBonus(a, 'verstand') / 100 : 1;
   const school = s.area === 'Magie' && s.dmgType ? affixSum(a, s.dmgType === 'fire' ? 'spellFire' : s.dmgType === 'frost' ? 'spellFrost' : 'healPower') : 0;
   const schoolMod = school !== 0 && s.dmgType !== 'poison' ? Math.max(0.2, 1 + school / 100) : 1;
-  return Math.round((w.rng.int(lo, hi) * lvl + scale + weaponBonus + (arrows?.arrowBonus ?? 0)) * rankDamage(rank) * spell * schoolMod);
+  return Math.round((w.rng.int(lo, hi) * lvl + scale + weaponBonus + (arrows?.arrowBonus ?? 0)) * rankDamage(rank) * ACTIVE_POWER * spell * schoolMod);
 }
 
 /** Nebenwirkungen eines Treffers: Statuseffekt (Brand: 10 % des Treffers pro Sekunde) und Gift über Zeit. */
@@ -1286,7 +1300,7 @@ function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void 
   if ((a.skillCd[s.id] ?? 0) > 0) return;
   if (a.status.stun) return fail(w, 'Du bist betäubt.');
   if (a.status.silence) return fail(w, 'Du bist zum Schweigen gebracht.');
-  const rank = a.skillRanks[s.id] ?? 1;
+  const rank = skillRankOf(s, a.skillRanks);
   // Manakosten: Manafluss (−) und Gegenstände (+/−), nie unter 40 % der Grundkosten
   const costMod = affixSum(a, 'manaCost') - passiveSum(a, 'manaCost');
   const manaCost = Math.round(s.mana * rankMana(rank) * (costMod !== 0 ? Math.max(0.4, 1 + costMod / 100) : 1));
