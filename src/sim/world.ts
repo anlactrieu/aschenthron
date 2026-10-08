@@ -170,6 +170,8 @@ export interface Actor {
   lastHitAt: number;
   /** Rudel-Kennung (0 = Einzelgänger): Rudelmitglieder greifen gemeinsam an */
   packId: number;
+  /** Lager-Kennung (nur Besatzung eines Lagers) */
+  campId?: string;
   /** Champion-Modifikator und Mini-Boss-Kennung */
   champ?: string;
   unique?: string;
@@ -217,7 +219,22 @@ export interface Chest {
   tier: 'wood' | 'iron' | 'gold';
   opened: boolean;
   respawnAt: number;
+  /** Lagertruhe: bleibt verschlossen, bis dieses Lager gesäubert ist */
+  camp?: string;
 }
+
+/** Lager zum Erobern: feste Besatzung in einem Rechteck; ist sie tot, bleibt das Lager lange ruhig und die Lagertruhe geht auf. */
+export interface Camp {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  cleared: boolean;
+}
+/** Nach dem Säubern kommt die Besatzung erst nach 30 Minuten wieder */
+export const CAMP_RESPAWN_TICKS = 20 * 60 * 30;
 
 export type NpcKind = 'trainer' | 'merchant' | 'stash' | 'quest' | 'smith';
 /** Fachgebiet eines Lehrers: Magie (Zauber) oder Kampf (Nahkampf, Fernkampf, Überleben). Ohne Angabe lehrt er alles. */
@@ -298,6 +315,7 @@ export interface World {
   /** Spieler dürfen einander außerhalb von Städten angreifen (Server-Einstellung) */
   pvp: boolean;
   chests: Chest[];
+  camps: Camp[];
   telegraphs: { id: number; x: number; y: number; r: number; at: number; dmg: number; src: number }[];
   /** Akteur des gerade ausgeführten Befehls (für `fail`-Ereignisse) */
   cmdActor: number | null;
@@ -320,7 +338,7 @@ export interface PackPatrol {
 }
 
 export function createWorld(seed: number, grid: Grid, safe: Rect[] = []): World {
-  return { tick: 0, grid, rng: new Rng(seed), actors: [], nextId: 1, events: [], ground: [], safe, npcs: [], start: { x: 1, y: 1 }, towns: [], regions: [], pvp: false, chests: [], telegraphs: [], cmdActor: null, packs: new Map(), npcWander: false, fx: new Rng((seed ^ 0x9e3779b9) >>> 0) };
+  return { tick: 0, grid, rng: new Rng(seed), actors: [], nextId: 1, events: [], ground: [], safe, npcs: [], start: { x: 1, y: 1 }, towns: [], regions: [], pvp: false, chests: [], camps: [], telegraphs: [], cmdActor: null, packs: new Map(), npcWander: false, fx: new Rng((seed ^ 0x9e3779b9) >>> 0) };
 }
 
 export function addNpc(w: World, kind: NpcKind, name: string, x: number, y: number, extra: Partial<Npc> = {}): Npc {
@@ -983,6 +1001,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       const c = w.chests.find((x) => x.id === cmd.chestId);
       if (!c) return;
       if (c.opened) return fail(w, 'Die Truhe ist leer.');
+      if (c.camp && !w.camps.find((x) => x.id === c.camp)?.cleared) return fail(w, 'Die Lagertruhe ist verschlossen – säubere erst das Lager.');
       a.targetId = null;
       a.pickupId = null;
       if (Math.hypot(a.x - c.x, a.y - c.y) <= CHEST_RANGE) return openChest(w, a, c);
@@ -1001,6 +1020,10 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       if (a.level < def.minLevel) return fail(w, `Benötigt Level ${def.minLevel}.`);
       if (def.requires && a.quests[def.requires]?.state !== 'turned') return fail(w, `Erst „${questById(def.requires)?.name ?? '?'}“ abschließen.`);
       a.quests[def.id] = { state: 'active', progress: 0 };
+      if (def.kind === 'camp' && w.camps.find((c) => c.id === def.target)?.cleared) {
+        a.quests[def.id] = { state: 'done', progress: def.count };
+        w.events.push({ type: 'questDone', questId: def.id, to: a.id });
+      }
       break;
     }
     case 'turnInQuest': {
@@ -1600,7 +1623,20 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
     const pl = getActor(w, Number(id));
     if (pl && pl.alive && w.tick - at <= TICK_RATE * 30 && Math.hypot(pl.x - m.x, pl.y - m.y) <= 25) credited.set(pl.id, pl);
   }
+  const camp = campClearedBy(w, m);
   for (const pl of credited.values()) {
+    if (camp) {
+      note(w, pl, `Lager „${camp.name}“ gesäubert – die Lagertruhe ist offen.`);
+      for (const q of QUESTS) {
+        const st = pl.quests[q.id];
+        if (q.kind === 'camp' && q.target === camp.id && st?.state === 'active') {
+          st.progress = q.count;
+          st.state = 'done';
+          w.events.push({ type: 'questProgress', questId: q.id, progress: st.progress, count: q.count, to: pl.id });
+          w.events.push({ type: 'questDone', questId: q.id, to: pl.id });
+        }
+      }
+    }
     // Beim Jagen nebenbei: freie Töte-Aufgaben (ohne Kette) für diese Monsterart starten automatisch
     if (m.kindId && !m.summoned) {
       for (const q of QUESTS) {
@@ -1667,6 +1703,19 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
   }
   const special = rollSpecial(w.rng, () => w.nextId++, k.level, k.id, !!k.boss);
   if (special) drop(special);
+}
+
+/** Fällt der letzte Gegner eines Lagers, ist es gesäubert: Besatzung wartet 30 Minuten, Lagertruhe geht auf. */
+function campClearedBy(w: World, m: Actor): Camp | undefined {
+  if (!m.campId) return undefined;
+  const camp = w.camps.find((c) => c.id === m.campId);
+  if (!camp || camp.cleared) return undefined;
+  const crew = w.actors.filter((a) => a.kind === 'monster' && a.campId === camp.id);
+  if (crew.some((a) => a.alive)) return undefined;
+  camp.cleared = true;
+  for (const a of crew) a.respawnTicks = CAMP_RESPAWN_TICKS;
+  for (const c of w.chests) if (c.camp === camp.id) { c.opened = false; c.respawnAt = w.tick + CAMP_RESPAWN_TICKS; }
+  return camp;
 }
 
 /** Ein Quest-Gegenstand wird gefunden (nur gezählt, nicht im Rucksack: nicht verkaufbar, nicht verlierbar). */
@@ -1919,6 +1968,7 @@ function reviveMonster(w: World, m: Actor): void {
   // Helfer vom letzten Mal verschwinden, sonst häufen sie sich über Respawns
   if (m.abilities.includes('summon')) dismissSummons(w, m);
   m.alive = true;
+  if (m.campId) { const cp = w.camps.find((x) => x.id === m.campId); if (cp) cp.cleared = false; }
   m.patrolling = false;
   m.patrolSeq = -1;
   m.hp = m.maxHp;
@@ -1956,7 +2006,7 @@ function alertPack(w: World, m: Actor, targetId: number): void {
 export function setupPatrols(w: World): void {
   const groups = new Map<number, Actor[]>();
   for (const a of w.actors) {
-    if (a.kind !== 'monster' || !a.packId || a.boss || a.unique || a.summonedBy || !a.home) continue;
+    if (a.kind !== 'monster' || !a.packId || a.boss || a.unique || a.campId || a.summonedBy || !a.home) continue;
     let g = groups.get(a.packId);
     if (!g) groups.set(a.packId, (g = []));
     g.push(a);
@@ -2148,7 +2198,7 @@ function tryOpenChest(w: World, a: Actor): void {
 /** Öffnet eine Truhe: Gold, Tränke, Ausrüstung (bessere Truhen: bessere Seltenheit, selten Unikate/Set-Teile). */
 function openChest(w: World, a: Actor, c: Chest): void {
   c.opened = true;
-  c.respawnAt = w.tick + CHEST_RESPAWN_TICKS;
+  c.respawnAt = w.tick + (c.camp ? CAMP_RESPAWN_TICKS : CHEST_RESPAWN_TICKS);
   for (const q of QUESTS) {
     const st = a.quests[q.id];
     if (st?.state !== 'active') continue;

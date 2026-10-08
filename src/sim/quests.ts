@@ -59,6 +59,10 @@ export function questTarget(w: World, p: Actor, def: QuestDef, done: boolean): {
       const n = w.npcs.find((x) => npcKeyOf(x.name) === def.target);
       return n ? { x: n.x, y: n.y } : undefined;
     }
+    case 'camp': {
+      const c = w.camps.find((x) => x.id === def.target);
+      return c ? { x: Math.round(c.x + c.w / 2), y: Math.round(c.y + c.h / 2) } : undefined;
+    }
     case 'kill': return nearest((a) => a.kindId === def.target);
     case 'unique': return def.target ? nearest((a) => a.unique === def.target) : undefined;
     case 'bring': {
@@ -94,6 +98,10 @@ export function questMarks(w: World, p: Actor): QuestMark[] {
 export function questWhere(w: World, def: QuestDef, done = false): string {
   if (done) return giverLocation(w, def)?.text ?? '';
   if (def.kind === 'champion') return 'Champions in der Wildnis (Gegner mit Aura)';
+  if (def.kind === 'camp') {
+    const c = w.camps.find((x) => x.id === def.target);
+    return c ? `${c.name} (${regionAt(w, c.x + c.w / 2, c.y + c.h / 2)?.name ?? '?'})` : '';
+  }
   const names = new Set<string>();
   if (def.kind === 'visit' && def.place) names.add(def.place);
   else if (def.kind === 'talk') {
@@ -114,9 +122,12 @@ export function questWhere(w: World, def: QuestDef, done = false): string {
 }
 
 /** Name des Quest-Monsters für Anzeigen (z. B. „Sumpfhexe“). */
+const CAMP_NAMES: Record<string, string> = { hofplaenderer: 'Lager der Hofplünderer', spinnenhoehle: 'Spinnenhöhle', raeuberversteck: 'Räuberversteck', ghulgrube: 'Ghulgrube', knochenhain: 'Knochenhain', trollhoehle: 'Trollhöhle', glutlager: 'Glutlager' };
+
 export function targetName(def: QuestDef): string {
   if (def.kind === 'kill') return monsterKind(def.target).name;
   if (def.kind === 'talk') return NPC_KEYS[def.target] ?? def.target;
+  if (def.kind === 'camp') return CAMP_NAMES[def.target] ?? def.target;
   return def.item ?? def.target;
 }
 

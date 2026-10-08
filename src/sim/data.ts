@@ -479,7 +479,7 @@ export const POTION_COOLDOWN_TICKS = 100;
 export const ARMOR_K = 30;
 
 /** kill: Monsterart; chest: Truhen; champion/unique: Champions bzw. Mini-Bosse (unique mit `target`: ein bestimmter); visit: Region betreten; bring: Gegenstand von Monstern/Truhen sammeln; talk: mit einem NPC sprechen */
-export type QuestKind = 'kill' | 'chest' | 'champion' | 'unique' | 'visit' | 'bring' | 'talk';
+export type QuestKind = 'kill' | 'chest' | 'champion' | 'unique' | 'visit' | 'bring' | 'talk' | 'camp';
 
 export interface QuestDef {
   id: string;
@@ -541,6 +541,21 @@ export const QUESTS: QuestDef[] = [
   q('q_ash', 'Asche und Glut', 'Aschenwandler ziehen aus der Öde. Besiege 8.', 21, 'ash_walker', 8, 2.62, 2.62),
   q('q_king', 'Der Aschenkönig', 'Der Aschenkönig sitzt auf seinem Thron. Beende seine Herrschaft.', 28, 'ash_king', 1, 1.5, 2),
 ];
+
+/** Lager erobern: alle Besatzer des Lagers (Kennung als `target`) erschlagen; danach geht die Lagertruhe auf. */
+const qc = (id: string, name: string, text: string, minLevel: number, camp: string, mult: number): QuestDef => ({
+  ...qv(id, name, text, minLevel, 'camp', 6, mult), target: camp, count: 1, reward: 'rare',
+});
+
+QUESTS.push(
+  qc('q_camp_farm', 'Die Hofplünderer', 'Ein Goblintrupp hat sich auf den Roggenfeldern eingenistet und raubt die Höfe aus. Säubere ihr Lager – alle müssen fallen, dann gehört die Lagertruhe dir.', 3, 'hofplaenderer', 1.6),
+  qc('q_camp_forest', 'Die Spinnenhöhle', 'Im Düsterwald hat sich eine Brut in einer Höhle festgesetzt. Räume sie aus; was sie den Reisenden abnahmen, liegt in der Truhe.', 6, 'spinnenhoehle', 1.6),
+  qc('q_camp_bandit', 'Das Räuberversteck', 'Ein Nebenlager der Räuber versorgt Harkons Banden. Nimm es ein, bevor sie Verstärkung bekommen.', 9, 'raeuberversteck', 1.6),
+  qc('q_camp_swamp', 'Die Ghulgrube', 'Im Moor ist eine Grube voller Ghule aufgebrochen. Säubere sie, sonst kriecht das Gewürm bis zu den Höfen.', 8, 'ghulgrube', 1.6),
+  qc('q_camp_grave', 'Der Knochenhain', 'Auf dem Totenacker versammeln sich Untote um einen alten Hain. Zerschlage sie und hol die Grabbeigaben.', 12, 'knochenhain', 1.6),
+  qc('q_camp_hills', 'Die Trollhöhle', 'Ein Trollclan hat im Hochland eine Höhle bezogen. Vertreibe ihn und nimm seinen Hort.', 16, 'trollhoehle', 1.6),
+  qc('q_camp_ash', 'Das Glutlager', 'In der Aschenöde lagert eine Schar von Aschenwesen um eine Feuerstelle. Lösche sie aus.', 22, 'glutlager', 1.6),
+);
 
 QUESTS.push(
   qv('q_chests1', 'Schatzsucher', 'Man munkelt von vergrabenen Truhen auf den Feldern. Öffne 3 Truhen.', 2, 'chest', 3, 2.5),

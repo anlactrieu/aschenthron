@@ -213,15 +213,15 @@ npc("Lehrer Varn", 7, 6, t1x, t1y, kind="trainer", tier=1)
 npc("Händlerin Mirel", 11, 6, t1x, t1y, kind="merchant", shop="basic")
 npc("Truhe", 9, 10, t1x, t1y, kind="stash")
 npc("Schmiedin Ilse", 14, 9, t1x, t1y, kind="smith")
-npc("Hauptmann Brandt", 16, 6, t1x, t1y, kind="quest", quests="q_rats,q_chests1,q_hounds,q_goblins,q_bandits,q_spiders,q_goblin_scouts,q_unique1")
-npc("Kräuterfrau Odda", 4, 9, t1x, t1y, kind="quest", quests="q_herbs,q_ghouls")
+npc("Hauptmann Brandt", 16, 6, t1x, t1y, kind="quest", quests="q_rats,q_chests1,q_hounds,q_goblins,q_bandits,q_spiders,q_goblin_scouts,q_unique1,q_camp_farm,q_camp_forest,q_camp_bandit")
+npc("Kräuterfrau Odda", 4, 9, t1x, t1y, kind="quest", quests="q_herbs,q_ghouls,q_camp_swamp")
 npc("Meisterin Kjorra", 5, 7, t2x, t2y, kind="trainer", tier=2, field="Kampf")
 npc("Erzmagier Orvan", 8, 9, t2x, t2y, kind="trainer", tier=2, field="Magie")
 npc("Händler Dorn", 12, 7, t2x, t2y, kind="merchant", shop="advanced")
 npc("Truhe", 11, 12, t2x, t2y, kind="stash")
 npc("Schmied Torgal", 3, 11, t2x, t2y, kind="smith")
-npc("Wachführerin Tessa", 16, 11, t2x, t2y, kind="quest", quests="q_harkon,q_champs1,q_goblin_king,q_wraiths,q_chests2,q_veshra,q_trolls,c_thr3")
-npc("Späher Ruven", 11, 5, t2x, t2y, kind="quest", quests="q_unique2,q_mine,q_champs2,q_ash,q_katacombs,q_king,c_thr4,c_thr5")
+npc("Wachführerin Tessa", 16, 11, t2x, t2y, kind="quest", quests="q_harkon,q_champs1,q_goblin_king,q_wraiths,q_chests2,q_veshra,q_trolls,c_thr3,q_camp_grave")
+npc("Späher Ruven", 11, 5, t2x, t2y, kind="quest", quests="q_unique2,q_mine,q_champs2,q_ash,q_katacombs,q_king,c_thr4,c_thr5,q_camp_hills,q_camp_ash")
 
 safe_rects = [(TOWN1[0] - 1, TOWN1[1] - 1, TOWN1[2] + 1, TOWN1[3] + 1), (TOWN2[0] - 1, TOWN2[1] - 1, TOWN2[2] + 1, TOWN2[3] + 1)]
 def in_safe(x, y, pad=0):
@@ -669,8 +669,8 @@ npc_at("Magierin Selka", 'magier', kind="trainer", tier=1, field="Magie")
 npc_at("Händlerin Mirel", 'haendler', kind="merchant", shop="basic", quests="c_arr3")
 npc_at("Schmiedin Ilse", 'schmied', kind="smith", quests="c_arr4")
 npc_at("Lagerverwalter Ottmar", 'lager', kind="stash", quests="c_arr5")
-npc_at("Hauptmann Brandt", 'wache', kind="quest", quests="q_rats,q_chests1,q_hounds,q_goblins,q_bandits,q_spiders,q_goblin_scouts,q_unique1")
-npc_at("Kräuterfrau Odda", 'kraeuter', kind="quest", quests="q_herbs,q_ghouls")
+npc_at("Hauptmann Brandt", 'wache', kind="quest", quests="q_rats,q_chests1,q_hounds,q_goblins,q_bandits,q_spiders,q_goblin_scouts,q_unique1,q_camp_farm,q_camp_forest,q_camp_bandit")
+npc_at("Kräuterfrau Odda", 'kraeuter', kind="quest", quests="q_herbs,q_ghouls,q_camp_swamp")
 npc_at("Händler Wenzel", 'ausruester', kind="merchant", shop="artisan")
 npc_at("Chronistin Maren", 'chronik', kind="quest", quests="c_gob1,c_thr1,c_thr2,c_thr6")
 
@@ -770,6 +770,49 @@ if bad:
     ids = {o["id"] for o in keep}; objs[:] = [o for o in objs if o["id"] not in ids]
     print("entfernt:", len(keep), "unerreichbare Objekte", file=sys.stderr)
 
+# Lager zum Erobern (Aufgabenart "camp"): je Gebiet ein Platz von 9x9 Feldern mit einer festen Besatzung und einer verschlossenen Lagertruhe,
+# die erst nach dem Säubern aufgeht. Eigener Zufallsstrom, damit der Rest der Karte gleich bleibt.
+CAMPS = [  # (Kennung, Name, Zone, Boden, Gegnerarten, Anführer, Stufe der Truhe, Truhenart)
+    ("hofplaenderer", "Lager der Hofplünderer", 'farm', (4,), ['goblin', 'goblin', 'goblin_scout', 'feral_hound'], 'goblin_scout', 4, 'wood'),
+    ("spinnenhoehle", "Spinnenhöhle", 'forest', (4,), ['forest_spider', 'forest_spider', 'venom_spider', 'goblin_archer'], 'venom_spider', 7, 'iron'),
+    ("raeuberversteck", "Räuberversteck", 'camp', (7, 4), ['bandit', 'bandit', 'bandit_archer', 'highwayman'], 'bandit_captain', 11, 'iron'),
+    ("ghulgrube", "Ghulgrube", 'swamp', (3,), ['bog_ghoul', 'bog_ghoul', 'marsh_corpse', 'bog_witch'], 'ghoul_alpha', 12, 'iron'),
+    ("knochenhain", "Knochenhain", 'grave', (4,), ['skeleton', 'zombie', 'bone_knight', 'wraith'], 'crypt_guard', 14, 'gold'),
+    ("trollhoehle", "Trollhöhle", 'hills', (8,), ['hill_troll', 'dire_wolf', 'stone_golem', 'rock_troll'], 'rock_troll', 18, 'gold'),
+    ("glutlager", "Glutlager", 'ash', (9,), ['ash_walker', 'cinder_wisp', 'night_stalker', 'hell_spawn'], 'ember_elemental', 25, 'gold'),
+]
+crng = random.Random(7771)
+camp_taken = []
+for cid, cname, zn, gnd, kinds, lead, clv, ctier in CAMPS:
+    x0, y0, x1, y1 = ZONES[zn]
+    spot = None
+    for _ in range(4000):
+        cx, cy = crng.randint(x0 + 6, x1 - 6), crng.randint(y0 + 6, y1 - 6)
+        if in_safe(cx, cy, 14) or any(abs(cx - a) < 25 and abs(cy - b) < 25 for a, b in camp_taken): continue
+        if not all(g[cy + dy][cx + dx] in gnd + (7, 10, 11, 13) for dx in range(-4, 5) for dy in range(-4, 5)): continue
+        if sum(1 for dx in range(-4, 5) for dy in range(-4, 5) if (cx + dx, cy + dy) in seen) < 60 or (cx, cy) not in seen: continue
+        if any(o["type"] in ("monster", "chest") and (prop(o, "unique") or prop(o, "kind") in BOSS_KINDS or o["type"] == "chest")
+               and abs(o["x"] // TS - cx) < 7 and abs(o["y"] // TS - cy) < 7 for o in objs): continue
+        spot = (cx, cy); break
+    if not spot: sys.exit("kein Platz für Lager " + cname)
+    cx, cy = spot; camp_taken.append(spot)
+    for dx in range(-4, 5):
+        for dy in range(-4, 5):
+            if g[cy + dy][cx + dx] in (10, 11, 13): g[cy + dy][cx + dx] = gnd[0]
+    objs[:] = [o for o in objs if not (o["type"] == "monster" and abs(o["x"] // TS - cx) <= 5 and abs(o["y"] // TS - cy) <= 5)]
+    obj(cname, "camp", cx - 4, cy - 4, 9, 9, id=cid, level=clv, tier=ctier)
+    members = [(lead, cx, cy - 2)]
+    for _ in range(300):
+        if len(members) >= 6: break
+        mx, my = cx + crng.randint(-3, 3), cy + crng.randint(-3, 3)
+        if all(abs(mx - a) >= 2 or abs(my - b) >= 2 for _, a, b in members) and (mx, my) != (cx, cy + 3):
+            members.append((crng.choice(kinds), mx, my))
+    for i, (kd, mx, my) in enumerate(members):
+        if i == 0: obj(kd, "monster", mx, my, kind=kd, pack=0, camp=cid, champ=crng.choice(['swift', 'armored', 'fiery', 'vampiric', 'thorned']))
+        else: obj(kd, "monster", mx, my, kind=kd, pack=0, camp=cid)
+    obj("Lagertruhe", "chest", cx, cy + 3, level=clv, tier=ctier, camp=cid)
+print("Lager:", len(camp_taken), file=sys.stderr)
+
 # Auflockern (nachträglich, Zufallsstrom bleibt gleich): Nur Goblins ziehen im Rudel (bis 3); alle anderen Tiere stehen einzeln,
 # und Gruppen halten Abstand zueinander. Bosse, Mini-Bosse und Dungeon-Rudel bleiben unberührt.
 SPREAD_GAP = 10
@@ -778,19 +821,27 @@ packs = collections.defaultdict(list)
 for o in objs:
     if o["type"] == "monster" and _prop(o, "unique") is None:
         pid = int(_prop(o, "pack") or 0)
-        if pid in PACK_META: packs[pid].append(o)
-anchors, dropped, singled = [], 0, 0
+        if pid in PACK_META and PACK_META[pid][0] != 'grund': packs[pid].append(o)
+anchors, dropped, singled, removed = [], 0, 0, []
 for pid in sorted(packs):
     mem = packs[pid]
     if sum(1 for o in mem if "goblin" in _prop(o, "kind")) * 2 <= len(mem):
-        for o in mem[1:]: objs.remove(o); dropped += 1
+        for o in mem[1:]: objs.remove(o); removed.append(o); dropped += 1
         mem = mem[:1]; singled += 1
         for p in mem[0]["properties"]:
             if p["name"] == "pack": p["value"] = "0"
     cx, cy = mem[0]["x"] // TS, mem[0]["y"] // TS
     if any(abs(cx - a) < SPREAD_GAP and abs(cy - b) < SPREAD_GAP for a, b in anchors):
-        for o in mem: objs.remove(o); dropped += 1
+        for o in mem: objs.remove(o); removed.append(o); dropped += 1
     else: anchors.append((cx, cy))
+# Jede Gegnerart behält mindestens 6 Vertreter (Aufgaben brauchen sie); zurückgeholte stehen einzeln
+left = collections.Counter(_prop(o, "kind") for o in objs if o["type"] == "monster")
+for o in removed:
+    kd = _prop(o, "kind")
+    if left[kd] < 6:
+        for p in o["properties"]:
+            if p["name"] == "pack": p["value"] = "0"
+        objs.append(o); left[kd] += 1; dropped -= 1
 print("Auflockern: %d Monster entfernt, %d Rudel zu Einzelgängern" % (dropped, singled), file=sys.stderr)
 
 data = [g[y][x] for y in range(H) for x in range(W)]

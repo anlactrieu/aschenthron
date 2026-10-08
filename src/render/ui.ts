@@ -1384,6 +1384,7 @@ export class Ui {
       case 'bring': return `Sammle ${def.item} (${prog})`;
       case 'visit': return `Betritt: ${def.place}`;
       case 'talk': return `Sprich mit ${targetName(def)}`;
+      case 'camp': return `Säubere: ${targetName(def)}`;
       case 'chest': return `Öffne Truhen (${prog})`;
       case 'champion': return `Besiege Champions (${prog})`;
       case 'unique': return def.target ? `Besiege den Weltboss (${prog})` : `Besiege benannte Gegner (${prog})`;

@@ -72,12 +72,19 @@ export function buildWorld(seed: number, map: TiledMap, opts: { player?: boolean
       if (inSafeZone(world, o.x / ts, o.y / ts) && o.name !== 'Truhe') world.npcs[world.npcs.length - 1]!.wander = 2;
     }
     if (o.type === 'chest') {
-      world.chests.push({ id: world.nextId++, x: o.x / ts, y: o.y / ts, level: Number(prop(o, 'level') ?? 1), tier: (prop(o, 'tier') ?? 'wood') as 'wood', opened: false, respawnAt: 0 });
+      world.chests.push({ id: world.nextId++, x: o.x / ts, y: o.y / ts, level: Number(prop(o, 'level') ?? 1), tier: (prop(o, 'tier') ?? 'wood') as 'wood', opened: false, respawnAt: 0, ...(prop(o, 'camp') ? { camp: prop(o, 'camp') } : {}) });
     }
+    if (o.type === 'camp') world.camps.push({ id: prop(o, 'id')!, name: o.name, x: o.x / ts, y: o.y / ts, w: o.width / ts, h: o.height / ts, cleared: false });
     if (o.type === 'townstart') world.towns.push({ x: o.x / ts, y: o.y / ts, name: o.name });
     if (o.type === 'monster') {
       const m = spawnMonster(world, o.x / ts, o.y / ts, prop(o, 'kind'), { champ: prop(o, 'champ'), unique: prop(o, 'unique') });
       m.packId = Number(prop(o, 'pack') ?? 0);
+      const campId = prop(o, 'camp');
+      if (campId) {
+        // Besatzung eines Lagers: ruft sich gegenseitig (gemeinsame Rudel-Id), patrouilliert aber nicht
+        m.campId = campId;
+        m.packId = 100000 + [...campId].reduce((n, ch) => (n * 31 + ch.charCodeAt(0)) % 90000, 7);
+      }
     }
   }
   setupPatrols(world);

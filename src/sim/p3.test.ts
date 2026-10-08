@@ -315,12 +315,12 @@ describe('P3: neue Zonen und Dungeons', () => {
     const forest = inRegion('Düsterwald');
     expect(forest.some((m) => m.kindId === 'goblin_king')).toBe(false);
     const packs = new Map<number, number>();
-    for (const m of forest) if (m.packId) packs.set(m.packId, (packs.get(m.packId) ?? 0) + 1);
+    for (const m of forest) if (m.packId && !m.campId) packs.set(m.packId, (packs.get(m.packId) ?? 0) + 1);
     expect(Math.max(...packs.values())).toBeLessThanOrEqual(5);
     // nahe dem Waldeingang (Entfernung < 0,5 vom Eingang (75,120)) nie mehr als 3
     const near = new Map<number, number>();
     const f = (m: Actor) => (Math.abs(m.x - 75) + Math.abs(m.y - 120)) / 105;
-    for (const m of forest.filter((x) => x.packId && f(x) < 0.45)) near.set(m.packId, (near.get(m.packId) ?? 0) + 1);
+    for (const m of forest.filter((x) => x.packId && !x.campId && f(x) < 0.45)) near.set(m.packId, (near.get(m.packId) ?? 0) + 1);
     for (const n of near.values()) expect(n).toBeLessThanOrEqual(3);
   });
 
