@@ -13,6 +13,7 @@ import { ACHIEVEMENTS } from './achievements';
 import { type NextStep, giverLocation, questAvailable, questChains, questWhere, targetName } from '../sim/quests';
 import { lookKey, lookOf, playerPortrait } from './art';
 import { initCredits, toggleCredits } from './credits';
+import { isTouch } from './touch';
 
 const RARITY_COLOR: Record<Item['rarity'], string> = { normal: '#c9c4bd', magic: '#7f9fff', rare: '#f2c94c', set: '#5fd070', legendary: '#ff8a2a' };
 const SLOT_NAME: Record<EquipSlot, string> = { weapon: 'Waffe', head: 'Kopf', chest: 'Brust', hands: 'Hände', feet: 'Füße', ring: 'Ring', ring2: 'Ring', amulet: 'Amulett', offhand: 'Nebenhand', belt: 'Gürtel', cloak: 'Umhang', legs: 'Beine' };
@@ -132,9 +133,25 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''):
 }
 
 /** Titelleiste eines Fensters: zum Verschieben ziehen, ✕ schließt. Die Position bleibt, weil nur der Inhalt neu aufgebaut wird. */
-function titleBar(text: string, win: HTMLElement, onClose: () => void): HTMLElement {
+function titleBar(text: string, win: HTMLElement, onClose: () => void, extra: HTMLElement[] = []): HTMLElement {
   const h = el('h3');
   h.append(el('span', '', text));
+  if (isTouch) {
+    // Handy: kein Verschieben; Titel antippen oder „–“ klappt das Fenster ein, damit die Welt wieder frei ist
+    const right = el('span');
+    right.style.cssText = 'display:flex;align-items:stretch;margin-left:auto';
+    const fold = el('span', 'a-x a-fold', win.classList.contains('a-min') ? '▢' : '–');
+    fold.onclick = () => {
+      win.classList.toggle('a-min');
+      fold.textContent = win.classList.contains('a-min') ? '▢' : '–';
+    };
+    const x = el('span', 'a-x', '✕');
+    x.onclick = onClose;
+    right.append(...extra, fold, x);
+    h.append(right);
+    (h.firstElementChild as HTMLElement).onclick = () => fold.click();
+    return h;
+  }
   const x = el('span', 'a-x', '✕');
   x.title = 'Schließen';
   x.onpointerdown = (e) => e.stopPropagation();
@@ -270,6 +287,14 @@ export class Ui {
   private cancelCapture: (() => void) | null = null;
   private bagFilter: BagFilter = 'all';
   private bagSort: BagSort = 'none';
+  /** Handy: gewählter Gegenstand (Tippen statt Ziehen) mit Aktionsleiste */
+  private sel: { d: Drag; equipped: Item | undefined } | null = null;
+  /** Handy: zeigt das Rucksack-Fenster (true) oder das Händler-/NPC-Fenster (false), wenn beide offen wären */
+  private touchMain = true;
+  private sideShown = false;
+  private tipPanel = false;
+  private trackerOpen = false;
+  private touchMenu = el('div');
 
   constructor(
     private send: (c: Command) => void,
@@ -306,8 +331,24 @@ export class Ui {
     this.bannerEl.style.cssText = 'position:fixed;left:50%;top:70px;transform:translateX(-50%);color:#e8d9b0;font:bold 24px Georgia,serif;text-shadow:0 2px 8px #000,0 0 2px #000;letter-spacing:1.5px;opacity:0;transition:opacity .6s;pointer-events:none;z-index:6;text-align:center';
     this.tip.style.cssText = 'position:fixed;z-index:50;max-width:270px;background:rgba(10,8,14,.97);border:1px solid #8a7258;color:#d4c4a8;font:12px/1.45 Georgia,serif;padding:8px 10px;pointer-events:none;display:none;box-shadow:0 4px 16px #000';
     this.hintEl.style.cssText = 'position:fixed;left:12px;top:12px;z-index:5;color:#a8d8a0;font:12px Georgia,serif;text-shadow:0 1px 3px #000;opacity:0;transition:opacity .5s;pointer-events:none';
+    if (isTouch) {
+      this.tracker.onclick = (e) => {
+        if ((e.target as HTMLElement).closest('button')) return;
+        this.trackerOpen = !this.trackerOpen;
+        this.trackerKey = '';
+      };
+      Object.assign(this.toast.style, { width: '34vw', bottom: '84px', font: '12px/1.3 Georgia,serif' });
+      this.tracker.style.top = 'max(8px,env(safe-area-inset-top))';
+      this.tracker.style.right = 'max(8px,env(safe-area-inset-right))';
+      this.bannerEl.style.fontSize = '18px';
+      Object.assign(this.xpBar.style, { minWidth: '0', width: '100%', height: '12px' });
+      this.hud.id = 't-hud';
+      this.hotbar.classList.add('t-hot');
+      Object.assign(this.xpText.style, { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', font: '10px/12px system-ui', inset: '-1px 0 0' });
+    }
     document.body.append(this.main, this.side, this.hud, this.tracker, this.target, this.toast, this.bannerEl, this.tip, this.hintEl);
 
+    if (isTouch) this.buildTouchControls();
     initCredits();
     window.addEventListener('keydown', (e) => {
       const k = e.key.toLowerCase();
@@ -342,18 +383,32 @@ export class Ui {
   /* ----------------------------------------------------------- Fenster */
 
   private toggleTab(t: Tab): void {
-    if (this.open && this.tab === t) this.toggle(false);
+    if (this.open && this.tab === t && (!isTouch || this.touchMain || !this.sideShown)) this.toggle(false);
     else {
       this.tab = t;
       this.toggle(true);
+      this.touchMain = true;
+      this.main.classList.remove('a-min');
+      this.layout();
     }
   }
 
   toggle(force?: boolean): void {
     this.open = force ?? !this.open;
-    this.main.style.display = this.open ? 'block' : 'none';
+    // Handy: Antippen eines NPCs öffnet dessen Fenster (Rucksack über den Knopf im Titel)
+    if (isTouch && this.open) this.touchMain = false;
     this.key = '';
+    this.sel = null;
     if (!this.open) this.tip.style.display = 'none';
+    this.layout();
+  }
+
+  /** Welches Fenster ist sichtbar? Am Laptop beide wie bisher, am Handy nur eines (sonst verdeckt es die Welt). */
+  private layout(): void {
+    const sideOn = this.sideShown && this.open;
+    const showMain = this.open && (!isTouch || this.touchMain || !sideOn);
+    this.main.style.display = showMain ? (isTouch ? 'flex' : 'block') : 'none';
+    this.side.style.display = sideOn && !(isTouch && showMain) ? (isTouch ? 'flex' : 'block') : 'none';
   }
 
   setArmed(id: string | null): void {
@@ -393,11 +448,13 @@ export class Ui {
     this.updateHud(p, target);
     this.updateTracker(w, p);
     const near = w.npcs.filter((n) => Math.hypot(n.x - p.x, n.y - p.y) <= NPC_RANGE);
-    const key = JSON.stringify([this.open, this.tab, p.inventory, this.bagFilter, this.bagSort, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.freeRespec, p.gold, p.level, p.spec, near.map((n) => n.id), p.quests, p.bounties, p.xp > 0, this.board?.map((r) => r.name + r.xp).join(), this.ach?.unlocked.size, this.ach?.stats.kills]);
+    const key = JSON.stringify([this.open, this.tab, p.inventory, this.bagFilter, this.bagSort, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.freeRespec, p.gold, p.level, p.spec, near.map((n) => n.id), p.quests, p.bounties, p.xp > 0, this.board?.map((r) => r.name + r.xp).join(), this.ach?.unlocked.size, this.ach?.stats.kills, this.sel?.d.item.id, this.sel?.d.templateId, this.touchMain]);
     if (key === this.key || this.dragging) return;
     this.key = key;
+    if (isTouch && this.sel && !this.selValid(p)) this.sel = null;
     if (this.open) this.renderMain(p);
     this.renderSide(p, this.open ? near : []);
+    this.layout();
   }
 
   /** Dauerhafte Aufgabenanzeige oben links: bis zu 3 laufende Aufgaben mit Ziel und Ort. */
@@ -406,10 +463,12 @@ export class Ui {
     act.sort((a, b) => Number(p.quests[b.id]!.state === 'done') - Number(p.quests[a.id]!.state === 'done'));
     const shown = act.slice(0, 3);
     const step = this.step;
-    const key = JSON.stringify([shown.map((q) => [q.id, p.quests[q.id]]), step?.text]);
+    const key = JSON.stringify([shown.map((q) => [q.id, p.quests[q.id]]), step?.text, this.trackerOpen]);
     if (key === this.trackerKey) return;
     this.trackerKey = key;
     this.tracker.replaceChildren();
+    this.tracker.classList.toggle('tr-fold', isTouch && !this.trackerOpen);
+    this.tracker.classList.toggle('tr-open', isTouch && this.trackerOpen);
     this.tracker.style.display = shown.length || step ? 'block' : 'none';
     if (step) {
       const row = el('div');
@@ -538,6 +597,88 @@ export class Ui {
     } else this.target.style.display = 'none';
   }
 
+  /* ----------------------------------------------------------- Handy */
+
+  /** Gewählter Gegenstand ist noch da? (Nach Anlegen, Verkauf usw. ändern sich die Listen.) */
+  private selValid(p: Actor): boolean {
+    const s = this.sel;
+    if (!s) return true;
+    const id = s.d.item.id;
+    if (s.d.from === 'bag') return p.inventory.some((i) => i.id === id);
+    if (s.d.from === 'equip') return Object.values(p.equipment).some((i) => i?.id === id);
+    if (s.d.from === 'stash') return p.stash.some((i) => i.id === id);
+    return true;
+  }
+
+  /** Handy: Aktionsleiste unter dem Fenster für den angetippten Gegenstand (statt Ziehen und Doppelklick). */
+  private selPanel(p: Actor): HTMLElement | null {
+    const s = this.sel;
+    if (!isTouch || !s) return null;
+    const { d } = s;
+    const box = el('div', 'a-sel');
+    this.tipPanel = true;
+    this.showTip(d.item, s.equipped, { clientX: 0, clientY: 0 } as MouseEvent);
+    this.tipPanel = false;
+    for (const n of Array.from(this.tip.childNodes)) box.append(n.cloneNode(true));
+    this.tip.style.display = 'none';
+    const acts = el('div', 'a-acts');
+    const add = (label: string, fn: () => void, off = false) => {
+      const b = el('button', `a-btn${off ? ' off' : ''}`, label) as HTMLButtonElement;
+      b.onclick = () => {
+        fn();
+        this.sel = null;
+        this.key = '';
+      };
+      acts.append(b);
+    };
+    const w = this.lastW;
+    const merchant = !!w && !!nearNpc(w, p, 'merchant');
+    const stash = !!w && !!nearNpc(w, p, 'stash');
+    if (d.from === 'bag') {
+      add(d.item.slot === 'potion' ? 'Benutzen' : 'Anlegen', () => this.send(d.item.slot === 'potion' ? { type: 'usePotion', itemId: d.item.id } : { type: 'equip', itemId: d.item.id }));
+      if (merchant) add('Verkaufen', () => this.perform(d, 'sell'));
+      if (stash) add('In die Truhe', () => this.perform(d, 'stash'));
+      add('Wegwerfen', () => this.perform(d, null));
+    } else if (d.from === 'equip') add('Ablegen', () => this.send({ type: 'unequip', slot: d.slot! }));
+    else if (d.from === 'stash') add('Nehmen', () => this.perform(d, 'bag'));
+    else add('Kaufen', () => this.perform(d, 'bag'));
+    const close = el('button', 'a-btn', 'Zurück') as HTMLButtonElement;
+    close.onclick = () => {
+      this.sel = null;
+      this.key = '';
+    };
+    acts.append(close);
+    box.append(acts);
+    return box;
+  }
+
+  /** Handy: Bedienleiste unten rechts (Rasten, Rucksack, Menü) und ausklappbares Menü mit den übrigen Fenstern. */
+  private buildTouchControls(): void {
+    const bar = el('div');
+    bar.id = 't-bar';
+    this.touchMenu.id = 't-menu';
+    const mk = (label: string, fn: () => void) => {
+      const b = el('button', 't-btn', label);
+      b.onclick = () => {
+        fn();
+        if (label !== 'Menü') this.touchMenu.classList.remove('open');
+      };
+      return b;
+    };
+    const win = (t: Tab) => () => this.toggleTab(t);
+    this.touchMenu.append(
+      mk('Charakter', win('char')), mk('Fertigkeiten', win('skills')),
+      mk('Aufgaben', win('quests')), mk('Erfolge', win('ach')),
+      mk('Karte', () => window.dispatchEvent(new CustomEvent('aschenthron:map'))), mk('Einstellungen', win('set')),
+      mk('Speichern', () => this.manualIo?.save()), mk('Laden', () => this.confirmLoad()),
+      mk('Zoom +', () => window.dispatchEvent(new CustomEvent('aschenthron:zoom', { detail: 1.2 }))),
+      mk('Zoom −', () => window.dispatchEvent(new CustomEvent('aschenthron:zoom', { detail: 1 / 1.2 }))),
+    );
+    const menu = mk('Menü', () => this.touchMenu.classList.toggle('open'));
+    bar.append(this.touchMenu, mk('Rasten', () => this.send({ type: 'rest' })), mk('Rucksack', win('inv')), menu);
+    document.body.append(bar);
+  }
+
   /* -------------------------------------------------- Tooltip & Drag */
 
   private statsOf(i: Item): Record<string, number> {
@@ -549,7 +690,7 @@ export class Ui {
   }
 
   private showTip(it: Item, equipped: Item | undefined, ev: MouseEvent): void {
-    if (this.dragging) return;
+    if (this.dragging || (isTouch && !this.tipPanel)) return;
     const box = this.tip;
     box.replaceChildren();
     const head = el('div', '', it.name);
@@ -689,6 +830,15 @@ export class Ui {
 
   /** Macht ein Element ziehbar (Zeiger-Ereignisse) und bindet Tooltip und Doppelklick. */
   private makeDraggable(e: HTMLElement, d: Drag, equipped: Item | undefined, onDouble: () => void): void {
+    if (isTouch) {
+      const same = this.sel && this.sel.d.from === d.from && this.sel.d.item.id === d.item.id && this.sel.d.templateId === d.templateId;
+      if (same) e.classList.add('sel');
+      e.onclick = () => {
+        this.sel = same ? null : { d, equipped };
+        this.key = '';
+      };
+      return;
+    }
     e.onmouseenter = (ev) => this.showTip(d.item, equipped, ev);
     e.onmousemove = (ev) => this.moveTip(ev);
     e.onmouseleave = () => (this.tip.style.display = 'none');
@@ -771,7 +921,7 @@ export class Ui {
 
   private renderMain(p: Actor): void {
     const tabs = el('div', 'a-tabs');
-    for (const [id, label] of [['inv', `Inventar (${keyLabel(keyOf('inv'))})`], ['char', `Charakter (${keyLabel(keyOf('char'))})`], ['skills', `Fertigkeiten (${keyLabel(keyOf('skills'))})`], ['quests', `Aufgaben (${keyLabel(keyOf('quests'))})`], ['ach', `Erfolge (${keyLabel(keyOf('ach'))})`], ['set', `Einstellungen (${keyLabel(keyOf('settings'))})`]] as [Tab, string][]) {
+    for (const [id, label] of ([['inv', 'Inventar', 'inv'], ['char', 'Charakter', 'char'], ['skills', 'Fertigkeiten', 'skills'], ['quests', 'Aufgaben', 'quests'], ['ach', 'Erfolge', 'ach'], ['set', 'Einstellungen', 'settings']] as [Tab, string, Parameters<typeof keyOf>[0]][]).map(([id, name, act]): [Tab, string] => [id, isTouch ? name : `${name} (${keyLabel(keyOf(act))})`])) {
       const t = el('div', `a-tab${this.tab === id ? ' on' : ''}`, label);
       t.onclick = () => {
         this.tab = id;
@@ -789,8 +939,10 @@ export class Ui {
       this.renderQuests(body, p);
       this.renderHunts(body, p);
     }
-    const title = titleBar(`${p.name} · Stufe ${p.level}`, this.main, () => this.toggle(false));
-    this.main.replaceChildren(title, tabs, body);
+    const toNpc = isTouch && this.sideShown ? [Object.assign(el('span', 'a-x', 'Händler'), { onclick: () => { this.touchMain = false; this.sel = null; this.key = ''; this.layout(); } })] : [];
+    for (const b of toNpc) b.style.cssText = 'font-size:13px;padding:0 10px;display:flex;align-items:center;border-left:1px solid #4b3f3a';
+    const title = titleBar(`${p.name} · Stufe ${p.level}`, this.main, () => this.toggle(false), toNpc);
+    this.main.replaceChildren(...[title, tabs, body, this.selPanel(p)].filter((x): x is HTMLElement => !!x));
   }
 
   private dollImage(p: Actor): { url: string; width: number } {
@@ -1352,12 +1504,12 @@ export class Ui {
 
   private renderSide(p: Actor, near: Npc[]): void {
     if (!near.length) {
-      this.side.style.display = 'none';
+      this.sideShown = false;
       this.sideClosed = '';
       return;
     }
     if (near.map((n) => n.id).join(',') === this.sideClosed) {
-      this.side.style.display = 'none';
+      this.sideShown = false;
       return;
     }
     this.sideClosed = '';
@@ -1552,12 +1704,17 @@ export class Ui {
       }
       if (locked) body.append(el('div', 'a-note', `Weitere Aufgaben (${locked}) folgen, sobald die vorherige erledigt ist.`));
     }
+    const toBag = isTouch ? [Object.assign(el('span', 'a-x', 'Rucksack'), { onclick: () => { this.touchMain = true; this.sel = null; this.key = ''; this.layout(); } })] : [];
+    for (const b of toBag) b.style.cssText = 'font-size:13px;padding:0 10px;display:flex;align-items:center;border-left:1px solid #4b3f3a';
     const title = titleBar(near.map((n) => n.name).join(' · '), this.side, () => {
       this.sideClosed = near.map((n) => n.id).join(',');
-      this.side.style.display = 'none';
-    });
-    this.side.replaceChildren(title, body);
-    this.side.style.display = 'block';
+      this.sideShown = false;
+      this.sel = null;
+      if (isTouch) this.open = false;
+      this.layout();
+    }, toBag);
+    this.side.replaceChildren(...[title, body, this.selPanel(p)].filter((x): x is HTMLElement => !!x));
+    this.sideShown = true;
   }
 
   private skillCard(s: SkillDef, p: Actor): HTMLElement {

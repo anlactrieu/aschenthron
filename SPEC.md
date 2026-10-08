@@ -234,7 +234,7 @@ Ziel: Spieler, NPCs und Monster zeigen beim Laufen die Seite (rechts/links) bzw.
 - **Nicht im Umfang:** echte 4-Richtungs-Sprites, Diagonalen als eigene Ansicht (Iso-Bewegung entlang einer Achse zählt als Seite bzw. Rücken).
 - **Prüfen:** Visuell im Browser (links/rechts/hoch/runter, Spieler, ein NPC, drei Monsterfamilien), `tsc` + Tests; Golden-Tests der Sim bleiben unberührt (nur Client).
 
-## Handy-Version (geplant, Entscheidung 2026-10-07)
+## Handy-Version (umgesetzt 2026-10-08, Entscheidung 2026-10-07)
 Ziel: Spiel auf dem Smartphone im Browser spielbar, Querformat, Touch-Steuerung.
 - **Entscheidungen (User):** Querformat mit Touch-Steuerung (kein Hochformat); Verteilung im Browser, lokal im WLAN (Dev-Server per `--host`), kein PWA/Hosting vorerst.
 - **Ist-Stand:** `index.html` hat Viewport-Meta; `main.ts` nutzt `Phaser.Scale.RESIZE`; Klick-zum-Laufen/Angreifen läuft über `pointerdown` (`GameScene.onClick`), funktioniert damit per Tippen. Tasten (Q/E Tränke, R Rasten, C/K/J/O/N Fenster, Skill-Tasten) und die festen Desktop-Fenster (`ui.ts`, Drag-Handles) sind nicht touch-tauglich.

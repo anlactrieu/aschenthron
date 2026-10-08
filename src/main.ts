@@ -5,6 +5,7 @@ import { RemoteSession } from './net/client';
 import type { TiledMap } from './sim/tiled';
 import { preloadSprites } from './render/sprites';
 import { allSpritePaths } from './render/spriteMap';
+import { initTouch } from './render/touch';
 
 function showError(msg: string): void {
   const d = document.createElement('div');
@@ -20,6 +21,7 @@ function showError(msg: string): void {
 }
 
 async function boot(): Promise<void> {
+  initTouch();
   const q = new URLSearchParams(location.search);
   let session: RemoteSession | undefined;
   const server = q.get('server');

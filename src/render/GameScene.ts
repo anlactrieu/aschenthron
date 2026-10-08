@@ -18,6 +18,7 @@ import { AchievementTracker, type Stats } from './achievements';
 import { itemIcon, skillCursor } from './icons';
 import { Sfx } from './audio';
 import { Minimap } from './minimap';
+import { isTouch } from './touch';
 import { Atmosphere, isDungeon } from './atmosphere';
 import { Fx } from './fx';
 import { onSettings, settings } from './settings';
@@ -46,8 +47,8 @@ const saveKey = (): string => slotKey(sessionSlot);
 const VIEW = 30;
 /** Kamera-Zoom: Standard etwas weiter draußen als 1, per Mausrad zwischen ZOOM_MIN und ZOOM_MAX */
 const ZOOM_DEFAULT = 0.75;
-const ZOOM_MIN = 0.55;
-const ZOOM_MAX = 1.1;
+const ZOOM_MIN = isTouch ? 0.4 : 0.55;
+const ZOOM_MAX = isTouch ? 1.4 : 1.1;
 const ZOOM_KEY = 'aschenthron.zoom';
 const CHUNK = 16;
 /** Pfeiltasten → Kachelrichtung (isometrisch: oben = −x −y, rechts = +x −y) */
@@ -228,6 +229,11 @@ export class GameScene extends Phaser.Scene {
     this.setZoom(Number(safeStorage()?.getItem(ZOOM_KEY)) || ZOOM_DEFAULT);
     this.input.on('wheel', (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => this.setZoom(this.cameras.main.zoom * (dy > 0 ? 0.92 : 1.08)));
     this.input.mouse?.disableContextMenu();
+    if (isTouch) {
+      // Handy: zwei Finger zoomen die Kamera, die Zoom-Knöpfe im Menü auch
+      this.input.addPointer(1);
+      window.addEventListener('aschenthron:zoom', (e) => this.setZoom(this.cameras.main.zoom * ((e as CustomEvent<number>).detail || 1)));
+    }
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') this.setArmed(null);
       if (ARROW_DIRS[e.key] && !typingInField(e) && !e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -570,7 +576,24 @@ export class GameScene extends Phaser.Scene {
     this.send({ type: 'moveTo', x: Math.round(t.x), y: Math.round(t.y) });
   }
 
+  /** Handy: Abstand der zwei Finger (0 = nicht zwei Finger) und Zoom beim Start der Geste */
+  private pinch = { dist: 0, zoom: 1 };
+
+  private pinchZoom(): boolean {
+    const a = this.input.pointer1;
+    const b = this.input.pointer2;
+    if (!a?.isDown || !b?.isDown) {
+      this.pinch.dist = 0;
+      return false;
+    }
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    if (!this.pinch.dist) this.pinch = { dist: d || 1, zoom: this.cameras.main.zoom };
+    else this.setZoom(this.pinch.zoom * (d / this.pinch.dist));
+    return true;
+  }
+
   private onClick(ptr: Phaser.Input.Pointer): void {
+    if (isTouch && this.input.pointer2?.isDown && this.input.pointer1?.isDown) return;       // zweiter Finger = Zoom, kein Befehl
     const t = toTile(ptr.worldX, ptr.worldY);
     const w = this.world;
     const hit = this.pick(ptr.worldX, ptr.worldY);
@@ -598,15 +621,15 @@ export class GameScene extends Phaser.Scene {
   /** Titelbild für neue Spiele: Prämisse, Endziel und Namenswahl. */
   private showTitle(p: Actor): void {
     const box = document.createElement('div');
-    box.style.cssText = 'position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,rgba(20,10,8,.88),rgba(0,0,0,.96));color:#e8d9b0;font-family:Georgia,serif;text-align:center';
+    box.style.cssText = 'position:fixed;inset:0;z-index:100;display:flex;overflow-y:auto;background:radial-gradient(ellipse at center,rgba(20,10,8,.88),rgba(0,0,0,.96));color:#e8d9b0;font-family:Georgia,serif;text-align:center';
     const inner = document.createElement('div');
-    inner.style.cssText = 'max-width:520px;padding:24px';
-    inner.innerHTML = `<div style="font-size:44px;letter-spacing:6px;color:#ffb14a;text-shadow:0 0 18px #b8501a">ASCHENTHRON</div>
+    inner.style.cssText = `max-width:520px;padding:${isTouch ? 10 : 24}px 24px;margin:auto`;
+    inner.innerHTML = `<div style="font-size:${isTouch ? 30 : 44}px;letter-spacing:6px;color:#ffb14a;text-shadow:0 0 18px #b8501a">ASCHENTHRON</div>
 <p style="margin:18px 0 6px;line-height:1.55">Aschental war ein Garten, bis der Aschenkönig den Himmel verbrannte. Seitdem wandern Tote durch die Moore, Goblins und Räuber plündern die Straßen, und die Hafenstadt hält sich am letzten Licht.</p>
 <p style="margin:6px 0 18px;line-height:1.55;opacity:.9">Du bist eine der Letzten, die noch gegen ihn ziehen. Werde stärker, finde seltene Beute und bring den Aschenkönig auf seinem Thron zu Fall.</p>
 <div style="margin-bottom:14px">Dein Name: <input id="ttl-name" maxlength="16" value="Held" style="background:#120f16;border:1px solid #6b5a48;color:#e8d9b0;padding:6px 10px;font:16px Georgia,serif;text-align:center;width:180px"></div>
 <button id="ttl-go" style="background:#3a2f26;border:2px solid #d8a24a;color:#ffe8b0;padding:10px 26px;font:bold 16px Georgia,serif;cursor:pointer">Das Abenteuer beginnt</button>
-<p style="margin:16px 0 0;font-size:12px;opacity:.65">Klick = laufen und angreifen · Pfeiltasten laufen auch · Hilfe und Tasten: P</p>`;
+<p style="margin:16px 0 0;font-size:12px;opacity:.65">${isTouch ? 'Tippen = laufen und angreifen · Zwei Finger = zoomen · Menü unten rechts' : 'Klick = laufen und angreifen · Pfeiltasten laufen auch · Hilfe und Tasten: P'}</p>`;
     box.append(inner);
     document.body.append(box);
     const go = (): void => {
@@ -673,6 +696,7 @@ export class GameScene extends Phaser.Scene {
       this.remote.requestBoard();
       this.ui.board = this.remote.board;
     }
+    if (isTouch) this.pinchZoom();
     this.arrowMove(time);
     this.pendingCastStep(time);
     this.handleEvents();

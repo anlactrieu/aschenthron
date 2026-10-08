@@ -1,6 +1,7 @@
 import type { World } from '../sim/world';
 import type { QuestMark } from '../sim/quests';
 import { uniqueDef } from '../sim/data';
+import { isTouch } from './touch';
 
 const COLORS: Record<number, string> = {
   1: '#6a625c', 2: '#2c2824', 3: '#35483a', 4: '#3f6034', 5: '#4a4452', 6: '#1d3550', 7: '#8a7658',
@@ -48,7 +49,25 @@ export class Minimap {
     } catch {
       /* ohne Speicher: Standardgröße */
     }
+    if (isTouch) {
+      // Handy: klein starten, Antippen wechselt klein → groß → ausgeblendet; Menü-Knopf „Karte“ blendet wieder ein
+      this.sizeIdx = 2;
+      this.view.style.left = 'max(8px,env(safe-area-inset-left))';
+      this.view.style.top = 'max(8px,env(safe-area-inset-top))';
+      this.view.style.pointerEvents = 'auto';
+      this.view.onclick = () => {
+        if (this.sizeIdx === 2) this.sizeIdx = 0;
+        else this.setVisible(false);
+        this.applySize();
+      };
+      window.addEventListener('aschenthron:map', () => {
+        this.sizeIdx = 2;
+        this.setVisible(!this.visible);
+        this.applySize();
+      });
+    }
     this.applySize();
+    if (isTouch) window.addEventListener('resize', () => this.applySize());
     window.addEventListener('keydown', (e) => {
       if (e.key.toLowerCase() === 'b' && !e.ctrlKey && !e.metaKey && !e.altKey && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
         this.sizeIdx = (this.sizeIdx + 1) % SIZES.length;
@@ -59,17 +78,23 @@ export class Minimap {
           /* egal */
         }
       }
-      if (e.key.toLowerCase() === 'n') {
-        this.visible = !this.visible;
-        this.view.style.display = this.visible ? 'block' : 'none';
-      }
+      if (e.key.toLowerCase() === 'n') this.setVisible(!this.visible);
     });
   }
 
-  /** Anzeigegröße per CSS (Auflösung bleibt, Marker skalieren mit). */
+  private setVisible(v: boolean): void {
+    this.visible = v;
+    this.view.style.display = v ? 'block' : 'none';
+  }
+
+  /** Anzeigegröße per CSS (Auflösung bleibt, Marker skalieren mit); höchstens ein Teil des Fensters. */
   private applySize(): void {
-    this.view.style.width = `${Math.round(this.view.width * SIZES[this.sizeIdx]!)}px`;
-    this.view.style.height = `${Math.round(this.view.height * SIZES[this.sizeIdx]!)}px`;
+    const w0 = this.view.width * SIZES[this.sizeIdx]!;
+    const h0 = this.view.height * SIZES[this.sizeIdx]!;
+    // Begrenzung nur am Handy; am Laptop bleibt die Karte wie bisher
+    const f = isTouch ? Math.min(1, (window.innerWidth * 0.4) / w0, (window.innerHeight * 0.55) / h0) : 1;
+    this.view.style.width = `${Math.round(w0 * f)}px`;
+    this.view.style.height = `${Math.round(h0 * f)}px`;
   }
 
   draw(px: number, py: number, marks: QuestMark[] = []): void {
