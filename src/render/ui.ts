@@ -240,6 +240,18 @@ interface Drag {
   templateId?: string;
 }
 
+const SKILL_GROUPS = ['Feuer', 'Frost', 'Blitz', 'Gift', 'Heilung', 'Schutz & Zauberkunst', 'Nahkampf', 'Fernkampf', 'Überleben'];
+const LIGHTNING_IDS = ['lightning', 'spark', 'chain_lightning', 'storm_call'];
+/** Anzeigegruppe beim Lehrer: Element des Zaubers, sonst das Fachgebiet. */
+function skillGroup(s: SkillDef): string {
+  if (s.dmgType === 'fire') return 'Feuer';
+  if (s.dmgType === 'frost') return 'Frost';
+  if (s.dmgType === 'poison') return 'Gift';
+  if (LIGHTNING_IDS.includes(s.id)) return 'Blitz';
+  if (s.heal !== undefined) return 'Heilung';
+  return s.area === 'Magie' ? 'Schutz & Zauberkunst' : s.area;
+}
+
 export class Ui {
   open = false;
   ach: AchievementTracker | null = null;
@@ -1694,7 +1706,14 @@ export class Ui {
         };
         body.append(rs);
       }
-      for (const s of SKILLS.filter((x) => trainerTeaches(trainer, x)).sort((a, b) => a.levelReq - b.levelReq)) body.append(this.skillCard(s, p));
+      // nach Element gruppiert (Feuer, Frost, Blitz, Gift, Heilung), Rest nach Fachgebiet; innerhalb nach Stufe
+      const groups = new Map<string, SkillDef[]>();
+      for (const s of SKILLS.filter((x) => trainerTeaches(trainer, x))) groups.set(skillGroup(s), [...(groups.get(skillGroup(s)) ?? []), s]);
+      const order = [...groups.keys()].sort((a, b) => SKILL_GROUPS.indexOf(a) - SKILL_GROUPS.indexOf(b));
+      for (const g of order) {
+        if (order.length > 1) body.append(el('div', 'a-note', `— ${g} —`));
+        for (const s of groups.get(g)!.sort((a, b) => a.levelReq - b.levelReq)) body.append(this.skillCard(s, p));
+      }
     }
     if (smith) {
       body.append(el('div', 'a-sec', `${smith.name} – Schmiede`));
