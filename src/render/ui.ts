@@ -1487,22 +1487,32 @@ export class Ui {
       }
       body.append(c);
     }
-    // Set-Jagd: Sets, von denen du schon Teile besitzt
+    // Set-Jagd: alle Sets mit Teilen, Boni und Fundorten (Besitz wird abgehakt)
     const owned = new Set<string>();
     for (const it of [...p.inventory, ...p.stash, ...Object.values(p.equipment)]) if (it?.setId) owned.add(`${it.setId}:${it.name}`);
-    const sets = SETS.filter((s) => s.pieces.some((pc) => owned.has(`${s.id}:${pc.name}`)));
-    if (sets.length) {
-      body.append(el('div', 'a-sec', 'Set-Jagd'));
-      for (const st of sets) {
-        const have = st.pieces.filter((pc) => owned.has(`${st.id}:${pc.name}`));
-        const missing = st.pieces.filter((pc) => !owned.has(`${st.id}:${pc.name}`));
-        const c = el('div', 'a-card');
-        c.style.display = 'block';
-        c.append(el('div', '', `${st.name}: ${have.length}/${st.pieces.length} Teile`));
-        c.append(el('div', 'a-note', missing.length ? `Fehlt: ${missing.map((m) => m.name).join(', ')}` : 'Komplett – der volle Set-Bonus ist aktiv, wenn alles angelegt ist.'));
-        if (missing.length) c.append(el('div', 'a-note', `Fundorte: Mini-Bosse („Gesucht“, oft Set-Teil), seltene Beute von Gegnern der Stufe ${st.minLevel}–${st.minLevel + 9}, Truhen.`));
-        body.append(c);
+    body.append(el('div', 'a-sec', 'Set-Jagd'));
+    body.append(el('div', 'a-note', 'Set-Teile erkennst du an der grünen Seltenheit. Je mehr Teile eines Sets du gleichzeitig trägst, desto stärker der Bonus.'));
+    for (const st of SETS) {
+      const c = el('div', 'a-card');
+      c.style.display = 'block';
+      const have = st.pieces.filter((pc) => owned.has(`${st.id}:${pc.name}`)).length;
+      const title = el('div', '', `${st.name} (ab Stufe ${st.minLevel}): ${have}/${st.pieces.length} Teile`);
+      title.style.fontWeight = 'bold';
+      c.append(title);
+      for (const pc of st.pieces) {
+        const mine = owned.has(`${st.id}:${pc.name}`);
+        const row = el('div', 'a-note', `${mine ? '✔' : '✖'} ${pc.name}  (${pc.affixes.map((x) => affixText(x)).join(', ')})`);
+        row.style.opacity = mine ? '1' : '.7';
+        c.append(row);
       }
+      for (const [n, bo] of Object.entries(st.bonuses)) {
+        const txt = [...(bo.affixes ?? []).map((x) => affixText(x)), ...(bo.power ? [POWER_TEXT[bo.power.id](bo.power.value)] : [])].join(', ');
+        const row = el('div', 'a-note', `${n} Teile: ${txt}`);
+        row.style.color = have >= Number(n) ? '#9be37a' : '';
+        c.append(row);
+      }
+      c.append(el('div', 'a-note', `Fundorte: Mini-Bosse („Gesucht“, ca. jedes dritte Mal ein Set-Teil), Weltbosse, Aufgaben-Belohnungen zur Wahl (Unikat-Aufgaben) und selten bei Gegnern der Stufe ${st.minLevel - 1}–${st.minLevel + 9}.`));
+      body.append(c);
     }
   }
 
