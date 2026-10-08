@@ -25,7 +25,7 @@ export const ARCHETYPES: Archetype[] = [
 ];
 
 const SKILL_GROUPS: Record<'melee' | 'shield' | 'elemental' | 'healer' | 'ranged' | 'control', string[]> = {
-  melee: ['power_strike', 'whirlwind', 'skull_split', 'armor_break'],
+  melee: ['power_strike', 'whirlwind', 'skull_split', 'armor_break', 'stunning_blow', 'mighty_blow'],
   shield: ['parry', 'shield_mastery', 'stone_skin'],
   elemental: ['ember_bolt', 'fireball', 'frost_nova', 'lightning', 'mana_flow', 'elemental_ward'],
   healer: ['healing_hand', 'cleanse', 'first_aid', 'elemental_ward'],

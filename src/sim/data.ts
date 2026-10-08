@@ -369,9 +369,9 @@ export interface SkillDef {
 }
 
 /** Passive Wirkungen (Prozent bzw. Punkte je Rang, siehe `passiveSum` in `world.ts`) */
-export type PassiveKey = 'parry' | 'evade' | 'crit' | 'armorPen' | 'shieldArmor' | 'manaCost' | 'manaRegen' | 'stealth' | 'fieldRegen' | 'carry';
+export type PassiveKey = 'parry' | 'evade' | 'crit' | 'armorPen' | 'shieldArmor' | 'manaCost' | 'manaRegen' | 'stealth' | 'fieldRegen' | 'carry' | 'stunProc' | 'mightProc';
 /** Obergrenzen gestapelter Passiven (Balance) */
-export const PASSIVE_CAP: Partial<Record<PassiveKey, number>> = { parry: 15, armorPen: 40, manaCost: 25, stealth: 40, shieldArmor: 60 };
+export const PASSIVE_CAP: Partial<Record<PassiveKey, number>> = { parry: 15, armorPen: 40, manaCost: 25, stealth: 40, shieldArmor: 60, stunProc: 25, mightProc: 30 };
 
 /** Funktionsgruppe eines Skills: explizit gesetzt oder aus den Wirkfeldern abgeleitet. */
 export function schoolOf(s: SkillDef): SkillSchool {
@@ -440,6 +440,10 @@ export const SKILLS: SkillDef[] = [
     info: { role: 'Wehrt manche Nahkampftreffer vollständig ab.', build: 'Schild- und Einhandkämpfer.', synergy: 'Mit Schild (auch Schildbeherrschung) und Einhandwaffen; Dolche mit schnellem Tempo profitieren vom Austausch.', decision: 'Verteidigung als Glück statt Rüstung.', limit: 'Nicht mit Zweihand, Bogen oder Stab; wirkt nicht gegen Zauber, Pfeile oder Flächenschaden; höchstens 15 %.' } },
   { id: 'shield_mastery', name: 'Schildbeherrschung', area: 'Nahkampf', levelReq: 8, price: 450, mana: 0, cooldown: 0, range: 0, ignoresArmor: false, school: 'protect', target: 'self', passive: true, pass: { shieldArmor: 12 }, tier: 1, desc: 'Passiv: Schilde bringen 12 % mehr Rüstung je Rang.',
     info: { role: 'Verstärkt die Rüstung des angelegten Schilds.', build: 'Defensiver Schildkämpfer.', synergy: 'Mit Schwergewichtsschilden, Parieren und Steinhaut.', decision: 'Nur mit Schild nützlich: festlegen auf Einhand und Schild.', limit: 'Ohne Schild wirkungslos; Zweihandwaffen und Bögen schließen den Schild aus.' } },
+  { id: 'stunning_blow', name: 'Betäubender Hieb', area: 'Nahkampf', levelReq: 8, price: 420, mana: 0, cooldown: 0, range: 0, ignoresArmor: false, school: 'control', target: 'enemy', passive: true, pass: { stunProc: 4 }, tier: 1, desc: 'Passiv: Nahkampftreffer betäuben das Ziel mit 4 % Chance je Rang für 1 s.',
+    info: { role: 'Nahkampftreffer betäuben Gegner zufällig.', build: 'Nahkämpfer und Schildkämpfer.', synergy: 'Mit schnellen Waffen (mehr Treffer, mehr Chancen) und Kontrolldauer-Items.', decision: 'Zufällige Kontrolle statt Schaden oder Verteidigung.', limit: 'Nur Nahkampf; Bosse sind nur halb so lange betäubt; wiederholte Betäubung wirkt verkürzt; höchstens 25 %.' } },
+  { id: 'mighty_blow', name: 'Mächtiger Hieb', area: 'Nahkampf', levelReq: 11, price: 600, mana: 0, cooldown: 0, range: 0, ignoresArmor: false, school: 'direct', target: 'enemy', passive: true, pass: { mightProc: 5 }, tier: 1, desc: 'Passiv: Nahkampftreffer richten mit 5 % Chance je Rang 75 % mehr Schaden an.',
+    info: { role: 'Nahkampftreffer schlagen zufällig besonders hart zu.', build: 'Nahkämpfer mit langsamen, schweren Waffen.', synergy: 'Mit Zweihändern (hoher Grundschaden), Rüstungsbrecher und Schädelspalter.', decision: 'Mehr Spitzenschaden gegen gleichmäßigen Schutz.', limit: 'Nur Nahkampf; zählt nicht als kritischer Treffer; höchstens 30 % Chance.' } },
   { id: 'armor_break', name: 'Rüstungsbrecher', area: 'Nahkampf', levelReq: 9, price: 500, mana: 0, cooldown: 0, range: 0, ignoresArmor: false, school: 'direct', target: 'enemy', passive: true, pass: { armorPen: 6 }, tier: 2, desc: 'Passiv: Angriffe ignorieren 6 % der gegnerischen Rüstung je Rang.',
     info: { role: 'Durchdringt Rüstung bei normalen Angriffen und Skills.', build: 'Nahkämpfer und Fernkämpfer gegen gepanzerte Gegner (Golems, Ritter).', synergy: 'Mit schweren Waffen (Zweihänder) und Schädelspalter.', decision: 'Dauerhafter Vorteil gegen Rüstung statt mehr Schaden.', limit: 'Wirkt nicht auf Zauber, die Rüstung ohnehin ignorieren; höchstens 40 %.' } },
   { id: 'precision', name: 'Präzision', area: 'Fernkampf', levelReq: 7, price: 400, mana: 0, cooldown: 0, range: 0, ignoresArmor: false, school: 'direct', target: 'enemy', passive: true, pass: { crit: 2 }, tier: 1, desc: 'Passiv: +2 % kritische Trefferchance je Rang (zählt zur Obergrenze von 50 %).',

@@ -1,5 +1,11 @@
 # HANDOFF – Aschenthron
 
+## AKTUELL (2026-10-08): Schriftrollen-Icon-Fix + Proc-Passive (uncommittet; tsc, 287 Tests, Lint grün; Passive nicht im Browser gesehen)
+- **Stand:** (1) Schriftrolle sah beim Händler wie Trank aus: `fake`-Item in `ui.ts` (Händler-Waren) hatte kein `town`; `itemIcon` (`icons.ts`) cacht pro `templateId`, also auch im Rucksack falsch. Fix: `town` im Fake-Item + Fallback `it.town ?? t.town`. (2) Neue Passive `stunning_blow` (Lvl 8, 4 %/Rang, 1 s Betäubung, Cap 25) und `mighty_blow` (Lvl 11, 5 %/Rang, +75 % Schaden, Cap 30) in `data.ts` (`PassiveKey` stunProc/mightProc, `PASSIVE_CAP`), Procs in `dealDamage` (`world.ts`, `meleeProc`), Test `src/sim/procs.test.ts`, Gruppe `melee` in `build.ts`.
+- **Entscheidungen:** (1) Procs nur bei Spieler-Nahkampf (Waffe nicht Bogen/Stab, physisch, Ziel Monster), damit Fernkampf/Zauber unberührt. (2) Eigener Zufallsstrom `w.fx` statt `w.rng`, damit Golden-Tests stabil bleiben. (3) Betäubung über `applyStatus` + `ctrlSeconds`, damit Boss-Halbierung/DR/Willenskraft gelten.
+- **Offen:** Commit; Passive im Spiel beim Lehrer lernen/prüfen; evtl. Fernkampf-/Magie-Procs; Handy-Version.
+- **Learnings:** Fake-Items fürs UI müssen alle icon-relevanten Felder (`town`) tragen, sonst vergiftet der `itemIcon`-Cache. Titelbildschirm blockiert Browser-Tests: Start-Button erst klicken, dann Tasten per `window.dispatchEvent`. `spawnMonster(w, x, y, kindId)` – Argumentreihenfolge.
+
 ## AKTUELL (2026-10-08): Komfort-Paket umgesetzt (tsc, 285 Tests, Lint grün; Einstellungen/Tasten/Filter im Browser gesehen)
 - **Stand:** Siehe SPEC.md "Umsetzungsstand Komfort-Paket". Neu: `src/render/settings.ts`, Reiter "Einstellungen" (P) in `ui.ts`, `autoPickup`/`slotList`/`switchSlot` in `GameScene.ts`, `Sfx.setVolume` in `audio.ts`.
 - **Offen:** Handy-Version (SPEC.md "Handy-Version"), Second-Brain-Notiz zum Download-Gotcha (Dienst war nicht erreichbar), Gang von Monstern/NPCs im Profil im Spiel prüfen, Schnell aufheben und Speicherplatzwechsel im echten Spiel testen.

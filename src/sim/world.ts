@@ -1476,6 +1476,15 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
     return -1;
   }
   let raw = rawIn;
+  // Passive Treffer-Procs (nur Nahkampf des Spielers); eigener Zufallsstrom `fx`, damit der Kampfwurf-Strom unverändert bleibt
+  const meleeProc = a.kind === 'player' && t.kind === 'monster' && !noReflect && dt === 'physical' && a.equipment.weapon?.kind !== 'bow' && a.equipment.weapon?.kind !== 'staff';
+  if (meleeProc) {
+    const might = passiveSum(a, 'mightProc');
+    if (might > 0 && w.fx.next() * 100 < might) {
+      raw *= 1.75;
+      note(w, a, 'Mächtiger Hieb!');
+    }
+  }
   // Entkräftung des Angreifers
   if (a.status.weaken) raw *= 1 - Math.min(50, a.statusMag?.weaken ?? 0) / 100;
   let crit = false;
@@ -1540,6 +1549,13 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
     t.attackedBy = { id: a.id, at: w.tick };
   }
   // Brand-/Frosttreffer: eigener Zufallsstrom `fx` und nur mit passender Power, damit der Kampfwurf-Strom unverändert bleibt
+  if (meleeProc && t.hp > 0 && amount > 0) {
+    const st = passiveSum(a, 'stunProc');
+    if (st > 0 && w.fx.next() * 100 < st) {
+      applyStatus(w, t, 'stun', ctrlSeconds(a, 'stun', 1), 'physical');
+      note(w, a, `Betäubender Hieb: ${t.name} ist betäubt.`);
+    }
+  }
   if (a.kind === 'player' && t.kind === 'monster' && t.hp > 0 && !noReflect && amount > 0) {
     const bh = powerOf(a, 'burnHit') + affixSum(a, 'procBurn');
     if (bh > 0 && w.fx.next() * 100 < bh) applyStatus(w, t, 'burn', 3, 'fire', { perSec: Math.max(2, Math.round(2 + a.level * 0.5)), srcId: a.id });

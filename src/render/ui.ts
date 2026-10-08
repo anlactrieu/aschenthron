@@ -1404,7 +1404,7 @@ export class Ui {
         const t = templateById(id);
         const fake: Item = {
           id: -1, templateId: id, name: t.name, slot: t.slot, rarity: 'normal', weight: t.weight, damage: t.damage, armor: t.armor,
-          heal: t.heal, mana: t.mana, reqKraft: t.reqKraft, value: t.value, affixes: [],
+          heal: t.heal, mana: t.mana, ...(t.town ? { town: t.town } : {}), reqKraft: t.reqKraft, value: t.value, affixes: [],
         };
         const s = this.slotEl(fake);
         const price = el('div', 'n', `${buyPrice(id)}g`);

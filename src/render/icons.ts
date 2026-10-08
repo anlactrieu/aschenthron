@@ -93,11 +93,12 @@ export function itemIcon(it: Item): string {
     return spriteUrl;
   }
   const t = templateById(it.templateId);
+  const town = it.town ?? t.town;
   const tier = tierOf(t.minLevel);
   const col = TIER_COL[tier]!;
   let url: string;
-  if (it.town) {
-    const seal = it.town === 'Felsenwacht' ? 0x5a7ad8 : 0xc83a3a;
+  if (town) {
+    const seal = town === 'Felsenwacht' ? 0x5a7ad8 : 0xc83a3a;
     url = make((c) => {
       // Papier zwischen zwei Rollen, Schnur und Siegel in der Mitte
       r(c, 3, 5, 10, 6, 0xe8d8a8);
