@@ -52,3 +52,11 @@
 - `player/head/` (6): cap_black_1, fhelm_horn_2, full_black, helm_plume, iron_1, iron_2
 - `player/legs/` (6): leg_armor_1, leg_armor_3, leg_armor_5, metal_gray, pants_black, pants_brown
 - Musik: generativ per WebAudio (src/render/music.ts), keine Dateien, keine Lizenz. Taste U = Musik an/aus, M = alles stumm.
+
+
+## Ninja Adventure Asset Pack (Pixel-Boy und AAA)
+- **Quelle:** https://pixel-boy.itch.io/ninja-adventure-asset-pack (Update #8, 29.03.2026; Godot-Projekt: https://github.com/pixel-boy/NinjaAdventure). Heruntergeladen am **2026-10-09** (`Ninja Adventure - Asset Pack.zip`, 89 MB) mit ausdrücklicher Freigabe des Projektinhabers; ohne Bezahlung ("No thanks, just take me to the downloads").
+- **Lizenz:** **CC0 1.0**. Geprüft an zwei Stellen: Seitentext ("released under the Creative Commons Zero (CC0) license … even commercial ones, attribution not required but appreciated") und `LICENSE.txt` im Paket (liegt als `public/assets/ninja/LICENSE.txt` bei).
+- **Autoren:** Pixel-Boy und AAA (Dank an dieser Stelle und in den Credits, F1).
+- **Verwendung:** neuer Look (Branch `neuer-look`): Gelände-Tilesets, Häuser/Props, Figuren, Monster, Bosse, Tiere, Waffen in der Hand, UI-Theme "Theme Wood", Pixelschrift. Import: `python3 scripts/import_ninja.py "<entpacktes Paket>"` (kopiert Bilder und Schrift, keine Audio-Dateien).
+- **Umfang:** 444 Dateien, ca. 2,3 MB unter `public/assets/ninja/`.
