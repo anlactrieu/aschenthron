@@ -6,7 +6,7 @@ import type { TiledMap } from './sim/tiled';
 import { preloadSprites } from './render/sprites';
 import { allSpritePaths } from './render/spriteMap';
 import { initTouch } from './render/touch';
-import { NINJA_GROUND_FILES, preloadNinja } from './render/ninja';
+import { preloadAllNinja } from './render/ninjaProps';
 
 function showError(msg: string): void {
   const d = document.createElement('div');
@@ -38,7 +38,7 @@ async function boot(): Promise<void> {
   }
   // Fremd-Sprites (CC0) vorladen; Fehler/Zeitüberschreitung ist erlaubt, dann greift die prozedurale Grafik
   await preloadSprites(allSpritePaths());
-  await preloadNinja(NINJA_GROUND_FILES);
+  await preloadAllNinja();
   const scene = new GameScene();
   const game = new Phaser.Game({
     type: Phaser.AUTO,

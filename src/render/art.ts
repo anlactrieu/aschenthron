@@ -15,6 +15,7 @@ import { CHEST_SPRITES, MONSTER_SPRITES, PLAYER_BASE, PLAYER_DEFAULTS, PLAYER_HA
 type Ctx = CanvasRenderingContext2D;
 
 import { groundCell } from './ninja';
+import { NINJA_KEYS, ninjaProp } from './ninjaProps';
 
 export const TILE_W = 48;
 export const TILE_H = 48;
@@ -1286,10 +1287,16 @@ export function registerStaticArt(scene: Phaser.Scene): void {
     if (!scene.textures.exists(key)) scene.textures.addCanvas(key, c);
   };
   for (const style of ['brick', 'dungeon', 'cliff'] as const) for (let v = 0; v < WALL_VARIANTS; v++) add(`wall_${style}_${v}`, wallCanvas(style, v));
-  for (const style of ['oak', 'pine', 'dead', 'char'] as const) for (let v = 0; v < 3; v++) add(`tree_${style}_${v}`, treeCanvas(style, v));
-  for (const style of ['grey', 'dark'] as const) for (let v = 0; v < 3; v++) add(`rock_${style}_${v}`, rockCanvas(style, v));
-  for (let v = 0; v < 2; v++) add(`grave_${v}`, graveCanvas(v));
-  add('pillar', pillarCanvas());
+  // Ninja-Bild, wenn geladen, sonst die prozedurale Zeichnung als Ersatz
+  const addN = (key: string, fallback: () => HTMLCanvasElement) => {
+    const n = ninjaProp(key);
+    if (n) NINJA_KEYS.add(key);
+    add(key, n ?? fallback());
+  };
+  for (const style of ['oak', 'pine', 'dead', 'char'] as const) for (let v = 0; v < 3; v++) addN(`tree_${style}_${v}`, () => treeCanvas(style, v));
+  for (const style of ['grey', 'dark'] as const) for (let v = 0; v < 3; v++) addN(`rock_${style}_${v}`, () => rockCanvas(style, v));
+  for (let v = 0; v < 3; v++) addN(`grave_${v}`, () => graveCanvas(v % 2));
+  addN('pillar', pillarCanvas);
   for (const r of ['normal', 'magic', 'rare', 'set', 'legendary'] as const) add(`loot_${r}`, lootCanvas(r));
   for (const k of ['trainer', 'merchant', 'stash', 'quest', 'smith']) add(`npc_${k}`, npcCanvas(k));
   for (const [name, f] of Object.entries(NPC_NAME_SPRITES)) if (sprite(f)) add(`npc_n_${name}`, npcCanvas('quest', name));

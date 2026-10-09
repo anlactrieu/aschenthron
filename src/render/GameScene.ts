@@ -10,6 +10,7 @@ import {
 } from '../sim/world';
 import { isWalkable } from '../sim/path';
 import { toScreen, toTile } from './iso';
+import { NINJA_KEYS } from './ninjaProps';
 import { DOOR_ICONS, TOWN_GID, WATER_PROP_GIDS, registerTownArt } from './town';
 import { Ui, describeItem, isUpgrade } from './ui';
 import { generateItem, type Item } from '../sim/items';
@@ -1469,7 +1470,7 @@ export class GameScene extends Phaser.Scene {
       key = `rock_${this.scanFor(x, y, 2, 9) ? 'dark' : 'grey'}_${v % 3}`;
       oy = 0.85;
     } else if (gid === 13) {
-      key = `grave_${v % 2}`;
+      key = `grave_${v % 3}`;
       oy = 0.88;
     } else if (gid >= TOWN_GID.wall && gid <= TOWN_GID.doorLast) {
       ({ key, oy, dy } = this.townProp(x, y, gid, v));
@@ -1477,6 +1478,8 @@ export class GameScene extends Phaser.Scene {
       key = 'pillar';
       oy = 0.92;
     }
+    // Ninja-Bilder sind unten zugeschnitten: Fuß unten Mitte, knapp über der Kachel-Unterkante
+    if (NINJA_KEYS.has(key)) return this.add.image(sx, sy + TILE_H / 2 - 5, key).setOrigin(0.5, 1).setDepth(sy + TILE_H / 2);
     return this.add.image(sx, sy + dy, key).setOrigin(0.5, oy).setDepth(sy + TILE_H / 2);
   }
 

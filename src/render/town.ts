@@ -1,4 +1,5 @@
 import type Phaser from 'phaser';
+import { NINJA_KEYS, ninjaProp } from './ninjaProps';
 import { TILE_H, TILE_W, WALL_H, ctxOf, css, diamondPath, grounded, mkCanvas, outline, rect, rng, shade, upscale } from './art';
 
 /**
@@ -163,7 +164,7 @@ export function doorCanvas(icon: DoorIcon, axis: 'x' | 'y'): HTMLCanvasElement {
 function prop(w: number, h: number, draw: (x: Ctx) => void, shadow = 0.8, base = 0.9): HTMLCanvasElement {
   const c = mkCanvas(w, h);
   draw(ctxOf(c));
-  return grounded(upscale(outline(c), 4), shadow, base);
+  return grounded(upscale(outline(c), 3), shadow, base);
 }
 
 function barrel(): HTMLCanvasElement {
@@ -260,7 +261,7 @@ function ship(): HTMLCanvasElement {
   rect(x, 3, 8, 11, 9, 0xd8d0b8); rect(x, 3, 12, 11, 1, 0xb8403a);
   rect(x, 23, 9, 11, 8, 0xd8d0b8); rect(x, 23, 13, 11, 1, 0xb8403a);
   rect(x, 19, 1, 6, 3, 0xb8403a); rect(x, 19, 0, 1, 4, 0x5a3c26);
-  return grounded(upscale(outline(L), 4), 0.95, 0.8);
+  return grounded(upscale(outline(L), 3), 0.95, 0.8);
 }
 
 /** Registriert alle Stadt-Texturen in Phaser. */
@@ -272,12 +273,17 @@ export function registerTownArt(scene: Phaser.Scene): void {
   DOOR_ICONS.forEach((icon) => {
     for (const axis of ['x', 'y'] as const) add(`twn_door_${icon}_${axis}`, doorCanvas(icon, axis));
   });
-  add('twn_barrel', barrel());
-  add('twn_crates', crates());
-  add('twn_well', well());
-  add('twn_lantern', lantern());
-  add('twn_stall', stall());
-  add('twn_post', post());
+  const addN = (key: string, fallback: () => HTMLCanvasElement) => {
+    const n = ninjaProp(key);
+    if (n) NINJA_KEYS.add(key);
+    add(key, n ?? fallback());
+  };
+  addN('twn_barrel', barrel);
+  addN('twn_crates', crates);
+  addN('twn_well', well);
+  addN('twn_lantern', lantern);
+  addN('twn_stall', stall);
+  addN('twn_post', post);
   add('twn_flowers', flowers());
   add('twn_boat', boat());
   add('twn_ship', ship());
