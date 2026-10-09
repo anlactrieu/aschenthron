@@ -1335,7 +1335,9 @@ export function registerStaticArt(scene: Phaser.Scene): void {
     add(key, n ?? fallback());
   };
   for (const style of ['oak', 'pine', 'dead', 'char'] as const) for (let v = 0; v < 3; v++) addN(`tree_${style}_${v}`, () => treeCanvas(style, v));
+  for (const style of ['oakr', 'pink', 'big'] as const) for (let v = 0; v < 3; v++) addN(`tree_${style}_${v}`, () => treeCanvas('oak', v));
   for (const style of ['grey', 'dark'] as const) for (let v = 0; v < 3; v++) addN(`rock_${style}_${v}`, () => rockCanvas(style, v));
+  for (let v = 0; v < 3; v++) addN(`rock_tan_${v}`, () => rockCanvas('grey', v));
   for (let v = 0; v < 3; v++) addN(`grave_${v}`, () => graveCanvas(v % 2));
   addN('pillar', pillarCanvas);
   for (const r of ['normal', 'magic', 'rare', 'set', 'legendary'] as const) add(`loot_${r}`, lootCanvas(r));

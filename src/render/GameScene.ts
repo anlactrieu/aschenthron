@@ -12,7 +12,7 @@ import { isWalkable } from '../sim/path';
 import { toScreen, toTile } from './iso';
 import { NINJA_KEYS } from './ninjaProps';
 import { detectHouses, houseDoor, houseDecor, houseFacade, houseFence, houseRoof, houseSign, houseWallTile, lowerKind, type House, type RoofNotch } from './houses';
-import { biomeOf, buildZoneMap, drawDetail, patchNoise } from './groundLook';
+import { biomeOf, buildZoneMap, drawDetail, drawLavaTile, drawWaterTile, patchNoise, Z } from './groundLook';
 import { DOOR_ICONS, TOWN_GID, WATER_PROP_GIDS, registerTownArt } from './town';
 import { Ui, describeItem, isUpgrade } from './ui';
 import { generateItem, type Item } from '../sim/items';
@@ -1373,6 +1373,25 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private zones(): Uint8Array {
+    if (!this.zoneMap) this.zoneMap = buildZoneMap(this.world.regions, this.world.grid.w, this.world.grid.h);
+    return this.zoneMap;
+  }
+
+  /** Abstand (Kacheln, 1..3) zur nächsten Landkachel; 3 = mindestens 3 */
+  private landDistance(x: number, y: number): number {
+    for (let r = 1; r < 3; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const g = this.gidAt(x + dx, y + dy);
+          if (g !== 6 && g !== 12 && g !== 0 && !WATER_PROP_GIDS.has(g)) return r;
+        }
+      }
+    }
+    return 3;
+  }
+
   private nearDoor(x: number, y: number): boolean {
     for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]] as const) if (this.gidAt(x + dx, y + dy) >= TOWN_GID.doorFirst) return true;
     return false;
@@ -1380,8 +1399,7 @@ export class GameScene extends Phaser.Scene {
 
   private makeChunk(cx: number, cy: number): void {
     const { w, h } = this.world.grid;
-    if (!this.zoneMap) this.zoneMap = buildZoneMap(this.world.regions, w, h);
-    const zones = this.zoneMap;
+    const zones = this.zones();
     const x0 = cx * CHUNK;
     const y0 = cy * CHUNK;
     const x1 = x0 + CHUNK - 1;
@@ -1412,11 +1430,21 @@ export class GameScene extends Phaser.Scene {
     for (let y = y0; y <= Math.min(y1, h - 1); y++) {
       for (let x = x0; x <= Math.min(x1, w - 1); x++) {
         const gid = this.tiles[y * w + x] ?? 0;
-        if (!gid || PROP_GIDS.has(gid) || this.houseAt.has(y * w + x) || !biomeOf(gid, 0)) continue;
+        if (!gid) continue;
         const zone = zones[y * w + x] ?? 0;
         const { sx, sy } = toScreen(x, y);
         const ox = sx - TILE_W / 2 - minSx;
         const oy = sy - TILE_H / 2 - minSy;
+        if (gid === 6 || WATER_PROP_GIDS.has(gid)) {
+          drawWaterTile(ctx, x, y, zone, this.landDistance(x, y), ox, oy, TILE_W);
+          continue;
+        }
+        if (gid === 12) {
+          const nl = (dx: number, dy: number): boolean => this.gidAt(x + dx, y + dy) !== 12;
+          drawLavaTile(ctx, x, y, [nl(1, 0), nl(-1, 0), nl(0, 1), nl(0, -1)], ox, oy, TILE_W);
+          continue;
+        }
+        if (PROP_GIDS.has(gid) || this.houseAt.has(y * w + x) || !biomeOf(gid, 0)) continue;
         const pn = patchNoise(x, y);
         if (Math.abs(pn) > 0.25) {
           ctx.fillStyle = pn > 0 ? `rgba(255,250,200,${(pn - 0.25) * 0.09})` : `rgba(0,20,30,${(-pn - 0.25) * 0.11})`;
@@ -1446,7 +1474,7 @@ export class GameScene extends Phaser.Scene {
       if (WATER_PROP_GIDS.has(ng)) ng = 6;
       else if (this.houseAt.has((y + dy) * this.world.grid.w + x + dx)) ng = 15;
       else if (PROP_GIDS.has(ng)) ng = this.groundUnder(x + dx, y + dy);
-      const nz = this.zoneMap?.[(y + dy) * this.world.grid.w + x + dx] ?? 0;
+      const nz = this.zones()[(y + dy) * this.world.grid.w + x + dx] ?? 0;
       if ((ng === ground && nz === zone) || ng === 0) continue;
       const nb = tileCanvas(ng, hash(x + dx, y + dy) % TILE_VARIANTS, nz);
       for (let i = 0; i < 16; i++) {
@@ -1588,12 +1616,11 @@ export class GameScene extends Phaser.Scene {
       oy = 1;
       dy = TILE_H / 2;
     } else if (gid === 10) {
-      const style = this.scanFor(x, y, 2, 3) ? 'dead' : this.scanFor(x, y, 2, 9) ? 'char' : this.scanFor(x, y, 2, 8) ? 'pine' : 'oak';
-      key = `tree_${style}_${v % 3}`;
+      key = `tree_${this.treeStyle(x, y, v)}_${v % 3}`;
       oy = 0.93;
       dy = 10;
     } else if (gid === 11) {
-      key = `rock_${this.scanFor(x, y, 2, 9) ? 'dark' : 'grey'}_${v % 3}`;
+      key = `rock_${this.rockStyle(x, y)}_${v % 3}`;
       oy = 0.85;
     } else if (gid === 13) {
       key = `grave_${v % 3}`;
@@ -1607,6 +1634,28 @@ export class GameScene extends Phaser.Scene {
     // Ninja-Bilder sind unten zugeschnitten: Fuß unten Mitte, knapp über der Kachel-Unterkante
     if (NINJA_KEYS.has(key)) return this.add.image(sx, sy + TILE_H / 2 - (gid === 2 ? 0 : 5), key).setOrigin(0.5, 1).setDepth(sy + TILE_H / 2);
     return this.add.image(sx, sy + dy, key).setOrigin(0.5, oy).setDepth(sy + TILE_H / 2);
+  }
+
+  /** Baumart je Zone (Wald: Eichen/Kiefern gemischt, Moor/Friedhof tot, Hochland Kiefern, Asche verkohlt), sonst nach den Nachbarkacheln. */
+  private treeStyle(x: number, y: number, v: number): string {
+    const zone = this.zones()[y * this.world.grid.w + x] ?? 0;
+    const r = (v >>> 5) % 100;
+    switch (zone) {
+      case Z.forest: return r < 38 ? 'pine' : r < 74 ? 'oak' : r < 88 ? 'oakr' : 'big';
+      case Z.farm: return r < 12 ? 'pink' : r < 32 ? 'big' : 'oak';
+      case Z.camp: return r < 30 ? 'dead' : r < 60 ? 'oakr' : 'oak';
+      case Z.grave: case Z.swamp: return r < 85 ? 'dead' : 'oakr';
+      case Z.hills: return r < 70 ? 'pine' : 'oakr';
+      case Z.ash: case Z.grund: return 'char';
+      default: return this.scanFor(x, y, 2, 3) ? 'dead' : this.scanFor(x, y, 2, 9) ? 'char' : this.scanFor(x, y, 2, 8) ? 'pine' : 'oak';
+    }
+  }
+
+  private rockStyle(x: number, y: number): string {
+    const zone = this.zones()[y * this.world.grid.w + x] ?? 0;
+    if (zone === Z.hills || zone === Z.camp) return (hash(x, y) >>> 7) % 100 < 30 ? 'tan' : 'grey';
+    if (zone === Z.ash || zone === Z.grund) return 'dark';
+    return this.scanFor(x, y, 2, 9) ? 'dark' : 'grey';
   }
 
   /** Stadtprops: Hauswand, Tür mit Berufsschild (Achse nach den Nachbarwänden), Dekoration. */

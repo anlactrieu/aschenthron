@@ -236,6 +236,10 @@ const PROC: Record<string, () => HTMLCanvasElement> = {
   embers_0: () => embers(1),
   embers_1: () => embers(2),
   web_0: () => web(1),
+  ripple_0: () => pix(['WWW..WW', '..WWW..'], { W: 'rgba(255,255,255,0.55)' }, null),
+  ripple_1: () => pix(['.WWWW.', 'WW..WW'], { W: 'rgba(255,255,255,0.5)' }, null),
+  lily: () => pix(['.GGGG.', 'GGGLGG', 'GGGG.G', '.GGGG.'], { G: '#4f9a42', L: '#7cc45e' }, '#2c4a34'),
+  lily_flower: () => pix(['.GGGG.', 'GGPPGG', 'GGPPG.', '.GGGG.'], { G: '#4f9a42', P: '#f4a6c4' }, '#2c4a34'),
   hay: () => pix(['.Y.Y..Y.', 'YYYYYYYY', '.YYYYYY.'], { Y: '#d8b858' }),
 };
 
@@ -341,6 +345,65 @@ export function drawDetail(ctx: CanvasRenderingContext2D, x: number, y: number, 
   const px = Math.floor((mix32(x, y, 4) * (tile - spr.width)) / PIXEL) * PIXEL;
   const py = Math.floor((mix32(x, y, 5) * (tile - spr.height)) / PIXEL) * PIXEL;
   ctx.drawImage(spr, ox + px, oy + py);
+}
+
+/**
+ * Wasserkachel: Tiefe (Abstand zum Land: 1 = Ufer, 2 = flach, 3+ = tief) färbt dunkler; Sumpfwasser wird trüb violett.
+ * Dazu statische Wellenstriche und Seerosen (das Glitzern bleibt Sache von `GameScene.shimmer`).
+ */
+export function drawWaterTile(ctx: CanvasRenderingContext2D, x: number, y: number, zone: number, dist: number, ox: number, oy: number, tile: number): void {
+  const swamp = zone === Z.swamp || zone === Z.gruft;
+  if (swamp) {
+    ctx.fillStyle = 'rgba(96,70,140,0.42)';
+    ctx.fillRect(ox, oy, tile, tile);
+  }
+  const n = 0.85 + mix32(x, y, 20) * 0.3;
+  if (dist >= 3) {
+    ctx.fillStyle = swamp ? `rgba(30,24,70,${0.2 * n})` : `rgba(24,84,168,${0.22 * n})`;
+    ctx.fillRect(ox, oy, tile, tile);
+  } else if (dist === 2) {
+    ctx.fillStyle = swamp ? `rgba(30,24,70,${0.08 * n})` : `rgba(30,100,180,${0.09 * n})`;
+    ctx.fillRect(ox, oy, tile, tile);
+  }
+  const r = mix32(x, y, 21);
+  let id: string | null = null;
+  if (dist <= 2 && r < (swamp ? 0.26 : 0.07)) id = mix32(x, y, 22) < 0.3 ? 'lily_flower' : 'lily';
+  else if (dist >= 2 && r > 0.82) id = mix32(x, y, 23) < 0.5 ? 'ripple_0' : 'ripple_1';
+  if (!id) return;
+  const spr = detailSprite(id);
+  if (!spr) return;
+  const px = Math.floor((mix32(x, y, 24) * (tile - spr.width)) / PIXEL) * PIXEL;
+  const py = Math.floor((mix32(x, y, 25) * (tile - spr.height)) / PIXEL) * PIXEL;
+  ctx.drawImage(spr, ox + px, oy + py);
+}
+
+/** Lavakachel: dunkle Krusten, gelbe Glutadern und ein verkrusteter Rand zu jedem Nachbarn ohne Lava (Seiten: [Ost, West, Süd, Nord]). */
+export function drawLavaTile(ctx: CanvasRenderingContext2D, x: number, y: number, rim: readonly [boolean, boolean, boolean, boolean], ox: number, oy: number, tile: number): void {
+  const px = PIXEL;
+  const n = tile / px;
+  ctx.fillStyle = 'rgba(176,36,10,0.42)';
+  ctx.fillRect(ox, oy, tile, tile);
+  for (let i = 0; i < 9; i++) {
+    const cx = Math.floor(mix32(x, y, 30 + i) * (n - 4)) + 1;
+    const cy = Math.floor(mix32(x, y, 40 + i) * (n - 4)) + 1;
+    if (i < 3) {
+      ctx.fillStyle = 'rgba(70,16,10,0.62)';
+      ctx.fillRect(ox + cx * px, oy + cy * px, px * 4, px * 2);
+      ctx.fillRect(ox + (cx + 1) * px, oy + (cy + 2) * px, px * 2, px);
+    } else {
+      ctx.fillStyle = i % 2 ? 'rgba(255,226,110,0.9)' : 'rgba(255,170,50,0.85)';
+      ctx.fillRect(ox + cx * px, oy + cy * px, px * (2 + (i % 3)), px);
+      if (i % 3 === 0) ctx.fillRect(ox + (cx + 1) * px, oy + (cy + 1) * px, px, px);
+    }
+  }
+  ctx.fillStyle = '#6a2412';
+  for (let i = 0; i < n; i++) {
+    const d = 1 + Math.floor(mix32(x * 16 + i, y, 50) * 2);
+    if (rim[0]) ctx.fillRect(ox + (n - d) * px, oy + i * px, d * px, px);
+    if (rim[1]) ctx.fillRect(ox, oy + i * px, d * px, px);
+    if (rim[2]) ctx.fillRect(ox + i * px, oy + (n - d) * px, px, d * px);
+    if (rim[3]) ctx.fillRect(ox + i * px, oy, px, d * px);
+  }
 }
 
 /** Sanfte Helligkeitsflecken (Wert-Rauschen, Wellenlänge ca. 5 Kacheln): −1..1 */
