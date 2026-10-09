@@ -53,8 +53,8 @@ const ZOOM_MIN = isTouch ? 0.4 : 0.55;
 const ZOOM_MAX = isTouch ? 1.4 : 1.1;
 const ZOOM_KEY = 'aschenthron.zoom';
 const CHUNK = 16;
-/** Pfeiltasten → Kachelrichtung (isometrisch: oben = −x −y, rechts = +x −y) */
-const ARROW_DIRS: Record<string, [number, number]> = { ArrowUp: [-1, -1], ArrowDown: [1, 1], ArrowLeft: [-1, 1], ArrowRight: [1, -1] };
+/** Pfeiltasten → Kachelrichtung (Draufsicht: oben = −y, rechts = +x) */
+const ARROW_DIRS: Record<string, [number, number]> = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
 
 /** Tippt der Spieler gerade in ein Eingabefeld (z. B. Spielstand-Code)? Dann bleiben die Pfeiltasten beim Feld. */
 function typingInField(e: KeyboardEvent): boolean {
@@ -857,8 +857,8 @@ export class GameScene extends Phaser.Scene {
           if (at && tg && at.id !== tg.id && !ambient) {
             const a = this.dispPos(at);
             const t = this.dispPos(tg);
-            const sxv = (t.x - a.x - (t.y - a.y)) * 32;
-            const syv = (t.x - a.x + (t.y - a.y)) * 16;
+            const sxv = (t.x - a.x) * TILE_W;
+            const syv = (t.y - a.y) * TILE_H;
             const len = Math.hypot(sxv, syv) || 1;
             const v = this.actorViews.get(at.id);
             if (v) {
@@ -1251,7 +1251,7 @@ export class GameScene extends Phaser.Scene {
       const ang = Math.atan2(to.sy - me.sy, to.sx - me.sx);
       const r = 78 + Math.sin(time / 260) * 3;
       const cx = me.sx + Math.cos(ang) * r;
-      const cy = me.sy - 14 + Math.sin(ang) * r * 0.6;
+      const cy = me.sy - 14 + Math.sin(ang) * r;
       const col = best.done ? 0x6fe08a : 0xffe45a;
       g.fillStyle(col, 0.9);
       g.lineStyle(1.5, 0x000000, 0.9);
@@ -1618,8 +1618,8 @@ export class GameScene extends Phaser.Scene {
       const ndy = np.y - dir.y;
       if (Math.abs(ndx) + Math.abs(ndy) > 0.001) {
         dir.movingUntil = time + 160;
-        if (Math.abs(ndx - ndy) > 0.0005) dir.flip = ndx - ndy < 0;
-        dir.side = Math.abs(ndx - ndy) > Math.abs(ndx + ndy) * 1.5;
+        if (Math.abs(ndx) > 0.0005) dir.flip = ndx < 0;
+        dir.side = Math.abs(ndx) > Math.abs(ndy) * 0.8;
       }
       dir.x = np.x;
       dir.y = np.y;
@@ -1796,11 +1796,11 @@ export class GameScene extends Phaser.Scene {
       const dy = pos.y - view.lastY;
       if (Math.abs(dx) + Math.abs(dy) > 0.001) {
         view.movingUntil = time + 160;
-        // Bildschirm-Richtung: iso x-y
-        const screenDx = dx - dy;
+        // Bildschirm-Richtung: Draufsicht, Kachelschritt = Bildschirmschritt
+        const screenDx = dx;
         if (Math.abs(screenDx) > 0.0005) view.flip = screenDx < 0;
-        const screenDy = dx + dy;
-        view.side = Math.abs(screenDx) > Math.abs(screenDy) * 1.5;
+        const screenDy = dy;
+        view.side = Math.abs(screenDx) > Math.abs(screenDy) * 0.8;
         if (Math.abs(screenDy) > 0.0005) view.up = screenDy < 0;
       }
       view.lastX = pos.x;
