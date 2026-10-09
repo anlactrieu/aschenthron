@@ -96,7 +96,7 @@ export function houseWallCanvas(variant: number): HTMLCanvasElement {
 }
 
 /** Schild-Symbol (14x14) für Türschilder. */
-function drawIcon(x: Ctx, icon: DoorIcon, ox: number, oy: number): void {
+export function drawDoorIcon(x: Ctx, icon: DoorIcon, ox: number, oy: number): void {
   const R = (a: number, b: number, w: number, h: number, col: number) => rect(x, ox + a, oy + b, w, h, col);
   switch (icon) {
     case 'anchor':
@@ -156,7 +156,7 @@ export function doorCanvas(icon: DoorIcon, axis: 'x' | 'y'): HTMLCanvasElement {
   rect(x, mx - 11, my + 8, 23, 20, shade(TIMBER, 0.7));
   rect(x, mx - 10, my + 9, 21, 18, 0xa07a4a);
   rect(x, mx - 10, my + 9, 21, 1, 0xc09a62);
-  drawIcon(x, icon, mx - 7, my + 11);
+  drawDoorIcon(x, icon, mx - 7, my + 11);
   return c;
 }
 

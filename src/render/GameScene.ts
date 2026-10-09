@@ -11,6 +11,7 @@ import {
 import { isWalkable } from '../sim/path';
 import { toScreen, toTile } from './iso';
 import { NINJA_KEYS } from './ninjaProps';
+import { detectHouses, houseDoor, houseFacade, houseRoof, houseWallTile, type House } from './houses';
 import { DOOR_ICONS, TOWN_GID, WATER_PROP_GIDS, registerTownArt } from './town';
 import { Ui, describeItem, isUpgrade } from './ui';
 import { generateItem, type Item } from '../sim/items';
@@ -95,6 +96,12 @@ interface ActorView {
 export class GameScene extends Phaser.Scene {
   private world!: World;
   private tiles: number[] = [];
+  /** Erkannte Häuser der Stadt (Wandringe, gid 18) samt Dach-Bildern und Zuordnung Kachel -> Haus */
+  private houses: House[] = [];
+  private houseAt = new Map<number, House>();
+  private roofs: { img: Phaser.GameObjects.Image; house: House }[] = [];
+  /** Türbilder an Nord-/Ost-/Westseite liegen über dem Dach und blenden mit ihm aus */
+  private fadeDoors = new Map<Phaser.GameObjects.Image, House>();
   private playerId = 0;
   private gfx!: Phaser.GameObjects.Graphics;
   private labels = new Map<string, Phaser.GameObjects.Text>();
@@ -179,6 +186,7 @@ export class GameScene extends Phaser.Scene {
     }
     registerStaticArt(this);
     registerTownArt(this);
+    this.initHouses();
     const store = this.remote ? null : safeStorage();
     const params = new URLSearchParams(location.search);
     if (!this.remote && params.has('neu')) {
@@ -1199,6 +1207,7 @@ export class GameScene extends Phaser.Scene {
     const py = Math.round(p.y);
     this.updateChunks(px, py);
     this.updateProps(px, py);
+    this.updateRoofs(px, py);
     this.updateNpcs(time);
     this.updateChests(time, px, py);
     this.updateLoot(time, g);
@@ -1381,7 +1390,7 @@ export class GameScene extends Phaser.Scene {
       for (let x = x0; x <= Math.min(x1, w - 1); x++) {
         const gid = this.tiles[y * w + x] ?? 0;
         if (!gid) continue;
-        const ground = WATER_PROP_GIDS.has(gid) ? 6 : PROP_GIDS.has(gid) ? this.groundUnder(x, y) : gid;
+        const ground = WATER_PROP_GIDS.has(gid) ? 6 : this.houseAt.has(y * w + x) ? 15 : PROP_GIDS.has(gid) ? this.groundUnder(x, y) : gid;
         const { sx, sy } = toScreen(x, y);
         const ox = sx - TILE_W / 2 - minSx;
         const oy = sy - TILE_H / 2 - minSy;
@@ -1451,7 +1460,73 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** Erkennt die Häuser und legt Dach-Bilder an; ohne Ninja-Bilder bleibt die alte Hausgrafik. */
+  private initHouses(): void {
+    this.houses = [];
+    this.houseAt.clear();
+    this.roofs = [];
+    if (!houseRoof(8, 6, 0)) return;
+    const { w, h } = this.world.grid;
+    this.houses = detectHouses(this.tiles, w, h);
+    for (const hs of this.houses) {
+      for (let dy = 0; dy < hs.h; dy++) {
+        for (let dx = 0; dx < hs.w; dx++) {
+          if (dx === 0 || dy === 0 || dx === hs.w - 1 || dy === hs.h - 1) this.houseAt.set((hs.y0 + dy) * w + hs.x0 + dx, hs);
+        }
+      }
+      const key = ensureTexture(this, `nh_roof_${hs.w}x${hs.h}_${hs.variant}`, () => houseRoof(hs.w, hs.h - 1, hs.variant)!);
+      const { sx, sy } = toScreen(hs.x0, hs.y0 - 1);
+      const roof = this.add.image(sx - TILE_W / 2, sy - TILE_H / 2, key).setOrigin(0, 0).setDepth(this.roofDepth(hs));
+      this.roofs.push({ img: roof, house: hs });
+      const fkey = ensureTexture(this, `nh_fac_${hs.w}_${hs.variant}`, () => houseFacade(hs.w, hs.variant)!);
+      const f = toScreen(hs.x0, hs.y0 + hs.h - 2);
+      const fac = this.add.image(f.sx - TILE_W / 2, f.sy - TILE_H / 2, fkey).setOrigin(0, 0).setDepth(this.roofDepth(hs) + 1);
+      this.roofs.push({ img: fac, house: hs });
+    }
+  }
+
+  /** Tiefe des Daches: über allen Figuren im Haus (Grundlinie der oberen Vorderwand), Figuren in der Türreihe stehen davor */
+  private roofDepth(hs: House): number {
+    return (hs.y0 + hs.h - 1) * TILE_H - 25;
+  }
+
+  /** Dach blendet auf 25 % aus, solange der Spieler im Haus (oder unter dem Dachüberstand im Norden) steht. */
+  private updateRoofs(px: number, py: number): void {
+    for (const { img, house: hs } of this.roofs) {
+      const inside = px >= hs.x0 && px <= hs.x0 + hs.w - 1 && py >= hs.y0 - 1 && py <= hs.y0 + hs.h - 1;
+      const target = inside ? 0.25 : 1;
+      if (Math.abs(img.alpha - target) > 0.01) img.setAlpha(img.alpha + (target - img.alpha) * 0.2);
+      else img.setAlpha(target);
+    }
+    for (const [img, hs] of this.fadeDoors) {
+      if (!img.active) {
+        this.fadeDoors.delete(img);
+        continue;
+      }
+      const inside = px >= hs.x0 && px <= hs.x0 + hs.w - 1 && py >= hs.y0 - 1 && py <= hs.y0 + hs.h - 1;
+      img.setAlpha(inside ? 0.3 : 1);
+    }
+  }
+
+  /** Haus-Kachel (Wandring oder Tür): Südreihe als Vorderwand mit Fenstern, übrige Wand schlicht, Tür mit Schild. */
+  private houseProp(x: number, y: number, gid: number, hs: House, sx: number, sy: number): Phaser.GameObjects.Image {
+    if (gid >= TOWN_GID.doorFirst && hs.door) {
+      const key = ensureTexture(this, `nh_door_${hs.door.icon}_${hs.variant}`, () => houseDoor(hs.door!.icon, hs.variant)!);
+      const side = hs.door.side;
+      const door = this.add.image(sx, sy + TILE_H / 2, key).setOrigin(0.5, 1).setDepth(side === 'S' ? sy + TILE_H / 2 : this.roofDepth(hs) + 2);
+      if (side !== 'S') this.fadeDoors.set(door, hs);
+      return door;
+    }
+    const south = y === hs.y0 + hs.h - 1;
+    const rel = x - hs.x0;
+    const kind = south && rel % 2 === 0 && rel !== 0 && rel !== hs.w - 1 ? 'win' : 'wall';
+    const key = ensureTexture(this, `nh_${kind}_${hs.variant}`, () => houseWallTile(kind, hs.variant)!);
+    return this.add.image(sx, sy + TILE_H / 2, key).setOrigin(0.5, 1).setDepth(sy + TILE_H / 2);
+  }
+
   private makeProp(x: number, y: number, gid: number, sx: number, sy: number): Phaser.GameObjects.Image {
+    const hs = this.houseAt.get(y * this.world.grid.w + x);
+    if (hs) return this.houseProp(x, y, gid, hs, sx, sy);
     const v = hash(x, y);
     let key: string;
     let oy: number;
