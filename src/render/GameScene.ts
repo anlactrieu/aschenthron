@@ -1498,11 +1498,14 @@ export class GameScene extends Phaser.Scene {
     return (hs.y0 + hs.h - 1) * TILE_H - 25;
   }
 
-  /** Dach blendet auf 25 % aus, solange der Spieler im Haus (oder unter dem Dachüberstand im Norden) steht. */
+  /** Dach blendet auf 20 % aus, solange der Spieler im Haus (oder unter dem Dachüberstand im Norden) steht, auf 50 % vor der Tür. */
   private updateRoofs(px: number, py: number): void {
     for (const { img, house: hs } of this.roofs) {
       const inside = px >= hs.x0 && px <= hs.x0 + hs.w - 1 && py >= hs.y0 - 1 && py <= hs.y0 + hs.h - 1;
-      const target = inside ? 0.2 : 1;
+      // Vor der Tür (bis 2 Kacheln) wird das Dach halb durchsichtig, damit man die Leute im Haus sieht
+      const d = hs.door;
+      const near = !!d && Math.abs(px - d.x) <= 2 && Math.abs(py - d.y) <= 2;
+      const target = inside ? 0.2 : near ? 0.5 : 1;
       if (Math.abs(img.alpha - target) > 0.01) img.setAlpha(img.alpha + (target - img.alpha) * 0.2);
       else img.setAlpha(target);
     }
