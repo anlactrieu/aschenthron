@@ -7,6 +7,9 @@ import { preloadSprites } from './render/sprites';
 import { allSpritePaths } from './render/spriteMap';
 import { initTouch } from './render/touch';
 import { preloadAllNinja } from './render/ninjaProps';
+import { preloadNinjaFigures } from './render/ninjaFigures';
+import { FIG_MODES, figureLists, figureMode } from './render/figureMap';
+import { MONSTERS } from './sim/data';
 
 function showError(msg: string): void {
   const d = document.createElement('div');
@@ -39,6 +42,13 @@ async function boot(): Promise<void> {
   // Fremd-Sprites (CC0) vorladen; Fehler/Zeitüberschreitung ist erlaubt, dann greift die prozedurale Grafik
   await preloadSprites(allSpritePaths());
   await preloadAllNinja();
+  await preloadNinjaFigures();
+  // Welche Monsterarten sind je Modus Ninja bzw. DCSS (Vergleichshilfe; Umschalten mit ?figuren=mix|ninja|dcss oder in den Einstellungen, P)
+  const ids = MONSTERS.map((m) => m.id);
+  for (const m of FIG_MODES) {
+    const l = figureLists(m, ids);
+    console.info(`[Figuren] Modus ${m}${m === figureMode() ? ' (aktiv)' : ''}: Ninja ${l.ninja.length}: ${l.ninja.join(', ') || '-'} | DCSS ${l.dcss.length}: ${l.dcss.join(', ') || '-'}`);
+  }
   const scene = new GameScene();
   const game = new Phaser.Game({
     type: Phaser.AUTO,

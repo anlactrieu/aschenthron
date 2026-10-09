@@ -23,7 +23,9 @@ patterns = [
     "Actor/Character/*/Faceset.png",
     "Actor/Monster/*/SpriteSheet.png",
     "Actor/Monster/*/Faceset.png",
-    "Actor/Boss/*/SpriteSheet.png",
+    "Actor/Boss/*/Idle.png",
+    "Actor/Boss/*/Sprite.png",
+    "Actor/Boss/*/Faceset.png",
     "Actor/Animal/*/SpriteSheet.png",
     "Items/Weapons/*/Sprite.png",
     "Items/Weapons/*/SpriteInHand.png",
@@ -35,6 +37,15 @@ patterns = [
     "Palette.png",
 ]
 n = 0
+# Monster ohne SpriteSheet.png heißen im Paket <Name>/<Name>.png (64x64, 4 Zeilen): als SpriteSheet.png ablegen
+for d in sorted((src / "Actor/Monster").iterdir()):
+    if d.is_dir() and not (d / "SpriteSheet.png").exists():
+        cand = [f for f in d.glob("*.png") if f.name.lower() != "faceset.png"]
+        if cand:
+            out = dst / "Actor/Monster" / d.name / "SpriteSheet.png"
+            out.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(cand[0], out)
+            n += 1
 for pat in patterns:
     for f in sorted(src.glob(pat)):
         if not f.is_file():

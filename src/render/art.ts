@@ -15,6 +15,8 @@ import { CHEST_SPRITES, MONSTER_SPRITES, PLAYER_BASE, PLAYER_DEFAULTS, PLAYER_HA
 type Ctx = CanvasRenderingContext2D;
 
 import { groundCell } from './ninja';
+import { ninjaMonsterDef, ninjaNpcDef } from './figureMap';
+import { ninjaFigureCanvas, ninjaHeroCanvas } from './ninjaFigures';
 import { lookImage, tileLook, tintCanvas } from './groundLook';
 import { NINJA_KEYS, ninjaProp } from './ninjaProps';
 
@@ -840,6 +842,9 @@ function spriteMonster(id: string, boss: boolean, frame: number, profile: boolea
 }
 
 export function monsterCanvas(id: string, family: MonsterFamily, color: number, boss: boolean, frame: number, back = false, profile = false): HTMLCanvasElement {
+  const nd = ninjaMonsterDef(id);
+  const nj = nd ? ninjaFigureCanvas(nd, frame, back, profile, FEET_ORIGIN_Y) : null;
+  if (nj) return nj;
   const sp = spriteMonster(id, boss, frame, profile && BIPED.has(family));
   if (sp) return sp;
   const fb = frame === FRAME_STEP_R ? FRAME_STEP_L : frame; // prozedurale Figur kennt nur einen Schrittwechsel
@@ -874,9 +879,13 @@ export interface Look {
   quiver: boolean;
   /** Schild in der Nebenhand: Stufe (-1 = keins) */
   shield: number;
+  /** Seltenheit (0 normal … 4 legendär) von Helm, Rumpf und Waffe: Federbusch/Akzentfarbe der Ninja-Figur */
+  rar: { head: number; chest: number; weapon: number };
   /** Vorlagen-IDs der sichtbaren Ausrüstung (für die Sprite-Ebenen), leer = nichts angelegt */
   ids: { chest: string; legs: string; feet: string; hands: string; head: string; cloak: string; weapon: string; offhand: string };
 }
+
+const RARITY_ORDER = ['normal', 'magic', 'rare', 'set', 'legendary'];
 
 export function lookOf(a: Actor): Look {
   const t = (slot: 'chest' | 'head' | 'weapon' | 'hands') => {
@@ -884,7 +893,12 @@ export function lookOf(a: Actor): Look {
     return it ? tierOf(templateById(it.templateId).minLevel) : -1;
   };
   const kind = a.equipment.weapon ? templateById(a.equipment.weapon.templateId).kind : undefined;
+  const rr = (slot: 'chest' | 'head' | 'weapon') => {
+    const it = a.equipment[slot];
+    return it ? Math.max(0, RARITY_ORDER.indexOf(it.rarity)) : 0;
+  };
   return {
+    rar: { head: rr('head'), chest: rr('chest'), weapon: rr('weapon') },
     chest: t('chest'), head: t('head'), weapon: t('weapon'), hands: t('hands'),
     weaponKind: kind === 'bow' ? 1 : kind === 'staff' ? 2 : 0,
     robe: !!a.equipment.chest && a.equipment.chest.templateId.includes('robe'),
@@ -901,7 +915,7 @@ export function lookOf(a: Actor): Look {
 /** Cache-/Texturschlüssel einer Spielerfigur (Aussehen + Bewegungsphase + Blickrichtung). */
 export function lookKey(look: Look, frame: number, back: boolean, profile = false): string {
   const i = look.ids;
-  return `pl_${look.chest}_${look.head}_${look.weapon}_${look.hands}_${look.weaponKind}_${look.robe ? 1 : 0}_${look.quiver ? 1 : 0}_${look.shield}_${i.chest}.${i.legs}.${i.feet}.${i.hands}.${i.head}.${i.cloak}.${i.weapon}.${i.offhand}_${frame}${back ? 'b' : ''}${profile ? 's' : ''}`;
+  return `pl_${look.chest}_${look.head}_${look.weapon}_${look.hands}_${look.weaponKind}_${look.robe ? 1 : 0}_${look.quiver ? 1 : 0}_${look.shield}_${look.rar.head}${look.rar.chest}${look.rar.weapon}_${i.chest}.${i.legs}.${i.feet}.${i.hands}.${i.head}.${i.cloak}.${i.weapon}.${i.offhand}_${frame}${back ? 'b' : ''}${profile ? 's' : ''}`;
 }
 
 /** Spielerfigur aus DCSS-Ebenen (Körper, Beine, Stiefel, Rüstung, Umhang, Handschuhe, Kopf, Schild, Waffe). Null = Fallback. */
@@ -1111,12 +1125,16 @@ const ORB_COLORS = [0x90c0ff, 0x80d0ff, 0xb090ff, 0x70e0e0, 0xff9a40, 0xc060ff];
 
 /** Große Figur für das Inventarfenster: Bild und CSS-Breite (Sprite 1:1, prozedural wie bisher 104 px). */
 export function playerPortrait(look: Look): { canvas: HTMLCanvasElement; width: number } {
+  const nj = ninjaHeroCanvas(look, 0, false, false, 6, FEET_ORIGIN_Y);
+  if (nj) return { canvas: nj, width: nj.width };
   const sp = spritePlayer(look, 0, 4);
   if (sp) return { canvas: sp, width: sp.width };
   return { canvas: playerCanvas(look, 0), width: 104 };
 }
 
 export function playerCanvas(look: Look, frame: number, back = false, profile = false): HTMLCanvasElement {
+  const nj = ninjaHeroCanvas(look, frame, back, profile, 3, FEET_ORIGIN_Y);
+  if (nj) return nj;
   const sp = spritePlayer(look, frame, SPRITE_SCALE.normal, back, profile);
   if (sp) return sp;
   const fb = frame === FRAME_STEP_R ? FRAME_STEP_L : frame;
@@ -1189,6 +1207,12 @@ export function playerCanvas(look: Look, frame: number, back = false, profile = 
 export function npcTextureKey(kind: string, name?: string): string {
   const f = name ? NPC_NAME_SPRITES[name] : undefined;
   return name && f && sprite(f) ? `npc_n_${name}` : `npc_${kind}`;
+}
+
+/** Ninja-Figur eines NPCs (Blickrichtung unten/oben/Seite nach rechts) oder `null` (Truhe, Modus dcss, Bild fehlt). */
+export function ninjaNpcCanvas(kind: string, name: string | undefined, frame: number, back: boolean, profile: boolean): HTMLCanvasElement | null {
+  const nd = ninjaNpcDef(kind, name);
+  return nd ? ninjaFigureCanvas({ group: 'Character', name: nd.sheet, scale: 3, tint: nd.tint }, frame, back, profile, FEET_ORIGIN_Y) : null;
 }
 
 export function npcCanvas(kind: string, name?: string, frame = 0, profile = false): HTMLCanvasElement {

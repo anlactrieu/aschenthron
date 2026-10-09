@@ -11,6 +11,7 @@ import {
 import { isWalkable } from '../sim/path';
 import { toScreen, toTile } from './iso';
 import { NINJA_KEYS } from './ninjaProps';
+import { ninjaNpcDef } from './figureMap';
 import { detectHouses, houseDoor, houseDecor, houseFacade, houseFence, houseRoof, houseSign, houseWallTile, lowerKind, type House, type RoofNotch } from './houses';
 import { biomeOf, buildZoneMap, drawDetail, drawLavaTile, drawWaterTile, patchNoise, Z } from './groundLook';
 import { DOOR_ICONS, TOWN_GID, WATER_PROP_GIDS, registerTownArt } from './town';
@@ -27,7 +28,7 @@ import { Fx } from './fx';
 import { onSettings, settings } from './settings';
 import type { RemoteSession } from '../net/client';
 import {
-  ensureTexture, FEET_ORIGIN_Y, FRAME_STEP_L, FRAME_STEP_R, FRAME_WIND, FRAME_STRIKE, lookKey, lookOf, npcTextureKey, BIPED, monsterCanvas, npcCanvas, playerCanvas, registerStaticArt, tileCanvas, TILE_H, TILE_VARIANTS, TILE_W, WALL_VARIANTS,
+  ensureTexture, FEET_ORIGIN_Y, FRAME_STEP_L, FRAME_STEP_R, FRAME_WIND, FRAME_STRIKE, lookKey, lookOf, npcTextureKey, BIPED, monsterCanvas, npcCanvas, ninjaNpcCanvas, playerCanvas, registerStaticArt, tileCanvas, TILE_H, TILE_VARIANTS, TILE_W, WALL_VARIANTS,
 } from './art';
 
 const SAVE_BASE = 'aschenthron.save.v1';
@@ -112,7 +113,7 @@ export class GameScene extends Phaser.Scene {
   private lootViews = new Map<number, Phaser.GameObjects.Image>();
   private npcViews = new Map<number, Phaser.GameObjects.Image>();
   /** Laufrichtung der NPCs: Spiegeln, Seitenansicht und Laufzyklus */
-  private npcDir = new Map<number, { x: number; y: number; flip: boolean; side: boolean; movingUntil: number }>();  private chestViews = new Map<number, Phaser.GameObjects.Image>();
+  private npcDir = new Map<number, { x: number; y: number; flip: boolean; side: boolean; up: boolean; movingUntil: number }>();  private chestViews = new Map<number, Phaser.GameObjects.Image>();
   private flash = new Map<number, number>();
   private acc = 0;
   private step: NextStep | null = null;
@@ -1677,6 +1678,19 @@ export class GameScene extends Phaser.Scene {
     return m[gid] ?? { key: 'pillar', oy: 0.92, dy: 8 };
   }
 
+  /** Sichtbare Höhe/Breite einer Ninja-Figurentextur (über den Füßen, in Bildpunkten); `null` bei DCSS-/prozeduralen Figuren. */
+  private figSize(img: Phaser.GameObjects.Image): { top: number; w: number; dir: boolean } | null {
+    const src = img.texture.getSourceImage() as { figTop?: number; figW?: number; figDir?: boolean } | undefined;
+    return src && src.figTop !== undefined ? { top: src.figTop, w: src.figW ?? 0, dir: !!src.figDir } : null;
+  }
+
+  /** Legt eine Ninja-Textur an (false, wenn das Bild nicht geladen ist → Aufrufer nimmt die DCSS-Figur). */
+  private addNinjaTexture(key: string, canvas: HTMLCanvasElement | null): boolean {
+    if (!canvas) return false;
+    this.textures.addCanvas(key, canvas);
+    return true;
+  }
+
   private updateNpcs(time: number): void {
     const p = this.player();
     const seen = new Set<string>();
@@ -1688,11 +1702,13 @@ export class GameScene extends Phaser.Scene {
         img = this.add.image(sx, sy + 8, npcTextureKey(n.kind, n.name)).setOrigin(0.5, FEET_ORIGIN_Y);
         this.npcViews.set(n.id, img);
       }
+      const nj = ninjaNpcDef(n.kind, n.name);
+      const chestLike = n.kind === 'stash' && !nj;
       this.gfxGround.fillStyle(0x000000, 0.2);
-      this.gfxGround.fillEllipse(sx, sy + 9, n.kind === 'stash' ? 34 : 26, n.kind === 'stash' ? 13 : 10);
+      this.gfxGround.fillEllipse(sx, sy + 9, chestLike ? 34 : 26, chestLike ? 13 : 10);
       let dir = this.npcDir.get(n.id);
       if (!dir) {
-        dir = { x: np.x, y: np.y, flip: false, side: false, movingUntil: 0 };
+        dir = { x: np.x, y: np.y, flip: false, side: false, up: false, movingUntil: 0 };
         this.npcDir.set(n.id, dir);
       }
       const ndx = np.x - dir.x;
@@ -1701,19 +1717,28 @@ export class GameScene extends Phaser.Scene {
         dir.movingUntil = time + 160;
         if (Math.abs(ndx) > 0.0005) dir.flip = ndx < 0;
         dir.side = Math.abs(ndx) > Math.abs(ndy) * 0.8;
+        if (Math.abs(ndy) > 0.0005) dir.up = ndy < 0;
       }
       dir.x = np.x;
       dir.y = np.y;
-      if (n.kind !== 'stash') {
+      if (!chestLike) {
         const nf = time < dir.movingUntil ? WALK_FRAMES[Math.floor(time / STEP_MS) % 4]! : 0;
         const nSide = dir.side;
         const nk = npcTextureKey(n.kind, n.name);
-        img.setTexture(ensureTexture(this, nSide ? `${nk}_${nf}s` : nf ? `${nk}_${nf}` : nk, () => (nSide ? npcCanvas(n.kind, n.name, nf, true) : npcCanvas(n.kind, n.name, nf))));
-        img.setFlipX(dir.flip);
+        // Ninja-Figur (4 Blickrichtungen, Seitenbild nach rechts); fehlt das Bild oder ist der Modus dcss, die DCSS-Figur wie bisher
+        const nBack = dir.up && !nSide;
+        const njKey = nj ? `nnpc_${nj.sheet}_${nj.tint ?? 0}_${nf}${nBack ? 'b' : ''}${nSide ? 's' : ''}` : '';
+        if (nj && (this.textures.exists(njKey) || this.addNinjaTexture(njKey, ninjaNpcCanvas(n.kind, n.name, nf, nBack, nSide)))) {
+          img.setTexture(njKey);
+        } else {
+          img.setTexture(ensureTexture(this, nSide ? `${nk}_${nf}s` : nf ? `${nk}_${nf}` : nk, () => (nSide ? npcCanvas(n.kind, n.name, nf, true) : npcCanvas(n.kind, n.name, nf))));
+        }
+        const nfig = this.figSize(img);
+        img.setFlipX(nfig?.dir ? nSide && dir.flip : dir.flip);
       }
-      const nBob = n.kind !== 'stash' && time < dir.movingUntil ? -Math.abs(Math.sin((time / STEP_MS) * Math.PI * 0.5)) * 1.2 : 0;
+      const nBob = !chestLike && time < dir.movingUntil ? -Math.abs(Math.sin((time / STEP_MS) * Math.PI * 0.5)) * 1.2 : 0;
       img.setPosition(sx, sy + 8 + nBob).setDepth(sy + 8);
-      this.label(`n${n.id}`, n.name, sx, sy - 52, '#e8d9b0', seen);
+      this.label(`n${n.id}`, n.name, sx, sy + 8 - (this.figSize(img)?.top ?? 56) - 4, '#e8d9b0', seen);
       const mark = this.questMark(n, p);
       if (mark) this.label(`m${n.id}`, mark, sx, sy - 70 + Math.sin(time / 200) * 2, mark === '!' ? '#ffe45a' : mark === '…' ? '#8fd0ff' : '#7fe08a', seen, 22);
     }
@@ -1915,8 +1940,9 @@ export class GameScene extends Phaser.Scene {
       const walking = time < view.movingUntil && a.alive;
       // Wippe: im Schritt (Fuß setzt auf) unten, im Durchgang (Stand-Bild) oben; Monster hüpfen stärker, Bosse weniger
       const bob = walking && !swinging ? -Math.abs(Math.sin(stepPhase * Math.PI * 0.5)) * (a.boss ? 0.8 : a.kind === 'monster' ? 1.6 : 1.2) : 0;
+      const fig = this.figSize(img);
       if (a.alive) {
-        const wide = a.boss ? 46 : a.kind === 'monster' && (monsterKind(a.kindId!).family === 'beast' || monsterKind(a.kindId!).family === 'spider') ? 30 : a.kind === 'monster' && monsterKind(a.kindId!).family === 'golem' ? 34 : 22;
+        const wide = fig ? Math.max(16, Math.min(56, fig.w * 0.55)) : a.boss ? 46 : a.kind === 'monster' && (monsterKind(a.kindId!).family === 'beast' || monsterKind(a.kindId!).family === 'spider') ? 30 : a.kind === 'monster' && monsterKind(a.kindId!).family === 'golem' ? 34 : 22;
         this.gfxGround.fillStyle(0x000000, 0.18);
         this.gfxGround.fillEllipse(sx + ox, sy + 9 + oy, wide * 1.25, wide * 0.5);
         this.gfxGround.fillStyle(0x000000, 0.22);
@@ -1924,7 +1950,7 @@ export class GameScene extends Phaser.Scene {
       }
       img.setVisible(true).setPosition(sx + ox, sy + 8 + oy + bob).setDepth(sy + 8).setFlipX(
         // DCSS-Monster blicken von Haus aus nach links; nur die vorab gespiegelte Seitenansicht (Zweibeiner) blickt nach rechts
-        a.kind === 'monster' && !(view.side && BIPED.has(monsterKind(a.kindId!).family)) ? !view.flip : view.flip,
+        fig ? (fig.dir ? !!view.side && view.flip : view.flip) : a.kind === 'monster' && !(view.side && BIPED.has(monsterKind(a.kindId!).family)) ? !view.flip : view.flip,
       );
       if (!a.alive) {
         const age = a.kind === 'monster' ? (this.world.tick - a.diedAt) / (TICK_RATE * 4) : 0;
@@ -1966,7 +1992,7 @@ export class GameScene extends Phaser.Scene {
       }
       if (a.kind === 'monster') {
         const big = a.boss ? 56 : 28;
-        const top = sy + 8 - (a.boss ? 110 : 62);
+        const top = sy + 8 - (fig ? fig.top + 8 : a.boss ? 110 : 62);
         // Balken nur bei Schaden, Ziel, Mauszeiger oder Boss
         if (a.boss || a.hp < a.maxHp - 0.5 || a.id === p.targetId || hovered) {
           g.fillStyle(0x200000, 0.9);
@@ -1990,7 +2016,7 @@ export class GameScene extends Phaser.Scene {
           g.fillRect(sx - big / 2, top, big * Math.max(0, a.hp / a.maxHp), 5);
         }
       } else {
-        if (a.id !== p.id) this.label(`a${a.id}`, `${a.name} (Lv ${a.level})${a.pkUntil > this.world.tick ? ' ☠' : ''}`, sx, sy + 8 - 66, a.pkUntil > this.world.tick ? '#ff5a4a' : '#9fd0ff', seen);
+        if (a.id !== p.id) this.label(`a${a.id}`, `${a.name} (Lv ${a.level})${a.pkUntil > this.world.tick ? ' ☠' : ''}`, sx, sy + 8 - (fig ? fig.top + 12 : 66), a.pkUntil > this.world.tick ? '#ff5a4a' : '#9fd0ff', seen);
         // Spielerring in der Stadt = sicher
         if (this.world.safe.some((r) => a.x >= r.x && a.y >= r.y && a.x < r.x + r.w && a.y < r.y + r.h)) {
           g.lineStyle(1, 0xd8a24a, 0.7);
