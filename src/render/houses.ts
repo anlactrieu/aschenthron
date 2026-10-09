@@ -395,3 +395,53 @@ export function houseSign(icon: DoorIcon): Cv | null {
   if (typeof document === 'undefined') return null;
   return up(drawSign(icon, false));
 }
+
+export interface HouseDecor { x: number; y: number; kind: 'barrel' | 'crates' | 'fence' }
+
+/**
+ * Kleine Außendeko vor der Südwand eines Hauses (nur Optik, keine Kollision, kein Sim-Einfluss): Fässer, Kisten, Zaunstücke
+ * per Hash an freien Kacheln. `free(x, y)` sagt, ob die Kachel ohne Prop/Wand und keine Wasser-/Lavakachel ist. Die Tür-Vorplätze
+ * (Süd: 2 Kacheln seitlich, Ost/West/Nord: 2 Kacheln davor) bleiben frei.
+ */
+export function houseDecor(hs: House, free: (x: number, y: number) => boolean): HouseDecor[] {
+  const out: HouseDecor[] = [];
+  const row = hs.y0 + hs.h; // Reihe direkt unter der Südwand
+  const d = hs.door;
+  const blocked = (x: number, y: number): boolean => !!d && Math.abs(x - d.x) + Math.abs(y - d.y) <= 2;
+  const seed = hs.x0 * 31 + hs.y0 * 17;
+  const pattern = hh(seed, 5, 5, 3);
+  const spots: [number, number, HouseDecor['kind'][]][] = [];
+  const L = hs.x0 + 1;
+  const R = hs.x0 + hs.w - 2;
+  if (pattern === 0) spots.push([L, row, ['barrel']], [R, row, ['crates']]);
+  else if (pattern === 1) spots.push([L, row, ['fence']], [L + 1, row, ['fence']], [R, row, ['barrel']]);
+  else spots.push([L, row, ['crates']], [R - 1, row, ['fence']], [R, row, ['fence']]);
+  for (const [x, y, kinds] of spots) {
+    if (blocked(x, y) || !free(x, y)) continue;
+    out.push({ x, y, kind: kinds[0]! });
+  }
+  return out;
+}
+
+/** Niedriger Holzzaun (Querstück 16 Breite, mit Pfosten links), unten bündig. */
+export function houseFence(variant: number): Cv | null {
+  if (typeof document === 'undefined') return null;
+  const c = mk(16, 11);
+  const g = ctx(c);
+  const wood: Rgb = variant % 2 ? [150, 108, 66] : [136, 98, 62];
+  // Querlatten
+  for (const y of [3, 7]) {
+    rect(g, col(OUTLINE), 0, y - 1, 16, 4);
+    rect(g, col(wood), 0, y, 16, 2);
+    rect(g, col(wood, 1.2), 0, y, 16, 1);
+  }
+  // Pfosten mit Spitze
+  for (const x of [0, 13]) {
+    rect(g, col(OUTLINE), x, 1, 4, 10);
+    rect(g, col(OUTLINE), x + 1, 0, 2, 1);
+    rect(g, col(wood, 1.05), x + 1, 1, 2, 9);
+    rect(g, col(wood, 1.3), x + 1, 1, 1, 9);
+    rect(g, col(wood, 0.7), x + 2, 2, 1, 8);
+  }
+  return up(c);
+}

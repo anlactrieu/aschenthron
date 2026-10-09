@@ -11,7 +11,7 @@ import {
 import { isWalkable } from '../sim/path';
 import { toScreen, toTile } from './iso';
 import { NINJA_KEYS } from './ninjaProps';
-import { detectHouses, houseDoor, houseFacade, houseRoof, houseSign, houseWallTile, lowerKind, type House, type RoofNotch } from './houses';
+import { detectHouses, houseDoor, houseDecor, houseFacade, houseFence, houseRoof, houseSign, houseWallTile, lowerKind, type House, type RoofNotch } from './houses';
 import { DOOR_ICONS, TOWN_GID, WATER_PROP_GIDS, registerTownArt } from './town';
 import { Ui, describeItem, isUpgrade } from './ui';
 import { generateItem, type Item } from '../sim/items';
@@ -1482,6 +1482,20 @@ export class GameScene extends Phaser.Scene {
       const f = toScreen(hs.x0, hs.y0 + hs.h - 2);
       const fac = this.add.image(f.sx - TILE_W / 2, f.sy - TILE_H / 2, fkey).setOrigin(0, 0).setDepth(this.roofDepth(hs) + 1);
       this.roofs.push({ img: fac, house: hs });
+      // Kleine Außendeko (reine Optik: keine Kollision, kein Sim-Einfluss)
+      const free = (x: number, y: number): boolean => {
+        const g = this.tiles[y * w + x] ?? 0;
+        return x >= 0 && y >= 0 && x < w && y < h && g !== 0 && g !== 6 && g !== 12 && !PROP_GIDS.has(g) && !this.houseAt.has(y * w + x);
+      };
+      for (const dc of houseDecor(hs, free)) {
+        const p = toScreen(dc.x, dc.y);
+        if (dc.kind === 'fence') {
+          const fk = ensureTexture(this, `nh_fence_${hs.variant % 2}`, () => houseFence(hs.variant)!);
+          this.add.image(p.sx, p.sy + 6, fk).setOrigin(0.5, 1).setDepth(p.sy + 6);
+        } else if (this.textures.exists(dc.kind === 'barrel' ? 'twn_barrel' : 'twn_crates')) {
+          this.add.image(p.sx, p.sy + TILE_H / 2 - 5, dc.kind === 'barrel' ? 'twn_barrel' : 'twn_crates').setOrigin(0.5, 1).setDepth(p.sy + TILE_H / 2);
+        }
+      }
     }
   }
 
