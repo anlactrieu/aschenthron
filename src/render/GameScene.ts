@@ -26,7 +26,7 @@ import { Fx } from './fx';
 import { onSettings, settings } from './settings';
 import type { RemoteSession } from '../net/client';
 import {
-  ensureTexture, tileBase, FEET_ORIGIN_Y, FRAME_STEP_L, FRAME_STEP_R, FRAME_WIND, FRAME_STRIKE, lookKey, lookOf, npcTextureKey, BIPED, monsterCanvas, npcCanvas, playerCanvas, registerStaticArt, tileCanvas, TILE_H, TILE_VARIANTS, TILE_W, WALL_VARIANTS,
+  ensureTexture, FEET_ORIGIN_Y, FRAME_STEP_L, FRAME_STEP_R, FRAME_WIND, FRAME_STRIKE, lookKey, lookOf, npcTextureKey, BIPED, monsterCanvas, npcCanvas, playerCanvas, registerStaticArt, tileCanvas, TILE_H, TILE_VARIANTS, TILE_W, WALL_VARIANTS,
 } from './art';
 
 const SAVE_BASE = 'aschenthron.save.v1';
@@ -1404,32 +1404,30 @@ export class GameScene extends Phaser.Scene {
     this.chunks.set(`${cx}_${cy}`, this.add.image(minSx, minSy, key).setOrigin(0, 0).setDepth(-1e6));
   }
 
-  /** Weicher Übergang: an Grenzen zu anderen Bodenarten streut die Nachbarfarbe Pixel auf die Kachelkante. */
+  /**
+   * Übergang zwischen Bodenarten (Draufsicht): An jeder Kante zu einer anderen Bodenart schiebt die Nachbarkachel ihre
+   * eigenen Randpixel 0 bis 2 Bildpunkte (je 3 Bildschirmpixel) in diese Kachel hinein. Die Tiefe wechselt pro Spalte
+   * zufällig, so entsteht ein ausgefranster Rand ohne harte Gerade. Wasser und Lava bekommen selbst keinen Rand.
+   */
   private dither(ctx: CanvasRenderingContext2D, x: number, y: number, ground: number, ox: number, oy: number): void {
-    if (ground >= 0) return; // TODO neuer Look: Übergänge für Draufsicht (Autotiling), vorerst aus
-    // Kanten der Raute (Ecken relativ zur Mitte): oben, rechts, unten, links
-    const T: [number, number] = [0, -16];
-    const R: [number, number] = [32, 0];
-    const B: [number, number] = [0, 16];
-    const L: [number, number] = [-32, 0];
-    const edges: [number, number, [number, number], [number, number]][] = [
-      [1, 0, R, B], [-1, 0, L, T], [0, 1, L, B], [0, -1, T, R],
-    ];
-    for (const [dx, dy, A, Bc] of edges) {
+    if (ground === 6 || ground === 12) return;
+    const px = TILE_W / 16;
+    const DEPTH = [0, 1, 1, 2, 2, 1];
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
       let ng = this.gidAt(x + dx, y + dy);
       if (WATER_PROP_GIDS.has(ng)) ng = 6;
+      else if (this.houseAt.has((y + dy) * this.world.grid.w + x + dx)) ng = 15;
       else if (PROP_GIDS.has(ng)) ng = this.groundUnder(x + dx, y + dy);
-      if (ng === ground || ng === 0 || ground === 6 || ground === 12) continue;
-      ctx.fillStyle = '#' + tileBase(ng).toString(16).padStart(6, '0');
-      const n = hash(x * 7 + dx + 3, y * 13 + dy + 5);
-      for (let i = 0; i < 12; i++) {
-        const t = (((n >>> (i * 2)) ^ (i * 2654435761)) >>> 0) % 100 / 100;
-        const depth = (((n >>> 5) + i * 7919) >>> 0) % 100 / 100;
-        if (depth > 0.55) continue;
-        // Punkt auf der Kante, nach innen zur Mitte hin versetzt
-        const px = (A[0] + (Bc[0] - A[0]) * t) * (1 - depth * 0.42);
-        const py = (A[1] + (Bc[1] - A[1]) * t) * (1 - depth * 0.42);
-        ctx.fillRect(Math.round(ox + TILE_W / 2 + px), Math.round(oy + TILE_H / 2 + py), 2, 1);
+      if (ng === ground || ng === 0) continue;
+      const nb = tileCanvas(ng, hash(x + dx, y + dy) % TILE_VARIANTS);
+      for (let i = 0; i < 16; i++) {
+        const d = DEPTH[hash(x * 131 + i * 7 + dx * 3 + 11, y * 17 + dy * 5 + ground) % DEPTH.length]!;
+        if (!d) continue;
+        const t = d * px;
+        if (dx === 1) ctx.drawImage(nb, 0, i * px, t, px, ox + TILE_W - t, oy + i * px, t, px);
+        else if (dx === -1) ctx.drawImage(nb, TILE_W - t, i * px, t, px, ox, oy + i * px, t, px);
+        else if (dy === 1) ctx.drawImage(nb, i * px, 0, px, t, ox + i * px, oy + TILE_H - t, px, t);
+        else ctx.drawImage(nb, i * px, TILE_H - t, px, t, ox + i * px, oy, px, t);
       }
     }
   }
