@@ -16,7 +16,7 @@ import { lookKey, lookOf, playerPortrait } from './art';
 import { initCredits, toggleCredits } from './credits';
 import { goFullscreen, isFullscreen, isTouch } from './touch';
 import { BAR_CSS, faceUrl, installTheme } from './theme';
-import { FIG_LABEL, FIG_MODES, figureMode, setFigureMode } from './figureMap';
+import { FIG_LABEL, FIG_MODES, HERO_BASE, figureMode, savedFigureMode, setFigureMode } from './figureMap';
 
 const RARITY_COLOR: Record<Item['rarity'], string> = { normal: '#c9c4bd', magic: '#7f9fff', rare: '#f2c94c', set: '#5fd070', legendary: '#ff8a2a' };
 const SLOT_NAME: Record<EquipSlot, string> = { weapon: 'Waffe', head: 'Kopf', chest: 'Brust', hands: 'Hände', feet: 'Füße', ring: 'Ring', ring2: 'Ring', amulet: 'Amulett', offhand: 'Nebenhand', belt: 'Gürtel', cloak: 'Umhang', legs: 'Beine' };
@@ -486,7 +486,7 @@ export class Ui {
     this.tl.id = 'hud-tl';
     const fc = el('div', 'fc');
     const face = el('img', 'face') as HTMLImageElement;
-    face.src = faceUrl('Knight');
+    face.src = faceUrl(figureMode() === 'dcss' ? 'Knight' : HERO_BASE);
     face.alt = '';
     fc.append(face);
     const hdr = el('div', 'hdr');
@@ -1304,14 +1304,13 @@ export class Ui {
     toggle('Namen über Figuren', cfg.labels, (v) => setSetting('labels', v));
     toggle('Schnell aufheben (Tränke, Edelsteine, Pfeile)', cfg.autoPickup, (v) => setSetting('autoPickup', v));
     // Figuren-Vergleich: Mix (halb Ninja, halb DCSS), nur Ninja, nur DCSS (wirkt nach dem Neuladen)
-    const figBtn = el('button', 'a-btn', FIG_LABEL[figureMode()]) as HTMLButtonElement;
     const figNow = figureMode();
+    const figLabel = (m: typeof figNow): string => (m === figNow ? FIG_LABEL[m] : `${FIG_LABEL[m]} (neu laden)`);
+    const figBtn = el('button', 'a-btn', figLabel(savedFigureMode())) as HTMLButtonElement;
     figBtn.onclick = () => {
-      const cur = FIG_MODES.indexOf(figBtn.dataset.m ? (figBtn.dataset.m as typeof figNow) : figNow);
-      const next = FIG_MODES[(cur + 1) % FIG_MODES.length]!;
-      figBtn.dataset.m = next;
-      figBtn.textContent = next === figNow ? FIG_LABEL[next] : `${FIG_LABEL[next]} (neu laden)`;
+      const next = FIG_MODES[(FIG_MODES.indexOf(savedFigureMode()) + 1) % FIG_MODES.length]!;
       setFigureMode(next);
+      figBtn.textContent = figLabel(next);
     };
     row('Figuren: Mix / Ninja / DCSS (F5 zum Übernehmen)', figBtn);
 

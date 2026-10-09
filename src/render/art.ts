@@ -1133,7 +1133,7 @@ export function playerPortrait(look: Look): { canvas: HTMLCanvasElement; width: 
 }
 
 export function playerCanvas(look: Look, frame: number, back = false, profile = false): HTMLCanvasElement {
-  const nj = figureMode() === 'dcss' ? null : ninjaHeroCanvas(look, frame, back, profile, 3, FEET_ORIGIN_Y);
+  const nj = figureMode() === 'dcss' ? null : ninjaHeroCanvas(look, frame, back, profile, 4, FEET_ORIGIN_Y);
   if (nj) return nj;
   const sp = spritePlayer(look, frame, SPRITE_SCALE.normal, back, profile);
   if (sp) return sp;
@@ -1212,7 +1212,7 @@ export function npcTextureKey(kind: string, name?: string): string {
 /** Ninja-Figur eines NPCs (Blickrichtung unten/oben/Seite nach rechts) oder `null` (Truhe, Modus dcss, Bild fehlt). */
 export function ninjaNpcCanvas(kind: string, name: string | undefined, frame: number, back: boolean, profile: boolean): HTMLCanvasElement | null {
   const nd = ninjaNpcDef(kind, name);
-  return nd ? ninjaFigureCanvas({ group: 'Character', name: nd.sheet, scale: 3, tint: nd.tint }, frame, back, profile, FEET_ORIGIN_Y) : null;
+  return nd ? ninjaFigureCanvas({ group: 'Character', name: nd.sheet, scale: 4, tint: nd.tint }, frame, back, profile, FEET_ORIGIN_Y) : null;
 }
 
 export function npcCanvas(kind: string, name?: string, frame = 0, profile = false): HTMLCanvasElement {

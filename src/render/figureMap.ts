@@ -50,6 +50,17 @@ export function setFigureMode(m: FigMode): void {
   }
 }
 
+/** Zuletzt gespeicherte Wahl (gilt nach dem Neuladen); ohne Eintrag der aktive Modus. */
+export function savedFigureMode(): FigMode {
+  try {
+    const v = typeof localStorage !== 'undefined' ? localStorage.getItem(FIG_KEY) : null;
+    if (isMode(v)) return v;
+  } catch {
+    /* kein Zugriff */
+  }
+  return figureMode();
+}
+
 /** Nur für Tests. */
 export function forceFigureMode(m: FigMode | undefined): void {
   mode = m;
@@ -69,6 +80,10 @@ export interface NinjaMon {
   tint?: number;
 }
 
+/**
+ * Skalierung: Character-Figuren (Menschen, Held, NPCs) 4x ≈ Höhe der DCSS-Menschen (je ~50–64 Bildpunkte sichtbar; bei 3x nur ~42–48);
+ * Monster-Sheets und Tiere 3x, größere Arten 4x, Bosse 2x (Streifen 50–62 px) bzw. 5x (Spinnenbosse).
+ */
 const M = (group: NinjaGroup, name: string, scale = 3, tint?: number): NinjaMon => ({ group, name, scale, tint });
 
 /** Monster-ID → Ninja-Figur. Jede der 64 Arten hat eine Zuordnung; ob sie gilt, entscheidet der Modus. */
@@ -84,20 +99,20 @@ export const NINJA_MONSTERS: Record<string, NinjaMon> = {
   shadow_wolf: M('Animal', 'DogBlack', 3, 0x6a6ab8),
   night_stalker: M('Animal', 'Hyena', 4, 0x6a6aa8),
   // Goblins
-  goblin: M('Character', 'ManGreen'),
-  goblin_scout: M('Character', 'NinjaGreen'),
-  goblin_warrior: M('Character', 'GreenPig'),
-  goblin_shaman: M('Character', 'MaskFrog'),
-  goblin_archer: M('Character', 'NinjaLeaf'),
-  goblin_chief: M('Character', 'DemonGreen'),
+  goblin: M('Character', 'ManGreen', 4),
+  goblin_scout: M('Character', 'NinjaGreen', 4),
+  goblin_warrior: M('Character', 'GreenPig', 4),
+  goblin_shaman: M('Character', 'MaskFrog', 4),
+  goblin_archer: M('Character', 'NinjaLeaf', 4),
+  goblin_chief: M('Character', 'DemonGreen', 4),
   goblin_brute: M('Monster', 'Reptile2'),
   goblin_warlord: M('Monster', 'Cyclope2', 4),
   // Banditen
-  bandit_novice: M('Character', 'Villager3'),
-  highwayman: M('Character', 'NinjaMasked'),
-  bandit_archer: M('Character', 'CamouflageRed'),
-  bandit: M('Character', 'NinjaRed'),
-  bandit_captain: M('Character', 'RedGladiator'),
+  bandit_novice: M('Character', 'Villager3', 4),
+  highwayman: M('Character', 'NinjaMasked', 4),
+  bandit_archer: M('Character', 'CamouflageRed', 4),
+  bandit: M('Character', 'NinjaRed', 4),
+  bandit_captain: M('Character', 'RedGladiator', 4),
   // Spinnen (nur Rot/Gelb vorhanden: Tönung je Art)
   forest_spider: M('Monster', 'SpiderRed', 3, 0x707090),
   venom_spider: M('Monster', 'SpiderYellow', 3, 0x90e070),
@@ -107,35 +122,35 @@ export const NINJA_MONSTERS: Record<string, NinjaMon> = {
   web_stalker: M('Monster', 'SpiderYellow', 4, 0xb0a0d8),
   nest_matron: M('Monster', 'SpiderRed', 4, 0xd070b8),
   // Sumpf (Menschen grün getönt)
-  bog_ghoul: M('Character', 'Caveman2', 3, 0x9ac88a),
-  marsh_corpse: M('Character', 'OldMan3', 3, 0x90a878),
-  bog_witch: M('Character', 'OldWoman', 3, 0xb080c0),
+  bog_ghoul: M('Character', 'Caveman2', 4, 0x9ac88a),
+  marsh_corpse: M('Character', 'OldMan3', 4, 0x90a878),
+  bog_witch: M('Character', 'OldWoman', 4, 0xb080c0),
   ghoul_alpha: M('Character', 'Caveman', 4, 0x90b878),
   // Untote
-  skeleton: M('Character', 'Skeleton'),
-  wraith: M('Character', 'Spirit'),
-  bone_acolyte: M('Character', 'SkeletonDemon'),
-  zombie: M('Character', 'Villager4', 3, 0x8aa070),
-  bone_knight: M('Character', 'Knight', 3, 0xe0d8b8),
-  necromancer: M('Character', 'SorcererBlack'),
-  crypt_guard: M('Character', 'Statue'),
-  death_knight: M('Character', 'NinjaDark'),
+  skeleton: M('Character', 'Skeleton', 4),
+  wraith: M('Character', 'Spirit', 4),
+  bone_acolyte: M('Character', 'SkeletonDemon', 4),
+  zombie: M('Character', 'Villager4', 4, 0x8aa070),
+  bone_knight: M('Character', 'Knight', 4, 0xe0d8b8),
+  necromancer: M('Character', 'SorcererBlack', 4),
+  crypt_guard: M('Character', 'Statue', 4),
+  death_knight: M('Character', 'NinjaDark', 4),
   // Trolle und Golems
   hill_troll: M('Monster', 'Beast2'),
-  stone_golem: M('Character', 'GoldStatue', 3, 0xa0a0a8),
+  stone_golem: M('Character', 'GoldStatue', 4, 0xa0a0a8),
   rock_troll: M('Monster', 'Beast', 4),
   iron_golem: M('Character', 'RobotGrey', 4),
   // Würmer
   pit_worm: M('Monster', 'Larva2'),
   acid_worm: M('Monster', 'Larva', 3, 0xc0e070),
   // Asche und Feuer
-  ash_walker: M('Character', 'Villager5', 3, 0xa89890),
+  ash_walker: M('Character', 'Villager5', 4, 0xa89890),
   cinder_wisp: M('Monster', 'Flam'),
   ember_elemental: M('Monster', 'Flam', 4, 0xffa060),
-  imp: M('Character', 'DemonRed'),
+  imp: M('Character', 'DemonRed', 4),
   hell_spawn: M('Monster', 'DragonYellow', 3, 0xe07050),
   hell_hound: M('Animal', 'DogOrange', 4, 0xd05040),
-  doom_knight: M('Character', 'GladiatorBlue', 3, 0x7070a0),
+  doom_knight: M('Character', 'GladiatorBlue', 4, 0x7070a0),
   pit_fiend: M('Monster', 'Dragon', 4, 0xd05040),
   // Bosse (Boss-Ordner: erstes Bild des Idle-Streifens; Spinnenbosse große Spinnen)
   goblin_king: M('Boss', 'GiantBamboo', 2),
