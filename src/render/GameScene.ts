@@ -1352,12 +1352,15 @@ export class GameScene extends Phaser.Scene {
     const cy0 = Math.max(0, Math.floor((py - VIEW) / CHUNK));
     const cy1 = Math.min(Math.floor((h - 1) / CHUNK), Math.floor((py + VIEW) / CHUNK));
     // Nur wenige Chunks pro Frame bauen (Ruckeln beim Überqueren von Chunk-Grenzen vermeiden); beim Start mehr
-    let budget = this.frame < 3 ? 40 : 2;
+    let budget = this.frame < 3 ? 40 : 3;
+    const t0 = performance.now();
     for (let cy = cy0; cy <= cy1 && budget > 0; cy++) {
       for (let cx = cx0; cx <= cx1 && budget > 0; cx++) {
         if (!this.chunks.has(`${cx}_${cy}`)) {
           this.makeChunk(cx, cy);
           budget--;
+          // Ein Chunk kostet 10–25 ms: nach dem ersten nur weiterbauen, solange der Frame kurz bleibt
+          if (this.frame >= 3 && performance.now() - t0 > 12) budget = 0;
         }
       }
     }

@@ -60,3 +60,4 @@
 - **Autoren:** Pixel-Boy und AAA (Dank an dieser Stelle und in den Credits, F1).
 - **Verwendung:** neuer Look (Branch `neuer-look`): Gelände-Tilesets, Häuser/Props, Figuren, Monster, Bosse, Tiere, Waffen in der Hand, UI-Theme "Theme Wood", Pixelschrift. Import: `python3 scripts/import_ninja.py "<entpacktes Paket>"` (kopiert Bilder und Schrift, keine Audio-Dateien).
 - **Umfang:** 444 Dateien, ca. 2,3 MB unter `public/assets/ninja/`.
+- **Bodendetails (Außenwelt):** `TilesetFloorDetail.png` und kleine Pflanzen/Steine aus `TilesetNature.png` (Ausschnitte in `src/render/ninjaProps.ts`, `dt_*`), Bodenzellen aus `TilesetField.png`/`TilesetFloor.png` (`src/render/groundLook.ts`); Knochen, Pilze, Risse, Netze, Pfützen u. Ä. sind eigene Pixelzeichnungen im Code.
