@@ -1479,7 +1479,7 @@ export class GameScene extends Phaser.Scene {
       oy = 0.92;
     }
     // Ninja-Bilder sind unten zugeschnitten: Fuß unten Mitte, knapp über der Kachel-Unterkante
-    if (NINJA_KEYS.has(key)) return this.add.image(sx, sy + TILE_H / 2 - 5, key).setOrigin(0.5, 1).setDepth(sy + TILE_H / 2);
+    if (NINJA_KEYS.has(key)) return this.add.image(sx, sy + TILE_H / 2 - (gid === 2 ? 0 : 5), key).setOrigin(0.5, 1).setDepth(sy + TILE_H / 2);
     return this.add.image(sx, sy + dy, key).setOrigin(0.5, oy).setDepth(sy + TILE_H / 2);
   }
 

@@ -1279,6 +1279,23 @@ export function chestCanvas(tier: 'wood' | 'iron' | 'gold', open: boolean): HTML
 /* ------------------------------------------------------------ Registrierung */
 
 export const WALL_VARIANTS = 3;
+
+/** Wandblock in Draufsicht: helle Oberkante, dunkler Fuß, damit die Fläche als Wand statt als Boden liest. */
+function shadeWallBlock(src: HTMLCanvasElement): HTMLCanvasElement {
+  const c = mkCanvas(TILE_W, TILE_H);
+  const x = ctxOf(c);
+  x.drawImage(src, 0, 0, TILE_W, TILE_H);
+  x.fillStyle = 'rgba(255,255,255,0.22)';
+  x.fillRect(0, 0, TILE_W, 3);
+  x.fillStyle = 'rgba(0,0,0,0.18)';
+  x.fillRect(0, TILE_H - 12, TILE_W, 9);
+  x.fillStyle = 'rgba(0,0,0,0.5)';
+  x.fillRect(0, TILE_H - 3, TILE_W, 3);
+  x.fillStyle = 'rgba(0,0,0,0.25)';
+  x.fillRect(0, 0, 3, TILE_H);
+  x.fillRect(TILE_W - 3, 0, 3, TILE_H);
+  return c;
+}
 export const TILE_VARIANTS = 4;
 
 /** Registriert alle statischen Texturen (Props) in Phaser. Kacheln werden zu Chunks zusammengesetzt. */
@@ -1286,7 +1303,14 @@ export function registerStaticArt(scene: Phaser.Scene): void {
   const add = (key: string, c: HTMLCanvasElement) => {
     if (!scene.textures.exists(key)) scene.textures.addCanvas(key, c);
   };
-  for (const style of ['brick', 'dungeon', 'cliff'] as const) for (let v = 0; v < WALL_VARIANTS; v++) add(`wall_${style}_${v}`, wallCanvas(style, v));
+  for (const style of ['brick', 'dungeon', 'cliff'] as const) {
+    for (let v = 0; v < WALL_VARIANTS; v++) {
+      const key = `wall_${style}_${v}`;
+      const n = ninjaProp(key);
+      if (n) NINJA_KEYS.add(key);
+      add(key, n ? shadeWallBlock(n) : wallCanvas(style, v));
+    }
+  }
   // Ninja-Bild, wenn geladen, sonst die prozedurale Zeichnung als Ersatz
   const addN = (key: string, fallback: () => HTMLCanvasElement) => {
     const n = ninjaProp(key);

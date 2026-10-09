@@ -24,6 +24,8 @@ export interface PropSpec {
   tint?: [number, number, number, number];
 }
 
+const REL = 'TilesetRelief';
+const DUN = 'TilesetDungeon';
 const NAT = 'TilesetNature';
 const ELE = 'TilesetElement';
 const HOU = 'TilesetHouse';
@@ -51,6 +53,16 @@ export const PROPS: Record<string, PropSpec> = {
   rock_dark_0: { f: NAT, r: [288, 144, 16, 16], tint: [30, 20, 40, 0.5] },
   rock_dark_1: { f: NAT, r: [258, 132, 29, 27], tint: [30, 20, 40, 0.5] },
   rock_dark_2: { f: NAT, r: [258, 132, 29, 27], flip: true, tint: [30, 20, 40, 0.5] },
+  // Wände (Felsfläche in Draufsicht, 16x16-Zellen); die Schattierung kommt in art.ts dazu
+  wall_cliff_0: { f: REL, r: [80, 96, 16, 16] },
+  wall_cliff_1: { f: REL, r: [80, 96, 16, 16], flip: true },
+  wall_cliff_2: { f: REL, r: [80, 96, 16, 16], tint: [90, 60, 50, 0.2] },
+  wall_dungeon_0: { f: REL, r: [80, 16, 16, 16], tint: [70, 56, 90, 0.22] },
+  wall_dungeon_1: { f: REL, r: [80, 16, 16, 16], flip: true, tint: [70, 56, 90, 0.22] },
+  wall_dungeon_2: { f: REL, r: [80, 16, 16, 16], tint: [50, 40, 70, 0.3] },
+  wall_brick_0: { f: DUN, r: [80, 16, 16, 16] },
+  wall_brick_1: { f: DUN, r: [80, 16, 16, 16], flip: true },
+  wall_brick_2: { f: DUN, r: [80, 16, 16, 16], tint: [60, 40, 40, 0.25] },
   // Gräber (Kreuz, Grabstein, Stele) und Säule
   grave_0: { f: ELE, r: [64, 32, 16, 16] },
   grave_1: { f: ELE, r: [80, 32, 16, 16] },
