@@ -2,6 +2,7 @@ import type { World } from '../sim/world';
 import type { QuestMark } from '../sim/quests';
 import { uniqueDef } from '../sim/data';
 import { isTouch } from './touch';
+import { NINJA_BASE } from './ninja';
 
 const COLORS: Record<number, string> = {
   1: '#a8a29a', 2: '#4a4650', 3: '#6e8038', 4: '#7cae48', 5: '#847e96', 6: '#4a9ad0', 7: '#cc8a58',
@@ -39,8 +40,8 @@ export class Minimap {
     this.view.width = gw * zoom;
     this.view.height = gh * zoom;
     Object.assign(this.view.style, {
-      position: 'fixed', left: '12px', top: '12px', border: '1px solid #4b3f3a', background: '#0b0a0d',
-      imageRendering: 'pixelated', opacity: '0.7', pointerEvents: 'none', zIndex: '3',
+      position: 'fixed', right: '12px', top: '12px', border: '10px solid transparent', borderImage: `url("${NINJA_BASE}Ui/Theme/Theme%20Wood/nine_path_panel.png") 5 / 10px stretch`, background: '#0b0a0d', backgroundClip: 'padding-box',
+      imageRendering: 'pixelated', opacity: '0.88', pointerEvents: 'none', zIndex: '3',
     } as Partial<CSSStyleDeclaration>);
     document.body.appendChild(this.view);
     try {
@@ -52,8 +53,11 @@ export class Minimap {
     if (isTouch) {
       // Handy: klein starten, Antippen wechselt klein → groß → ausgeblendet; Menü-Knopf „Karte“ blendet wieder ein
       this.sizeIdx = 2;
+      this.view.style.right = 'auto';
       this.view.style.left = 'max(8px,env(safe-area-inset-left))';
-      this.view.style.top = 'max(8px,env(safe-area-inset-top))';
+      this.view.style.top = 'calc(max(8px,env(safe-area-inset-top)) + var(--tl-h) + 4px)';
+      this.view.style.borderWidth = '6px';
+      this.view.style.borderImageWidth = '6px';
       this.view.style.pointerEvents = 'auto';
       this.view.onclick = () => {
         if (this.sizeIdx === 2) this.sizeIdx = 0;
@@ -85,6 +89,13 @@ export class Minimap {
   private setVisible(v: boolean): void {
     this.visible = v;
     this.view.style.display = v ? 'block' : 'none';
+    this.syncHeight();
+  }
+
+  /** Höhe samt Rahmen als CSS-Variable, damit die Aufgabenanzeige darunter Platz lässt. */
+  private syncHeight(): void {
+    const h = this.visible && !isTouch ? this.view.offsetHeight || parseFloat(this.view.style.height) + 20 || 0 : 0;
+    document.documentElement.style.setProperty('--mm-h', `${h}px`);
   }
 
   /** Anzeigegröße per CSS (Auflösung bleibt, Marker skalieren mit); höchstens ein Teil des Fensters. */
@@ -95,6 +106,7 @@ export class Minimap {
     const f = isTouch ? Math.min(1, (window.innerWidth * 0.4) / w0, (window.innerHeight * 0.55) / h0) : 1;
     this.view.style.width = `${Math.round(w0 * f)}px`;
     this.view.style.height = `${Math.round(h0 * f)}px`;
+    this.syncHeight();
   }
 
   draw(px: number, py: number, marks: QuestMark[] = []): void {

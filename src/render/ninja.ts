@@ -4,7 +4,7 @@
  * Lädt nie nach dem Start nach: `ninjaImg()` liefert nur, was `preloadNinja()` geholt hat.
  */
 
-const BASE = `${(import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/'}assets/ninja/`;
+export const NINJA_BASE = `${(import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/'}assets/ninja/`;
 const store = new Map<string, HTMLImageElement>();
 
 export function ninjaImg(path: string): HTMLImageElement | null {
@@ -27,7 +27,7 @@ export function preloadNinja(paths: string[], timeoutMs = 8000): Promise<void> {
       const img = new Image();
       img.onload = () => { store.set(p, img); done(); };
       img.onerror = done;
-      img.src = BASE + p;
+      img.src = NINJA_BASE + p;
     }
   });
 }

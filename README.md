@@ -27,6 +27,6 @@ npm run server                      # Terminal 1: Server, nur lokal erreichbar (
 Karte neu erzeugen: `python3 scripts/gen_map.py --preview`.
 
 ## Grafik und Lizenzen
-Figuren, Monster, NPCs, Truhen sowie Item- und Skill-Icons stammen aus „Dungeon Crawl 32x32 Tiles“ (Dungeon Crawl Stone Soup, **CC0**, https://opengameart.org/content/dungeon-crawl-32x32-tiles); Terrain, Wände und Effekte werden im Code gezeichnet. Fehlt ein Sprite, greift die prozedurale Grafik als Fallback. Quellen, Lizenzprüfung und Dateiliste: `ASSETS.md`; im Spiel F1 (Credits). Sprites neu importieren: `python3 scripts/import_dcss.py "<entpacktes Paket>"`.
+Figuren, Monster, NPCs, Truhen sowie Item- und Skill-Icons stammen aus „Dungeon Crawl 32x32 Tiles“ (Dungeon Crawl Stone Soup, **CC0**, https://opengameart.org/content/dungeon-crawl-32x32-tiles); Gelände, Häuser, Bäume und Props, Fenster-/Knopfrahmen, Porträt und Pixelschrift stammen aus dem „Ninja Adventure Asset Pack“ (Pixel-Boy und AAA, **CC0**, https://pixel-boy.itch.io/ninja-adventure-asset-pack); Wände, Effekte und Ton werden teils im Code gezeichnet. Fehlt ein Sprite, greift die prozedurale Grafik als Fallback. Quellen, Lizenzprüfung und Dateiliste: `ASSETS.md`; im Spiel F1 (Credits). Sprites neu importieren: `python3 scripts/import_dcss.py "<entpacktes Paket>"`.
 
 Details: `SPEC.md` (Konzept, Annahmen), `HANDOFF.md` (Stand für die nächste Session).

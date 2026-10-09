@@ -15,6 +15,7 @@ import { type NextStep, giverLocation, questAvailable, questChains, questWhere, 
 import { lookKey, lookOf, playerPortrait } from './art';
 import { initCredits, toggleCredits } from './credits';
 import { goFullscreen, isFullscreen, isTouch } from './touch';
+import { BAR_CSS, faceUrl, installTheme } from './theme';
 
 const RARITY_COLOR: Record<Item['rarity'], string> = { normal: '#c9c4bd', magic: '#7f9fff', rare: '#f2c94c', set: '#5fd070', legendary: '#ff8a2a' };
 const SLOT_NAME: Record<EquipSlot, string> = { weapon: 'Waffe', head: 'Kopf', chest: 'Brust', hands: 'Hände', feet: 'Füße', ring: 'Ring', ring2: 'Ring', amulet: 'Amulett', offhand: 'Nebenhand', belt: 'Gürtel', cloak: 'Umhang', legs: 'Beine' };
@@ -179,54 +180,56 @@ function titleBar(text: string, win: HTMLElement, onClose: () => void, extra: HT
 }
 
 const CSS = `
-.a-win{position:fixed;background:linear-gradient(180deg,#1b1620 0%,#120f16 100%);border:2px solid #6b5a48;box-shadow:0 0 0 1px #14100c,0 0 0 3px #3a2f26,0 8px 30px rgba(0,0,0,.7);color:#d4c4a8;font:13px/1.4 Georgia,'Times New Roman',serif;display:none;z-index:10;user-select:none}
-.a-win{max-height:calc(100vh - 24px)}
+.a-win{position:fixed;display:none;z-index:10;user-select:none;max-height:calc(100vh - 24px - 2*var(--bw));box-shadow:0 8px 24px rgba(0,0,0,.6)}
 @media (max-width:1000px){.a-win{zoom:.76}}
-.a-win h3{margin:0;padding:6px 10px;font:bold 14px Georgia,serif;letter-spacing:.5px;color:#e8d4a8;background:linear-gradient(180deg,#3a2f26,#241d18);border-bottom:1px solid #6b5a48}
-.a-win h3{display:flex;align-items:center;justify-content:space-between;cursor:move;touch-action:none}
-.a-x{cursor:pointer;color:#c9b898;padding:0 6px;margin:-2px -4px -2px 8px;font:bold 16px Georgia,serif;line-height:1.2;border-radius:3px}
-.a-x:hover{color:#fff;background:#8a2a2a}
-.a-tabs{display:flex;background:#241d18;border-bottom:1px solid #6b5a48}
-.a-tab{flex:1;padding:6px 4px;text-align:center;cursor:pointer;color:#9a8a70;border-right:1px solid #3a2f26;font-size:12px}
-.a-tab:hover{color:#e8d4a8;background:#2e251e}
-.a-tab.on{color:#ffe8b0;background:#3a2f26;box-shadow:inset 0 -2px 0 #d8a24a}
-.a-body{padding:10px;overflow-y:auto;max-height:calc(100vh - 140px)}
-.a-sec{margin:12px 0 6px;padding-bottom:3px;border-bottom:1px solid #4b3f3a;font-weight:bold;color:#e8c888;letter-spacing:.5px}
+.a-win h3{margin:0 0 4px;padding:2px 8px 0;font:18px/1.2 var(--ui-font);letter-spacing:.5px;color:var(--ink);display:flex;align-items:center;justify-content:space-between;cursor:move;touch-action:none}
+.a-x{cursor:pointer;color:var(--ink);padding:0 6px;margin:0 -2px 0 8px;font:18px/1.2 var(--ui-font)}
+.a-x:hover{color:#fff;background:#9b2a2a}
+.a-tabs{display:flex;flex-wrap:wrap;gap:2px;margin:0 0 4px}
+.a-tab{flex:1 1 30%;min-width:0;padding:0;text-align:center;cursor:pointer;font-size:15px;line-height:18px;border-width:3px 3px 5px;border-image-width:3px 3px 5px}
+.a-tab.on{color:var(--ink)}
+.a-body{padding:6px 8px;overflow-y:auto;max-height:calc(100vh - 200px)}
+.a-sec{margin:12px 0 6px;padding-bottom:3px;border-bottom:2px solid var(--wood-l);color:var(--gold);letter-spacing:.8px}
 .a-grid{display:grid;gap:3px;grid-template-columns:repeat(${BAG_COLS},46px)}
-.a-slot{position:relative;width:46px;height:46px;background:#0d0a10;border:1px solid #3a3040;box-shadow:inset 0 0 6px #000;box-sizing:border-box}
-.a-slot.item{cursor:grab;border-width:2px}
-.a-slot img{width:38px;height:38px;image-rendering:pixelated;position:absolute;left:3px;top:3px;pointer-events:none}
-.a-slot .n{position:absolute;right:2px;bottom:0;font:bold 11px system-ui;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000;pointer-events:none}
-.a-slot .l{position:absolute;left:2px;top:1px;font:10px system-ui;color:#7a6a58;pointer-events:none}
+.a-slot{position:relative;width:46px;height:46px}
+.a-slot.item{cursor:grab}
+.a-slot img,.hb img{width:100%;height:100%;image-rendering:pixelated;position:absolute;left:0;top:0;pointer-events:none;object-fit:contain}
+.a-slot .n{position:absolute;right:0;bottom:-2px;font:14px/1 var(--ui-font);color:#fff;text-shadow:-1px 0 #000,1px 0 #000,0 -1px #000,0 1px #000;pointer-events:none}
+.a-slot .l{position:absolute;left:0;top:-3px;font:11px/1 var(--ui-font);letter-spacing:0;white-space:nowrap;color:#fff;text-shadow:-1px 0 #131b1b,1px 0 #131b1b,0 -1px #131b1b,0 1px #131b1b;pointer-events:none}
 .a-slot.ok{box-shadow:inset 0 0 0 2px #5fd070,0 0 8px #5fd070}
 .a-slot.bad{box-shadow:inset 0 0 0 2px #d04a3a}
 .a-drop.ok{outline:2px dashed #5fd070;outline-offset:-3px;background:rgba(95,208,112,.08)}
 .pulse{animation:xpPulse 1.4s ease-in-out infinite}
 @keyframes xpPulse{0%,100%{box-shadow:0 0 0 0 rgba(216,162,74,0)}50%{box-shadow:0 0 10px 3px rgba(216,162,74,.85)}}
-.a-btn{background:linear-gradient(180deg,#4a3c2e,#2e251e);color:#f0e0c0;border:1px solid #8a7258;padding:3px 9px;cursor:pointer;font:12px Georgia,serif;border-radius:2px}
-.a-btn:hover{background:linear-gradient(180deg,#6a5640,#3e3226);color:#fff}
-.a-btn:disabled,.a-btn.off{opacity:.45;cursor:default}
+.a-btn{padding:0 8px;cursor:pointer;font:15px/20px var(--ui-font)}
 .a-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:3px 0}
-.a-note{font-size:11px;opacity:.65}
-.a-card{border:1px solid #3a3040;background:#0f0c13;padding:6px 8px;margin:5px 0;display:flex;gap:8px;align-items:center}
+.a-note{font-size:15px;color:var(--dim)}
+.a-card{border:2px solid var(--ink);background:var(--wood-d);box-shadow:inset 0 0 0 2px #5a4e34;padding:6px 8px;margin:5px 0;display:flex;gap:8px;align-items:center}
 .a-card img{width:36px;height:36px;image-rendering:pixelated;flex:none}
-.a-bar{height:8px;background:#241f2a;border:1px solid #3a3040;position:relative}
+.a-bar{height:10px;background:#1d1810;border:2px solid var(--ink);position:relative}
 .a-bar>div{height:100%}
-.a-doll{position:relative;width:324px;height:196px;margin:0 auto;background:radial-gradient(ellipse at 50% 60%,#2a2230 0%,#120f16 70%);border:1px solid #3a3040}
+.a-doll{position:relative;width:324px;height:196px;margin:0 auto;background:radial-gradient(ellipse at 50% 60%,#5a5238 0%,#2d2a1f 75%);border:2px solid var(--ink);box-shadow:inset 0 0 0 2px #5a4e34}
 .a-doll .a-slot{position:absolute}
-.a-doll img.me{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:104px;image-rendering:pixelated;opacity:.95;pointer-events:none}
-.orb{position:relative;width:92px;height:92px;border-radius:50%;border:3px solid #6b5a48;background:#0b080d;overflow:hidden;box-shadow:0 0 0 2px #14100c,0 4px 14px rgba(0,0,0,.7),inset 0 0 14px #000}
-.orb .liq{position:absolute;left:0;right:0;bottom:0}
-.orb .shine{position:absolute;left:14%;top:10%;width:38%;height:26%;border-radius:50%;background:rgba(255,255,255,.18);filter:blur(2px)}
-.orb .t{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:bold 13px system-ui;color:#fff;text-shadow:0 1px 3px #000,0 0 4px #000}
-.hb{position:relative;width:52px;height:52px;background:#0d0a10;border:2px solid #6b5a48;box-shadow:inset 0 0 6px #000,0 2px 6px rgba(0,0,0,.6);cursor:pointer}
-.hb img{width:42px;height:42px;image-rendering:pixelated;position:absolute;left:3px;top:3px;pointer-events:none}
-.hb .k{position:absolute;left:2px;top:0;font:bold 11px system-ui;color:#ffe8b0;text-shadow:0 0 3px #000,0 0 3px #000}
+.a-doll img.me{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:104px;image-rendering:pixelated;opacity:.95;pointer-events:none;object-fit:initial}
+.a-win input[type=range]{accent-color:#f06733}
+.a-win select{background:var(--wood-d);color:var(--txt);border:2px solid var(--ink);font-size:16px}
+.a-win input[type=text],.a-win input:not([type]){background:var(--wood-d);color:var(--txt);border:2px solid var(--ink)}
+.hb{position:relative;width:52px;flex:0 1 auto;min-width:30px;height:52px;cursor:pointer}
+.hb .k{position:absolute;left:-3px;top:-5px;font:14px/1 var(--ui-font);color:#fff;text-shadow:-1px 0 #000,1px 0 #000,0 -1px #000,0 1px #000}
 .hb .cd{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.62)}
-.hb .c{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:bold 15px system-ui;color:#fff;text-shadow:0 0 4px #000}
-.hb.armed{border-color:#ffd86a;box-shadow:inset 0 0 8px #000,0 0 10px #ffd86a}
+.hb .c{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:20px var(--ui-font);color:#fff;text-shadow:-1px 0 #000,1px 0 #000,0 -1px #000,0 1px #000}
+.hb.armed{box-shadow:inset 0 0 0 3px var(--gold),0 0 10px var(--gold)}
 .hb.nomana img{filter:grayscale(.8) brightness(.6)}
-.hb .cnt{position:absolute;right:3px;bottom:0;font:bold 12px system-ui;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000}
+.hb .cnt{position:absolute;right:-2px;bottom:-5px;font:14px/1 var(--ui-font);color:#fff;text-shadow:-1px 0 #000,1px 0 #000,0 -1px #000,0 1px #000}
+/* unten: Leben | Schnellleiste + XP | Mana */
+.hud>.pbar{width:150px;flex:0 1 auto;min-width:84px;margin-bottom:2px}
+#hud-tl{position:fixed;left:12px;top:12px;z-index:5;display:flex;align-items:stretch;gap:0;pointer-events:none}
+#hud-tl .face{width:76px;height:76px;image-rendering:pixelated;display:block}
+#hud-tl .hdr{display:flex;flex-direction:column;justify-content:center;min-width:168px;padding:0 4px 0 8px;gap:0}
+#hud-tl .nm{font-size:20px;line-height:1.1;color:var(--gold);text-shadow:0 2px var(--ink);max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#hud-tl .lv{font-size:16px;line-height:1.1;color:var(--txt);margin-bottom:2px}
+#hud-tl .pbar{height:18px;margin:4px 5px 4px 3px}
+${BAR_CSS}
 `;
 
 type Tab = 'inv' | 'char' | 'skills' | 'quests' | 'ach' | 'set';
@@ -261,9 +264,14 @@ export class Ui {
   private main = el('div', 'a-win');
   private side = el('div', 'a-win');
   private hud = el('div');
-  private orbHp = el('div', 'orb');
-  private orbMp = el('div', 'orb');
+  private orbHp = el('div', 'pbar hp');
+  private orbMp = el('div', 'pbar mp');
   private orbParts: { hp: { liq: HTMLElement; t: HTMLElement }; mp: { liq: HTMLElement; t: HTMLElement } } | null = null;
+  /** Porträt oben links: Name, Stufe und die zweiten Leisten für Leben/Mana */
+  private tl = el('div', 'w-frame');
+  private tlName = el('div', 'nm');
+  private tlLevel = el('div', 'lv');
+  private tlParts: { hp: { liq: HTMLElement; t: HTMLElement }; mp: { liq: HTMLElement; t: HTMLElement } } | null = null;
   private hotbar = el('div');
   private xpBar = el('div', 'a-bar');
   private xpFill = el('div');
@@ -308,7 +316,7 @@ export class Ui {
   private sideShown = false;
   private tipPanel = false;
   private trackerOpen = false;
-  private touchMenu = el('div');
+  private touchMenu = el('div', 'w-frame');
 
   constructor(
     private send: (c: Command) => void,
@@ -319,48 +327,53 @@ export class Ui {
     private slotIo: { list: () => { n: number; label: string; exists: boolean; active: boolean }[]; switchTo: (n: number) => void } | null = null,
     private manualIo: { save: () => void; load: () => void; info: () => string | null } | null = null,
   ) {
+    installTheme();
     const style = document.createElement('style');
     style.textContent = CSS;
     document.head.appendChild(style);
 
-    Object.assign(this.main.style, { right: '12px', top: '12px', width: '420px' });
-    Object.assign(this.side.style, { left: '12px', top: '190px', width: '420px' });
+    Object.assign(this.main.style, { right: '12px', top: '12px', width: '480px' });
+    Object.assign(this.side.style, { left: '12px', top: 'calc(var(--tl-h) + 24px)', width: '480px' });
 
-    this.hud.style.cssText = 'position:fixed;left:50%;bottom:8px;transform:translateX(-50%);display:flex;align-items:flex-end;gap:10px;pointer-events:none;z-index:5';
+    this.hud.className = 'hud';
+    this.hud.style.cssText = 'position:fixed;left:8px;right:8px;bottom:8px;display:flex;justify-content:center;align-items:flex-end;gap:4px;pointer-events:none;z-index:5';
     const mid = el('div');
-    mid.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none';
-    this.hotbar.style.cssText = 'display:flex;gap:4px;pointer-events:auto;min-height:56px;align-items:flex-end';
-    this.xpBar.style.cssText = 'width:100%;min-width:300px;position:relative';
-    this.xpFill.style.cssText = 'background:linear-gradient(180deg,#d8b84a,#8a7220)';
-    this.xpText.style.cssText = 'position:absolute;inset:-3px 0 0;text-align:center;font:10px system-ui;color:#fff;text-shadow:0 0 3px #000;line-height:14px';
+    mid.style.cssText = 'display:flex;flex-direction:column;align-items:stretch;gap:8px;pointer-events:none;min-width:0;flex:0 1 auto';
+    this.hotbar.style.cssText = 'display:flex;gap:4px;pointer-events:auto;min-height:56px;align-items:flex-end;justify-content:center';
+    this.xpBar.style.cssText = 'width:100%;min-width:300px;position:relative;height:16px;box-sizing:border-box';
+    this.xpFill.style.cssText = 'background:linear-gradient(180deg,#ffe27a 0 2px,#e8b832 2px calc(100% - 3px),#9a7a1a calc(100% - 3px))';
+    this.xpText.style.cssText = 'position:absolute;inset:-2px 4px 0;text-align:center;font:14px var(--ui-font);color:#fff;text-shadow:-1px 0 #131b1b,1px 0 #131b1b,0 -1px #131b1b,0 1px #131b1b;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
     this.xpBar.append(this.xpFill, this.xpText);
     this.statusBar.style.cssText = 'display:flex;gap:4px;min-height:20px;pointer-events:none';
     mid.append(this.statusBar, this.hotbar, this.xpBar);
     this.buildOrbs();
     this.hud.append(this.orbHp, mid, this.orbMp);
+    this.buildPortrait();
 
-    this.target.style.cssText = 'position:fixed;z-index:4;left:50%;top:10px;transform:translateX(-50%);background:rgba(14,12,18,.88);border:1px solid #6b5a48;color:#d4c4a8;font:13px Georgia,serif;padding:4px 12px;display:none;text-align:center;min-width:160px';
-    this.toast.style.cssText = 'position:fixed;z-index:4;left:12px;bottom:112px;width:420px;color:#d4c4a8;font:13px/1.35 Georgia,serif;pointer-events:none;text-shadow:0 1px 2px #000,0 0 4px #000';
-    this.tracker.style.cssText = 'position:fixed;right:12px;top:12px;max-width:260px;text-align:right;color:#e8d9b0;font:13px Georgia,serif;text-shadow:0 1px 4px #000,0 0 2px #000;background:rgba(10,8,6,.45);border-right:2px solid #d8a24a;padding:6px 10px;pointer-events:auto;z-index:5;display:none';
-    this.bannerEl.style.cssText = 'position:fixed;left:50%;top:70px;transform:translateX(-50%);color:#e8d9b0;font:bold 24px Georgia,serif;text-shadow:0 2px 8px #000,0 0 2px #000;letter-spacing:1.5px;opacity:0;transition:opacity .6s;pointer-events:none;z-index:6;text-align:center';
-    this.tip.style.cssText = 'position:fixed;z-index:50;max-width:270px;background:rgba(10,8,14,.97);border:1px solid #8a7258;color:#d4c4a8;font:12px/1.45 Georgia,serif;padding:8px 10px;pointer-events:none;display:none;box-shadow:0 4px 16px #000';
-    this.hintEl.style.cssText = 'position:fixed;left:12px;top:12px;z-index:5;color:#a8d8a0;font:12px Georgia,serif;text-shadow:0 1px 3px #000;opacity:0;transition:opacity .5s;pointer-events:none';
+    this.target.className = 'w-frame';
+    this.target.style.cssText = 'position:fixed;z-index:4;left:50%;top:8px;transform:translateX(-50%);--bw:6px;font:15px var(--ui-font);padding:0 8px;display:none;text-align:center;min-width:160px;max-width:min(560px,60vw)';
+    this.toast.style.cssText = 'position:fixed;z-index:4;left:12px;bottom:112px;width:420px;color:#f1e6c8;font:15px/1.3 var(--ui-font);pointer-events:none;text-shadow:0 1px 2px #000,0 0 4px #000';
+    this.tracker.style.cssText = 'position:fixed;right:12px;top:calc(var(--mm-h) + 12px);max-width:260px;text-align:right;color:#f1e6c8;font:15px var(--ui-font);text-shadow:0 1px 4px #000,0 0 2px #000;background:rgba(29,24,16,.7);border-right:3px solid #f06733;padding:6px 10px;pointer-events:auto;z-index:5;display:none';
+    this.bannerEl.style.cssText = 'position:fixed;left:50%;top:70px;transform:translateX(-50%);color:#e8d9b0;font:28px var(--ui-font);text-shadow:0 2px 8px #000,0 0 2px #000;letter-spacing:1.5px;opacity:0;transition:opacity .6s;pointer-events:none;z-index:6;text-align:center';
+    this.tip.className = 'w-frame tipbox';
+    this.tip.style.cssText = 'position:fixed;z-index:50;max-width:290px;--bw:8px;background:#26221a;font:14px/1.4 var(--ui-font);padding:4px 6px;pointer-events:none;display:none;box-shadow:0 4px 16px #000';
+    this.hintEl.style.cssText = 'position:fixed;left:12px;top:calc(var(--tl-h) + 20px);z-index:5;color:#a8d8a0;font:14px var(--ui-font);text-shadow:0 1px 3px #000;opacity:0;transition:opacity .5s;pointer-events:none';
     if (isTouch) {
       this.tracker.onclick = (e) => {
         if ((e.target as HTMLElement).closest('button')) return;
         this.trackerOpen = !this.trackerOpen;
         this.trackerKey = '';
       };
-      Object.assign(this.toast.style, { width: '26vw', bottom: '84px', font: '11px/1.25 Georgia,serif' });
+      Object.assign(this.toast.style, { width: '26vw', bottom: '84px', font: '13px/1.25 var(--ui-font)' });
       this.tracker.style.top = 'max(8px,env(safe-area-inset-top))';
       this.tracker.style.right = 'max(8px,env(safe-area-inset-right))';
-      this.bannerEl.style.fontSize = '18px';
+      this.bannerEl.style.fontSize = '20px';
       Object.assign(this.xpBar.style, { minWidth: '0', width: '100%', height: '12px' });
       this.hud.id = 't-hud';
       this.hotbar.classList.add('t-hot');
-      Object.assign(this.xpText.style, { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', font: '10px/12px system-ui', inset: '-1px 0 0' });
+      Object.assign(this.xpText.style, { font: '12px/12px var(--ui-font)', inset: '-1px 4px 0' });
     }
-    document.body.append(this.main, this.side, this.hud, this.tracker, this.target, this.toast, this.bannerEl, this.tip, this.hintEl);
+    document.body.append(this.main, this.side, this.hud, this.tl, this.tracker, this.target, this.toast, this.bannerEl, this.tip, this.hintEl);
 
     if (isTouch) this.buildTouchControls();
     initCredits();
@@ -457,14 +470,30 @@ export class Ui {
   /* -------------------------------------------------------------- HUD */
 
   private buildOrbs(): void {
-    const mk = (orb: HTMLElement, color: string) => {
-      const liq = el('div', 'liq');
-      liq.style.background = `linear-gradient(180deg,${color} 0%,#000 160%)`;
-      const t = el('div', 't');
-      orb.append(liq, el('div', 'shine'), t);
-      return { liq, t };
-    };
-    this.orbParts = { hp: mk(this.orbHp, '#d83a3a'), mp: mk(this.orbMp, '#3a6ae0') };
+    this.orbParts = { hp: this.barParts(this.orbHp), mp: this.barParts(this.orbMp) };
+  }
+
+  private barParts(bar: HTMLElement): { liq: HTMLElement; t: HTMLElement } {
+    const liq = el('div', 'liq');
+    const t = el('div', 't');
+    bar.append(liq, t);
+    return { liq, t };
+  }
+
+  /** Porträt (Faceset des Ninja-Helden) mit Name, Stufe und Leisten oben links. */
+  private buildPortrait(): void {
+    this.tl.id = 'hud-tl';
+    const fc = el('div', 'fc');
+    const face = el('img', 'face') as HTMLImageElement;
+    face.src = faceUrl('Knight');
+    face.alt = '';
+    fc.append(face);
+    const hdr = el('div', 'hdr');
+    const hp = el('div', 'pbar hp');
+    const mp = el('div', 'pbar mp');
+    this.tlParts = { hp: this.barParts(hp), mp: this.barParts(mp) };
+    hdr.append(this.tlName, this.tlLevel, hp, mp);
+    this.tl.append(fc, hdr);
   }
 
   update(w: World, p: Actor, target?: Actor): void {
@@ -499,12 +528,12 @@ export class Ui {
       const row = el('div');
       row.style.cssText = 'margin:0 0 6px;padding-bottom:5px;border-bottom:1px solid #6b5a48';
       const head = el('div', '', '▶ Nächster Schritt');
-      head.style.cssText = 'font-weight:bold;color:#ffcf6a;font-size:12px;letter-spacing:.5px';
+      head.style.cssText = 'font-weight:bold;color:#ffcf6a;font-size:14px;letter-spacing:.5px';
       const txt = el('div', '', step.text);
       row.append(head, txt);
       if (step.x !== undefined && step.y !== undefined) {
         const go = el('button', 'a-btn', 'Hinlaufen');
-        go.style.cssText = 'margin-top:4px;font-size:11px;padding:2px 8px;cursor:pointer';
+        go.style.cssText = 'margin-top:4px;font-size:13px;padding:2px 8px;cursor:pointer';
         go.onclick = () => this.send({ type: 'moveTo', x: Math.round(step.x!), y: Math.round(step.y!) });
         row.append(go);
       }
@@ -520,20 +549,30 @@ export class Ui {
       goal.style.opacity = '.85';
       row.append(title, goal);
       const where = questWhere(w, q, done);
-      if (where) { const wh = el('div', '', where); wh.style.cssText = 'opacity:.6;font-size:12px'; row.append(wh); }
+      if (where) { const wh = el('div', '', where); wh.style.cssText = 'opacity:.6;font-size:14px'; row.append(wh); }
       this.tracker.append(row);
     }
-    if (act.length > shown.length) { const more = el('div', '', `+${act.length - shown.length} weitere (J)`); more.style.cssText = 'opacity:.6;font-size:12px'; this.tracker.append(more); }
+    if (act.length > shown.length) { const more = el('div', '', `+${act.length - shown.length} weitere (J)`); more.style.cssText = 'opacity:.6;font-size:14px'; this.tracker.append(more); }
   }
 
   private updateHud(p: Actor, t?: Actor): void {
     const o = this.orbParts!;
     const hpMax = maxHpOf(p);
     const mpMax = maxManaOf(p);
-    o.hp.liq.style.height = `${Math.max(0, Math.min(1, p.hp / hpMax)) * 100}%`;
-    o.mp.liq.style.height = `${Math.max(0, Math.min(1, p.mana / mpMax)) * 100}%`;
-    o.hp.t.textContent = `${Math.ceil(p.hp)}`;
-    o.mp.t.textContent = `${Math.floor(p.mana)}`;
+    const hpFrac = `${Math.max(0, Math.min(1, p.hp / hpMax)) * 100}%`;
+    const mpFrac = `${Math.max(0, Math.min(1, p.mana / mpMax)) * 100}%`;
+    const hpTxt = `${Math.ceil(p.hp)}/${hpMax}`;
+    const mpTxt = `${Math.floor(p.mana)}/${mpMax}`;
+    for (const parts of [o, this.tlParts!]) {
+      parts.hp.liq.style.width = hpFrac;
+      parts.mp.liq.style.width = mpFrac;
+      if (parts.hp.t.textContent !== hpTxt) parts.hp.t.textContent = hpTxt;
+      if (parts.mp.t.textContent !== mpTxt) parts.mp.t.textContent = mpTxt;
+    }
+    const specName = p.spec ? SPECS.find((x) => x.id === p.spec)?.name : '';
+    const lvTxt = `Stufe ${p.level}${specName ? ` · ${specName}` : ''}`;
+    if (this.tlName.textContent !== p.name) this.tlName.textContent = p.name;
+    if (this.tlLevel.textContent !== lvTxt) this.tlLevel.textContent = lvTxt;
     this.orbHp.title = `Leben ${Math.ceil(p.hp)}/${hpMax}`;
     this.orbMp.title = `Mana ${Math.floor(p.mana)}/${mpMax}`;
 
@@ -547,6 +586,7 @@ export class Ui {
     const heavy = load >= 0.9;
     this.xpText.textContent = `Stufe ${p.level} · ${p.level >= MAX_LEVEL ? 'Maximum' : `${into} / ${span} XP`} · ${p.gold} Gold${p.statPoints ? ` · ${p.statPoints} Attributpunkte (C)` : ''}${p.skillPoints ? ` · ${p.skillPoints} Skillpunkte (K)` : ''}${heavy ? ` · Last ${carriedWeight(p).toFixed(0)}/${carryCapacity(p)}` : ''}`;
     this.xpText.style.color = heavy ? '#ffb0a0' : '#fff';
+    this.xpBar.title = this.xpText.textContent;
 
     // Schnellleiste: Tränke (Q/E) und Skills (1–9); Elemente bleiben bestehen, nur Zustand wird aktualisiert
     const act = hotbarFor(p);
@@ -613,7 +653,7 @@ export class Ui {
       this.statusKey = ck;
       this.statusBar.replaceChildren(...chips.map(([n, c, sec, id]) => {
         const d = el('div');
-        d.style.cssText = `font:bold 11px system-ui;padding:1px 6px 1px 3px;border:1px solid ${c};color:${c};background:rgba(10,8,14,.85);border-radius:3px;display:flex;align-items:center;gap:3px`;
+        d.style.cssText = `font:13px var(--ui-font);padding:1px 6px 1px 3px;border:1px solid ${c};color:${c};background:rgba(10,8,14,.85);border-radius:3px;display:flex;align-items:center;gap:3px`;
         const ic = document.createElement('img');
         ic.src = statusIcon(id);
         ic.alt = '';
@@ -649,7 +689,7 @@ export class Ui {
     const s = this.sel;
     if (!isTouch || !s) return null;
     const { d } = s;
-    const box = el('div', 'a-sel');
+    const box = el('div', 'a-sel tipbox');
     this.tipPanel = true;
     this.showTip(d.item, s.equipped, { clientX: 0, clientY: 0 } as MouseEvent);
     this.tipPanel = false;
@@ -731,27 +771,29 @@ export class Ui {
     if (this.dragging || (isTouch && !this.tipPanel)) return;
     const box = this.tip;
     box.replaceChildren();
-    const head = el('div', '', it.name);
-    head.style.cssText = `font-weight:bold;color:${RARITY_COLOR[it.rarity]}`;
-    box.append(head);
+    box.append(el('div', 'tp-name', it.name));
     const rar = { normal: 'Normal', magic: 'Magisch', rare: 'Selten', set: 'Set', legendary: 'Legendär' }[it.rarity];
     const slotName = it.slot === 'potion' ? 'Trank' : it.slot === 'gem' ? 'Edelstein' : it.off === 'arrows' ? 'Pfeile' : it.off === 'shield' ? 'Schild' : SLOT_NAME[it.slot];
     const baseName = it.slot !== 'potion' && it.slot !== 'gem' && it.rarity === 'rare' ? templateById(it.templateId).name : '';
-    const sub = el('div', '', `${rar} · ${slotName}${baseName ? ` (${baseName})` : ''}`);
-    sub.style.opacity = '.6';
+    const sub = el('div');
+    const rarEl = el('span', '', rar);
+    rarEl.style.color = RARITY_COLOR[it.rarity];
+    sub.append(rarEl, ` · ${slotName}${baseName ? ` (${baseName})` : ''}`);
     box.append(sub);
     // gewürfelte Affixe und Sockel zeigt der Block darunter (mit Stufe bzw. Edelstein), nicht doppelt
     const tmpl = it.slot === 'potion' || it.slot === 'gem' ? undefined : templateById(it.templateId);
     const skip = new Set(it.affixes.slice(tmpl?.base?.length ?? 0).map((a) => affixText(a)));
     for (const part of describeItem(it).split(' · ')) {
       if (part.startsWith('Benötigt ') || skip.has(part) || (it.sockets?.length && part.startsWith('Sockel '))) continue;
-      box.append(el('div', '', part));
+      // Primärwerte violett (Schaden groß), Boni grün, Set orange, Gewicht/Build gedämpft
+      const cls = part.startsWith('Schaden ') ? 'tp-big' : /^(Rüstung |Heilt |Stellt |Pfeile |Einhand|Zweihand|Teleportiert)/.test(part) ? 'tp-pri' : part.startsWith('Set: ') ? 'tp-set' : /^(Gewicht |Build: )/.test(part) ? 'tp-dim' : 'tp-bonus';
+      box.append(el('div', cls, part));
     }
     if (it.affixes.length && it.slot !== 'potion' && it.slot !== 'gem') {
       const t = templateById(it.templateId);
       const base = t.base?.length ?? 0;
       const q = el('div');
-      q.style.cssText = 'margin-top:4px;font-size:11px';
+      q.style.cssText = 'margin-top:4px;font-size:13px';
       it.affixes.slice(base).forEach((a) => {
         let line: HTMLElement;
         if (a.tier) {
@@ -772,7 +814,7 @@ export class Ui {
     }
     if (it.sockets?.length) {
       const sk = el('div');
-      sk.style.cssText = 'margin-top:4px;font-size:11px';
+      sk.style.cssText = 'margin-top:4px;font-size:13px';
       for (const g of it.sockets) {
         const line = el('div', '', g ? `◆ ${gemName(g)}: ${gemEffect(g, it.slot)}` : '◇ leerer Sockel');
         line.style.color = g ? `#${GEM_COLOR[g.kind].toString(16).padStart(6, '0')}` : '#7a6a58';
@@ -809,7 +851,7 @@ export class Ui {
       box.append(verdict);
       if (it.power?.id !== equipped.power?.id && (it.power || equipped.power)) {
         const eff = el('div', '', `Effekt: ${equipped.power ? POWER_TEXT[equipped.power.id](equipped.power.value) : 'keiner'} → ${it.power ? POWER_TEXT[it.power.id](it.power.value) : 'keiner'}`);
-        eff.style.cssText = 'color:#e8c888;font-size:11px';
+        eff.style.cssText = 'color:#e8c888;font-size:13px';
         box.append(eff);
       }
       for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
@@ -950,14 +992,17 @@ export class Ui {
     const s = el('div', item ? 'a-slot item' : 'a-slot');
     if (label) s.append(el('div', 'l', label));
     if (item) {
-      s.style.borderColor = RARITY_COLOR[item.rarity];
-      if (item.rarity !== 'normal') s.style.boxShadow = `inset 0 0 8px ${RARITY_COLOR[item.rarity]}55`;
+      // Seltenheit als Innenring in der Ninja-Inventarzelle (border-image ignoriert border-color)
+      const rc = RARITY_COLOR[item.rarity];
+      s.style.setProperty('--rc', rc);
+      s.style.boxShadow = item.rarity !== 'normal' ? `inset 0 0 0 2px ${rc}, inset 0 0 8px ${rc}99` : `inset 0 0 0 2px ${rc}66`;
       s.append(Object.assign(el('img'), { src: itemIcon(item) }));
     }
     return s;
   }
 
   private renderMain(p: Actor): void {
+    this.tip.style.display = 'none'; // Inhalt wird neu aufgebaut: ein hängender Tooltip würde auf nichts mehr zeigen
     const tabs = el('div', 'a-tabs');
     for (const [id, label] of ([['inv', 'Inventar', 'inv'], ['char', 'Charakter', 'char'], ['skills', 'Fertigkeiten', 'skills'], ['quests', 'Aufgaben', 'quests'], ['ach', 'Erfolge', 'ach'], ['set', 'Einstellungen', 'settings']] as [Tab, string, Parameters<typeof keyOf>[0]][]).map(([id, name, act]): [Tab, string] => [id, isTouch ? name : `${name} (${keyLabel(keyOf(act))})`])) {
       const t = el('div', `a-tab${this.tab === id ? ' on' : ''}`, label);
@@ -978,7 +1023,7 @@ export class Ui {
       this.renderHunts(body, p);
     }
     const toNpc = isTouch && this.sideShown ? [Object.assign(el('span', 'a-x', 'Händler'), { onclick: () => { this.touchMain = false; this.sel = null; this.key = ''; this.layout(); } })] : [];
-    for (const b of toNpc) b.style.cssText = 'font-size:13px;padding:0 10px;display:flex;align-items:center;border-left:1px solid #4b3f3a';
+    for (const b of toNpc) b.style.cssText = 'font-size:15px;padding:0 10px;display:flex;align-items:center;border-left:1px solid #4b3f3a';
     const title = titleBar(`${p.name} · Stufe ${p.level}`, this.main, () => this.toggle(false), toNpc);
     this.main.replaceChildren(...[title, tabs, body, this.selPanel(p)].filter((x): x is HTMLElement => !!x));
   }
@@ -1076,11 +1121,11 @@ export class Ui {
         const it = st.item;
         if (isUpgrade(p, it)) {
           const up = el('div', 'n', '▲');
-          up.style.cssText = 'right:auto;left:3px;bottom:auto;top:1px;color:#6fe08a;font-size:12px';
+          up.style.cssText = 'right:auto;left:3px;bottom:auto;top:1px;color:#6fe08a;font-size:14px';
           s.append(up);
         } else if (isDowngrade(p, it)) {
           const dn = el('div', 'n', '▼');
-          dn.style.cssText = 'right:auto;left:3px;bottom:auto;top:1px;color:#ff7a6a;font-size:12px';
+          dn.style.cssText = 'right:auto;left:3px;bottom:auto;top:1px;color:#ff7a6a;font-size:14px';
           s.append(dn);
         }
         this.makeDraggable(s, { item: it, from: 'bag' }, equippedFor(p, it), () =>
@@ -1753,7 +1798,7 @@ export class Ui {
             seen.add(g.templateId);
             const gi = g.gem!;
             const b = el('button', `a-btn${p.gold >= socketCost(gi) ? '' : ' off'}`, `${full ? 'Ersetze mit' : '+'} ${gemName(gi)} ${socketCost(gi)}g`);
-            b.style.cssText += `;margin:0 4px 3px 0;border-color:#${GEM_COLOR[gi.kind].toString(16).padStart(6, '0')}`;
+            b.style.cssText += `;margin:0 4px 3px 0;box-shadow:0 0 0 2px #${GEM_COLOR[gi.kind].toString(16).padStart(6, '0')}`;
             b.onclick = () => {
               if (full && !confirm(`${gemName(gi)} ersetzt den Edelstein in Sockel 1 (der alte geht verloren). Fortfahren?`)) return;
               this.send({ type: 'socket', gemId: g.id, itemId: it.id, ...(full ? { index: 0 } : {}) });
@@ -1836,7 +1881,7 @@ export class Ui {
       if (locked) body.append(el('div', 'a-note', `Weitere Aufgaben (${locked}) folgen, sobald die vorherige erledigt ist.`));
     }
     const toBag = isTouch ? [Object.assign(el('span', 'a-x', 'Rucksack'), { onclick: () => { this.touchMain = true; this.sel = null; this.key = ''; this.layout(); } })] : [];
-    for (const b of toBag) b.style.cssText = 'font-size:13px;padding:0 10px;display:flex;align-items:center;border-left:1px solid #4b3f3a';
+    for (const b of toBag) b.style.cssText = 'font-size:15px;padding:0 10px;display:flex;align-items:center;border-left:1px solid #4b3f3a';
     const title = titleBar(near.map((n) => n.name).join(' · '), this.side, () => {
       this.sideClosed = near.map((n) => n.id).join(',');
       this.sideShown = false;
