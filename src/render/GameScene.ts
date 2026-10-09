@@ -1378,9 +1378,9 @@ export class GameScene extends Phaser.Scene {
     return this.zoneMap;
   }
 
-  /** Abstand (Kacheln, 1..3) zur nächsten Landkachel; 3 = mindestens 3 */
+  /** Abstand (Kacheln, 1..6) zur nächsten Landkachel; 6 = mindestens 6 */
   private landDistance(x: number, y: number): number {
-    for (let r = 1; r < 3; r++) {
+    for (let r = 1; r < 6; r++) {
       for (let dy = -r; dy <= r; dy++) {
         for (let dx = -r; dx <= r; dx++) {
           if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
@@ -1389,7 +1389,7 @@ export class GameScene extends Phaser.Scene {
         }
       }
     }
-    return 3;
+    return 6;
   }
 
   private nearDoor(x: number, y: number): boolean {
@@ -1612,7 +1612,7 @@ export class GameScene extends Phaser.Scene {
     let dy = 8;
     if (gid === 2) {
       const style = this.scanFor(x, y, 2, 5) ? 'dungeon' : this.scanFor(x, y, 2, 1) ? 'brick' : 'cliff';
-      key = `wall_${style}_${v % WALL_VARIANTS}`;
+      key = `wall_${style === 'cliff' && this.gidAt(x, y + 1) === 2 ? 'top' : style}_${v % WALL_VARIANTS}`;
       oy = 1;
       dy = TILE_H / 2;
     } else if (gid === 10) {

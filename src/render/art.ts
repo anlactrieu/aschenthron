@@ -1328,6 +1328,22 @@ export function registerStaticArt(scene: Phaser.Scene): void {
       add(key, n ? shadeWallBlock(n) : wallCanvas(style, v));
     }
   }
+  // Berg-Oberseite: flache Steinplatte mit ein paar Steinsprenkeln (Innenkacheln großer Felsmassen)
+  for (let v = 0; v < WALL_VARIANTS; v++) {
+    const key = `wall_top_${v}`;
+    const n = ninjaProp(key);
+    if (!n) { add(key, wallCanvas('cliff', v)); continue; }
+    NINJA_KEYS.add(key);
+    const c = mkCanvas(n.width, n.height);
+    const g = ctxOf(c);
+    g.drawImage(n, 0, 0);
+    const r = rng(v * 71 + 5);
+    for (let i = 0; i < 9; i++) {
+      g.fillStyle = r() < 0.55 ? 'rgba(40,52,44,0.34)' : 'rgba(235,240,225,0.2)';
+      g.fillRect(Math.floor(r() * 14) * 3, Math.floor(r() * 15) * 3, 3 * (1 + Math.floor(r() * 3)), 3);
+    }
+    add(key, c);
+  }
   // Ninja-Bild, wenn geladen, sonst die prozedurale Zeichnung als Ersatz
   const addN = (key: string, fallback: () => HTMLCanvasElement) => {
     const n = ninjaProp(key);

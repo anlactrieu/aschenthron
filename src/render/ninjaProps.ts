@@ -71,6 +71,10 @@ export const PROPS: Record<string, PropSpec> = {
   wall_cliff_0: { f: REL, r: [64, 16, 16, 16] },
   wall_cliff_1: { f: REL, r: [96, 16, 16, 16], flip: true },
   wall_cliff_2: { f: REL, r: [144, 16, 16, 16] },
+  // Berg-Oberseite (Hochfläche, Innenkacheln großer Felsmassen): flacher Ausschnitt der Relief-Platte, auf Stein getönt
+  wall_top_0: { f: REL, r: [28, 8, 16, 16], tint: [104, 116, 96, 0.8] },
+  wall_top_1: { f: REL, r: [28, 8, 16, 16], flip: true, tint: [112, 112, 100, 0.8] },
+  wall_top_2: { f: REL, r: [28, 8, 16, 16], tint: [96, 108, 104, 0.82] },
   wall_dungeon_0: { f: DUN, r: [80, 16, 16, 16], tint: [92, 98, 124, 0.7] },
   wall_dungeon_1: { f: DUN, r: [80, 16, 16, 16], flip: true, tint: [84, 92, 118, 0.72] },
   wall_dungeon_2: { f: DUN, r: [80, 16, 16, 16], tint: [100, 90, 118, 0.7] },

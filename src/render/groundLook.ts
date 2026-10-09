@@ -358,17 +358,15 @@ export function drawWaterTile(ctx: CanvasRenderingContext2D, x: number, y: numbe
     ctx.fillRect(ox, oy, tile, tile);
   }
   const n = 0.85 + mix32(x, y, 20) * 0.3;
-  if (dist >= 3) {
-    ctx.fillStyle = swamp ? `rgba(30,24,70,${0.2 * n})` : `rgba(24,84,168,${0.22 * n})`;
-    ctx.fillRect(ox, oy, tile, tile);
-  } else if (dist === 2) {
-    ctx.fillStyle = swamp ? `rgba(30,24,70,${0.08 * n})` : `rgba(30,100,180,${0.09 * n})`;
+  if (dist >= 2) {
+    const k = (Math.min(dist, 6) - 1) * 0.045 * n;
+    ctx.fillStyle = swamp ? `rgba(30,24,70,${k * 0.9})` : `rgba(24,84,168,${k})`;
     ctx.fillRect(ox, oy, tile, tile);
   }
   const r = mix32(x, y, 21);
   let id: string | null = null;
   if (dist <= 2 && r < (swamp ? 0.26 : 0.07)) id = mix32(x, y, 22) < 0.3 ? 'lily_flower' : 'lily';
-  else if (dist >= 2 && r > 0.82) id = mix32(x, y, 23) < 0.5 ? 'ripple_0' : 'ripple_1';
+  else if (dist >= 3 && r > 0.82) id = mix32(x, y, 23) < 0.5 ? 'ripple_0' : 'ripple_1';
   if (!id) return;
   const spr = detailSprite(id);
   if (!spr) return;
