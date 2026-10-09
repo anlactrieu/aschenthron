@@ -15,6 +15,7 @@ import { CHEST_SPRITES, MONSTER_SPRITES, PLAYER_BASE, PLAYER_DEFAULTS, PLAYER_HA
 type Ctx = CanvasRenderingContext2D;
 
 import { groundCell } from './ninja';
+import { lookImage, tileLook, tintCanvas } from './groundLook';
 import { NINJA_KEYS, ninjaProp } from './ninjaProps';
 
 export const TILE_W = 48;
@@ -389,13 +390,29 @@ const TILE_PAL: Record<number, TilePalette> = {
 const tileCache = new Map<string, HTMLCanvasElement>();
 
 /** Boden aus dem Ninja-Paket: Zelle 3x hochskaliert, getönt, mit ein paar Punkten je Variante gegen Wiederholung. */
-function ninjaTile(gid: number, variant: number): HTMLCanvasElement | null {
-  const cell = groundCell(gid);
-  if (!cell) return null;
+function ninjaTile(gid: number, variant: number, zone: number): HTMLCanvasElement | null {
+  const look = tileLook(gid, zone);
+  let img: HTMLImageElement | null = null;
+  let sx = 0;
+  let sy = 0;
+  if (look?.cells) {
+    const lc = look.cells[variant % look.cells.length]!;
+    img = lookImage(lc);
+    sx = lc.x;
+    sy = lc.y;
+  }
+  if (!img) {
+    const cell = groundCell(gid);
+    if (!cell) return null;
+    img = cell.img;
+    sx = cell.tx * 16;
+    sy = cell.ty * 16;
+  }
   const c = mkCanvas(TILE_W, TILE_H);
   const x = ctxOf(c);
-  x.drawImage(cell.img, cell.tx * 16, cell.ty * 16, 16, 16, 0, 0, TILE_W, TILE_H);
-  const r = rng(gid * 977 + variant * 131 + 7);
+  x.drawImage(img, sx, sy, 16, 16, 0, 0, TILE_W, TILE_H);
+  if (look?.tint) tintCanvas(c, look.tint);
+  const r = rng(gid * 977 + variant * 131 + 7 + zone * 31);
   const px = TILE_W / 16;
   for (let i = 0; i < 5; i++) {
     x.fillStyle = r() < 0.5 ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)';
@@ -410,11 +427,11 @@ function ninjaTile(gid: number, variant: number): HTMLCanvasElement | null {
   return c;
 }
 
-export function tileCanvas(gid: number, variant: number): HTMLCanvasElement {
-  const key = `${gid}_${variant}`;
+export function tileCanvas(gid: number, variant: number, zone = 0): HTMLCanvasElement {
+  const key = `${gid}_${variant}_${zone}`;
   const hit = tileCache.get(key);
   if (hit) return hit;
-  const ninja = ninjaTile(gid, variant);
+  const ninja = ninjaTile(gid, variant, zone);
   if (ninja) {
     tileCache.set(key, ninja);
     return ninja;

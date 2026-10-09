@@ -9,7 +9,7 @@ import { ninjaImg, preloadNinja, NINJA_GROUND_FILES } from './ninja';
 export const preloadAllNinja = (): Promise<void> => preloadNinja([...new Set([...NINJA_GROUND_FILES, ...NINJA_PROP_FILES])]);
 
 const sheet = (n: string): string => `Backgrounds/Tilesets/${n}.png`;
-export const NINJA_PROP_FILES = ['TilesetHouse', 'tileset_camp', 'TilesetNature', 'TilesetElement', 'TilesetRelief', 'TilesetDungeon'].map(sheet);
+export const NINJA_PROP_FILES = ['TilesetHouse', 'tileset_camp', 'TilesetNature', 'TilesetElement', 'TilesetRelief', 'TilesetDungeon', 'TilesetFloorDetail'].map(sheet);
 
 export const PIXEL = 3;
 
@@ -30,6 +30,7 @@ const NAT = 'TilesetNature';
 const ELE = 'TilesetElement';
 const HOU = 'TilesetHouse';
 const CAM = 'tileset_camp';
+const FD = 'TilesetFloorDetail';
 
 /** Rechtecke in Pixeln des 16x16-Rasters (abgelesen mit dem Gitter-Helfer). */
 export const PROPS: Record<string, PropSpec> = {
@@ -74,6 +75,50 @@ export const PROPS: Record<string, PropSpec> = {
   twn_well: { f: ELE, r: [112, 32, 16, 16] },
   twn_stall: { f: HOU, r: [0, 0, 32, 30], parts: [{ f: HOU, r: [256, 208, 16, 16], x: 0, y: 0 }, { f: HOU, r: [272, 208, 16, 16], x: 16, y: 0 }, { f: HOU, r: [256, 258, 32, 14], x: 0, y: 14 }] },
   twn_post: { f: CAM, r: [2, 80, 14, 30] },
+  // Bodendetails (reine Optik, siehe groundLook.ts): Ausschnitte 16x16 aus TilesetFloorDetail und TilesetNature
+  dt_leaves_a: { f: FD, r: [0, 0, 16, 16] },
+  dt_leaves_b: { f: FD, r: [16, 0, 16, 16] },
+  dt_flower: { f: FD, r: [32, 0, 16, 16] },
+  dt_seeds: { f: FD, r: [48, 0, 16, 16] },
+  dt_berries: { f: FD, r: [64, 0, 16, 16] },
+  dt_twig_a: { f: FD, r: [80, 0, 16, 16] },
+  dt_twig_b: { f: FD, r: [96, 0, 16, 16] },
+  dt_branch: { f: FD, r: [112, 0, 16, 16] },
+  dt_roots: { f: FD, r: [128, 0, 16, 16] },
+  dt_pebbles: { f: FD, r: [0, 16, 16, 16] },
+  dt_tuft_0: { f: FD, r: [0, 32, 16, 16] },
+  dt_tuft_1: { f: FD, r: [16, 32, 16, 16] },
+  dt_tuft_2: { f: FD, r: [32, 32, 16, 16] },
+  dt_tuft_3: { f: FD, r: [48, 32, 16, 16] },
+  dt_tuft_4: { f: FD, r: [64, 32, 16, 16] },
+  dt_tuft_5: { f: FD, r: [80, 32, 16, 16] },
+  dt_tuft_6: { f: FD, r: [96, 32, 16, 16] },
+  dt_tuft_7: { f: FD, r: [112, 32, 16, 16] },
+  dt_dark_0: { f: FD, r: [0, 32, 16, 16], tint: [24, 52, 44, 0.4] },
+  dt_dark_1: { f: FD, r: [32, 32, 16, 16], tint: [24, 52, 44, 0.4] },
+  dt_dark_2: { f: FD, r: [48, 32, 16, 16], tint: [24, 52, 44, 0.4] },
+  dt_dark_3: { f: FD, r: [64, 32, 16, 16], tint: [24, 52, 44, 0.4] },
+  dt_dry_0: { f: FD, r: [0, 32, 16, 16], tint: [196, 168, 84, 0.55] },
+  dt_dry_1: { f: FD, r: [32, 32, 16, 16], tint: [196, 168, 84, 0.55] },
+  dt_dry_2: { f: FD, r: [48, 32, 16, 16], tint: [196, 168, 84, 0.55] },
+  dt_dry_3: { f: FD, r: [64, 32, 16, 16], tint: [150, 130, 90, 0.6] },
+  dt_char_twig: { f: FD, r: [96, 0, 16, 16], tint: [30, 24, 26, 0.7] },
+  dt_char_branch: { f: FD, r: [112, 0, 16, 16], tint: [30, 24, 26, 0.7] },
+  dt_grey_leaves: { f: FD, r: [16, 0, 16, 16], tint: [120, 120, 130, 0.65] },
+  dt_sun_a: { f: NAT, r: [0, 176, 16, 16] },
+  dt_sun_b: { f: NAT, r: [16, 176, 16, 16] },
+  dt_clover: { f: NAT, r: [32, 176, 16, 16] },
+  dt_tulip: { f: NAT, r: [48, 176, 16, 16] },
+  dt_fern_a: { f: NAT, r: [64, 176, 16, 16] },
+  dt_fern_b: { f: NAT, r: [80, 176, 16, 16] },
+  dt_daisy: { f: NAT, r: [96, 176, 16, 16] },
+  dt_wheat: { f: NAT, r: [112, 176, 16, 16] },
+  dt_gem_a: { f: NAT, r: [0, 224, 16, 16] },
+  dt_gem_b: { f: NAT, r: [16, 224, 16, 16] },
+  dt_gem_c: { f: NAT, r: [32, 224, 16, 16] },
+  dt_gem_d: { f: NAT, r: [48, 224, 16, 16] },
+  dt_rock: { f: NAT, r: [288, 144, 16, 16] },
+  dt_rock_dark: { f: NAT, r: [288, 144, 16, 16], tint: [30, 20, 40, 0.5] },
 };
 
 /** Schlüssel der Texturen, die aus dem Ninja-Paket stammen (Fuß unten mitte, nicht prozedural verankert) */

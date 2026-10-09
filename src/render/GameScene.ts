@@ -12,6 +12,7 @@ import { isWalkable } from '../sim/path';
 import { toScreen, toTile } from './iso';
 import { NINJA_KEYS } from './ninjaProps';
 import { detectHouses, houseDoor, houseDecor, houseFacade, houseFence, houseRoof, houseSign, houseWallTile, lowerKind, type House, type RoofNotch } from './houses';
+import { biomeOf, buildZoneMap, drawDetail, patchNoise } from './groundLook';
 import { DOOR_ICONS, TOWN_GID, WATER_PROP_GIDS, registerTownArt } from './town';
 import { Ui, describeItem, isUpgrade } from './ui';
 import { generateItem, type Item } from '../sim/items';
@@ -156,6 +157,7 @@ export class GameScene extends Phaser.Scene {
   private timers: { at: number; fn: () => void }[] = [];
   private fireballs = new Map<number, { impacts: (() => void)[]; target: number }>();
   private regionName = '';
+  private zoneMap: Uint8Array | null = null;
   private armedSkill: string | null = null;
   private armedCursor = '';
   /** Zauber, der nach dem Anlaufen gewirkt wird (Ziel war außer Reichweite). */
@@ -1371,8 +1373,15 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private nearDoor(x: number, y: number): boolean {
+    for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]] as const) if (this.gidAt(x + dx, y + dy) >= TOWN_GID.doorFirst) return true;
+    return false;
+  }
+
   private makeChunk(cx: number, cy: number): void {
     const { w, h } = this.world.grid;
+    if (!this.zoneMap) this.zoneMap = buildZoneMap(this.world.regions, w, h);
+    const zones = this.zoneMap;
     const x0 = cx * CHUNK;
     const y0 = cy * CHUNK;
     const x1 = x0 + CHUNK - 1;
@@ -1394,8 +1403,27 @@ export class GameScene extends Phaser.Scene {
         const { sx, sy } = toScreen(x, y);
         const ox = sx - TILE_W / 2 - minSx;
         const oy = sy - TILE_H / 2 - minSy;
-        ctx.drawImage(tileCanvas(ground, hash(x, y) % TILE_VARIANTS), ox, oy);
-        this.dither(ctx, x, y, ground, ox, oy);
+        const zone = zones[y * w + x] ?? 0;
+        ctx.drawImage(tileCanvas(ground, hash(x, y) % TILE_VARIANTS, zone), ox, oy);
+        this.dither(ctx, x, y, ground, zone, ox, oy);
+      }
+    }
+    // Zweiter Durchlauf: sanfte Helligkeitsflecken und Bodendetails (Gras, Blumen, Kiesel, Knochen …) nur auf freien Kacheln
+    for (let y = y0; y <= Math.min(y1, h - 1); y++) {
+      for (let x = x0; x <= Math.min(x1, w - 1); x++) {
+        const gid = this.tiles[y * w + x] ?? 0;
+        if (!gid || PROP_GIDS.has(gid) || this.houseAt.has(y * w + x) || !biomeOf(gid, 0)) continue;
+        const zone = zones[y * w + x] ?? 0;
+        const { sx, sy } = toScreen(x, y);
+        const ox = sx - TILE_W / 2 - minSx;
+        const oy = sy - TILE_H / 2 - minSy;
+        const pn = patchNoise(x, y);
+        if (Math.abs(pn) > 0.25) {
+          ctx.fillStyle = pn > 0 ? `rgba(255,250,200,${(pn - 0.25) * 0.09})` : `rgba(0,20,30,${(-pn - 0.25) * 0.11})`;
+          ctx.fillRect(ox, oy, TILE_W, TILE_H);
+        }
+        if (this.nearDoor(x, y)) continue;
+        drawDetail(ctx, x, y, gid, zone, ox, oy, TILE_W);
       }
     }
     const key = `chunk_${cx}_${cy}`;
@@ -1409,7 +1437,7 @@ export class GameScene extends Phaser.Scene {
    * eigenen Randpixel 0 bis 2 Bildpunkte (je 3 Bildschirmpixel) in diese Kachel hinein. Die Tiefe wechselt pro Spalte
    * zufällig, so entsteht ein ausgefranster Rand ohne harte Gerade. Wasser und Lava bekommen selbst keinen Rand.
    */
-  private dither(ctx: CanvasRenderingContext2D, x: number, y: number, ground: number, ox: number, oy: number): void {
+  private dither(ctx: CanvasRenderingContext2D, x: number, y: number, ground: number, zone: number, ox: number, oy: number): void {
     if (ground === 6 || ground === 12) return;
     const px = TILE_W / 16;
     const DEPTH = [0, 1, 1, 2, 2, 1];
@@ -1418,8 +1446,9 @@ export class GameScene extends Phaser.Scene {
       if (WATER_PROP_GIDS.has(ng)) ng = 6;
       else if (this.houseAt.has((y + dy) * this.world.grid.w + x + dx)) ng = 15;
       else if (PROP_GIDS.has(ng)) ng = this.groundUnder(x + dx, y + dy);
-      if (ng === ground || ng === 0) continue;
-      const nb = tileCanvas(ng, hash(x + dx, y + dy) % TILE_VARIANTS);
+      const nz = this.zoneMap?.[(y + dy) * this.world.grid.w + x + dx] ?? 0;
+      if ((ng === ground && nz === zone) || ng === 0) continue;
+      const nb = tileCanvas(ng, hash(x + dx, y + dy) % TILE_VARIANTS, nz);
       for (let i = 0; i < 16; i++) {
         const d = DEPTH[hash(x * 131 + i * 7 + dx * 3 + 11, y * 17 + dy * 5 + ground) % DEPTH.length]!;
         if (!d) continue;
