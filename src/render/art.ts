@@ -15,7 +15,7 @@ import { CHEST_SPRITES, MONSTER_SPRITES, PLAYER_BASE, PLAYER_DEFAULTS, PLAYER_HA
 type Ctx = CanvasRenderingContext2D;
 
 import { groundCell } from './ninja';
-import { ninjaMonsterDef, ninjaNpcDef } from './figureMap';
+import { figureMode, ninjaMonsterDef, ninjaNpcDef } from './figureMap';
 import { ninjaFigureCanvas, ninjaHeroCanvas } from './ninjaFigures';
 import { lookImage, tileLook, tintCanvas } from './groundLook';
 import { NINJA_KEYS, ninjaProp } from './ninjaProps';
@@ -1125,7 +1125,7 @@ const ORB_COLORS = [0x90c0ff, 0x80d0ff, 0xb090ff, 0x70e0e0, 0xff9a40, 0xc060ff];
 
 /** Große Figur für das Inventarfenster: Bild und CSS-Breite (Sprite 1:1, prozedural wie bisher 104 px). */
 export function playerPortrait(look: Look): { canvas: HTMLCanvasElement; width: number } {
-  const nj = ninjaHeroCanvas(look, 0, false, false, 6, FEET_ORIGIN_Y);
+  const nj = figureMode() === 'dcss' ? null : ninjaHeroCanvas(look, 0, false, false, 6, FEET_ORIGIN_Y);
   if (nj) return { canvas: nj, width: nj.width };
   const sp = spritePlayer(look, 0, 4);
   if (sp) return { canvas: sp, width: sp.width };
@@ -1133,7 +1133,7 @@ export function playerPortrait(look: Look): { canvas: HTMLCanvasElement; width: 
 }
 
 export function playerCanvas(look: Look, frame: number, back = false, profile = false): HTMLCanvasElement {
-  const nj = ninjaHeroCanvas(look, frame, back, profile, 3, FEET_ORIGIN_Y);
+  const nj = figureMode() === 'dcss' ? null : ninjaHeroCanvas(look, frame, back, profile, 3, FEET_ORIGIN_Y);
   if (nj) return nj;
   const sp = spritePlayer(look, frame, SPRITE_SCALE.normal, back, profile);
   if (sp) return sp;

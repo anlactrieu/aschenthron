@@ -16,6 +16,7 @@ import { lookKey, lookOf, playerPortrait } from './art';
 import { initCredits, toggleCredits } from './credits';
 import { goFullscreen, isFullscreen, isTouch } from './touch';
 import { BAR_CSS, faceUrl, installTheme } from './theme';
+import { FIG_LABEL, FIG_MODES, figureMode, setFigureMode } from './figureMap';
 
 const RARITY_COLOR: Record<Item['rarity'], string> = { normal: '#c9c4bd', magic: '#7f9fff', rare: '#f2c94c', set: '#5fd070', legendary: '#ff8a2a' };
 const SLOT_NAME: Record<EquipSlot, string> = { weapon: 'Waffe', head: 'Kopf', chest: 'Brust', hands: 'Hände', feet: 'Füße', ring: 'Ring', ring2: 'Ring', amulet: 'Amulett', offhand: 'Nebenhand', belt: 'Gürtel', cloak: 'Umhang', legs: 'Beine' };
@@ -1302,6 +1303,17 @@ export class Ui {
     toggle('Schadenszahlen', cfg.dmgNumbers, (v) => setSetting('dmgNumbers', v));
     toggle('Namen über Figuren', cfg.labels, (v) => setSetting('labels', v));
     toggle('Schnell aufheben (Tränke, Edelsteine, Pfeile)', cfg.autoPickup, (v) => setSetting('autoPickup', v));
+    // Figuren-Vergleich: Mix (halb Ninja, halb DCSS), nur Ninja, nur DCSS (wirkt nach dem Neuladen)
+    const figBtn = el('button', 'a-btn', FIG_LABEL[figureMode()]) as HTMLButtonElement;
+    const figNow = figureMode();
+    figBtn.onclick = () => {
+      const cur = FIG_MODES.indexOf(figBtn.dataset.m ? (figBtn.dataset.m as typeof figNow) : figNow);
+      const next = FIG_MODES[(cur + 1) % FIG_MODES.length]!;
+      figBtn.dataset.m = next;
+      figBtn.textContent = next === figNow ? FIG_LABEL[next] : `${FIG_LABEL[next]} (neu laden)`;
+      setFigureMode(next);
+    };
+    row('Figuren: Mix / Ninja / DCSS (F5 zum Übernehmen)', figBtn);
 
     body.append(el('div', 'a-sec', 'Tastenbelegung'));
     body.append(el('div', 'a-note', 'Auf eine Taste klicken, dann die neue Taste drücken. Esc bricht ab. M (Ton), U (Musik), N (Karte) und die Pfeiltasten sind fest.'));
