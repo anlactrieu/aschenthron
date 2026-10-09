@@ -1367,10 +1367,10 @@ export class GameScene extends Phaser.Scene {
     const y0 = cy * CHUNK;
     const x1 = x0 + CHUNK - 1;
     const y1 = y0 + CHUNK - 1;
-    const minSx = (x0 - y1) * (TILE_W / 2) - TILE_W / 2;
-    const maxSx = (x1 - y0) * (TILE_W / 2) + TILE_W / 2;
-    const minSy = (x0 + y0) * (TILE_H / 2) - TILE_H / 2;
-    const maxSy = (x1 + y1) * (TILE_H / 2) + TILE_H / 2;
+    const minSx = x0 * TILE_W - TILE_W / 2;
+    const maxSx = (x1 + 1) * TILE_W - TILE_W / 2;
+    const minSy = y0 * TILE_H - TILE_H / 2;
+    const maxSy = (y1 + 1) * TILE_H - TILE_H / 2;
     const c = document.createElement('canvas');
     c.width = maxSx - minSx;
     c.height = maxSy - minSy;
@@ -1396,6 +1396,7 @@ export class GameScene extends Phaser.Scene {
 
   /** Weicher Übergang: an Grenzen zu anderen Bodenarten streut die Nachbarfarbe Pixel auf die Kachelkante. */
   private dither(ctx: CanvasRenderingContext2D, x: number, y: number, ground: number, ox: number, oy: number): void {
+    if (ground >= 0) return; // TODO neuer Look: Übergänge für Draufsicht (Autotiling), vorerst aus
     // Kanten der Raute (Ecken relativ zur Mitte): oben, rechts, unten, links
     const T: [number, number] = [0, -16];
     const R: [number, number] = [32, 0];

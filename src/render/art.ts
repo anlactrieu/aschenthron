@@ -14,8 +14,8 @@ import { CHEST_SPRITES, MONSTER_SPRITES, PLAYER_BASE, PLAYER_DEFAULTS, PLAYER_HA
 
 type Ctx = CanvasRenderingContext2D;
 
-export const TILE_W = 64;
-export const TILE_H = 32;
+export const TILE_W = 48;
+export const TILE_H = 48;
 
 function mkCanvas(w: number, h: number): HTMLCanvasElement {
   const c = document.createElement('canvas');
@@ -355,10 +355,7 @@ function weaponGeo(img: HTMLImageElement): WeaponGeo {
 
 const diamondPath = (c: Ctx, w = TILE_W, h = TILE_H, y0 = 0): void => {
   c.beginPath();
-  c.moveTo(w / 2, y0);
-  c.lineTo(w, y0 + h / 2);
-  c.lineTo(w / 2, y0 + h);
-  c.lineTo(0, y0 + h / 2);
+  c.rect(0, y0, w, h);
   c.closePath();
 };
 
