@@ -54,9 +54,9 @@ export const PROPS: Record<string, PropSpec> = {
   rock_dark_1: { f: NAT, r: [258, 132, 29, 27], tint: [30, 20, 40, 0.5] },
   rock_dark_2: { f: NAT, r: [258, 132, 29, 27], flip: true, tint: [30, 20, 40, 0.5] },
   // Wände (Felsfläche in Draufsicht, 16x16-Zellen); die Schattierung kommt in art.ts dazu
-  wall_cliff_0: { f: REL, r: [80, 96, 16, 16] },
-  wall_cliff_1: { f: REL, r: [80, 96, 16, 16], flip: true },
-  wall_cliff_2: { f: REL, r: [80, 96, 16, 16], tint: [90, 60, 50, 0.2] },
+  wall_cliff_0: { f: REL, r: [64, 16, 16, 16] },
+  wall_cliff_1: { f: REL, r: [96, 16, 16, 16], flip: true },
+  wall_cliff_2: { f: REL, r: [144, 16, 16, 16] },
   wall_dungeon_0: { f: REL, r: [80, 16, 16, 16], tint: [70, 56, 90, 0.22] },
   wall_dungeon_1: { f: REL, r: [80, 16, 16, 16], flip: true, tint: [70, 56, 90, 0.22] },
   wall_dungeon_2: { f: REL, r: [80, 16, 16, 16], tint: [50, 40, 70, 0.3] },
@@ -72,7 +72,6 @@ export const PROPS: Record<string, PropSpec> = {
   twn_barrel: { f: HOU, r: [288, 176, 16, 16] },
   twn_crates: { f: HOU, r: [304, 224, 16, 16] },
   twn_well: { f: ELE, r: [112, 32, 16, 16] },
-  twn_lantern: { f: CAM, r: [91, 81, 15, 26] },
   twn_stall: { f: HOU, r: [0, 0, 32, 30], parts: [{ f: HOU, r: [256, 208, 16, 16], x: 0, y: 0 }, { f: HOU, r: [272, 208, 16, 16], x: 16, y: 0 }, { f: HOU, r: [256, 258, 32, 14], x: 0, y: 14 }] },
   twn_post: { f: CAM, r: [2, 80, 14, 30] },
 };

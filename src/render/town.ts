@@ -281,7 +281,7 @@ export function registerTownArt(scene: Phaser.Scene): void {
   addN('twn_barrel', barrel);
   addN('twn_crates', crates);
   addN('twn_well', well);
-  addN('twn_lantern', lantern);
+  add('twn_lantern', lantern()); // Ninja-Camp-Sprite war nur ein Holzstapel, daher bleibt die gezeichnete Laterne
   addN('twn_stall', stall);
   addN('twn_post', post);
   add('twn_flowers', flowers());
