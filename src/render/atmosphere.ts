@@ -150,7 +150,7 @@ export class Atmosphere {
         this.k = 0;
         this.cur = want;
       }
-    } else if (this.cur !== 'clear') this.k = Math.min(1, this.k + dt / 3500);
+    } else if (this.cur !== 'clear') this.k = Math.min(1, this.k + dt / 1500);
     const rainK = this.cur === 'rain' ? this.k : 0;
 
     // Farb-Overlay (nur bei sichtbarer Änderung neu gesetzt)
@@ -192,9 +192,9 @@ export class Atmosphere {
     const H = this.scene.scale.height;
     const s = dt / 1000;
     if (rainK > 0.02) {
-      const want = Math.round(130 * rainK);
+      const want = Math.round(130 * Math.min(1, rainK * 1.4));
       while (this.drops.length < 130) this.drops.push({ x: Math.random() * W, y: Math.random() * H, v: 760 + Math.random() * 380, s: 9 + Math.random() * 9 });
-      g.lineStyle(1.5, 0xdcecff, 0.62 * rainK);
+      g.lineStyle(2, 0xdcecff, Math.min(0.85, 0.85 * Math.min(1, rainK * 1.5)));
       g.beginPath();
       for (let i = 0; i < want; i++) {
         const d = this.drops[i]!;

@@ -41,7 +41,7 @@ export class Minimap {
     this.view.width = gw * zoom;
     this.view.height = gh * zoom;
     Object.assign(this.view.style, {
-      position: 'fixed', right: '12px', top: '12px', border: '10px solid transparent', borderImage: `url("${NINJA_BASE}Ui/Theme/Theme%20Wood/nine_path_panel.png") 5 / 10px stretch`, background: '#0b0a0d', backgroundClip: 'padding-box',
+      position: 'fixed', right: '12px', top: '12px', border: '10px solid transparent', borderImage: `url("${NINJA_BASE}Ui/Theme/Theme%20Wood/nine_path_panel.png") 5 / 10px stretch`, background: '#26222c', backgroundClip: 'padding-box',
       imageRendering: 'pixelated', opacity: '0.88', pointerEvents: 'none', zIndex: '3',
     } as Partial<CSSStyleDeclaration>);
     document.body.appendChild(this.view);
@@ -72,6 +72,10 @@ export class Minimap {
       });
     }
     this.applySize();
+    // sofort das Gelände zeigen (draw läuft erst nach den ersten Bildern), statt einer schwarzen Fläche
+    const v = this.view.getContext('2d')!;
+    v.imageSmoothingEnabled = false;
+    v.drawImage(this.base, 0, 0, this.view.width, this.view.height);
     if (isTouch) window.addEventListener('resize', () => this.applySize());
     window.addEventListener('keydown', (e) => {
       if (e.key.toLowerCase() === 'b' && !e.ctrlKey && !e.metaKey && !e.altKey && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {

@@ -37,6 +37,9 @@ export interface TileLook { cells?: LookCell[]; tint?: readonly [number, number,
 const block = (f: string, x: number, y: number): LookCell[] => [{ f, x, y }, { f, x: x + 16, y }, { f, x, y: y + 16 }, { f, x: x + 16, y: y + 16 }];
 const GRASS_Y = block(FIELD, 48, 48);
 const GRASS_D = block(FIELD, 48, 96);
+const RELIEF = 'Backgrounds/Tilesets/TilesetRelief.png';
+/** Steinplatten (Stadtstraße, Plätze): leicht gemusterte Reliefzellen, per Tönung ins Dunkelviolett gezogen */
+const FLAGS: LookCell[] = [[80, 32], [128, 32], [160, 32], [128, 32]].map(([x, y]) => ({ f: RELIEF, x: x!, y: y! }));
 const DIRT: LookCell[] = [[128, 128], [128, 144], [160, 144], [160, 160]].map(([x, y]) => ({ f: FLOOR, x: x!, y: y! }));
 
 /** Boden-Look für (gid, Zone); null = Standardzelle (`groundCell`). */
@@ -53,6 +56,7 @@ export function tileLook(gid: number, zone: number): TileLook | null {
       }
     case 3: return { cells: GRASS_D, tint: [88, 84, 40, 0.42] };
     case 7: return { cells: DIRT, tint: zone === Z.camp ? [110, 84, 52, 0.28] : [190, 140, 70, 0.2] };
+    case 16: return { cells: FLAGS, tint: [118, 98, 134, 0.5] };
     case 8: return { cells: GRASS_D, tint: [170, 150, 90, 0.4] };
     case 9: return zone === Z.grund ? { tint: [140, 36, 40, 0.34] } : { tint: [170, 96, 60, 0.22] };
     case 5:
@@ -63,7 +67,7 @@ export function tileLook(gid: number, zone: number): TileLook | null {
         case Z.thron: return { tint: [150, 40, 50, 0.24] };
         case Z.goblin: return { tint: [110, 100, 40, 0.24] };
         case Z.nest: return { tint: [110, 60, 140, 0.24] };
-        default: return null;
+        default: return { cells: FLAGS, tint: [118, 98, 134, 0.5] };
       }
     default: return null;
   }

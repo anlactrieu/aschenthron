@@ -446,6 +446,8 @@ export class Ui {
     const showMain = this.open && (!isTouch || this.touchMain || !sideOn);
     this.main.style.display = showMain ? (isTouch ? 'flex' : 'block') : 'none';
     this.side.style.display = sideOn && !(isTouch && showMain) ? (isTouch ? 'flex' : 'block') : 'none';
+    // schmaler Bildschirm: Aufgabenanzeige würde unter dem Seitenfenster liegen, solange es offen ist
+    this.tracker.style.visibility = this.side.style.display !== 'none' && window.innerWidth < 900 ? 'hidden' : 'visible';
   }
 
   setArmed(id: string | null): void {
@@ -656,7 +658,8 @@ export class Ui {
     this.xpBar.classList.toggle('pulse', p.statPoints > 0 || p.skillPoints > 0);
     const load = carriedWeight(p) / Math.max(1, carryCapacity(p));
     const heavy = load >= 0.9;
-    this.xpText.textContent = `Stufe ${p.level} · ${p.level >= MAX_LEVEL ? 'Maximum' : `${into} / ${span} XP`} · ${p.gold} Gold${p.statPoints ? ` · ${p.statPoints} Attributpunkte (C)` : ''}${p.skillPoints ? ` · ${p.skillPoints} Skillpunkte (K)` : ''}${heavy ? ` · Last ${carriedWeight(p).toFixed(0)}/${carryCapacity(p)}` : ''}`;
+    const narrow = window.innerWidth < 900;
+    this.xpText.textContent = `Stufe ${p.level} · ${p.level >= MAX_LEVEL ? 'Maximum' : `${into} / ${span} XP`} · ${p.gold} Gold${p.statPoints ? ` · ${p.statPoints} ${narrow ? 'AP' : 'Attributpunkte'} (C)` : ''}${p.skillPoints ? ` · ${p.skillPoints} ${narrow ? 'SP' : 'Skillpunkte'} (K)` : ''}${heavy ? ` · Last ${carriedWeight(p).toFixed(0)}/${carryCapacity(p)}` : ''}`;
     this.xpText.style.color = heavy ? '#ffb0a0' : '#fff';
     this.xpBar.title = this.xpText.textContent;
 
