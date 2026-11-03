@@ -342,7 +342,8 @@ export class Ui {
     document.head.appendChild(style);
 
     Object.assign(this.main.style, { right: '12px', top: '12px', width: '480px' });
-    Object.assign(this.side.style, { left: '12px', top: 'calc(var(--tl-h) + 24px)', width: '480px' });
+    // Höhe bis knapp über den unteren Rand begrenzen (Fenster beginnt unter dem Porträt), Inhalt scrollt im Fenster
+    Object.assign(this.side.style, { left: '12px', top: 'calc(var(--tl-h) + 24px)', width: '480px', maxHeight: 'calc(100vh - var(--tl-h) - 36px)', overflowY: 'auto' });
 
     this.hud.className = 'hud';
     this.hud.style.cssText = 'position:fixed;left:8px;right:8px;bottom:8px;display:flex;justify-content:center;align-items:flex-end;gap:4px;pointer-events:none;z-index:5';
