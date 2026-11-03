@@ -373,7 +373,7 @@ User: „Wie in D4O kein Rang für Zauber, lieber mehr Zauber; neue Zauber desse
 - [x] Kamerablitze durch gedämpften `glow()` ersetzt
 - [x] Stadtboden/Häuser zentral entsättigt (`NINJA_GRADE`)
 - [x] Heldenporträt = Brustbild des DCSS-Helden
-- [x] Säule 1 Wucht: Zauber-Effekte aus pixelfx (Blitz, Frostnova, Wirbelhieb, Bodenschlag, Heilung); Wackeln/Zahlen gab es schon. Offen: Feuerball-Einschlag
+- [x] Säule 1 Wucht: Zauber-Effekte aus pixelfx (Blitz, Frostnova, Wirbelhieb, Bodenschlag, Heilung); Wackeln/Zahlen gab es schon; Feuerball-Einschlag `fire_burst`
 - [x] Säule 3 Skillgewinn: Runenkreis, Banner, Schnellleisten-Platz pulsiert
 - [x] Säule 4 (Darstellung): Boss-Aura, Boss-Auftritt, Gefahr-Warnung + rote Vignette
 - [x] Sheets verkleinert (15/20 fps): Level-up 0,5 MB, 15 Effekte zusammen 4,2 MB
