@@ -25,6 +25,7 @@ import { Minimap } from './minimap';
 import { isTouch } from './touch';
 import { Atmosphere, isDungeon } from './atmosphere';
 import { Fx } from './fx';
+import { playPixelfx, registerPixelfx, type FxName } from './pixelfx';
 import { onSettings, settings } from './settings';
 import type { RemoteSession } from '../net/client';
 import {
@@ -145,6 +146,8 @@ export class GameScene extends Phaser.Scene {
   private cursor = '';
   private kicks = new Map<number, { x: number; y: number }>();
   private lootBorn = new Map<number, { t: number; dx: number }>();
+  /** Lichtstrahl (pixelfx) je Beuteteil ab magisch */
+  private lootBeams = new Map<number, Phaser.GameObjects.Sprite>();
   private vignette!: HTMLDivElement;
   private ambientKind: 'embers' | 'mist' | null = null;
   private lastTime = 0;
@@ -209,6 +212,7 @@ export class GameScene extends Phaser.Scene {
     this.sfx = new Sfx();
     this.sfx.setVolume(settings().volume);
     onSettings(() => this.sfx.setVolume(settings().volume));
+    registerPixelfx(this);
     this.atmo = new Atmosphere(this, this.sfx);
     this.minimap = new Minimap(this.world, this.tiles);
     if (this.remote) this.ui.say(`Verbunden als ${p.name}${this.remote.pvp ? ' – PvP außerhalb der Städte aktiv, Angreifer werden zu Mördern' : ''}. Klick auf Spieler greift an.`);
@@ -837,7 +841,11 @@ export class GameScene extends Phaser.Scene {
               } else if (toPlayer) this.fx.floatText(pos.x, pos.y - 30, txt, dcol ?? '#ff6a5a', 18);
               else if (fromPlayer) this.fx.floatText(pos.x, pos.y - 26, txt, e.crit ? '#ffe45a' : poison ? '#8fe070' : dcol ?? '#ffffff', e.crit ? 22 : 15);
               else this.fx.floatText(pos.x, pos.y - 26, txt, dcol ?? '#cfcfcf', 12);
-              this.fx.burst(pos.x, pos.y, toPlayer ? 0xff5a4a : e.crit ? 0xffe45a : 0xffffff, 260);
+              const away = at && tg && at.id !== tg.id ? this.dispPos(tg).x - this.dispPos(at).x - (this.dispPos(tg).y - this.dispPos(at).y) : 0;
+              // pixelfx: Funken in Schlagrichtung (nach rechts gebacken, bei Schlag von rechts gespiegelt); ohne Sheet der alte Funkenkranz
+              if (e.amount > 0 && !playPixelfx(this, e.crit ? 'crit' : 'hit', pos.x, pos.y, { depth: OVERLAY_DEPTH - 1, flip: away < 0 })) {
+                this.fx.burst(pos.x, pos.y, toPlayer ? 0xff5a4a : e.crit ? 0xffe45a : 0xffffff, 260);
+              }
             }
             if (at && tg && at.id !== tg.id) {
               const a = this.dispPos(at);
@@ -1064,7 +1072,7 @@ export class GameScene extends Phaser.Scene {
           this.sfx.levelUp();
           const pos = this.bodyPos(this.player());
           if (pos) {
-            this.fx.column(pos.x, pos.y + 20, 0xfff0a0, 1400);
+            if (!playPixelfx(this, 'levelup', pos.x, pos.y + 20, { depth: OVERLAY_DEPTH - 1 })) this.fx.column(pos.x, pos.y + 20, 0xfff0a0, 1400);
             this.fx.ring(pos.x, pos.y + 20, 170, 0xfff0a0, 600);
           }
           this.ui.banner(`Stufe ${e.level}!`, '#ffe45a');
@@ -1844,7 +1852,16 @@ export class GameScene extends Phaser.Scene {
       img.setPosition(sx + slide, sy + 2 + arc).setDepth(sy + 4);
       const r = gi.item.rarity;
       const col = { normal: 0xc9c4bd, magic: 0x6f8fff, rare: 0xf2c94c, set: 0x5fd070, legendary: 0xff8a2a }[r];
-      if (r !== 'normal') {
+      const beamName = r === 'normal' ? undefined : (`loot_${r}` as FxName);
+      let beam = this.lootBeams.get(gi.id);
+      if (beamName && !beam) {
+        beam = playPixelfx(this, beamName, sx, sy + 4, { depth: sy + 5, alpha: { magic: 0.6, rare: 0.8, set: 0.85, legendary: 1 }[r as 'magic'], blend: 1 });
+        // weißen Kern in der Seltenheitsfarbe einfärben (Multiplikation), sonst wirken alle Strahlen gleich blass
+        beam?.setTint({ magic: 0x6f8fff, rare: 0xf2c94c, set: 0x5fd070, legendary: 0xff7a22, normal: 0xc9c4bd }[r]);
+        if (beam) this.lootBeams.set(gi.id, beam);
+      }
+      beam?.setPosition(sx, sy + 4).setDepth(sy + 5);
+      if (r !== 'normal' && !beam) {
         const pulse = r === 'legendary' ? 0.75 + 0.25 * Math.sin(time / 180) : 1;
         const wide = r === 'legendary' ? 16 : r === 'set' ? 12 : 8;
         const tall = r === 'legendary' ? 110 : 60;
@@ -1872,6 +1889,8 @@ export class GameScene extends Phaser.Scene {
         img.destroy();
         this.lootViews.delete(id);
         this.lootBorn.delete(id);
+        this.lootBeams.get(id)?.destroy();
+        this.lootBeams.delete(id);
       }
     }
   }

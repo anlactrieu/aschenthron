@@ -8,6 +8,7 @@ import { allSpritePaths } from './render/spriteMap';
 import { initTouch } from './render/touch';
 import { preloadAllNinja } from './render/ninjaProps';
 import { preloadNinjaFigures } from './render/ninjaFigures';
+import { preloadPixelfx } from './render/pixelfx';
 import { FIG_MODES, figureLists, figureMode } from './render/figureMap';
 import { MONSTERS } from './sim/data';
 
@@ -43,6 +44,7 @@ async function boot(): Promise<void> {
   await preloadSprites(allSpritePaths());
   await preloadAllNinja();
   await preloadNinjaFigures();
+  await preloadPixelfx();
   // Welche Monsterarten sind je Modus Ninja bzw. DCSS (Vergleichshilfe; Umschalten mit ?figuren=mix|ninja|dcss oder in den Einstellungen, P)
   const ids = MONSTERS.map((m) => m.id);
   for (const m of FIG_MODES) {
