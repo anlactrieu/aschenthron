@@ -223,7 +223,7 @@ const CSS = `
 .hb.nomana img{filter:grayscale(.8) brightness(.6)}
 .hb .cnt{position:absolute;right:-2px;bottom:-5px;font:14px/1 var(--ui-font);color:#fff;text-shadow:-1px 0 #000,1px 0 #000,0 -1px #000,0 1px #000}
 /* unten: Leben | Schnellleiste + XP | Mana */
-.hud>.pbar{width:150px;flex:0 1 auto;min-width:84px;margin-bottom:2px}
+.hud>.pbar{width:150px;flex:0 1 auto;min-width:84px;margin-bottom:34px}
 #hud-tl{position:fixed;left:12px;top:12px;z-index:5;display:flex;align-items:stretch;gap:0;pointer-events:none}
 #hud-tl .face{width:76px;height:76px;image-rendering:pixelated;display:block}
 #hud-tl .hdr{display:flex;flex-direction:column;justify-content:center;min-width:168px;padding:0 4px 0 8px;gap:0}
@@ -460,6 +460,24 @@ export class Ui {
       window.clearTimeout(this.toastTimer);
       this.toastTimer = window.setTimeout(() => this.say2(), 6000);
     }
+  }
+
+  /** Gerahmtes Hinweisfenster (Holzrahmen, Pixelschrift) mit „Verstanden“; ersetzt lange Willkommenstexte im Meldungsprotokoll. */
+  welcome(title: string, lines: string[]): void {
+    const win = el('div', 'w-frame');
+    win.style.cssText = 'position:fixed;z-index:6;left:50%;top:22%;transform:translateX(-50%);width:min(440px,86vw);padding:6px 12px 10px;--bw:10px;pointer-events:auto';
+    const h = el('div', '', title);
+    h.style.cssText = 'color:var(--gold);font-size:22px;margin-bottom:6px;text-align:center';
+    win.append(h, ...lines.map((t) => {
+      const d = el('div', '', t);
+      d.style.cssText = 'margin:6px 0;line-height:1.3';
+      return d;
+    }));
+    const ok = el('button', 'a-btn', 'Verstanden');
+    ok.style.cssText = 'display:block;margin:10px auto 0;padding:0 18px';
+    ok.onclick = () => win.remove();
+    win.append(ok);
+    document.body.append(win);
   }
 
   private say2(): void {

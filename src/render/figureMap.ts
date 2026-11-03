@@ -3,9 +3,9 @@
  * Reine Daten und Funktionen ohne Canvas/Image: import-sicher in Node (Tests). Gezeichnet wird in `ninjaFigures.ts`.
  *
  * Schalter (URL `?figuren=` hat Vorrang und wird gemerkt, sonst localStorage `aschenthron.figuren`):
- *  - `mix` (Standard): Held und NPCs Ninja; von den Monsterarten per stabilem Hash der Art-ID abwechselnd die Hälfte Ninja, die andere DCSS
+ *  - `mix`: Held und NPCs Ninja; von den Monsterarten per stabilem Hash der Art-ID abwechselnd die Hälfte Ninja, die andere DCSS
  *  - `ninja`: alle Monster Ninja
- *  - `dcss`: alles wie vor dem Umbau (DCSS-Held, DCSS-NPCs, DCSS-Monster) – zum Vergleich
+ *  - `dcss` (Standard seit 2026-11-03): DCSS-Held, DCSS-NPCs, DCSS-Monster, ein Pixelmaßstab
  * Pfade relativ zu `public/assets/ninja/` (siehe `NINJA_BASE` in ninja.ts).
  */
 
@@ -18,7 +18,7 @@ let mode: FigMode | undefined;
 
 const isMode = (v: unknown): v is FigMode => v === 'mix' || v === 'ninja' || v === 'dcss';
 
-/** Aktueller Modus: URL > localStorage > mix. Außerhalb des Browsers immer `mix`. */
+/** Aktueller Modus: URL > localStorage > dcss. Außerhalb des Browsers immer `dcss`. */
 export function figureMode(): FigMode {
   if (mode) return mode;
   let m: unknown;
@@ -37,7 +37,7 @@ export function figureMode(): FigMode {
       m = null;
     }
   }
-  mode = isMode(m) ? m : 'mix';
+  mode = isMode(m) ? m : 'dcss';
   return mode;
 }
 

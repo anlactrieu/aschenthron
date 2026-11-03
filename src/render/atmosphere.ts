@@ -46,6 +46,11 @@ export function dayColor(hour: number): [number, number, number] {
   return KEYS[0]![1];
 }
 
+/** Dunkle Grundstimmung (Dark Fantasy, Asche): multipliziert auf die Tagesfarbe, auch im hellen Mittag nie volle Farbe. */
+export const DARK_GRADE: readonly [number, number, number] = [0.66, 0.64, 0.74];
+/** Wie weit Städte zum ungetönten Bild aufgehellt werden (vorher 0.4: Stadt wirkte bunt und hell). */
+const TOWN_LIFT = 0.12;
+
 const hash32 = (n: number): number => {
   let t = (n + 0x9e3779b9) >>> 0;
   t = Math.imul(t ^ (t >>> 15), t | 1);
@@ -149,8 +154,11 @@ export class Atmosphere {
     const rainK = this.cur === 'rain' ? this.k : 0;
 
     // Farb-Overlay (nur bei sichtbarer Änderung neu gesetzt)
-    const [r, g, b] = dayColor(hour);
-    const lift = Math.min(1, this.mix.indoor + this.mix.town * 0.4);
+    const [r0, g0, b0] = dayColor(hour);
+    // Innenräume (Dungeons) haben ihre Dunkelheit schon über Vignette/Tönung: Grundton nur außen und in der Stadt
+    const grade = 1 - this.mix.indoor;
+    const [r, g, b] = [r0 * (1 - grade * (1 - DARK_GRADE[0])), g0 * (1 - grade * (1 - DARK_GRADE[1])), b0 * (1 - grade * (1 - DARK_GRADE[2]))];
+    const lift = Math.min(1, this.mix.indoor + this.mix.town * TOWN_LIFT);
     const rain = 1 - 0.14 * rainK;
     const out = [r, g, b].map((c) => Math.round((c + (255 - c) * lift) * rain));
     const ck = out.map((c) => Math.min(255, Math.round(c / 2) * 2)).join(',');

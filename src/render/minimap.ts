@@ -11,8 +11,9 @@ const COLORS: Record<number, string> = {
   28: '#a8794a', 29: '#a8794a', 30: '#a8794a', 31: '#a8794a', 32: '#a8794a', 33: '#a8794a', 34: '#a8794a', 35: '#a8794a', 36: '#a8794a',
 };
 
-const SIZES = [1, 0.7, 0.45];
-const SIZE_KEY = 'aschenthron.minimapSize';
+// Standard klein (B: größer / noch kleiner); neuer Speicherschlüssel, damit alte Wahl der großen Karte nicht greift
+const SIZES = [0.5, 0.85, 0.32];
+const SIZE_KEY = 'aschenthron.minimapSize2';
 
 /** Kleine Übersichtskarte (N ein/aus, B Größe wechseln): Gelände einmal vorgerendert, pro Aufruf nur Marker. */
 export class Minimap {

@@ -6,7 +6,7 @@
  */
 
 /** Vergrößerung der 32×32-Sprites in der Welt (ganzzahlig, damit die Pixel gleich groß bleiben). */
-export const SPRITE_SCALE = { normal: 2, boss: 3, chest: 2 };
+export const SPRITE_SCALE = { normal: 2, boss: 2, chest: 2 };
 
 export interface MonsterSprite {
   file: string;

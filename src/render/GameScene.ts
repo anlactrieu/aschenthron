@@ -220,9 +220,11 @@ export class GameScene extends Phaser.Scene {
       p.inventory.push(sword);
       this.send({ type: 'equip', itemId: sword.id });
       this.ui.banner('Aschental brennt. Der Thron der Asche ruft.', '#d8a24a');
-      this.ui.say('Einst war Aschental ein Garten – dann verbrannte der Aschenkönig den Himmel. Du bist einer der Letzten, die noch gegen ihn ziehen. Dein Ziel: Stufe 30, der Thron der Asche.');
-      this.ui.say('Willkommen in Aschenhafen! Sprich mit Hafenmeister Joren (Haus mit Anker, links vom Platz) – er zeigt dir die Stadt. Klick auf den Boden: laufen. Klick auf einen Gegner: angreifen. Dein nächster Schritt steht oben rechts.');
-      this.ui.say('Du hast Punkte zu verteilen: C öffnet deinen Charakter (Attribute), K die Fertigkeiten. Alle Tasten und Tipps findest du unter P.');
+      this.ui.welcome('Willkommen in Aschenhafen', [
+        'Einst war Aschental ein Garten – dann verbrannte der Aschenkönig den Himmel. Du bist einer der Letzten, die noch gegen ihn ziehen. Dein Ziel: Stufe 30, der Thron der Asche.',
+        'Sprich mit Hafenmeister Joren (Haus mit Anker, links vom Platz) – er zeigt dir die Stadt. Klick auf den Boden: laufen. Klick auf einen Gegner: angreifen. Dein nächster Schritt steht oben rechts.',
+        'Punkte zu verteilen: C öffnet deinen Charakter, K die Fertigkeiten. Alle Tasten und Tipps findest du unter P.',
+      ]);
     }
     this.gfx = this.add.graphics().setDepth(OVERLAY_DEPTH);
     this.gfxGround = this.add.graphics().setDepth(-9e5);
@@ -642,15 +644,15 @@ export class GameScene extends Phaser.Scene {
   /** Titelbild für neue Spiele: Prämisse, Endziel und Namenswahl. */
   private showTitle(p: Actor): void {
     const box = document.createElement('div');
-    box.style.cssText = 'position:fixed;inset:0;z-index:100;display:flex;overflow-y:auto;background:radial-gradient(ellipse at center,rgba(20,10,8,.88),rgba(0,0,0,.96));color:#e8d9b0;font-family:Georgia,serif;text-align:center';
+    box.style.cssText = 'position:fixed;inset:0;z-index:100;display:flex;overflow-y:auto;background:radial-gradient(ellipse at center,rgba(20,10,8,.88),rgba(0,0,0,.96));color:#e8d9b0;font-family:var(--ui-font);font-size:18px;text-align:center';
     const inner = document.createElement('div');
     inner.style.cssText = `max-width:520px;padding:${isTouch ? 10 : 24}px 24px;margin:auto`;
     inner.innerHTML = `<div style="font-size:${isTouch ? 30 : 44}px;letter-spacing:6px;color:#ffb14a;text-shadow:0 0 18px #b8501a">ASCHENTHRON</div>
 <p style="margin:18px 0 6px;line-height:1.55">Aschental war ein Garten, bis der Aschenkönig den Himmel verbrannte. Seitdem wandern Tote durch die Moore, Goblins und Räuber plündern die Straßen, und die Hafenstadt hält sich am letzten Licht.</p>
 <p style="margin:6px 0 18px;line-height:1.55;opacity:.9">Du bist eine der Letzten, die noch gegen ihn ziehen. Werde stärker, finde seltene Beute und bring den Aschenkönig auf seinem Thron zu Fall.</p>
-<div style="margin-bottom:14px">Dein Name: <input id="ttl-name" maxlength="16" value="Held" style="background:#120f16;border:1px solid #6b5a48;color:#e8d9b0;padding:6px 10px;font:16px Georgia,serif;text-align:center;width:180px"></div>
-<button id="ttl-go" style="background:#3a2f26;border:2px solid #d8a24a;color:#ffe8b0;padding:10px 26px;font:bold 16px Georgia,serif;cursor:pointer">Das Abenteuer beginnt</button>
-<p style="margin:16px 0 0;font-size:12px;opacity:.65">${isTouch ? 'Tippen = laufen und angreifen · Zwei Finger = zoomen · Menü unten rechts' : 'Klick = laufen und angreifen · Pfeiltasten laufen auch · Hilfe und Tasten: P'}</p>`;
+<div style="margin-bottom:14px">Dein Name: <input id="ttl-name" maxlength="16" value="Held" style="background:#120f16;border:1px solid #6b5a48;color:#e8d9b0;padding:6px 10px;font:18px var(--ui-font);text-align:center;width:180px"></div>
+<button id="ttl-go" style="background:#3a2f26;border:2px solid #d8a24a;color:#ffe8b0;padding:10px 26px;font:20px var(--ui-font);cursor:pointer">Das Abenteuer beginnt</button>
+<p style="margin:16px 0 0;font-size:15px;opacity:.65">${isTouch ? 'Tippen = laufen und angreifen · Zwei Finger = zoomen · Menü unten rechts' : 'Klick = laufen und angreifen · Pfeiltasten laufen auch · Hilfe und Tasten: P'}</p>`;
     box.append(inner);
     document.body.append(box);
     const go = (): void => {
