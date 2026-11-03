@@ -14,11 +14,10 @@ import { CHEST_SPRITES, MONSTER_SPRITES, PLAYER_BASE, PLAYER_DEFAULTS, PLAYER_HA
 
 type Ctx = CanvasRenderingContext2D;
 
-import { groundCell } from './ninja';
 import { figureMode, ninjaMonsterDef, ninjaNpcDef, usesNinja } from './figureMap';
 import { ninjaFigureCanvas, ninjaHeroCanvas } from './ninjaFigures';
-import { lookImage, tileLook, tintCanvas } from './groundLook';
-import { NINJA_KEYS, ninjaProp } from './ninjaProps';
+import { Raster, toCanvas } from './world/raster';
+import { grave, pillar, rock, tree } from './world/props';
 import { heroMode, heroPortraitCanvas } from './heroSheet';
 
 export const TILE_W = 48;
@@ -60,11 +59,6 @@ function shade(n: number, f: number): number {
 function mix(a: number, b: number, t: number): number {
   const ch = (s: number) => Math.round(((a >> s) & 255) * (1 - t) + ((b >> s) & 255) * t);
   return (ch(16) << 16) | (ch(8) << 8) | ch(0);
-}
-
-/** Grundfarbe einer Kachelart (für Übergänge an Terraingrenzen). */
-export function tileBase(gid: number): number {
-  return (TILE_PAL[gid] ?? TILE_PAL[4]!).base;
 }
 
 function rect(c: Ctx, x: number, y: number, w: number, h: number, col: number | string): void {
@@ -366,271 +360,10 @@ const diamondPath = (c: Ctx, w = TILE_W, h = TILE_H, y0 = 0): void => {
   c.closePath();
 };
 
-interface TilePalette {
-  base: number;
-  dots: number[];
-  dotCount: number;
-  seams?: number;
-  detail?: (c: Ctx, r: () => number) => void;
-}
-
-const TILE_PAL: Record<number, TilePalette> = {
-  1: { base: 0x4a4440, dots: [0x3a3532, 0x5a534d, 0x403a37], dotCount: 40, seams: 0x363230 },
-  3: { base: 0x2f3f2c, dots: [0x3a3a26, 0x2a4a45, 0x4a6a3a, 0x263622], dotCount: 55 },
-  4: { base: 0x35502e, dots: [0x4a6e3a, 0x2a4226, 0x3f5e33], dotCount: 70 },
-  5: { base: 0x34303a, dots: [0x26222c, 0x403a48, 0x2d2933], dotCount: 35, seams: 0x24202a },
-  6: { base: 0x1d3550, dots: [0x2f5578, 0x244566, 0x16283e], dotCount: 30 },
-  7: { base: 0x6a5840, dots: [0x8a7658, 0x4a3e2c, 0x75634a], dotCount: 55 },
-  8: { base: 0x4a5040, dots: [0x6a6e5c, 0x3a4a30, 0x585e4c], dotCount: 55 },
-  9: { base: 0x3a3230, dots: [0x6a4a3a, 0x2a2220, 0x4a3c38], dotCount: 55 },
-  12: { base: 0x8a2a10, dots: [0xf08a20, 0x3a1008, 0xc84a14], dotCount: 45 },
-  // Stadt (Stufe 6): Dielen, Marktplatzpflaster, Blumenwiese
-  15: { base: 0x7a5a38, dots: [0x6a4a2c, 0x8a6a44, 0x70522f], dotCount: 22 },
-  16: { base: 0x6e665e, dots: [0x80786e, 0x5c554e, 0x766e66], dotCount: 50, seams: 0x4e4741 },
-  17: { base: 0x3a5a30, dots: [0x4a6e3a, 0x2f4a28, 0x44663a], dotCount: 60 },
-};
-
-const tileCache = new Map<string, HTMLCanvasElement>();
-
-/** Boden aus dem Ninja-Paket: Zelle 3x hochskaliert, getönt, mit ein paar Punkten je Variante gegen Wiederholung. */
-function ninjaTile(gid: number, variant: number, zone: number): HTMLCanvasElement | null {
-  const look = tileLook(gid, zone);
-  let img: CanvasImageSource | null = null;
-  let sx = 0;
-  let sy = 0;
-  if (look?.cells) {
-    const lc = look.cells[variant % look.cells.length]!;
-    img = lookImage(lc);
-    sx = lc.x;
-    sy = lc.y;
-  }
-  if (!img) {
-    const cell = groundCell(gid);
-    if (!cell) return null;
-    img = cell.img;
-    sx = cell.tx * 16;
-    sy = cell.ty * 16;
-  }
-  const c = mkCanvas(TILE_W, TILE_H);
-  const x = ctxOf(c);
-  x.drawImage(img, sx, sy, 16, 16, 0, 0, TILE_W, TILE_H);
-  if (look?.tint) tintCanvas(c, look.tint);
-  const r = rng(gid * 977 + variant * 131 + 7 + zone * 31);
-  const px = TILE_W / 16;
-  for (let i = 0; i < 5; i++) {
-    x.fillStyle = r() < 0.5 ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)';
-    x.fillRect(Math.floor(r() * 16) * px, Math.floor(r() * 16) * px, px, px);
-  }
-  if (gid === 17) {
-    for (let i = 0; i < 4; i++) {
-      x.fillStyle = ['#f6e27a', '#ffffff', '#f09ab4', '#c9a0f0'][Math.floor(r() * 4)]!;
-      x.fillRect(Math.floor(r() * 15) * px, Math.floor(r() * 15) * px, px, px);
-    }
-  }
-  return c;
-}
-
-export function tileCanvas(gid: number, variant: number, zone = 0): HTMLCanvasElement {
-  const key = `${gid}_${variant}_${zone}`;
-  const hit = tileCache.get(key);
-  if (hit) return hit;
-  const ninja = ninjaTile(gid, variant, zone);
-  if (ninja) {
-    tileCache.set(key, ninja);
-    return ninja;
-  }
-  const pal = TILE_PAL[gid] ?? TILE_PAL[4]!;
-  const c = mkCanvas(TILE_W, TILE_H);
-  const x = ctxOf(c);
-  const r = rng(gid * 977 + variant * 131 + 7);
-  x.save();
-  diamondPath(x);
-  x.clip();
-  rect(x, 0, 0, TILE_W, TILE_H, pal.base);
-  for (let i = 0; i < pal.dotCount; i++) {
-    const px = Math.floor(r() * TILE_W);
-    const py = Math.floor(r() * TILE_H);
-    const sz = r() < 0.2 ? 3 : 2;
-    rect(x, px, py, sz, sz - (r() < 0.5 ? 1 : 0), mix(pal.base, pal.dots[Math.floor(r() * pal.dots.length)]!, 0.55));
-  }
-  if (pal.seams !== undefined) {
-    x.strokeStyle = css(pal.seams);
-    x.lineWidth = 1;
-    x.beginPath();
-    x.moveTo(TILE_W / 4, TILE_H / 4);
-    x.lineTo((TILE_W * 3) / 4, (TILE_H * 3) / 4);
-    x.moveTo((TILE_W * 3) / 4, TILE_H / 4);
-    x.lineTo(TILE_W / 4, (TILE_H * 3) / 4);
-    x.stroke();
-  }
-  if (gid === 4 && r() < 0.15) rect(x, 28 + Math.floor(r() * 8), 12 + Math.floor(r() * 6), 2, 2, 0xc0b060);
-  if (gid === 15) {
-    // Dielen: Fugen parallel zur Kachelkante, wechselnde Brettlängen
-    x.strokeStyle = css(0x4a3220);
-    x.lineWidth = 1;
-    for (let i = -4; i <= 4; i++) {
-      x.beginPath();
-      x.moveTo(TILE_W / 2 + i * 8, 0);
-      x.lineTo(TILE_W / 2 + i * 8 + TILE_W / 2, TILE_H / 2);
-      x.lineTo(TILE_W / 2 + i * 8, TILE_H);
-      x.stroke();
-    }
-    for (let i = 0; i < 5; i++) rect(x, 8 + Math.floor(r() * 46), 4 + Math.floor(r() * 22), 2, 1, 0x3a2818);
-  }
-  if (gid === 17) {
-    const cols = [0xe05a5a, 0xf0d84a, 0xf0f0f0, 0xb07ae0];
-    for (let i = 0; i < 9; i++) rect(x, 8 + Math.floor(r() * 48), 4 + Math.floor(r() * 24), 2, 2, cols[Math.floor(r() * cols.length)]!);
-  }
-  if (gid === 9 && r() < 0.3) rect(x, 20 + Math.floor(r() * 24), 8 + Math.floor(r() * 14), 2, 2, 0xd86a2a);
-  if (gid === 6) {
-    x.fillStyle = 'rgba(160,200,230,0.25)';
-    for (let i = 0; i < 3; i++) x.fillRect(10 + Math.floor(r() * 40), 6 + Math.floor(r() * 18), 8, 1);
-  }
-  if (gid === 3) {
-    x.fillStyle = 'rgba(120,180,170,0.22)';
-    for (let i = 0; i < 2; i++) x.fillRect(12 + Math.floor(r() * 36), 8 + Math.floor(r() * 16), 9, 2);
-  }
-  x.restore();
-  tileCache.set(key, c);
-  return c;
-}
-
 /* ------------------------------------------------------- Props (Wand, Baum…) */
 
-export type WallStyle = 'brick' | 'dungeon' | 'cliff';
+/** Wandhöhe der alten Iso-Stadtwand (town.ts, nur noch Ersatz für Wände außerhalb erkannter Häuser) */
 const WALL_H = 44;
-
-function wallCanvas(style: WallStyle, variant: number): HTMLCanvasElement {
-  const pal = {
-    brick: { left: 0x5c5148, right: 0x4a4038, top: 0x7a6e62, line: 0x3a322c },
-    dungeon: { left: 0x2c2833, right: 0x221e28, top: 0x403a48, line: 0x18151d },
-    cliff: { left: 0x57524a, right: 0x433f39, top: 0x6c665c, line: 0x2f2c27 },
-  }[style];
-  const c = mkCanvas(TILE_W, TILE_H + WALL_H);
-  const x = ctxOf(c);
-  const r = rng(variant * 53 + style.length * 11);
-  const hw = TILE_W / 2;
-  const hh = TILE_H / 2;
-  // linke Fläche
-  x.fillStyle = css(pal.left);
-  x.beginPath();
-  x.moveTo(0, hh);
-  x.lineTo(hw, TILE_H);
-  x.lineTo(hw, TILE_H + WALL_H);
-  x.lineTo(0, hh + WALL_H);
-  x.closePath();
-  x.fill();
-  // rechte Fläche
-  x.fillStyle = css(pal.right);
-  x.beginPath();
-  x.moveTo(TILE_W, hh);
-  x.lineTo(hw, TILE_H);
-  x.lineTo(hw, TILE_H + WALL_H);
-  x.lineTo(TILE_W, hh + WALL_H);
-  x.closePath();
-  x.fill();
-  // Ziegel/Fugen
-  x.strokeStyle = css(pal.line);
-  x.lineWidth = 1;
-  for (let i = 1; i < 6; i++) {
-    const dy = i * 7;
-    x.beginPath();
-    x.moveTo(0, hh + dy);
-    x.lineTo(hw, TILE_H + dy);
-    x.lineTo(TILE_W, hh + dy);
-    x.stroke();
-  }
-  for (let i = 0; i < 14; i++) {
-    const side = r() < 0.5 ? 0 : 1;
-    const px = side === 0 ? 2 + Math.floor(r() * 28) : hw + 2 + Math.floor(r() * 28);
-    const py = TILE_H + Math.floor(r() * (WALL_H - 4));
-    rect(x, px, py, 2, 2, shade(side === 0 ? pal.left : pal.right, 0.8 + r() * 0.4));
-  }
-  // Oberseite
-  x.save();
-  x.translate(0, 0);
-  diamondPath(x);
-  x.fillStyle = css(pal.top);
-  x.fill();
-  x.restore();
-  for (let i = 0; i < 10; i++) rect(x, 14 + Math.floor(r() * 36), 7 + Math.floor(r() * 17), 2, 1, shade(pal.top, 0.85 + r() * 0.3));
-  if (style === 'cliff' && r() < 0.5) rect(x, 24 + Math.floor(r() * 14), 12, 6, 2, 0x4a6a3a);
-  return c;
-}
-
-function treeCanvas(style: 'oak' | 'pine' | 'dead' | 'char', variant: number): HTMLCanvasElement {
-  const lw = 16;
-  const lh = 24;
-  const c = mkCanvas(lw, lh);
-  const x = ctxOf(c);
-  const r = rng(variant * 31 + style.length);
-  const trunk = style === 'char' ? 0x2a2220 : 0x5a4030;
-  rect(x, 7, 15, 2, 8, trunk);
-  rect(x, 6, 21, 4, 2, shade(trunk, 0.8));
-  if (style === 'oak') {
-    const g = [0x2f5a30, 0x3f7a3c, 0x255026];
-    for (const [cx, cy, rad] of [[8, 9, 6], [4, 11, 4], [12, 11, 4], [8, 5, 4]] as const) {
-      for (let yy = -rad; yy <= rad; yy++) {
-        for (let xx = -rad; xx <= rad; xx++) {
-          if (xx * xx + yy * yy <= rad * rad) rect(x, cx + xx, cy + yy, 1, 1, g[(xx + yy + 20 + variant) % 3 === 0 ? 1 : yy > 1 ? 2 : 0]!);
-        }
-      }
-    }
-  } else if (style === 'pine') {
-    for (let i = 0; i < 4; i++) {
-      const w = 3 + i * 2;
-      rect(x, 8 - Math.floor(w / 2) - 1, 4 + i * 4, w + 2, 4, i % 2 ? 0x2a4a2c : 0x35603a);
-      rect(x, 8 - Math.floor(w / 2) - 1, 7 + i * 4, w + 2, 1, 0x1f3a22);
-    }
-  } else {
-    const col = style === 'dead' ? 0x4a4036 : 0x2a2220;
-    rect(x, 7, 6, 2, 10, col);
-    for (const [bx, by, dx] of [[7, 8, -4], [8, 6, 4], [7, 11, -3], [8, 10, 3]] as const) {
-      rect(x, bx + Math.min(0, dx), by, Math.abs(dx), 1, col);
-      rect(x, bx + dx, by - 2, 1, 2, col);
-    }
-    if (style === 'dead' && r() < 0.6) rect(x, 3, 14, 2, 1, 0x5a6a3a);
-  }
-  return grounded(upscale(outline(c), 3), 0.55, 0.93);
-}
-
-function rockCanvas(style: 'grey' | 'dark', variant: number): HTMLCanvasElement {
-  const c = mkCanvas(14, 10);
-  const x = ctxOf(c);
-  const base = style === 'grey' ? 0x77727c : 0x54504c;
-  rect(x, 2, 5, 10, 4, shade(base, 0.8));
-  rect(x, 3, 3, 8, 4, base);
-  rect(x, 5, 2, 4, 2, shade(base, 1.2));
-  rect(x, 4 + (variant % 3), 4, 2, 1, shade(base, 1.3));
-  return grounded(upscale(outline(c), 4), 0.9, 0.86);
-}
-
-function graveCanvas(variant: number): HTMLCanvasElement {
-  const c = mkCanvas(12, 16);
-  const x = ctxOf(c);
-  const base = 0x8a8a90;
-  if (variant % 2 === 0) {
-    rect(x, 3, 4, 6, 9, base);
-    rect(x, 4, 3, 4, 1, base);
-    rect(x, 5, 6, 2, 1, 0x4a4a52);
-    rect(x, 5, 8, 2, 1, 0x4a4a52);
-  } else {
-    rect(x, 5, 1, 2, 12, base);
-    rect(x, 2, 4, 8, 2, base);
-  }
-  rect(x, 2, 12, 8, 2, 0x3a4a30);
-  return grounded(upscale(outline(c), 4), 0.8, 0.9);
-}
-
-function pillarCanvas(): HTMLCanvasElement {
-  const c = mkCanvas(12, 22);
-  const x = ctxOf(c);
-  rect(x, 2, 18, 8, 3, 0x3a3640);
-  rect(x, 3, 4, 6, 15, 0x4a4652);
-  rect(x, 3, 4, 2, 15, 0x5a5662);
-  rect(x, 2, 2, 8, 3, 0x3a3640);
-  return grounded(upscale(outline(c), 4), 0.9, 0.93);
-}
 
 /* ------------------------------------------------------------- Akteure */
 
@@ -1324,67 +1057,19 @@ export function chestCanvas(tier: 'wood' | 'iron' | 'gold', open: boolean): HTML
 
 /* ------------------------------------------------------------ Registrierung */
 
-export const WALL_VARIANTS = 3;
 
-/** Wandblock in Draufsicht: helle Oberkante, dunkler Fuß, damit die Fläche als Wand statt als Boden liest. */
-function shadeWallBlock(src: HTMLCanvasElement): HTMLCanvasElement {
-  const c = mkCanvas(TILE_W, TILE_H);
-  const x = ctxOf(c);
-  x.drawImage(src, 0, 0, TILE_W, TILE_H);
-  x.fillStyle = 'rgba(255,255,255,0.22)';
-  x.fillRect(0, 0, TILE_W, 3);
-  x.fillStyle = 'rgba(0,0,0,0.18)';
-  x.fillRect(0, TILE_H - 12, TILE_W, 9);
-  x.fillStyle = 'rgba(0,0,0,0.5)';
-  x.fillRect(0, TILE_H - 3, TILE_W, 3);
-  x.fillStyle = 'rgba(0,0,0,0.25)';
-  x.fillRect(0, 0, 3, TILE_H);
-  x.fillRect(TILE_W - 3, 0, 3, TILE_H);
-  return c;
-}
-export const TILE_VARIANTS = 4;
 
 /** Registriert alle statischen Texturen (Props) in Phaser. Kacheln werden zu Chunks zusammengesetzt. */
 export function registerStaticArt(scene: Phaser.Scene): void {
   const add = (key: string, c: HTMLCanvasElement) => {
     if (!scene.textures.exists(key)) scene.textures.addCanvas(key, c);
   };
-  for (const style of ['brick', 'dungeon', 'cliff'] as const) {
-    for (let v = 0; v < WALL_VARIANTS; v++) {
-      const key = `wall_${style}_${v}`;
-      const n = ninjaProp(key);
-      if (n) NINJA_KEYS.add(key);
-      add(key, n ? shadeWallBlock(n) : wallCanvas(style, v));
-    }
-  }
-  // Berg-Oberseite: flache Steinplatte mit ein paar Steinsprenkeln (Innenkacheln großer Felsmassen)
-  for (let v = 0; v < WALL_VARIANTS; v++) {
-    const key = `wall_top_${v}`;
-    const n = ninjaProp(key);
-    if (!n) { add(key, wallCanvas('cliff', v)); continue; }
-    NINJA_KEYS.add(key);
-    const c = mkCanvas(n.width, n.height);
-    const g = ctxOf(c);
-    g.drawImage(n, 0, 0);
-    const r = rng(v * 71 + 5);
-    for (let i = 0; i < 9; i++) {
-      g.fillStyle = r() < 0.55 ? 'rgba(40,52,44,0.34)' : 'rgba(235,240,225,0.2)';
-      g.fillRect(Math.floor(r() * 14) * 3, Math.floor(r() * 15) * 3, 3 * (1 + Math.floor(r() * 3)), 3);
-    }
-    add(key, c);
-  }
-  // Ninja-Bild, wenn geladen, sonst die prozedurale Zeichnung als Ersatz
-  const addN = (key: string, fallback: () => HTMLCanvasElement) => {
-    const n = ninjaProp(key);
-    if (n) NINJA_KEYS.add(key);
-    add(key, n ?? fallback());
-  };
-  for (const style of ['oak', 'pine', 'dead', 'char'] as const) for (let v = 0; v < 3; v++) addN(`tree_${style}_${v}`, () => treeCanvas(style, v));
-  for (const style of ['oakr', 'pink', 'big'] as const) for (let v = 0; v < 3; v++) addN(`tree_${style}_${v}`, () => treeCanvas('oak', v));
-  for (const style of ['grey', 'dark'] as const) for (let v = 0; v < 3; v++) addN(`rock_${style}_${v}`, () => rockCanvas(style, v));
-  for (let v = 0; v < 3; v++) addN(`rock_tan_${v}`, () => rockCanvas('grey', v));
-  for (let v = 0; v < 3; v++) addN(`grave_${v}`, () => graveCanvas(v % 2));
-  addN('pillar', pillarCanvas);
+  // Welt-Props aus dem Code (world/props.ts), Maßstab 2; Wände malt der Boden-Chunk selbst
+  const W = (key: string, make: () => Raster) => add(key, toCanvas(make()));
+  for (const style of ['oak', 'pine', 'dead', 'char', 'oakr', 'pink', 'big'] as const) for (let v = 0; v < 3; v++) W(`tree_${style}_${v}`, () => tree(style, v));
+  for (const style of ['grey', 'dark', 'tan'] as const) for (let v = 0; v < 3; v++) W(`rock_${style}_${v}`, () => rock(style, v));
+  for (let v = 0; v < 3; v++) W(`grave_${v}`, () => grave(v));
+  W('pillar', pillar);
   for (const r of ['normal', 'magic', 'rare', 'set', 'legendary'] as const) add(`loot_${r}`, lootCanvas(r));
   for (const k of ['trainer', 'merchant', 'stash', 'quest', 'smith']) add(`npc_${k}`, npcCanvas(k));
   for (const [name, f] of Object.entries(NPC_NAME_SPRITES)) if (sprite(f)) add(`npc_n_${name}`, npcCanvas('quest', name));

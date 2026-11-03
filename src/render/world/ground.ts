@@ -81,7 +81,7 @@ function dirtPat(seed: number, stones = 0.01, crumbs = 0.05): Pattern {
 }
 
 /** Steinplatten in versetzten Reihen (Fuge 0, Platte 3/4/2, Licht oben links, Schatten unten rechts, wenige Risse) */
-function slabPat(seed: number, rowH: number, minW: number, maxW: number, cracks = 0.08): Pattern {
+function slabPat(seed: number, rowH: number, minW: number, maxW: number, cracks = 0.08, joint = 0): Pattern {
   const p = pat();
   for (let r = 0; r < P / rowH; r++) {
     const y0 = r * rowH;
@@ -103,7 +103,7 @@ function slabPat(seed: number, rowH: number, minW: number, maxW: number, cracks 
       for (let yy = y0; yy < y0 + rowH; yy++) {
         for (let xx = a; xx < b; xx++) {
           let t = tone;
-          if (yy === y0 + rowH - 1 || xx === b - 1) t = 0; // Fuge
+          if (yy === y0 + rowH - 1 || xx === b - 1) t = joint; // Fuge
           else if (yy === y0 || xx === a) t = tone + 1; // Lichtkante
           else if (yy === y0 + rowH - 2 || xx === b - 2) t = tone - 1; // Schattenkante
           else if (h3(xx, yy, seed + 3) < 0.025) t = tone - 1;
@@ -124,26 +124,38 @@ function slabPat(seed: number, rowH: number, minW: number, maxW: number, cracks 
   return p;
 }
 
-/** Kopfsteinpflaster: runde Steine im versetzten 8er-Raster, dunkle Fugen */
-function cobblePat(seed: number): Pattern {
-  const p = pat(0);
-  const S = 8;
-  for (let r = 0; r < P / S; r++) {
-    for (let c = 0; c < P / S; c++) {
-      const cx = c * S + (r % 2) * 4 + 3.5 + (h3(c, r, seed) - 0.5);
-      const cy = r * S + 3.5 + (h3(c, r, seed + 1) - 0.5) * 0.8;
-      const k = h3(c, r, seed + 2);
-      const tone = k < 0.25 ? 4 : k > 0.82 ? 2 : 3;
-      for (let yy = -4; yy <= 4; yy++) {
-        for (let xx = -4; xx <= 4; xx++) {
-          const px = Math.floor(cx + xx);
-          const py = Math.floor(cy + yy);
-          const dx = px + 0.5 - cx;
-          const dy = py + 0.5 - cy;
-          if ((dx * dx) / 12 + (dy * dy) / 10 > 1) continue;
-          put(p, px, py, dx + dy < -3 ? tone + 1 : dx + dy > 2.6 ? tone - 2 : tone);
+/** Natursteinplatten bzw. Kopfstein: unregelmäßige Steine (Voronoi, n Zellen je Periode), Fugen 0, Licht oben links */
+function flagPat(seed: number, n = 11, mortar = 1.1): Pattern {
+  const p = pat(1);
+  const c = P / n;
+  const pts: [number, number, number][] = [];
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) pts.push([(i + 0.2 + 0.6 * h3(i, j, seed)) * c, (j + 0.2 + 0.6 * h3(i, j, seed + 1)) * c, h3(i, j, seed + 2)]);
+  for (let y = 0; y < P; y++) {
+    for (let x = 0; x < P; x++) {
+      const ci = Math.floor(x / c);
+      const cj = Math.floor(y / c);
+      let d1 = 1e9, d2 = 1e9, best = 0, bdx = 0, bdy = 0;
+      for (let dj = -1; dj <= 1; dj++) {
+        for (let di = -1; di <= 1; di++) {
+          const ii = (ci + di + n) % n;
+          const jj = (cj + dj + n) % n;
+          const q = pts[jj * n + ii]!;
+          // Punkt in die Nachbarperiode verschieben, damit das Muster nahtlos umläuft
+          const qx = q[0] + (ci + di < 0 ? -P : ci + di >= n ? P : 0);
+          const qy = q[1] + (cj + dj < 0 ? -P : cj + dj >= n ? P : 0);
+          const dx = x + 0.5 - qx;
+          const dy = y + 0.5 - qy;
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (d < d1) { d2 = d1; d1 = d; best = jj * n + ii; bdx = dx; bdy = dy; } else if (d < d2) d2 = d;
         }
       }
+      const k = pts[best]![2];
+      const base = k < 0.25 ? 4 : k > 0.8 ? 2 : 3;
+      const edge = d2 - d1;
+      let t = edge < mortar ? 0 : base;
+      if (edge >= mortar && edge < mortar + 1.3) t = bdx + bdy < 0 ? base + 1 : base - 1;
+      if (t > 0 && h3(x, y, seed + 3) < 0.02) t -= 1;
+      put(p, x, y, t);
     }
   }
   return p;
@@ -237,8 +249,10 @@ function pats(): Record<string, Pattern> {
     gravel: dirtPat(22, 0.045, 0.08),
     ash: dirtPat(23, 0.005, 0.09),
     slab: slabPat(31, 8, 8, 16),
-    bigslab: slabPat(32, 16, 12, 22, 0.12),
-    cobble: cobblePat(33),
+    bigslab: slabPat(32, 16, 12, 22, 0.12, 1),
+    crypt: slabPat(34, 16, 14, 20, 0.2, 1),
+    cobble: flagPat(33, 21, 1.4),
+    flagstone: flagPat(35),
     plank: plankPat(41),
     moor: moorPat(51),
     water: waterPat(61),
@@ -274,10 +288,10 @@ export const MATS: Mat[] = [
   m('lava', 'lava', [0x4a0e08, 0x7a1a0c, 0xb0320e, 0xe86416, 0xffc048], 1, 'lava', 0x241012),
   m('plank', 'plank', [0x1d130e, 0x2e1f15, 0x40291b, 0x553726, 0x6c4831], 2),
   m('cobble', 'cobble', [0x141218, 0x25212a, 0x332e38, 0x443e49, 0x5a535e], 3),
-  m('flags', 'slab', [0x17151b, 0x27232c, 0x36313c, 0x48424e, 0x5e5764], 3),
+  m('flags', 'flagstone', [0x17151b, 0x27232c, 0x36313c, 0x48424e, 0x5e5764], 3),
   m('dun', 'bigslab', [0x0f0e13, 0x1a1820, 0x24212b, 0x302c38, 0x403b48], 3, 'land', undefined, D),
   m('dun_gruft', 'bigslab', [0x0c110e, 0x151e19, 0x1e2a23, 0x29372e, 0x37473b], 3, 'land', undefined, D),
-  m('dun_kata', 'slab', [0x131215, 0x1f1c20, 0x2b282c, 0x3a3539, 0x4c464a], 3, 'land', undefined, D),
+  m('dun_kata', 'crypt', [0x131215, 0x1f1c20, 0x2b282c, 0x3a3539, 0x4c464a], 3, 'land', undefined, D),
   m('dun_mine', 'rock', [0x120e0b, 0x1e1712, 0x2a2019, 0x382b21, 0x4a392b], 3, 'land', undefined, D),
   m('dun_thron', 'bigslab', [0x140a0c, 0x211114, 0x2e171b, 0x3e1f24, 0x52282d], 3, 'land', undefined, D),
   m('dun_goblin', 'rock', [0x11110b, 0x1d1c13, 0x29281b, 0x363423, 0x47442e], 3, 'land', undefined, D),
@@ -417,10 +431,10 @@ function higher(T: Tables, k: number, n: number): boolean {
 }
 
 /**
- * Zeichnet die Kacheln (tx0..tx0+ntx-1, ty0..ty0+nty-1) in `out` (ntx*24 x nty*24 Kunstpixel). Kacheln, für die
- * `skip` true liefert, bleiben leer (außerhalb der Karte).
+ * Zeichnet die Kacheln (tx0..tx0+ntx-1, ty0..ty0+nty-1) in `out` (Breite ntx*24 Kunstpixel), ab Pixelzeile `outRow`
+ * (so lässt sich ein Chunk in Streifen über mehrere Bilder malen). Kacheln, für die `skip` true liefert, bleiben leer.
  */
-export function paintGround(out: Raster, tx0: number, ty0: number, ntx: number, nty: number, q: GroundQuery, skip?: (x: number, y: number) => boolean): void {
+export function paintGround(out: Raster, tx0: number, ty0: number, ntx: number, nty: number, q: GroundQuery, skip?: (x: number, y: number) => boolean, outRow = 0): void {
   const T = tables();
   const { col: C, pat: PT, prio: PR, kind: KD, group: GR, noise: NT, warpX: WX, warpY: WY } = T;
   // Kachelcache mit 2 Kacheln Rand (Verschiebung + Nachbarn): Material und (Wasser) Landabstand
@@ -546,7 +560,7 @@ export function paintGround(out: Raster, tx0: number, ty0: number, ntx: number, 
       for (let dy = -2; dy <= 2 && !border; dy++) for (let dx = -2; dx <= 2; dx++) if (tm[ci + dy * cw + dx] !== k0) { border = true; break; }
       for (let v = 0; v < A_; v++) {
         const j = (ty - ty0) * A_ + v + RIM;
-        const row = (j - RIM) * W;
+        const row = (j - RIM + outRow) * W;
         for (let u = 0; u < A_; u++) {
           const i = (tx - tx0) * A_ + u + RIM;
           const k = own[j * pw + i]!;

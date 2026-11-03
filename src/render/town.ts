@@ -1,10 +1,12 @@
 import type Phaser from 'phaser';
-import { NINJA_KEYS, ninjaProp } from './ninjaProps';
-import { TILE_H, TILE_W, WALL_H, ctxOf, css, diamondPath, grounded, mkCanvas, outline, rect, rng, shade, upscale } from './art';
+import { TILE_H, TILE_W, WALL_H, ctxOf, css, diamondPath, mkCanvas, rect, rng, shade } from './art';
+import { Raster, toCanvas } from './world/raster';
+import { barrel, boat, crates, flowerBox, lantern, post, ship, stall, well } from './world/props';
 
 /**
- * Stadtgrafik (Stufe 6, Aschenhafen): Fachwerkhäuser mit Ziegeldach, Türen mit Schild je Beruf, Fässer, Kisten, Brunnen,
- * Laternen, Marktstand, Blumenkästen, Boote, Pfähle und ein Segelschiff. Alles prozedural, keine Fremdgrafik.
+ * Stadtgrafik (Stufe 6, Aschenhafen): Türschild-Symbole und die Registrierung der Stadt-Props (Fässer, Kisten, Brunnen,
+ * Laternen, Marktstand, Blumenkästen, Boote, Pfähle, Segelschiff aus world/props.ts). Die alten Iso-Wand-/Türbilder
+ * bleiben nur als Ersatz für Wandkacheln außerhalb erkannter Häuser.
  */
 
 type Ctx = CanvasRenderingContext2D;
@@ -15,6 +17,8 @@ export const TOWN_GID = { wall: 18, barrel: 19, crates: 20, well: 21, lantern: 2
 export const WATER_PROP_GIDS = new Set<number>([TOWN_GID.boat, TOWN_GID.post, TOWN_GID.ship]);
 export const DOOR_ICONS = ['anchor', 'book', 'coins', 'anvil', 'chest', 'shield', 'leaf', 'scroll', 'sword', 'staff'] as const;
 export type DoorIcon = (typeof DOOR_ICONS)[number];
+/** Stadt-Texturen aus der Code-Welt (stehen unten mittig, siehe GameScene.makeProp) */
+export const WORLD_TOWN_KEYS = new Set(['twn_barrel', 'twn_crates', 'twn_well', 'twn_lantern', 'twn_stall', 'twn_post', 'twn_flowers', 'twn_boat', 'twn_ship']);
 
 const PLASTER = [0xcdbf9f, 0xd8c8a8, 0xbfae90, 0xc9b69a];
 const ROOF = [0x9a4632, 0x8a3a2c, 0x7a3a30, 0xa4502e];
@@ -160,110 +164,6 @@ export function doorCanvas(icon: DoorIcon, axis: 'x' | 'y'): HTMLCanvasElement {
   return c;
 }
 
-/** Kleine Props: logisch gezeichnet, vierfach skaliert, mit Umriss und Schatten. */
-function prop(w: number, h: number, draw: (x: Ctx) => void, shadow = 0.8, base = 0.9): HTMLCanvasElement {
-  const c = mkCanvas(w, h);
-  draw(ctxOf(c));
-  return grounded(upscale(outline(c), 3), shadow, base);
-}
-
-function barrel(): HTMLCanvasElement {
-  return prop(11, 12, (x) => {
-    rect(x, 2, 2, 7, 9, 0x7a5030); rect(x, 1, 4, 9, 5, 0x8a5c36); rect(x, 3, 1, 5, 1, 0x6a4428);
-    rect(x, 1, 3, 9, 1, 0x3a3a42); rect(x, 1, 8, 9, 1, 0x3a3a42);
-    rect(x, 3, 4, 1, 5, 0xa8744a); rect(x, 6, 4, 1, 5, 0x6a4428);
-  });
-}
-
-function crates(): HTMLCanvasElement {
-  return prop(14, 13, (x) => {
-    rect(x, 1, 6, 8, 6, 0x946438); rect(x, 1, 6, 8, 1, 0xb4804a); rect(x, 1, 9, 8, 1, 0x6a4428); rect(x, 4, 6, 1, 6, 0x6a4428);
-    rect(x, 7, 3, 6, 5, 0x8a5c36); rect(x, 7, 3, 6, 1, 0xb4804a); rect(x, 7, 5, 6, 1, 0x6a4428);
-    rect(x, 9, 8, 4, 4, 0xa07a4a); rect(x, 9, 8, 4, 1, 0xc09a62);
-  });
-}
-
-function well(): HTMLCanvasElement {
-  return prop(16, 18, (x) => {
-    // Pfosten und Dach
-    rect(x, 3, 3, 1, 8, 0x5a3c26); rect(x, 12, 3, 1, 8, 0x5a3c26);
-    rect(x, 2, 1, 12, 2, 0x9a4632); rect(x, 3, 0, 10, 1, 0xb85a40); rect(x, 1, 3, 14, 1, 0x7a3426);
-    // Eimer am Seil
-    rect(x, 8, 4, 1, 4, 0x8a7a5a); rect(x, 7, 8, 3, 2, 0x6a4a2a);
-    // Steinring
-    rect(x, 1, 10, 14, 6, 0x77727c); rect(x, 2, 9, 12, 2, 0x8a858f); rect(x, 3, 10, 10, 2, 0x1d3550);
-    for (let i = 0; i < 6; i++) rect(x, 2 + i * 2, 13 + (i % 2), 2, 1, 0x57535c);
-    rect(x, 1, 15, 14, 1, 0x57535c);
-  });
-}
-
-function lantern(): HTMLCanvasElement {
-  const c = prop(8, 22, (x) => {
-    rect(x, 3, 6, 2, 15, 0x2a2a30); rect(x, 2, 19, 4, 2, 0x3a3a42);
-    rect(x, 1, 1, 6, 1, 0x2a2a30); rect(x, 2, 2, 4, 5, 0xf0c050); rect(x, 3, 3, 2, 3, 0xfff0b0); rect(x, 1, 2, 1, 5, 0x2a2a30); rect(x, 6, 2, 1, 5, 0x2a2a30); rect(x, 2, 0, 4, 1, 0x2a2a30);
-  }, 0.5, 0.95);
-  const x = ctxOf(c);
-  const grad = x.createRadialGradient(c.width / 2, c.height * 0.22, 2, c.width / 2, c.height * 0.22, 30);
-  grad.addColorStop(0, 'rgba(255,210,110,0.35)');
-  grad.addColorStop(1, 'rgba(255,210,110,0)');
-  x.fillStyle = grad;
-  x.fillRect(0, 0, c.width, c.height * 0.6);
-  return c;
-}
-
-function stall(): HTMLCanvasElement {
-  return prop(18, 15, (x) => {
-    rect(x, 2, 5, 1, 9, 0x5a3c26); rect(x, 15, 5, 1, 9, 0x5a3c26);
-    for (let i = 0; i < 8; i++) rect(x, 1 + i * 2, 2, 2, 4, i % 2 ? 0xe8e0d0 : 0xb8403a);
-    rect(x, 1, 6, 16, 1, 0x7a2a28);
-    rect(x, 2, 9, 14, 4, 0x946438); rect(x, 2, 9, 14, 1, 0xb4804a);
-    for (const [px, col] of [[3, 0xd84a3a], [6, 0xe8b830], [9, 0x58a848], [12, 0xe08a30]] as const) rect(x, px, 8, 2, 2, col);
-  });
-}
-
-function post(): HTMLCanvasElement {
-  return prop(6, 12, (x) => {
-    rect(x, 1, 1, 4, 10, 0x5a4230); rect(x, 1, 1, 1, 10, 0x7a5c42); rect(x, 0, 1, 6, 2, 0x6a5038); rect(x, 1, 5, 4, 1, 0x3a2a1c);
-  }, 0.5, 0.95);
-}
-
-function flowers(): HTMLCanvasElement {
-  return prop(14, 10, (x) => {
-    rect(x, 1, 5, 12, 5, 0x6a4428); rect(x, 1, 5, 12, 1, 0x8a5c36); rect(x, 2, 8, 10, 1, 0x4a2e1c);
-    const cols = [0xe05a5a, 0xf0d84a, 0xf0f0f0, 0xb07ae0, 0xf08a4a];
-    for (let i = 0; i < 6; i++) {
-      rect(x, 2 + i * 2, 3 + (i % 2), 2, 2, cols[i % cols.length]!);
-      rect(x, 2 + i * 2, 5, 1, 1, 0x3a8a3a);
-    }
-    rect(x, 1, 4, 12, 1, 0x3a7a38);
-  });
-}
-
-function boat(): HTMLCanvasElement {
-  return prop(22, 10, (x) => {
-    rect(x, 2, 4, 18, 4, 0x6a4428); rect(x, 1, 3, 20, 2, 0x8a5c36); rect(x, 3, 8, 16, 1, 0x4a2e1c);
-    rect(x, 4, 4, 14, 1, 0xa8744a); rect(x, 2, 2, 1, 2, 0x8a5c36); rect(x, 19, 2, 1, 2, 0x8a5c36);
-    for (let i = 0; i < 4; i++) rect(x, 5 + i * 3, 5, 1, 2, 0x4a2e1c);
-    rect(x, 8, 0, 1, 5, 0xc8b898); rect(x, 7, 0, 3, 1, 0xc8b898);
-  }, 0.9, 0.78);
-}
-
-function ship(): HTMLCanvasElement {
-  const L = mkCanvas(40, 36);
-  const x = ctxOf(L);
-  // Rumpf
-  rect(x, 3, 24, 34, 6, 0x4a2e1c); rect(x, 1, 21, 38, 4, 0x6a4428); rect(x, 5, 30, 30, 2, 0x34200f);
-  rect(x, 1, 21, 38, 1, 0x8a5c36); rect(x, 4, 25, 32, 1, 0xa8744a); rect(x, 36, 18, 3, 4, 0x6a4428); rect(x, 1, 19, 4, 3, 0x6a4428);
-  for (let i = 0; i < 6; i++) rect(x, 6 + i * 5, 27, 2, 2, 0x1a1008);
-  // Masten und Segel
-  rect(x, 18, 3, 2, 19, 0x5a3c26); rect(x, 8, 7, 2, 14, 0x5a3c26); rect(x, 28, 8, 2, 13, 0x5a3c26);
-  rect(x, 11, 4, 16, 14, 0xe8e0c8); rect(x, 11, 4, 16, 1, 0xb8b098); rect(x, 11, 10, 16, 2, 0xb8403a); rect(x, 12, 17, 14, 1, 0xc8c0a8);
-  rect(x, 3, 8, 11, 9, 0xd8d0b8); rect(x, 3, 12, 11, 1, 0xb8403a);
-  rect(x, 23, 9, 11, 8, 0xd8d0b8); rect(x, 23, 13, 11, 1, 0xb8403a);
-  rect(x, 19, 1, 6, 3, 0xb8403a); rect(x, 19, 0, 1, 4, 0x5a3c26);
-  return grounded(upscale(outline(L), 3), 0.95, 0.8);
-}
-
 /** Registriert alle Stadt-Texturen in Phaser. */
 export function registerTownArt(scene: Phaser.Scene): void {
   const add = (key: string, c: HTMLCanvasElement) => {
@@ -273,18 +173,15 @@ export function registerTownArt(scene: Phaser.Scene): void {
   DOOR_ICONS.forEach((icon) => {
     for (const axis of ['x', 'y'] as const) add(`twn_door_${icon}_${axis}`, doorCanvas(icon, axis));
   });
-  const addN = (key: string, fallback: () => HTMLCanvasElement) => {
-    const n = ninjaProp(key);
-    if (n) NINJA_KEYS.add(key);
-    add(key, n ?? fallback());
-  };
-  addN('twn_barrel', barrel);
-  addN('twn_crates', crates);
-  addN('twn_well', well);
-  add('twn_lantern', lantern()); // Ninja-Camp-Sprite war nur ein Holzstapel, daher bleibt die gezeichnete Laterne
-  addN('twn_stall', stall);
-  addN('twn_post', post);
-  add('twn_flowers', flowers());
-  add('twn_boat', boat());
-  add('twn_ship', ship());
+  // Stadt-Props der Code-Welt (world/props.ts), Maßstab 2, Fußpunkt unten mittig
+  const W = (key: string, make: () => Raster) => add(key, toCanvas(make()));
+  W('twn_barrel', barrel);
+  W('twn_crates', crates);
+  W('twn_well', well);
+  W('twn_lantern', lantern);
+  W('twn_stall', stall);
+  W('twn_post', post);
+  W('twn_flowers', flowerBox);
+  W('twn_boat', boat);
+  W('twn_ship', ship);
 }

@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { ART, Raster, bytes, upscale } from '../src/render/world/raster';
 import { MATS, matOf, paintGround } from '../src/render/world/ground';
 import { stampDetail, stampWaterDetail } from '../src/render/world/details';
+import { barrel, boat, crates, fence, flowerBox, glow, grave, lantern, pillar, post, rock, ship, stall, tree, wallTile, well, type TreeStyle, type WallStyle } from '../src/render/world/props';
 import { Z } from '../src/render/groundLook';
 // @ts-expect-error reines JS-Hilfsmodul aus dem pixelfx-Klon (nur Skript, nicht im Spiel)
 import { encodePNG } from '../tools/pixelfx/tools/lib/png.mjs';
@@ -121,4 +122,53 @@ if (!only || only === 'boden') {
   save('boden-see.png', crop(1, 8, 14, 10), 4);
   save('boden-stadt.png', crop(22, 8, 16, 9), 4);
   save('boden-asche.png', crop(6, 17, 18, 9), 4);
+}
+
+/* ------------------------------------------------ Props auf Wiese: Bäume, Felsen, Gräber, Stadt, Wände */
+
+if (!only || only === 'props') {
+  const TW = 30;
+  const TH = 16;
+  const mat = (x: number, y: number): number => matOf(y >= 11 && x >= 18 ? 5 : y >= 11 ? 9 : 4, y >= 11 && x >= 18 ? Z.kata : y >= 11 ? Z.ash : x > 14 ? Z.forest : Z.farm);
+  const r = new Raster(TW * ART, TH * ART);
+  paintGround(r, 0, 0, TW, TH, { mat, waterDist: () => 3 });
+  /** Prop mit Fußpunkt unten mittig auf die Kachel (tx, ty) stellen */
+  const stand = (img: Raster, tx: number, ty: number, lift = 2): void => r.blit(img, Math.round(tx * ART + ART / 2 - img.w / 2), (ty + 1) * ART - img.h + lift);
+  const styles: TreeStyle[] = ['oak', 'oakr', 'big', 'pink', 'pine', 'dead', 'char'];
+  styles.forEach((st, i) => { for (let v = 0; v < 3; v++) stand(tree(st, v), 1 + i * 4 + v, v % 2 ? 4 : 3); });
+  (['grey', 'dark', 'tan'] as const).forEach((st, i) => { for (let v = 0; v < 3; v++) stand(rock(st, v), 1 + i * 3 + v, 6); });
+  for (let v = 0; v < 3; v++) stand(grave(v), 11 + v, 6);
+  stand(pillar(), 15, 6);
+  stand(barrel(), 1, 9);
+  stand(crates(), 3, 9);
+  stand(well(), 5, 9);
+  stand(lantern(), 7, 9);
+  const gl = glow(20, 0xffc060, 90);
+  r.blit(gl, 7 * ART + 12 - 20, 9 * ART + 2 - 20 + 4);
+  stand(stall(), 10, 9);
+  stand(post(), 13, 9);
+  stand(flowerBox(), 15, 9);
+  stand(boat(), 18, 9);
+  stand(ship(), 23, 9, 6);
+  for (let x = 0; x < 4; x++) stand(fence(x), 26 + x, 9);
+  // Wände: je Stil ein kleines Rechteck (5x3) mit offener Südseite
+  const styles2: [WallStyle, number][] = [['cliff', 1], ['brick', 9], ['dungeon', 19]];
+  for (const [st, x0] of styles2) {
+    const isWall = (x: number, y: number): boolean => x >= x0 && x < x0 + 5 && y >= 11 && y < 14;
+    for (let y = 11; y < 14; y++) {
+      for (let x = x0; x < x0 + 5; x++) {
+        const open = (isWall(x, y - 1) ? 0 : 1) | (isWall(x + 1, y) ? 0 : 2) | (isWall(x, y + 1) ? 0 : 4) | (isWall(x - 1, y) ? 0 : 8);
+        r.blit(wallTile(st, open, x, y), x * ART, y * ART);
+      }
+    }
+  }
+  save('props.png', r, 2);
+  const crop = (x0: number, y0: number, w: number, h: number): Raster => {
+    const c = new Raster(w * ART, h * ART);
+    for (let y = 0; y < c.h; y++) for (let x = 0; x < c.w; x++) c.d[y * c.w + x] = r.d[(y0 * ART + y) * r.w + x0 * ART + x]!;
+    return c;
+  };
+  save('props-baeume.png', crop(0, 0, 16, 5), 3);
+  save('props-stadt.png', crop(0, 5, 30, 5), 2);
+  save('props-waende.png', crop(0, 10, 25, 5), 3);
 }

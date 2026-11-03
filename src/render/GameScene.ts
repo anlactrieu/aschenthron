@@ -10,14 +10,14 @@ import {
 } from '../sim/world';
 import { isWalkable } from '../sim/path';
 import { toScreen, toTile } from './iso';
-import { NINJA_KEYS } from './ninjaProps';
 import { figureMode, ninjaNpcDef } from './figureMap';
 import { detectHouses, houseDoor, houseDecor, houseFacade, houseFence, houseRoof, houseSign, houseWallTile, lowerKind, type House, type RoofNotch } from './houses';
 import { buildZoneMap, Z } from './groundLook';
 import { ART, ART_SCALE, Raster, toCanvas } from './world/raster';
 import { matOf, paintGround } from './world/ground';
 import { stampDetail, stampWaterDetail } from './world/details';
-import { DOOR_ICONS, TOWN_GID, WATER_PROP_GIDS, registerTownArt } from './town';
+import { wallTile } from './world/props';
+import { DOOR_ICONS, TOWN_GID, WATER_PROP_GIDS, WORLD_TOWN_KEYS, registerTownArt } from './town';
 import { Ui, describeItem, isUpgrade } from './ui';
 import { generateItem, type Item } from '../sim/items';
 import type { Mood } from './music';
@@ -38,7 +38,7 @@ import { npcDef, npcFigKey } from './npc';
 import { onSettings, settings } from './settings';
 import type { RemoteSession } from '../net/client';
 import {
-  ensureTexture, FEET_ORIGIN_Y, FRAME_STEP_L, FRAME_STEP_R, FRAME_WIND, FRAME_STRIKE, lookKey, lookOf, npcTextureKey, BIPED, monsterCanvas, npcCanvas, ninjaNpcCanvas, playerCanvas, registerStaticArt, TILE_H, TILE_W, WALL_VARIANTS,
+  ensureTexture, FEET_ORIGIN_Y, FRAME_STEP_L, FRAME_STEP_R, FRAME_WIND, FRAME_STRIKE, lookKey, lookOf, npcTextureKey, BIPED, monsterCanvas, npcCanvas, ninjaNpcCanvas, playerCanvas, registerStaticArt, TILE_H, TILE_W,
 } from './art';
 
 const SAVE_BASE = 'aschenthron.save.v1';
@@ -184,6 +184,8 @@ export class GameScene extends Phaser.Scene {
   /** Bodenmaterial und Landabstand je Kachel (Zeichen-Cache, siehe matAt/landDistance) */
   private matMap: Int16Array | null = null;
   private landDist: Int8Array | null = null;
+  /** Boden-Chunk im Bau (siehe updateChunks/stepChunk) */
+  private chunkJob: { cx: number; cy: number; r: Raster; step: number } | null = null;
   private armedSkill: string | null = null;
   private armedCursor = '';
   /** Zauber, der nach dem Anlaufen gewirkt wird (Ziel war außer Reichweite). */
@@ -1518,24 +1520,33 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Boden-Chunks im Sichtbereich bauen: nächstgelegener fehlender Chunk zuerst, in Etappen (vier Bodenstreifen, Details
+   * und Wände, Upload), pro Bild nur so viele Etappen, wie in ~6 ms passen (eine Etappe kostet 3–8 ms). Beim Start alles.
+   */
   private updateChunks(px: number, py: number): void {
     const { w, h } = this.world.grid;
     const cx0 = Math.max(0, Math.floor((px - VIEW) / CHUNK));
     const cx1 = Math.min(Math.floor((w - 1) / CHUNK), Math.floor((px + VIEW) / CHUNK));
     const cy0 = Math.max(0, Math.floor((py - VIEW) / CHUNK));
     const cy1 = Math.min(Math.floor((h - 1) / CHUNK), Math.floor((py + VIEW) / CHUNK));
-    // Nur wenige Chunks pro Frame bauen (Ruckeln beim Überqueren von Chunk-Grenzen vermeiden); beim Start mehr
-    let budget = this.frame < 3 ? 40 : 3;
     const t0 = performance.now();
-    for (let cy = cy0; cy <= cy1 && budget > 0; cy++) {
-      for (let cx = cx0; cx <= cx1 && budget > 0; cx++) {
-        if (!this.chunks.has(`${cx}_${cy}`)) {
-          this.makeChunk(cx, cy);
-          budget--;
-          // Ein Chunk kostet 10–25 ms: nach dem ersten nur weiterbauen, solange der Frame kurz bleibt
-          if (this.frame >= 3 && performance.now() - t0 > 12) budget = 0;
+    const budget = this.frame < 3 ? Infinity : 6;
+    while (performance.now() - t0 < budget) {
+      if (!this.chunkJob) {
+        let best: [number, number] | null = null;
+        let bestD = Infinity;
+        for (let cy = cy0; cy <= cy1; cy++) {
+          for (let cx = cx0; cx <= cx1; cx++) {
+            if (this.chunks.has(`${cx}_${cy}`)) continue;
+            const d = Math.hypot((cx + 0.5) * CHUNK - px, (cy + 0.5) * CHUNK - py);
+            if (d < bestD) { bestD = d; best = [cx, cy]; }
+          }
         }
+        if (!best) break;
+        this.chunkJob = { cx: best[0], cy: best[1], r: new Raster(CHUNK * ART, CHUNK * ART), step: 0 };
       }
+      if (this.stepChunk(this.chunkJob)) this.chunkJob = null;
     }
     if (this.frame % 30 === 0) {
       for (const [key, img] of this.chunks) {
@@ -1602,30 +1613,57 @@ export class GameScene extends Phaser.Scene {
     return m;
   }
 
-  /** Bodenchunk: im Kunstraster (24 px je Kachel) gemalt, Boden und Details in einem Bild, angezeigt mit Maßstab 2 */
-  private makeChunk(cx: number, cy: number): void {
+  /**
+   * Eine Etappe am Bodenchunk (Kunstraster, 24 px je Kachel, angezeigt mit Maßstab 2): 0–3 Bodenstreifen zu je vier
+   * Kachelreihen, 4 Details und Wände, 5 Upload als Textur. Liefert true, wenn der Chunk fertig ist.
+   */
+  private stepChunk(job: { cx: number; cy: number; r: Raster; step: number }): boolean {
     const { w, h } = this.world.grid;
-    const zones = this.zones();
+    const { cx, cy, r } = job;
     const x0 = cx * CHUNK;
     const y0 = cy * CHUNK;
-    const r = new Raster(CHUNK * ART, CHUNK * ART);
-    paintGround(r, x0, y0, CHUNK, CHUNK, { mat: (x, y) => this.matAt(x, y), waterDist: (x, y) => this.landDistance(x, y) }, (x, y) => x >= w || y >= h);
+    const strip = CHUNK / 4;
+    if (job.step < 4) {
+      const ys = y0 + job.step * strip;
+      paintGround(r, x0, ys, CHUNK, strip, { mat: (x, y) => this.matAt(x, y), waterDist: (x, y) => this.landDistance(x, y) }, (x, y) => x >= w || y >= h, job.step * strip * ART);
+    } else if (job.step === 4) {
+      this.chunkDecor(r, x0, y0);
+    } else {
+      const key = `chunk_${cx}_${cy}`;
+      if (this.textures.exists(key)) this.textures.remove(key);
+      this.textures.addCanvas(key, toCanvas(r, 1));
+      this.chunks.set(`${cx}_${cy}`, this.add.image(x0 * TILE_W - TILE_W / 2, y0 * TILE_H - TILE_H / 2, key).setOrigin(0, 0).setScale(ART_SCALE).setDepth(-1e6));
+      return true;
+    }
+    job.step++;
+    return false;
+  }
+
+  /** Bodendetails, Wände und Klippen (Oberseite + Front zur offenen Südseite, Schatten auf den Boden darunter) in den Chunk */
+  private chunkDecor(r: Raster, x0: number, y0: number): void {
+    const { w, h } = this.world.grid;
+    const zones = this.zones();
+    const isWall = (x: number, y: number): boolean => x < 0 || y < 0 || x >= w || y >= h || this.tiles[y * w + x] === 2;
     for (let y = y0; y < Math.min(y0 + CHUNK, h); y++) {
       for (let x = x0; x < Math.min(x0 + CHUNK, w); x++) {
         const gid = this.tiles[y * w + x] ?? 0;
         if (!gid) continue;
-        const zone = zones[y * w + x] ?? 0;
         const ox = (x - x0) * ART;
         const oy = (y - y0) * ART;
+        if (gid === 2) {
+          const open = (isWall(x, y - 1) ? 0 : 1) | (isWall(x + 1, y) ? 0 : 2) | (isWall(x, y + 1) ? 0 : 4) | (isWall(x - 1, y) ? 0 : 8);
+          const style = this.scanFor(x, y, 2, 5) ? 'dungeon' : this.scanFor(x, y, 2, 1) ? 'brick' : 'cliff';
+          r.blit(wallTile(style, open, x, y), ox, oy);
+          continue;
+        }
+        const zone = zones[y * w + x] ?? 0;
         const ground = this.groundGid(x, y);
         if (ground === 6) stampWaterDetail(r, x, y, zone, this.landDistance(x, y), ox, oy);
         else if (ground !== 12 && !PROP_GIDS.has(gid) && !this.houseAt.has(y * w + x) && !this.nearDoor(x, y)) stampDetail(r, x, y, ground, zone, ox, oy);
+        // Schatten der Wandfront auf die Kachel darunter (auch über die Chunkgrenze)
+        if (y > 0 && this.tiles[(y - 1) * w + x] === 2) for (let k = 0; k < 3; k++) for (let u = 0; u < ART; u++) r.blend(ox + u, oy + k, 0x040306, 0.45 - k * 0.13);
       }
     }
-    const key = `chunk_${cx}_${cy}`;
-    if (this.textures.exists(key)) this.textures.remove(key);
-    this.textures.addCanvas(key, toCanvas(r, 1));
-    this.chunks.set(`${cx}_${cy}`, this.add.image(x0 * TILE_W - TILE_W / 2, y0 * TILE_H - TILE_H / 2, key).setOrigin(0, 0).setScale(ART_SCALE).setDepth(-1e6));
   }
 
   private updateProps(px: number, py: number): void {
@@ -1634,7 +1672,8 @@ export class GameScene extends Phaser.Scene {
     for (let y = Math.max(0, py - VIEW); y < Math.min(h, py + VIEW); y++) {
       for (let x = Math.max(0, px - VIEW); x < Math.min(w, px + VIEW); x++) {
         const gid = this.tiles[y * w + x] ?? 0;
-        if (!PROP_GIDS.has(gid)) continue;
+        // Wände (gid 2) malt der Boden-Chunk selbst
+        if (!PROP_GIDS.has(gid) || gid === 2) continue;
         const idx = y * w + x;
         if (this.props.has(idx)) continue;
         const { sx, sy } = toScreen(x, y);
@@ -1747,32 +1786,17 @@ export class GameScene extends Phaser.Scene {
     if (hs) return this.houseProp(x, y, gid, hs, sx, sy);
     const v = hash(x, y);
     let key: string;
-    let oy: number;
-    let dy = 8;
-    if (gid === 2) {
-      const style = this.scanFor(x, y, 2, 5) ? 'dungeon' : this.scanFor(x, y, 2, 1) ? 'brick' : 'cliff';
-      key = `wall_${style === 'cliff' && this.gidAt(x, y + 1) === 2 ? 'top' : style}_${v % WALL_VARIANTS}`;
-      oy = 1;
-      dy = TILE_H / 2;
-    } else if (gid === 10) {
-      key = `tree_${this.treeStyle(x, y, v)}_${v % 3}`;
-      oy = 0.93;
-      dy = 10;
-    } else if (gid === 11) {
-      key = `rock_${this.rockStyle(x, y)}_${v % 3}`;
-      oy = 0.85;
-    } else if (gid === 13) {
-      key = `grave_${v % 3}`;
-      oy = 0.88;
-    } else if (gid >= TOWN_GID.wall && gid <= TOWN_GID.doorLast) {
-      ({ key, oy, dy } = this.townProp(x, y, gid, v));
-    } else {
-      key = 'pillar';
-      oy = 0.92;
-    }
-    // Ninja-Bilder sind unten zugeschnitten: Fuß unten Mitte, knapp über der Kachel-Unterkante
-    if (NINJA_KEYS.has(key)) return this.add.image(sx, sy + TILE_H / 2 - (gid === 2 ? 0 : 5), key).setOrigin(0.5, 1).setDepth(sy + TILE_H / 2);
-    return this.add.image(sx, sy + dy, key).setOrigin(0.5, oy).setDepth(sy + TILE_H / 2);
+    if (gid === 10) key = `tree_${this.treeStyle(x, y, v)}_${v % 3}`;
+    else if (gid === 11) key = `rock_${this.rockStyle(x, y)}_${v % 3}`;
+    else if (gid === 13) key = `grave_${v % 3}`;
+    else if (gid >= TOWN_GID.wall && gid <= TOWN_GID.doorLast) {
+      const t = this.townProp(x, y, gid, v);
+      if (!WORLD_TOWN_KEYS.has(t.key)) return this.add.image(sx, sy + t.dy, t.key).setOrigin(0.5, t.oy).setDepth(sy + TILE_H / 2);
+      key = t.key;
+    } else key = 'pillar';
+    // Code-Welt-Props stehen unten mittig; Fußpunkt (Unterkante samt Schatten) knapp über der Kachel-Unterkante
+    const lift = WATER_PROP_GIDS.has(gid) ? 8 : 2;
+    return this.add.image(sx, sy + TILE_H / 2 - lift, key).setOrigin(0.5, 1).setDepth(sy + TILE_H / 2);
   }
 
   /** Baumart je Zone (Wald: Eichen/Kiefern gemischt, Moor/Friedhof tot, Hochland Kiefern, Asche verkohlt), sonst nach den Nachbarkacheln. */
