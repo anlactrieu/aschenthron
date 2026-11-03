@@ -2,23 +2,29 @@
  * Zuordnung Spiel-IDs → Figuren aus „Ninja Adventure“ (Pixel-Boy und AAA, CC0, siehe ASSETS.md) und der Schalter „Figuren“.
  * Reine Daten und Funktionen ohne Canvas/Image: import-sicher in Node (Tests). Gezeichnet wird in `ninjaFigures.ts`.
  *
- * Schalter (URL `?figuren=` hat Vorrang und wird gemerkt, sonst localStorage `aschenthron.figuren`):
+ * Schalter (URL `?figuren=` hat Vorrang und wird gemerkt, sonst localStorage `aschenthron.figuren2`):
+ *  - `skelett` (Standard seit 2026-11-04): eigene Skelett-Figuren für Monster und NPCs (`monster.ts`, `npc.ts`); die alten
+ *    Figuren (DCSS) nur, solange ein Sheet noch gebacken wird
+ *  - `dcss`: DCSS-NPCs, DCSS-Monster, ein Pixelmaßstab (Rückfall)
  *  - `mix`: Held und NPCs Ninja; von den Monsterarten per stabilem Hash der Art-ID abwechselnd die Hälfte Ninja, die andere DCSS
  *  - `ninja`: alle Monster Ninja
- *  - `dcss` (Standard seit 2026-11-03): DCSS-Held, DCSS-NPCs, DCSS-Monster, ein Pixelmaßstab
+ * Der Held hat einen eigenen Schalter (`?held=skelett|dcss`, `heroSheet.ts`).
  * Pfade relativ zu `public/assets/ninja/` (siehe `NINJA_BASE` in ninja.ts).
  */
 
-export type FigMode = 'mix' | 'ninja' | 'dcss';
-export const FIG_MODES: FigMode[] = ['mix', 'ninja', 'dcss'];
-export const FIG_LABEL: Record<FigMode, string> = { mix: 'Mix', ninja: 'Ninja', dcss: 'DCSS' };
-const FIG_KEY = 'aschenthron.figuren';
+export type FigMode = 'skelett' | 'mix' | 'ninja' | 'dcss';
+export const FIG_MODES: FigMode[] = ['skelett', 'dcss', 'mix', 'ninja'];
+export const FIG_LABEL: Record<FigMode, string> = { skelett: 'Skelett', mix: 'Mix', ninja: 'Ninja', dcss: 'DCSS' };
+// neuer Schlüssel: ein früher gemerktes `dcss` (alter Standard) soll die neuen Figuren nicht verdecken
+const FIG_KEY = 'aschenthron.figuren2';
 
 let mode: FigMode | undefined;
 
-const isMode = (v: unknown): v is FigMode => v === 'mix' || v === 'ninja' || v === 'dcss';
+const isMode = (v: unknown): v is FigMode => v === 'skelett' || v === 'mix' || v === 'ninja' || v === 'dcss';
+/** Modi mit Ninja-Figuren (Held/NPCs/Monster aus Ninja Adventure) */
+export const usesNinja = (m: FigMode): boolean => m === 'mix' || m === 'ninja';
 
-/** Aktueller Modus: URL > localStorage > dcss. Außerhalb des Browsers immer `dcss`. */
+/** Aktueller Modus: URL > localStorage > skelett. Außerhalb des Browsers immer `skelett`. */
 export function figureMode(): FigMode {
   if (mode) return mode;
   let m: unknown;
@@ -37,7 +43,7 @@ export function figureMode(): FigMode {
       m = null;
     }
   }
-  mode = isMode(m) ? m : 'dcss';
+  mode = isMode(m) ? m : 'skelett';
   return mode;
 }
 
@@ -189,7 +195,7 @@ const mixSet = ((): Set<string> => {
 
 /** Ninja-Figur der Monsterart im gewählten Modus (`undefined` = DCSS-Sprite). */
 export function ninjaMonsterDef(id: string, m: FigMode = figureMode()): NinjaMon | undefined {
-  if (m === 'dcss') return undefined;
+  if (!usesNinja(m)) return undefined;
   const d = NINJA_MONSTERS[id];
   if (!d) return undefined;
   return m === 'ninja' || mixSet.has(id) ? d : undefined;
@@ -251,7 +257,7 @@ export const NINJA_NPC_POOL = ['Villager', 'Villager2', 'Villager3', 'Villager4'
 
 /** Figur eines NPCs (`undefined` im Modus `dcss` und für Truhen ohne Namen in der Tabelle: Lagerverwalter sind Figuren, Truhen bleiben Truhen). */
 export function ninjaNpcDef(kind: string, name?: string, m: FigMode = figureMode()): NinjaNpc | undefined {
-  if (m === 'dcss') return undefined;
+  if (!usesNinja(m)) return undefined;
   if (name && NINJA_NPC_NAMES[name]) return NINJA_NPC_NAMES[name];
   if (kind === 'stash') return undefined;
   if (kind === 'quest' || !NINJA_NPC_KINDS[kind]) return N(NINJA_NPC_POOL[hash(name ?? kind) % NINJA_NPC_POOL.length]!);

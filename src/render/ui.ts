@@ -17,7 +17,7 @@ import { heroMode } from './heroSheet';
 import { initCredits, toggleCredits } from './credits';
 import { goFullscreen, isFullscreen, isTouch } from './touch';
 import { BAR_CSS, faceUrl, installTheme } from './theme';
-import { FIG_LABEL, FIG_MODES, HERO_BASE, figureMode, savedFigureMode, setFigureMode } from './figureMap';
+import { FIG_LABEL, FIG_MODES, HERO_BASE, figureMode, savedFigureMode, setFigureMode, usesNinja } from './figureMap';
 
 const RARITY_COLOR: Record<Item['rarity'], string> = { normal: '#c9c4bd', magic: '#7f9fff', rare: '#f2c94c', set: '#5fd070', legendary: '#ff8a2a' };
 const SLOT_NAME: Record<EquipSlot, string> = { weapon: 'Waffe', head: 'Kopf', chest: 'Brust', hands: 'Hände', feet: 'Füße', ring: 'Ring', ring2: 'Ring', amulet: 'Amulett', offhand: 'Nebenhand', belt: 'Gürtel', cloak: 'Umhang', legs: 'Beine' };
@@ -517,7 +517,7 @@ export class Ui {
     const fc = el('div', 'fc');
     const face = el('img', 'face') as HTMLImageElement;
     // DCSS: leer (dunkler Grund) bis das Brustbild steht, sonst blitzt kurz das Ninja-Gesicht auf
-    if (figureMode() !== 'dcss' && heroMode() !== 'skelett') face.src = faceUrl(HERO_BASE);
+    if (usesNinja(figureMode()) && heroMode() !== 'skelett') face.src = faceUrl(HERO_BASE);
     face.alt = '';
     this.face = face;
     fc.append(face);
@@ -532,7 +532,7 @@ export class Ui {
   /** Skelett-Held oder DCSS-Modus: Brustbild (Kopf und Schultern) des Helden mit aktueller Ausrüstung, ganzzahlig skaliert. */
   private updatePortrait(p: Actor): void {
     const face = this.face;
-    if (!face || (figureMode() !== 'dcss' && heroMode() !== 'skelett')) return;
+    if (!face || (usesNinja(figureMode()) && heroMode() !== 'skelett')) return;
     const look = lookOf(p);
     const key = lookKey(look, 0, false);
     if (key === this.faceKey || performance.now() < this.faceRetryAt) return;

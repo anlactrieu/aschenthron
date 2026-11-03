@@ -138,15 +138,23 @@ function idlePose(i: number, h: HeroLook): RigPose {
   return { ...c, crouch: 0.9 - b * 0.45, lean: 0.6, fy: (c.fy ?? -12) + b * 0.4, ...off, ffx: 3, ffy: -4, fbx: -3.2, fby: -4, hy: 0.2, sway: b * 0.3 };
 }
 
-function walkPose(i: number, h: HeroLook, view: HeroView): RigPose {
+/** Gangart: Schrittweite, Anteil Standbein, Fußhub (1x-Pixel bei Körpergröße 1) */
+export interface Gait {
+  stride: number;
+  stance: number;
+  lift: number;
+}
+export const HERO_GAIT: Gait = { stride: HERO_STRIDE, stance: HERO_STANCE, lift: LIFT };
+
+function walkPose(i: number, h: HeroLook, view: HeroView, g: Gait): RigPose {
   const p = i / HERO_ANIMS.walk;
   const side = view === 'side';
-  const lift = LIFT * (side ? 1 : 1.5);
-  const n = gaitFoot(p, HERO_STRIDE, lift, HERO_STANCE);
-  const f = gaitFoot(p + 0.5, HERO_STRIDE, lift, HERO_STANCE);
+  const lift = g.lift * (side ? 1 : 1.5);
+  const n = gaitFoot(p, g.stride, lift, g.stance);
+  const f = gaitFoot(p + 0.5, g.stride, lift, g.stance);
   const swing = Math.cos(p * Math.PI * 2);
   // Laufschritt: tief beim Aufsetzen, oben in der Flugphase
-  const crouch = 1.3 + 0.9 * Math.cos((p - 0.12) * Math.PI * 4);
+  const crouch = (g.stance < 0.45 ? 1.3 : 0.9) + (g.stance < 0.45 ? 0.9 : 0.5) * Math.cos((p - 0.12) * Math.PI * 4);
   const c = carry(h.weapon);
   const hold = h.weapon !== 'none';
   const off = h.shield ? { bx: 6 + swing * 0.8, by: -13, bz: 2.5 } : { bx: 1 + swing * ARM * 1.2, by: -11.8 + Math.abs(swing) * 0.6 };
@@ -222,8 +230,8 @@ const DIE: RigPose[] = [
   { fx: -5, fy: -15.5, bx: -9, by: -13, crouch: 0.6, lean: -1.5, hy: 0, ffx: 2.5, fbx: -0.5, fall: 1.55, fallX: 12, fallY: -5.6 },
 ];
 
-export function heroPose(anim: HeroAnim, view: HeroView, i: number, h: HeroLook): RigPose {
-  const base = anim === 'walk' ? walkPose(i, h, view) : anim === 'attack' ? attackPose(i, h) : anim === 'hit' ? hitPose(i, h) : anim === 'die' ? DIE[Math.min(DIE.length - 1, i)]! : idlePose(i, h);
+export function heroPose(anim: HeroAnim, view: HeroView, i: number, h: HeroLook, g: Gait = HERO_GAIT): RigPose {
+  const base = anim === 'walk' ? walkPose(i, h, view, g) : anim === 'attack' ? attackPose(i, h) : anim === 'hit' ? hitPose(i, h) : anim === 'die' ? DIE[Math.min(DIE.length - 1, i)]! : idlePose(i, h);
   const gear: HeroGear = {
     helm: h.helm, pauldron: !h.robe && (h.armor === 'iron' || h.armor === 'dread' || h.armor === 'ash' || h.armor === 'bone'),
     robe: h.robe, cloak: !!h.cloak, quiver: h.quiver, shield: h.shield, crest: h.rar[0] >= 2 && h.helm >= 2 && h.helm <= 4,
@@ -241,7 +249,7 @@ export function heroPose(anim: HeroAnim, view: HeroView, i: number, h: HeroLook)
     pose.bzz = -3.3;
     if (anim === 'walk') {
       // Schräge Draufsicht: der Fuß weiter weg von der Kamera steht höher im Bild, so sieht man den Schritt
-      const away = (x: number): number => (view === 'front' ? HERO_STRIDE - x : x + HERO_STRIDE) * 0.32;
+      const away = (x: number): number => (view === 'front' ? g.stride - x : x + g.stride) * 0.32;
       pose.ffy = (pose.ffy ?? -4) - away(pose.ffx ?? 0);
       pose.fby = (pose.fby ?? -4) - away(pose.fbx ?? 0);
     }
@@ -252,7 +260,7 @@ export function heroPose(anim: HeroAnim, view: HeroView, i: number, h: HeroLook)
 /* ------------------------------------------------ Farben je Material (hell -> dunkel, dazu Naht) */
 
 // Grundpalette bewusst heller als die Welt: das Spiel legt noch eine dunkle Multiplikation (DARK_GRADE) darüber
-const MAT = {
+export const MAT = {
   skin: [0xf0c49c, 0xd29a72, 0xa87254, 0x7a4e3a, 0x4a3024],
   hair: [0x8a6440, 0x6a4a30, 0x4e3422, 0x36241a, 0x22160e],
   cloth: [0x8c9ab4, 0x6c7a96, 0x505c78, 0x3a4258, 0x262a3a],
@@ -271,7 +279,7 @@ const MAT = {
   wood: [0xb08050, 0x8a6038, 0x684628, 0x48301c, 0x2e1e12],
   fletch: [0xf0ece0, 0xc8c0b0, 0x9a9080, 0x6a6458, 0x403c34],
 } satisfies Record<string, Ramp>;
-const CLOAKS: Record<string, Ramp> = {
+export const CLOAKS: Record<string, Ramp> = {
   rag: [0x9a8a72, 0x7a6c58, 0x5c5042, 0x40382e, 0x2a241e],
   wool: [0xa8504a, 0x843a36, 0x642a28, 0x461c1c, 0x2e1212],
   hunter: [0x72905a, 0x567044, 0x405432, 0x2c3a22, 0x1c2616],
@@ -282,7 +290,7 @@ const CLOAKS: Record<string, Ramp> = {
   rime: [0xa8d0e8, 0x80a8c8, 0x5e82a4, 0x42607c, 0x2a3e52],
 };
 /** Seltenheitsakzent (Saum, Kamm, Parierstange): magisch blau, selten gold, Set grün, legendär glut */
-const ACCENT: (Ramp | undefined)[] = [
+export const ACCENT: (Ramp | undefined)[] = [
   undefined,
   [0x9ab4ff, 0x6f8fff, 0x4a64c8, 0x34468e, 0x222e5c],
   [0xffe08a, 0xf2c94c, 0xc09a30, 0x86681e, 0x544010],

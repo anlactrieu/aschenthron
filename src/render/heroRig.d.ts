@@ -26,6 +26,8 @@ export interface HeroGear {
   feet?: number;
   /** ohne Beine, Robe bis zum Boden */
   ghost?: boolean;
+  /** Skelett: Rippen statt Brust */
+  ribs?: boolean;
 }
 /** Körperbau (alles 1 = der Held); `size` skaliert Figur, Posen und Waffe */
 export interface RigBody {

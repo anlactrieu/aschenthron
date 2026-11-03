@@ -15,7 +15,7 @@ import { CHEST_SPRITES, MONSTER_SPRITES, PLAYER_BASE, PLAYER_DEFAULTS, PLAYER_HA
 type Ctx = CanvasRenderingContext2D;
 
 import { groundCell } from './ninja';
-import { figureMode, ninjaMonsterDef, ninjaNpcDef } from './figureMap';
+import { figureMode, ninjaMonsterDef, ninjaNpcDef, usesNinja } from './figureMap';
 import { ninjaFigureCanvas, ninjaHeroCanvas } from './ninjaFigures';
 import { lookImage, tileLook, tintCanvas } from './groundLook';
 import { NINJA_KEYS, ninjaProp } from './ninjaProps';
@@ -1130,7 +1130,7 @@ export function playerPortrait(look: Look): { canvas: HTMLCanvasElement; width: 
     const c = heroPortraitCanvas(look, 4);
     return { canvas: c, width: c.width };
   }
-  const nj = figureMode() === 'dcss' ? null : ninjaHeroCanvas(look, 0, false, false, 6, FEET_ORIGIN_Y);
+  const nj = usesNinja(figureMode()) ? ninjaHeroCanvas(look, 0, false, false, 6, FEET_ORIGIN_Y) : null;
   if (nj) return { canvas: nj, width: nj.width };
   const sp = spritePlayer(look, 0, 4);
   if (sp) return { canvas: sp, width: sp.width };
@@ -1138,7 +1138,7 @@ export function playerPortrait(look: Look): { canvas: HTMLCanvasElement; width: 
 }
 
 export function playerCanvas(look: Look, frame: number, back = false, profile = false): HTMLCanvasElement {
-  const nj = figureMode() === 'dcss' ? null : ninjaHeroCanvas(look, frame, back, profile, 4, FEET_ORIGIN_Y);
+  const nj = usesNinja(figureMode()) ? ninjaHeroCanvas(look, frame, back, profile, 4, FEET_ORIGIN_Y) : null;
   if (nj) return nj;
   const sp = spritePlayer(look, frame, SPRITE_SCALE.normal, back, profile);
   if (sp) return sp;

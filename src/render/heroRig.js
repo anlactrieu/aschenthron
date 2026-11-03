@@ -239,10 +239,22 @@ function drawBody(S) {
   const gear = S.q.gear ?? {};
   const C = F_("chest"), fwd = mv(C.R, [1, 0, 0]), up = mv(C.R, [0, 1, 0]), across = mv(C.R, [0, 0, 1]);
   const ghost = !!gear.ghost; // ohne Beine (Geister): Robe bis zum Boden, schwebt
-  ellipsoid(at("pelvis", [0, -0.2 * k, 0]), F_("pelvis").R, [3.2 * k * bk, 2.6 * k, 4.7 * wk], PART.pelvis, 0);
-  sweep(F_("pelvis").t, C.t, 3.5 * k * bk, 3.8 * wk, PART.waist, 1);
-  ellipsoid(at("chest", [0.3 * k, 0.8 * tk, 0]), C.R, [4.0 * k * Math.max(1, bk * 0.9), 4.3 * tk, 6.6 * wk], PART.chest, 0);
-  if (bk > 1.05) ellipsoid(at("waist", [1.2 * k * bk, -0.6 * k, 0]), C.R, [3.4 * k * bk, 3.4 * k, 4.6 * wk], PART.belly, 0);
+  if (gear.ribs) {
+    // Skelett: Becken, dünne Wirbelsäule, Brustkorb aus Rippenbögen um einen dunklen Hohlraum
+    ellipsoid(at("pelvis", [0, -0.2 * k, 0]), F_("pelvis").R, [2.4 * k, 1.9 * k, 3.9 * wk], PART.pelvis, 0);
+    sweep(F_("pelvis").t, C.t, 1.1 * k, 1.2 * k, PART.waist, 1);
+    ellipsoid(at("chest", [0, 0.6 * tk, 0]), C.R, [2.6 * k, 3.2 * tk, 4.6 * wk], PART.belly, 0);
+    for (let j = 0; j < 4; j++) {
+      const y = (2.7 - j * 1.45) * tk, rx = (3.7 - j * 0.25) * k, rz = (5.9 - j * 0.55) * wk;
+      for (let a = 0; a < Math.PI * 2; a += 0.3) sphere(at("chest", [Math.cos(a) * rx, y - Math.abs(Math.sin(a)) * 0.5 * k, Math.sin(a) * rz]), 0.72 * k, PART.chest, 0);
+    }
+    sphere(at("chest", [0, 3.4 * tk, 0]), 1.6 * k, PART.chest, 0);
+  } else {
+    ellipsoid(at("pelvis", [0, -0.2 * k, 0]), F_("pelvis").R, [3.2 * k * bk, 2.6 * k, 4.7 * wk], PART.pelvis, 0);
+    sweep(F_("pelvis").t, C.t, 3.5 * k * bk, 3.8 * wk, PART.waist, 1);
+    ellipsoid(at("chest", [0.3 * k, 0.8 * tk, 0]), C.R, [4.0 * k * Math.max(1, bk * 0.9), 4.3 * tk, 6.6 * wk], PART.chest, 0);
+  }
+  if (bk > 1.05 && !gear.ribs) ellipsoid(at("waist", [1.2 * k * bk, -0.6 * k, 0]), C.R, [3.4 * k * bk, 3.4 * k, 4.6 * wk], PART.belly, 0);
   sweep(F_("neck").t, add(F_("neck").t, mv(F_("head").R, [0, 1.6 * hk, 0])), 1.7 * lk * BODY.neck ** 0.3, 1.5 * lk, PART.neck, 1);
   const H = F_("head"), hr = (v) => mv(H.R, v), atH = (v) => add(H.t, hr(v));
   const back = hr([1, 0, 0])[2];
@@ -622,20 +634,21 @@ function finish(S) {
     }
   }
   for (const [i, c] of marks) Col[i] = c;
-  // Aschenthron: Augen, wo das Gesicht (oder der Topfhelm) zu sehen ist
+  // Aschenthron: Augen, wo das Gesicht (oder der Topfhelm) zu sehen ist; Tiere geben ihre Augenpunkte direkt (`eyePts`)
   const { B } = S;
-  if (S.q.eyes !== false) {
+  const eyeAt = (e, ok) => {
+    const i = (OY - Math.round(e[1])) * BW + (OX + Math.round(e[0]));
+    if (ok(Part[i]) && Zb[i] <= e[2] + 1.2) Col[i] = SHADE.EYE;
+  };
+  if (S.eyePts) for (const e of S.eyePts) eyeAt(e, (p) => p !== 0);
+  if (B && S.q.eyes !== false) {
     const H = B.head, hk = BODY.size * BODY.head, full = S.q.gear?.helm === 3, sn = full ? 1.45 : S.q.gear?.snout ?? 1;
     const fc = full ? add(H.t, mv(H.R, [0.4 * hk, 0.3 * hk, 0])) : add(H.t, mv(H.R, [1.05 * hk, -0.55 * hk, 0]));
-    for (const s2 of [1, -1]) {
-      const e = add(fc, mv(H.R, [2.68 * sn * hk, (full ? 0.9 : 0.5) * hk, s2 * 1.3 * hk]));
-      const i = (OY - Math.round(e[1])) * BW + (OX + Math.round(e[0]));
-      if ((Part[i] === PART.face || (full && Part[i] === PART.helm)) && Zb[i] <= e[2] + 1.2) Col[i] = SHADE.EYE;
-    }
+    for (const s2 of [1, -1]) eyeAt(add(fc, mv(H.R, [2.68 * sn * hk, (full ? 0.9 : 0.5) * hk, s2 * 1.3 * hk])), (p) => p === PART.face || (full && p === PART.helm));
   }
   // the mark on his chest, when it's facing us
-  const chestAt = add(B.chest.t, mv(B.chest.R, [3, 1.6, -1.8]));
-  if (S.q.mark !== false && mv(B.chest.R, [1, 0, 0])[2] > 0.15) {
+  if (B && S.q.mark !== false && mv(B.chest.R, [1, 0, 0])[2] > 0.15) {
+    const chestAt = add(B.chest.t, mv(B.chest.R, [3, 1.6, -1.8]));
     const i = (OY - Math.round(chestAt[1])) * BW + (OX + Math.round(chestAt[0]));
     if (Part[i] === PART.chest) Col[i] = MARK;
   }
@@ -693,7 +706,18 @@ function render(pose) {
     S.OW.draw(along(S.armF.end, ax, sd, PART.offWeapon), q, S.armF.end);
   }
   clipWeapon = false;
-  return finish(S);
+  const out = finish(S);
+  return q.fall ? onGround(out) : out;
+}
+// Aschenthron: eine liegende Figur so anheben, dass nichts unter dem Boden (Fußlinie) liegt
+function onGround(out) {
+  const over = out.y1 - 1;
+  if (over > 0) {
+    for (let k = 0; k < out.n; k++) out.ys[k] -= over;
+    out.y0 -= over;
+    out.y1 -= over;
+  }
+  return out;
 }
 
 /** How far short of where the pose wants them the hands fall, in px: arms don't stretch. */
@@ -728,4 +752,18 @@ export function skeleton(pose) {
   const joints = Object.fromEntries(Object.entries(J).map(([k, v]) => [k, [v[0], -v[1], v[2]]]));
   const bones = [["pelvis", "waist"], ["waist", "chest"], ["chest", "neck"], ["neck", "head"], ["head", "crown"], ["chest", "shoulderN"], ["shoulderN", "elbowN"], ["elbowN", "handN"], ["chest", "shoulderF"], ["shoulderF", "elbowF"], ["elbowF", "handF"], ["pelvis", "hipN"], ["hipN", "kneeN"], ["kneeN", "ankleN"], ["ankleN", "toeN"], ["pelvis", "hipF"], ["hipF", "kneeF"], ["kneeF", "ankleF"], ["ankleF", "toeF"]];
   return { joints, bones, handles: ["handN", "handF", "ankleN", "ankleF"] };
+}
+
+/**
+ * Aschenthron: Werkzeug für eigene Skelette (Tiere in `monsterRig.js`): dieselben Formen, derselbe Tiefenpuffer, dieselben
+ * Töne, Nähte, Lichtsäume und Umrisse wie beim Helden. `shape(draw)` zeichnet (draw gibt die Augenpunkte zurück) und liefert
+ * die Pixel wie `posed()`.
+ */
+export const KIT = { add, sub, mul, dot, cross, len, unit, rotY, rotZ, mm, mv, ik, axes, lerp3, sphere, sweep, ellipsoid };
+export function shape(draw) {
+  setBody(null);
+  clipBody = false;
+  clipWeapon = false;
+  const eyePts = draw();
+  return onGround(finish({ q: { eyes: false, mark: false }, eyePts }));
 }

@@ -11,7 +11,7 @@ import {
 import { isWalkable } from '../sim/path';
 import { toScreen, toTile } from './iso';
 import { NINJA_KEYS } from './ninjaProps';
-import { ninjaNpcDef } from './figureMap';
+import { figureMode, ninjaNpcDef } from './figureMap';
 import { detectHouses, houseDoor, houseDecor, houseFacade, houseFence, houseRoof, houseSign, houseWallTile, lowerKind, type House, type RoofNotch } from './houses';
 import { buildZoneMap, Z } from './groundLook';
 import { ART, ART_SCALE, Raster, toCanvas } from './world/raster';
@@ -32,6 +32,9 @@ import { playPixelfx, registerPixelfx, type FxName } from './pixelfx';
 import { attackFrame, onceFrame, walkFrame, type FigureSheet } from './figure';
 import { idleFrame } from './hero';
 import { FIG_SCALE, heroMode, heroTexture, originOf } from './heroSheet';
+import { monsterKey } from './monster';
+import { figureTexture, pumpFigures } from './monsterSheet';
+import { npcDef, npcFigKey } from './npc';
 import { onSettings, settings } from './settings';
 import type { RemoteSession } from '../net/client';
 import {
@@ -942,7 +945,7 @@ export class GameScene extends Phaser.Scene {
               v.flip = sxv < 0;
               v.up = syv < 0;
               // Skelett-Held: Ansicht nach Schlagrichtung (sonst bliebe nach seitlichem Laufen die Seitenansicht beim Hieb nach oben)
-              if (at.kind === 'player' && heroMode() === 'skelett') v.side = Math.abs(sxv) > Math.abs(syv) * 0.8;
+              if (this.figSize(v.img)?.dir) v.side = Math.abs(sxv) > Math.abs(syv) * 0.8;
             }
             delay = SWING_MS * 0.4 * this.ts;
             this.later(delay, () => this.kick(at.id, (sxv / len) * (projectile ? -1 : 10), (syv / len) * (projectile ? -0.5 : 10)));
@@ -1047,6 +1050,16 @@ export class GameScene extends Phaser.Scene {
           if (v) {
             v.swingStart = this.now;
             v.swingUntil = this.now + SWING_MS * this.ts;
+            // Skelett-Figuren: Blick und Ansicht zum Ziel, wie beim Treffer
+            if (tg && this.figSize(v.img)?.dir) {
+              const d = this.dispPos(tg);
+              const o = this.dispPos(at!);
+              const sxv = d.x - o.x;
+              const syv = d.y - o.y;
+              v.flip = sxv < 0;
+              v.up = syv < 0;
+              v.side = Math.abs(sxv) > Math.abs(syv) * 0.8;
+            }
           }
           this.later(SWING_MS * 0.4 * this.ts, () => {
             const pos = this.bodyPos(tg);
@@ -1825,7 +1838,10 @@ export class GameScene extends Phaser.Scene {
         this.npcViews.set(n.id, img);
       }
       const nj = ninjaNpcDef(n.kind, n.name);
-      const chestLike = n.kind === 'stash' && !nj;
+      // Skelett-NPC (Modus skelett): Mensch mit Kleidung nach Rolle; Truhen ohne Verwalter bleiben Truhen
+      const nfigKey = figureMode() === 'skelett' ? npcFigKey(n.kind, n.name) : '';
+      const nSkel = nfigKey && npcDef(n.kind, n.name) ? figureTexture(this, nfigKey, { t: 'n', kind: n.kind, name: n.name }) : null;
+      const chestLike = n.kind === 'stash' && !nj && !(nfigKey && npcDef(n.kind, n.name));
       this.gfxGround.fillStyle(0x000000, 0.2);
       this.gfxGround.fillEllipse(sx, sy + 9, chestLike ? 34 : 26, chestLike ? 13 : 10);
       let dir = this.npcDir.get(n.id);
@@ -1843,7 +1859,14 @@ export class GameScene extends Phaser.Scene {
       }
       dir.x = np.x;
       dir.y = np.y;
-      if (!chestLike) {
+      if (nSkel) {
+        const v3 = dir.side ? 'side' : dir.up ? 'back' : 'front';
+        const A = nSkel.sheet.anims;
+        const o = originOf(nSkel.sheet);
+        img.setTexture(nSkel.key, time < dir.movingUntil ? `walk_${v3}_${Math.floor(time / 85) % A.walk}` : `idle_${v3}_${idleFrame(time + n.id * 1231, A.idle)}`);
+        img.setOrigin(o.x, o.y).setScale(FIG_SCALE).setFlipX(dir.side && dir.flip);
+      } else if (!chestLike) {
+        img.setOrigin(0.5, FEET_ORIGIN_Y).setScale(1);
         const nf = time < dir.movingUntil ? WALK_FRAMES[Math.floor(time / STEP_MS) % 4]! : 0;
         const nSide = dir.side;
         const nk = npcTextureKey(n.kind, n.name);
@@ -1858,7 +1881,7 @@ export class GameScene extends Phaser.Scene {
         const nfig = this.figSize(img);
         img.setFlipX(nfig?.dir ? nSide && dir.flip : dir.flip);
       }
-      const nBob = !chestLike && time < dir.movingUntil ? -Math.abs(Math.sin((time / STEP_MS) * Math.PI * 0.5)) * 1.2 : 0;
+      const nBob = !chestLike && !nSkel && time < dir.movingUntil ? -Math.abs(Math.sin((time / STEP_MS) * Math.PI * 0.5)) * 1.2 : 0;
       img.setPosition(sx, sy + 8 + nBob).setDepth(sy + 8);
       this.label(`n${n.id}`, n.name, sx, sy + 8 - (this.figSize(img)?.top ?? 56) - 4, '#e8d9b0', seen);
       const mark = this.questMark(n, p);
@@ -2018,12 +2041,24 @@ export class GameScene extends Phaser.Scene {
   private skelFigure(a: Actor): { key: string; sheet: FigureSheet } | null {
     if (a.kind === 'player') {
       if (heroMode() !== 'skelett') return null;
-      return heroTexture(this, lookOf(a), () => new Set([...this.actorViews.values()].map((av) => av.img.texture.key)));
+      return heroTexture(this, lookOf(a), () => this.figuresInUse());
     }
-    return null;
+    if (figureMode() !== 'skelett') return null;
+    const id = a.kindId!;
+    return figureTexture(this, monsterKey(id), { t: 'm', id });
+  }
+
+  /** Texturen der gerade gezeigten Figuren (dürfen nicht aus dem Cache fliegen) */
+  private figuresInUse(): Set<string> {
+    const keys = new Set<string>();
+    for (const v of this.actorViews.values()) keys.add(v.img.texture.key);
+    for (const img of this.npcViews.values()) keys.add(img.texture.key);
+    return keys;
   }
 
   private updateActors(time: number, p: Actor, g: Phaser.GameObjects.Graphics): void {
+    // Skelett-Figuren im Hintergrund backen (Zeitbudget je Frame), bis dahin zeigt jede Art ihre alte Figur
+    pumpFigures(this, () => this.figuresInUse());
     const seen = new Set<string>();
     const active = new Set<number>();
     for (const a of this.world.actors) {
