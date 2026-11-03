@@ -954,7 +954,10 @@ export class GameScene extends Phaser.Scene {
                   if (!primary || !f2) return batch.impacts.forEach((fn) => fn());
                   this.fx.projectile(f2.x, f2.y, primary.x, primary.y, 0xff5a1a, 240, () => {
                     this.fx.ring(primary.x, primary.y + 14, 130, 0xff6a2a, 420);
-                    this.fx.burst(primary.x, primary.y, 0xffa040, 520);
+                    // pixelfx-Einschlag am Boden unter dem Hauptziel; der Rauch blendet zum Ende hin aus
+                    const fb = playPixelfx(this, 'fire_burst', primary.x, primary.y + 18, { depth: OVERLAY_DEPTH - 1 });
+                    if (fb) this.tweens.add({ targets: fb, alpha: 0, delay: 700 * this.ts, duration: 600 * this.ts });
+                    else this.fx.burst(primary.x, primary.y, 0xffa040, 520);
                     this.cameras.main.shake(110, 0.004);
                     batch.impacts.forEach((fn) => fn());
                   });

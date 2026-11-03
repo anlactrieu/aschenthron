@@ -35,6 +35,7 @@ import * as explosions_implosion from "./explosions/implosion.js";
 import * as explosions_nuke from "./explosions/nuke.js";
 import * as explosions_plasma_explosion from "./explosions/plasma-explosion.js";
 import * as explosions_small_explosion from "./explosions/small-explosion.js";
+import * as explosions_fire_burst from "./explosions/fire-burst.js";
 import * as explosions_smoke_bomb from "./explosions/smoke-bomb.js";
 import * as water_bubbles from "./water/bubbles.js";
 import * as water_drip from "./water/drip.js";
@@ -285,6 +286,7 @@ export const effects = {
   "explosions/nuke": explosions_nuke,
   "explosions/plasma-explosion": explosions_plasma_explosion,
   "explosions/small-explosion": explosions_small_explosion,
+  "explosions/fire-burst": explosions_fire_burst,
   "explosions/smoke-bomb": explosions_smoke_bomb,
   "water/bubbles": water_bubbles,
   "water/drip": water_drip,

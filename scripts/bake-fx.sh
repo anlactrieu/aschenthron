@@ -29,6 +29,8 @@ bake lightning lightning/lightning-strike '{"palette":["#080c22","#141e48","#263
 bake heal holy/heal '{"palette":["#06180c","#0e3418","#1c5a2a","#2e8a40","#52b860","#90e090","#d4ffd0","#ffffff"]}' 15
 # Säule 3: neue Fertigkeit gelernt (Runenkreis mit Lichtsäule, gedämpftes Violett)
 bake learn arcane/magic-circle-cast '{"palette":["#100818","#24103a","#3e1c62","#5e2e8e","#8448b8","#b07ade","#dcc0f6","#ffffff"]}' 15
+# Feuerball-Einschlag: Remix explosions/fire-burst (kurze small-explosion, Rauch blendet das Spiel aus)
+bake fire_burst explosions/fire-burst '{"palette":["#1a0806","#4a1208","#8a2a0c","#c84a14","#f07a24","#ffb04a","#ffe0a0","#ffffff"]}' 20
 # Säule 4: Boss-Aura hinter dem Boss (Schattenflammen, Asche-Violett), bei Wut Glutrot
 bake boss_aura shadow/shadow-flames '{"palette":["#06040a","#140a1e","#2a1238","#4a1e5a","#743082","#a05aa8","#d0a0d0","#ffffff"]}' 15
 bake boss_rage shadow/shadow-flames '{"palette":["#080204","#1e0606","#420c08","#74180c","#b02c10","#e06020","#ffb050","#fff0c0"]}' 15

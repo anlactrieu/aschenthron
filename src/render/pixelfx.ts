@@ -8,7 +8,7 @@ import type Phaser from 'phaser';
 
 export const FX_NAMES = [
   'hit', 'crit', 'levelup', 'loot_magic', 'loot_rare', 'loot_set', 'loot_legendary',
-  'frost_nova', 'whirl', 'slam', 'lightning', 'heal', 'learn', 'boss_aura', 'boss_rage',
+  'frost_nova', 'whirl', 'slam', 'lightning', 'heal', 'learn', 'boss_aura', 'boss_rage', 'fire_burst',
 ] as const;
 export type FxName = (typeof FX_NAMES)[number];
 /** Pixelmaßstab der Effekte = Maßstab der Figuren */

@@ -1,0 +1,633 @@
+{
+ "frames": [
+  {
+   "filename": "fire-burst 0",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 1",
+   "frame": {
+    "x": 200,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 2",
+   "frame": {
+    "x": 400,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 3",
+   "frame": {
+    "x": 600,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 4",
+   "frame": {
+    "x": 800,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 5",
+   "frame": {
+    "x": 0,
+    "y": 150,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 6",
+   "frame": {
+    "x": 200,
+    "y": 150,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 7",
+   "frame": {
+    "x": 400,
+    "y": 150,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 8",
+   "frame": {
+    "x": 600,
+    "y": 150,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 9",
+   "frame": {
+    "x": 800,
+    "y": 150,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 10",
+   "frame": {
+    "x": 0,
+    "y": 300,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 11",
+   "frame": {
+    "x": 200,
+    "y": 300,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 12",
+   "frame": {
+    "x": 400,
+    "y": 300,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 13",
+   "frame": {
+    "x": 600,
+    "y": 300,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 14",
+   "frame": {
+    "x": 800,
+    "y": 300,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 15",
+   "frame": {
+    "x": 0,
+    "y": 450,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 16",
+   "frame": {
+    "x": 200,
+    "y": 450,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 17",
+   "frame": {
+    "x": 400,
+    "y": 450,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 18",
+   "frame": {
+    "x": 600,
+    "y": 450,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 19",
+   "frame": {
+    "x": 800,
+    "y": 450,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 20",
+   "frame": {
+    "x": 0,
+    "y": 600,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 21",
+   "frame": {
+    "x": 200,
+    "y": 600,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 22",
+   "frame": {
+    "x": 400,
+    "y": 600,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 23",
+   "frame": {
+    "x": 600,
+    "y": 600,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 24",
+   "frame": {
+    "x": 800,
+    "y": 600,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 25",
+   "frame": {
+    "x": 0,
+    "y": 750,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fire-burst 26",
+   "frame": {
+    "x": 200,
+    "y": 750,
+    "w": 200,
+    "h": 150
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 200,
+    "h": 150
+   },
+   "sourceSize": {
+    "w": 200,
+    "h": 150
+   },
+   "duration": 50
+  }
+ ],
+ "meta": {
+  "app": "https://github.com/patch-gg/pixelfx",
+  "version": "1",
+  "image": "fire-burst.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 1000,
+   "h": 900
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "fire-burst",
+    "from": 0,
+    "to": 26,
+    "direction": "forward"
+   }
+  ],
+  "pixelfx": {
+   "id": "explosions/fire-burst",
+   "name": "Fire burst",
+   "fps": 20,
+   "loop": false,
+   "frames": 27,
+   "frameSize": [
+    200,
+    150
+   ],
+   "pivot": [
+    100,
+    120
+   ],
+   "columns": 5
+  }
+ }
+}
