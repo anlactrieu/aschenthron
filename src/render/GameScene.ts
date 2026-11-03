@@ -557,7 +557,10 @@ export class GameScene extends Phaser.Scene {
       if (a.id === this.playerId || !a.alive || (a.kind === 'player' && !this.remote)) continue;
       const v = this.actorViews.get(a.id);
       if (!v || !v.img.visible) continue;
-      if (v.img.getBounds().contains(wx, wy) && (!best || v.img.depth > best.depth)) best = { depth: v.img.depth, actor: a };
+      // Skelett-Held: Rahmen hat viel Platz für die Waffe, getroffen wird nur der Körper
+      const fig = a.kind === 'player' && heroMode() === 'skelett' ? this.figSize(v.img) : null;
+      const box = fig ? new Phaser.Geom.Rectangle(v.img.x - fig.w / 2, v.img.y - fig.top, fig.w, fig.top) : v.img.getBounds();
+      if (box.contains(wx, wy) && (!best || v.img.depth > best.depth)) best = { depth: v.img.depth, actor: a };
     }
     // NPCs: zuerst die Figur selbst, erst danach die erweiterte Fläche (Namensschild/Marker); bei Überlappung gewinnt der nächste
     let npcBest: { score: number; npc: Npc } | null = null;
@@ -2083,7 +2086,7 @@ export class GameScene extends Phaser.Scene {
         const look = lookOf(a);
         const v3 = view.side ? 'side' : view.up ? 'back' : 'front';
         const fname = swinging ? `attack_${v3}_${attackFrame(swingK)}` : time < view.movingUntil ? `walk_${v3}_${walkFrame(view.dist ?? 0)}` : `idle_${v3}_${idleFrame(time + a.id * 977)}`;
-        img.setTexture(heroTexture(this, look), fname).setOrigin(HERO_ORIGIN.x, HERO_ORIGIN.y);
+        img.setTexture(heroTexture(this, look, () => new Set([...this.actorViews.values()].map((av) => av.img.texture.key))), fname).setOrigin(HERO_ORIGIN.x, HERO_ORIGIN.y);
       } else if (a.kind === 'player') {
         const look = lookOf(a);
         img.setTexture(ensureTexture(this, lookKey(look, frame, !!view.up && !view.side, !!view.side), () => playerCanvas(look, frame, !!view.up && !view.side, !!view.side)));

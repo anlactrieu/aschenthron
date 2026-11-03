@@ -55,16 +55,20 @@ function sheetOf(look: Look): { key: string; sheet: HeroSheet; canvas: FigCanvas
 const KEEP = 6;
 
 /** Texturschlüssel des Helden-Sheets für diesen Look; legt die Textur samt Bildern beim ersten Mal an. */
-export function heroTexture(scene: Phaser.Scene, look: Look): string {
+export function heroTexture(scene: Phaser.Scene, look: Look, inUse?: () => Set<string>): string {
   const { key, sheet, canvas } = sheetOf(look);
-  // zuletzt benutzt ans Ende (Map hält die Einfügereihenfolge), Älteste verwerfen
+  // zuletzt benutzt ans Ende (Map hält die Einfügereihenfolge), Älteste verwerfen, außer sie sind gerade zu sehen
   const hit = sheets.get(key)!;
   sheets.delete(key);
   sheets.set(key, hit);
-  for (const old of sheets.keys()) {
-    if (sheets.size <= KEEP) break;
-    sheets.delete(old);
-    if (scene.textures.exists(old)) scene.textures.remove(old);
+  if (sheets.size > KEEP) {
+    const busy = inUse?.() ?? new Set<string>();
+    for (const old of [...sheets.keys()]) {
+      if (sheets.size <= KEEP) break;
+      if (old === key || busy.has(old)) continue;
+      sheets.delete(old);
+      if (scene.textures.exists(old)) scene.textures.remove(old);
+    }
   }
   if (!scene.textures.exists(key)) {
     const tex = scene.textures.addCanvas(key, canvas)!;
