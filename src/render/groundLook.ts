@@ -56,6 +56,7 @@ export function tileLook(gid: number, zone: number): TileLook | null {
       }
     case 3: return { cells: GRASS_D, tint: [88, 84, 40, 0.42] };
     case 7: return { cells: DIRT, tint: zone === Z.camp ? [110, 84, 52, 0.28] : [190, 140, 70, 0.2] };
+    case 1: return zone === Z.none ? { cells: FLAGS, tint: [96, 82, 112, 0.5] } : null;
     case 16: return { cells: FLAGS, tint: [118, 98, 134, 0.5] };
     case 8: return { cells: GRASS_D, tint: [170, 150, 90, 0.4] };
     case 9: return zone === Z.grund ? { tint: [140, 36, 40, 0.34] } : { tint: [170, 96, 60, 0.22] };
