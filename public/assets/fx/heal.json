@@ -1,7 +1,7 @@
 {
  "frames": [
   {
-   "filename": "heal 0",
+   "filename": "heal-clean 0",
    "frame": {
     "x": 0,
     "y": 0,
@@ -23,7 +23,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 1",
+   "filename": "heal-clean 1",
    "frame": {
     "x": 80,
     "y": 0,
@@ -45,7 +45,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 2",
+   "filename": "heal-clean 2",
    "frame": {
     "x": 160,
     "y": 0,
@@ -67,7 +67,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 3",
+   "filename": "heal-clean 3",
    "frame": {
     "x": 240,
     "y": 0,
@@ -89,7 +89,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 4",
+   "filename": "heal-clean 4",
    "frame": {
     "x": 320,
     "y": 0,
@@ -111,7 +111,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 5",
+   "filename": "heal-clean 5",
    "frame": {
     "x": 400,
     "y": 0,
@@ -133,7 +133,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 6",
+   "filename": "heal-clean 6",
    "frame": {
     "x": 480,
     "y": 0,
@@ -155,7 +155,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 7",
+   "filename": "heal-clean 7",
    "frame": {
     "x": 0,
     "y": 104,
@@ -177,7 +177,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 8",
+   "filename": "heal-clean 8",
    "frame": {
     "x": 80,
     "y": 104,
@@ -199,7 +199,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 9",
+   "filename": "heal-clean 9",
    "frame": {
     "x": 160,
     "y": 104,
@@ -221,7 +221,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 10",
+   "filename": "heal-clean 10",
    "frame": {
     "x": 240,
     "y": 104,
@@ -243,7 +243,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 11",
+   "filename": "heal-clean 11",
    "frame": {
     "x": 320,
     "y": 104,
@@ -265,7 +265,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 12",
+   "filename": "heal-clean 12",
    "frame": {
     "x": 400,
     "y": 104,
@@ -287,7 +287,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 13",
+   "filename": "heal-clean 13",
    "frame": {
     "x": 480,
     "y": 104,
@@ -309,7 +309,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 14",
+   "filename": "heal-clean 14",
    "frame": {
     "x": 0,
     "y": 208,
@@ -331,7 +331,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 15",
+   "filename": "heal-clean 15",
    "frame": {
     "x": 80,
     "y": 208,
@@ -353,7 +353,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 16",
+   "filename": "heal-clean 16",
    "frame": {
     "x": 160,
     "y": 208,
@@ -375,7 +375,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 17",
+   "filename": "heal-clean 17",
    "frame": {
     "x": 240,
     "y": 208,
@@ -397,7 +397,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 18",
+   "filename": "heal-clean 18",
    "frame": {
     "x": 320,
     "y": 208,
@@ -419,7 +419,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 19",
+   "filename": "heal-clean 19",
    "frame": {
     "x": 400,
     "y": 208,
@@ -441,7 +441,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 20",
+   "filename": "heal-clean 20",
    "frame": {
     "x": 480,
     "y": 208,
@@ -463,7 +463,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 21",
+   "filename": "heal-clean 21",
    "frame": {
     "x": 0,
     "y": 312,
@@ -485,7 +485,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 22",
+   "filename": "heal-clean 22",
    "frame": {
     "x": 80,
     "y": 312,
@@ -507,7 +507,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 23",
+   "filename": "heal-clean 23",
    "frame": {
     "x": 160,
     "y": 312,
@@ -529,7 +529,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 24",
+   "filename": "heal-clean 24",
    "frame": {
     "x": 240,
     "y": 312,
@@ -551,7 +551,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 25",
+   "filename": "heal-clean 25",
    "frame": {
     "x": 320,
     "y": 312,
@@ -573,7 +573,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 26",
+   "filename": "heal-clean 26",
    "frame": {
     "x": 400,
     "y": 312,
@@ -595,7 +595,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 27",
+   "filename": "heal-clean 27",
    "frame": {
     "x": 480,
     "y": 312,
@@ -617,7 +617,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 28",
+   "filename": "heal-clean 28",
    "frame": {
     "x": 0,
     "y": 416,
@@ -639,7 +639,7 @@
    "duration": 67
   },
   {
-   "filename": "heal 29",
+   "filename": "heal-clean 29",
    "frame": {
     "x": 80,
     "y": 416,
@@ -664,7 +664,7 @@
  "meta": {
   "app": "https://github.com/patch-gg/pixelfx",
   "version": "1",
-  "image": "heal.png",
+  "image": "heal-clean.png",
   "format": "RGBA8888",
   "size": {
    "w": 560,
@@ -673,15 +673,15 @@
   "scale": "1",
   "frameTags": [
    {
-    "name": "heal",
+    "name": "heal-clean",
     "from": 0,
     "to": 29,
     "direction": "forward"
    }
   ],
   "pixelfx": {
-   "id": "holy/heal",
-   "name": "Heal",
+   "id": "holy/heal-clean",
+   "name": "Heal (no body)",
    "fps": 15,
    "loop": false,
    "frames": 30,
