@@ -1,1623 +1,831 @@
 {
  "frames": [
   {
-   "filename": "loot-beam 0",
+   "filename": "loot-pillar 0",
    "frame": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 1",
+   "filename": "loot-pillar 1",
    "frame": {
-    "x": 96,
+    "x": 80,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 2",
+   "filename": "loot-pillar 2",
    "frame": {
-    "x": 192,
+    "x": 160,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 3",
+   "filename": "loot-pillar 3",
    "frame": {
-    "x": 288,
+    "x": 240,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 4",
+   "filename": "loot-pillar 4",
    "frame": {
-    "x": 384,
+    "x": 320,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 5",
+   "filename": "loot-pillar 5",
    "frame": {
-    "x": 480,
+    "x": 400,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 6",
-   "frame": {
-    "x": 576,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 7",
-   "frame": {
-    "x": 672,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 8",
-   "frame": {
-    "x": 768,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 9",
-   "frame": {
-    "x": 864,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 10",
-   "frame": {
-    "x": 960,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 11",
-   "frame": {
-    "x": 1056,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 12",
-   "frame": {
-    "x": 0,
-    "y": 176,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 13",
-   "frame": {
-    "x": 96,
-    "y": 176,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 14",
-   "frame": {
-    "x": 192,
-    "y": 176,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 15",
-   "frame": {
-    "x": 288,
-    "y": 176,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 16",
-   "frame": {
-    "x": 384,
-    "y": 176,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 17",
+   "filename": "loot-pillar 6",
    "frame": {
     "x": 480,
-    "y": 176,
-    "w": 96,
-    "h": 176
+    "y": 0,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 18",
-   "frame": {
-    "x": 576,
-    "y": 176,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 19",
-   "frame": {
-    "x": 672,
-    "y": 176,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 20",
-   "frame": {
-    "x": 768,
-    "y": 176,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 21",
-   "frame": {
-    "x": 864,
-    "y": 176,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 22",
-   "frame": {
-    "x": 960,
-    "y": 176,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 23",
-   "frame": {
-    "x": 1056,
-    "y": 176,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 24",
+   "filename": "loot-pillar 7",
    "frame": {
     "x": 0,
-    "y": 352,
-    "w": 96,
-    "h": 176
+    "y": 104,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 25",
+   "filename": "loot-pillar 8",
    "frame": {
-    "x": 96,
-    "y": 352,
-    "w": 96,
-    "h": 176
+    "x": 80,
+    "y": 104,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 26",
+   "filename": "loot-pillar 9",
    "frame": {
-    "x": 192,
-    "y": 352,
-    "w": 96,
-    "h": 176
+    "x": 160,
+    "y": 104,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 27",
+   "filename": "loot-pillar 10",
    "frame": {
-    "x": 288,
-    "y": 352,
-    "w": 96,
-    "h": 176
+    "x": 240,
+    "y": 104,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 28",
+   "filename": "loot-pillar 11",
    "frame": {
-    "x": 384,
-    "y": 352,
-    "w": 96,
-    "h": 176
+    "x": 320,
+    "y": 104,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 29",
+   "filename": "loot-pillar 12",
+   "frame": {
+    "x": 400,
+    "y": 104,
+    "w": 80,
+    "h": 104
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 104
+   },
+   "duration": 67
+  },
+  {
+   "filename": "loot-pillar 13",
    "frame": {
     "x": 480,
-    "y": 352,
-    "w": 96,
-    "h": 176
+    "y": 104,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 30",
-   "frame": {
-    "x": 576,
-    "y": 352,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 31",
-   "frame": {
-    "x": 672,
-    "y": 352,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 32",
-   "frame": {
-    "x": 768,
-    "y": 352,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 33",
-   "frame": {
-    "x": 864,
-    "y": 352,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 34",
-   "frame": {
-    "x": 960,
-    "y": 352,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 35",
-   "frame": {
-    "x": 1056,
-    "y": 352,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 36",
+   "filename": "loot-pillar 14",
    "frame": {
     "x": 0,
-    "y": 528,
-    "w": 96,
-    "h": 176
+    "y": 208,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 37",
+   "filename": "loot-pillar 15",
    "frame": {
-    "x": 96,
-    "y": 528,
-    "w": 96,
-    "h": 176
+    "x": 80,
+    "y": 208,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 38",
+   "filename": "loot-pillar 16",
    "frame": {
-    "x": 192,
-    "y": 528,
-    "w": 96,
-    "h": 176
+    "x": 160,
+    "y": 208,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 39",
+   "filename": "loot-pillar 17",
    "frame": {
-    "x": 288,
-    "y": 528,
-    "w": 96,
-    "h": 176
+    "x": 240,
+    "y": 208,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 40",
+   "filename": "loot-pillar 18",
    "frame": {
-    "x": 384,
-    "y": 528,
-    "w": 96,
-    "h": 176
+    "x": 320,
+    "y": 208,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 41",
+   "filename": "loot-pillar 19",
+   "frame": {
+    "x": 400,
+    "y": 208,
+    "w": 80,
+    "h": 104
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 104
+   },
+   "duration": 67
+  },
+  {
+   "filename": "loot-pillar 20",
    "frame": {
     "x": 480,
-    "y": 528,
-    "w": 96,
-    "h": 176
+    "y": 208,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 42",
-   "frame": {
-    "x": 576,
-    "y": 528,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 43",
-   "frame": {
-    "x": 672,
-    "y": 528,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 44",
-   "frame": {
-    "x": 768,
-    "y": 528,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 45",
-   "frame": {
-    "x": 864,
-    "y": 528,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 46",
-   "frame": {
-    "x": 960,
-    "y": 528,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 47",
-   "frame": {
-    "x": 1056,
-    "y": 528,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 48",
+   "filename": "loot-pillar 21",
    "frame": {
     "x": 0,
-    "y": 704,
-    "w": 96,
-    "h": 176
+    "y": 312,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 49",
+   "filename": "loot-pillar 22",
    "frame": {
-    "x": 96,
-    "y": 704,
-    "w": 96,
-    "h": 176
+    "x": 80,
+    "y": 312,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 50",
+   "filename": "loot-pillar 23",
    "frame": {
-    "x": 192,
-    "y": 704,
-    "w": 96,
-    "h": 176
+    "x": 160,
+    "y": 312,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 51",
+   "filename": "loot-pillar 24",
    "frame": {
-    "x": 288,
-    "y": 704,
-    "w": 96,
-    "h": 176
+    "x": 240,
+    "y": 312,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 52",
+   "filename": "loot-pillar 25",
    "frame": {
-    "x": 384,
-    "y": 704,
-    "w": 96,
-    "h": 176
+    "x": 320,
+    "y": 312,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 53",
+   "filename": "loot-pillar 26",
+   "frame": {
+    "x": 400,
+    "y": 312,
+    "w": 80,
+    "h": 104
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 104
+   },
+   "duration": 67
+  },
+  {
+   "filename": "loot-pillar 27",
    "frame": {
     "x": 480,
-    "y": 704,
-    "w": 96,
-    "h": 176
+    "y": 312,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 54",
-   "frame": {
-    "x": 576,
-    "y": 704,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 55",
-   "frame": {
-    "x": 672,
-    "y": 704,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 56",
-   "frame": {
-    "x": 768,
-    "y": 704,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 57",
-   "frame": {
-    "x": 864,
-    "y": 704,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 58",
-   "frame": {
-    "x": 960,
-    "y": 704,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 59",
-   "frame": {
-    "x": 1056,
-    "y": 704,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 60",
+   "filename": "loot-pillar 28",
    "frame": {
     "x": 0,
-    "y": 880,
-    "w": 96,
-    "h": 176
+    "y": 416,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 61",
+   "filename": "loot-pillar 29",
    "frame": {
-    "x": 96,
-    "y": 880,
-    "w": 96,
-    "h": 176
+    "x": 80,
+    "y": 416,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 62",
+   "filename": "loot-pillar 30",
    "frame": {
-    "x": 192,
-    "y": 880,
-    "w": 96,
-    "h": 176
+    "x": 160,
+    "y": 416,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 63",
+   "filename": "loot-pillar 31",
    "frame": {
-    "x": 288,
-    "y": 880,
-    "w": 96,
-    "h": 176
+    "x": 240,
+    "y": 416,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 64",
+   "filename": "loot-pillar 32",
    "frame": {
-    "x": 384,
-    "y": 880,
-    "w": 96,
-    "h": 176
+    "x": 320,
+    "y": 416,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 65",
+   "filename": "loot-pillar 33",
+   "frame": {
+    "x": 400,
+    "y": 416,
+    "w": 80,
+    "h": 104
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 104
+   },
+   "duration": 67
+  },
+  {
+   "filename": "loot-pillar 34",
    "frame": {
     "x": 480,
-    "y": 880,
-    "w": 96,
-    "h": 176
+    "y": 416,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
+   "duration": 67
   },
   {
-   "filename": "loot-beam 66",
+   "filename": "loot-pillar 35",
    "frame": {
-    "x": 576,
-    "y": 880,
-    "w": 96,
-    "h": 176
+    "x": 0,
+    "y": 520,
+    "w": 80,
+    "h": 104
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
    "sourceSize": {
-    "w": 96,
-    "h": 176
+    "w": 80,
+    "h": 104
    },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 67",
-   "frame": {
-    "x": 672,
-    "y": 880,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 68",
-   "frame": {
-    "x": 768,
-    "y": 880,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 69",
-   "frame": {
-    "x": 864,
-    "y": 880,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 70",
-   "frame": {
-    "x": 960,
-    "y": 880,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
-  },
-  {
-   "filename": "loot-beam 71",
-   "frame": {
-    "x": 1056,
-    "y": 880,
-    "w": 96,
-    "h": 176
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 96,
-    "h": 176
-   },
-   "sourceSize": {
-    "w": 96,
-    "h": 176
-   },
-   "duration": 33
+   "duration": 67
   }
  ],
  "meta": {
   "app": "https://github.com/patch-gg/pixelfx",
   "version": "1",
-  "image": "loot-beam.png",
+  "image": "loot-pillar.png",
   "format": "RGBA8888",
   "size": {
-   "w": 1152,
-   "h": 1056
+   "w": 560,
+   "h": 624
   },
   "scale": "1",
   "frameTags": [
    {
-    "name": "loot-beam",
+    "name": "loot-pillar",
     "from": 0,
-    "to": 71,
+    "to": 35,
     "direction": "forward"
    }
   ],
   "pixelfx": {
-   "id": "pickups/loot-beam",
-   "name": "Loot beam",
-   "fps": 30,
+   "id": "pickups/loot-pillar",
+   "name": "Loot pillar",
+   "fps": 15,
    "loop": true,
-   "frames": 72,
+   "frames": 36,
    "frameSize": [
-    96,
-    176
+    80,
+    104
    ],
    "pivot": [
-    48,
-    162
+    40,
+    92
    ],
-   "columns": 12
+   "columns": 7
   }
  }
 }

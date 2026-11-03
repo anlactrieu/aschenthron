@@ -773,6 +773,24 @@ export class GameScene extends Phaser.Scene {
     return { x: sx, y: sy - (a.boss ? 34 : 18) };
   }
 
+  /** Bildschirmposition der Füße (Drehpunkt der Boden-Effekte aus pixelfx) */
+  private feetPos(a: Actor | undefined): { x: number; y: number } | null {
+    if (!a) return null;
+    const pos = this.dispPos(a);
+    const { sx, sy } = toScreen(pos.x, pos.y);
+    return { x: sx, y: sy };
+  }
+
+  /**
+   * Gedämpfter Bildschirmschimmer statt `cameras.main.flash` (der hellt bis Vollfarbe auf und sprengt den dunklen Look):
+   * Farbfläche mit kleiner Deckkraft über allem, blendet aus.
+   */
+  private glow(color: number, alpha: number, ms: number, add = true): void {
+    const { width, height } = this.scale;
+    const r = this.add.rectangle(width / 2, height / 2, width * 3, height * 3, color, 1).setScrollFactor(0).setDepth(OVERLAY_DEPTH + 2).setAlpha(alpha).setBlendMode(add ? 1 : 0);
+    this.tweens.add({ targets: r, alpha: 0, duration: ms * this.ts, ease: 'Quad.easeOut', onComplete: () => r.destroy() });
+  }
+
   /** Verzögert eine Darstellung (Ausholen vor dem Treffer). */
   private later(ms: number, fn: () => void): void {
     if (ms <= 0) fn();
@@ -790,25 +808,47 @@ export class GameScene extends Phaser.Scene {
     const to = this.bodyPos(tg);
     if (!from || !to) return;
     const tag = `${e.attackerId}:${e.skill}`;
+    const once = () => !fxSeen.has(tag) && !!fxSeen.add(tag);
+    // pixelfx (gebacken, Drehpunkt = Füße); ohne Sheet die alten Code-Effekte. `from` überspringt den Vorlauf, der Treffer steht ja schon fest.
+    const pfx = (n: FxName, p: { x: number; y: number } | null, o: { from?: number; depth?: number } = {}) => !!p && !!playPixelfx(this, n, p.x, p.y, { depth: o.depth ?? OVERLAY_DEPTH - 1, from: o.from });
+    const feetFrom = this.feetPos(at);
+    const feetTo = this.feetPos(tg);
     switch (e.skill) {
-      case 'lightning': this.fx.bolt(to.x, to.y + 10, 0x9fc0ff); this.cameras.main.shake(120, 0.004); break;
+      case 'lightning':
+        if (!pfx('lightning', feetTo, { from: 0.8 })) this.fx.bolt(to.x, to.y + 10, 0x9fc0ff);
+        this.cameras.main.shake(120, 0.004);
+        break;
       case 'whirlwind':
-        if (!fxSeen.has(tag)) {
-          fxSeen.add(tag);
+        if (once() && !pfx('whirl', feetFrom, { from: 0.05 })) {
           this.fx.ring(from.x, from.y + 18, 150, 0xe8e8f0, 320);
           this.fx.slash(from.x, from.y, 0xdadae8, 0);
           this.fx.slash(from.x, from.y, 0xdadae8, Math.PI);
         }
         break;
       case 'frost_nova':
-        if (!fxSeen.has(tag)) {
-          fxSeen.add(tag);
+      case 'glacial_burst':
+        // pixelfx ist seitlich gezeichnet (flacher Bodenring): der runde Code-Ring zeigt zusätzlich die echte Wirkfläche
+        if (once()) {
           this.fx.ring(from.x, from.y + 18, 210, 0x7fd0ff, 460);
-          this.fx.burst(from.x, from.y, 0xaee4ff, 520);
+          if (!pfx('frost_nova', feetFrom, { from: 0.4 })) this.fx.burst(from.x, from.y, 0xaee4ff, 520);
+        }
+        if (e.skill === 'glacial_burst' && fxSeen.has(tag)) this.cameras.main.shake(140, 0.005);
+        break;
+      case 'shockwave':
+        if (once()) {
+          this.fx.ring(from.x, from.y + 18, 170, 0xe0a060, 380);
+          pfx('slam', feetFrom);
+          this.cameras.main.shake(160, 0.006);
         }
         break;
       case 'power_strike': this.fx.slash(to.x, to.y, 0xffe0a0, 0.3); break;
-      case 'skull_split': this.fx.slash(to.x, to.y, 0xff9a60, 0.3); this.fx.ring(to.x, to.y + 14, 60, 0xff9a60, 300); this.cameras.main.shake(130, 0.006); break;
+      case 'skull_split':
+      case 'titan_blow':
+      case 'execution':
+        this.fx.slash(to.x, to.y, 0xff9a60, 0.3);
+        if (!pfx('slam', feetTo)) this.fx.ring(to.x, to.y + 14, 60, 0xff9a60, 300);
+        this.cameras.main.shake(130, e.skill === 'skull_split' ? 0.006 : 0.008);
+        break;
       default: break;
     }
   }
@@ -1013,13 +1053,13 @@ export class GameScene extends Phaser.Scene {
           if (r === 'rare') {
             this.achBump('rares');
             this.ui.banner(`Selten: ${e.item.name}`, '#f2c94c');
-            this.cameras.main.flash(160, 255, 220, 90);
+            this.glow(0xf2c94c, 0.14, 260);
           }
           else if (r === 'legendary' || r === 'set') this.achBump('legendary');
           if (r === 'legendary' || r === 'set') {
             this.sfx.legendary();
             this.ui.banner(`${r === 'legendary' ? 'Legendär' : 'Set-Teil'}: ${e.item.name}`, r === 'legendary' ? '#ff8a2a' : '#5fd070');
-            this.cameras.main.flash(220, r === 'legendary' ? 255 : 120, r === 'legendary' ? 150 : 255, 60);
+            this.glow(r === 'legendary' ? 0xff8a2a : 0x5fd070, 0.2, 360);
             say(`Beute: ${e.item.name}!`);
           } else if (r === 'rare' || e.item.slot === 'gem') {
             if (r === 'rare') this.sfx.rare();
@@ -1082,6 +1122,17 @@ export class GameScene extends Phaser.Scene {
           const sk = SKILLS.find((s) => s.id === e.skillId);
           say(sk?.passive ? `${sk.name}: Rang ${e.rank ?? 1}` : `${sk?.name} gelernt!`);
           this.sfx.quest();
+          // Säule 3: Skillgewinn spürbar – Runenkreis mit Lichtsäule am Helden, Banner, leiser violetter Schimmer
+          {
+            const f = this.feetPos(this.player());
+            const rank = e.rank ?? 1;
+            if (f && !playPixelfx(this, 'learn', f.x, f.y + 2, { depth: OVERLAY_DEPTH - 1, from: sk?.passive ? 1.0 : 0.5 })) {
+              const pos = this.bodyPos(this.player());
+              if (pos) this.fx.ring(pos.x, pos.y + 20, 140, 0xb07ade, 600);
+            }
+            if (sk) this.ui.banner(sk.passive ? `${sk.name} – Rang ${rank}` : `Neue Fertigkeit: ${sk.name}`, '#c8a0f0');
+            this.glow(0x8448b8, 0.12, 500);
+          }
           // neuer aktiver Zauber landet im ersten freien Platz der Schnellleiste
           if (sk && !sk.passive) {
             const p = this.player();
@@ -1105,7 +1156,8 @@ export class GameScene extends Phaser.Scene {
         case 'healed': {
           const pos = this.bodyPos(this.player());
           if (pos) {
-            this.fx.sparkle(pos.x, pos.y, 0x6fff9a);
+            const f = this.feetPos(this.player());
+            if (!f || !playPixelfx(this, 'heal', f.x, f.y, { depth: OVERLAY_DEPTH - 1 })) this.fx.sparkle(pos.x, pos.y, 0x6fff9a);
             this.fx.floatText(pos.x, pos.y - 30, `+${e.amount}`, '#6fff9a', 16);
           }
           this.sfx.potion();
@@ -1170,11 +1222,11 @@ export class GameScene extends Phaser.Scene {
           if (this.achv.stats.deaths <= 1) say('Tipp: Du erwachst in der Stadt. Rasten (R) und Tränke (Q/E) retten dich im Kampf; fliehen ist keine Schande.');
           this.sfx.death();
           this.cameras.main.shake(300, 0.008);
-          this.cameras.main.flash(500, 120, 0, 0);
+          this.glow(0x3a0006, 0.5, 900, false);
           this.ui.banner('Du bist gefallen', '#c43a3a');
           break;
         case 'teleported':
-          this.cameras.main.flash(500, 180, 200, 255);
+          this.glow(0x8fb4ff, 0.22, 420);
           this.sfx.levelUp();
           break;
         case 'respawned': say('Du erwachst in der Stadt.'); break;
@@ -1855,9 +1907,10 @@ export class GameScene extends Phaser.Scene {
       const beamName = r === 'normal' ? undefined : (`loot_${r}` as FxName);
       let beam = this.lootBeams.get(gi.id);
       if (beamName && !beam) {
-        beam = playPixelfx(this, beamName, sx, sy + 4, { depth: sy + 5, alpha: { magic: 0.6, rare: 0.8, set: 0.85, legendary: 1 }[r as 'magic'], blend: 1 });
-        // weißen Kern in der Seltenheitsfarbe einfärben (Multiplikation), sonst wirken alle Strahlen gleich blass
-        beam?.setTint({ magic: 0x6f8fff, rare: 0xf2c94c, set: 0x5fd070, legendary: 0xff7a22, normal: 0xc9c4bd }[r]);
+        // Sheets sind schon je Seltenheit eingefärbt (Kern in der hellsten Seltenheitsfarbe); kein setTint und keine additive
+        // Mischung, sonst wird alles auf hellem Boden weiß.
+        // Startphase je Beutestück versetzt, damit viele Strahlen nicht im Gleichtakt pulsieren.
+        beam = playPixelfx(this, beamName, sx, sy + 4, { depth: sy + 5, alpha: { magic: 0.7, rare: 0.9, set: 0.95, legendary: 1 }[r as 'magic'], from: ((gi.id * 0.37) % 1) * 2.4 });
         if (beam) this.lootBeams.set(gi.id, beam);
       }
       beam?.setPosition(sx, sy + 4).setDepth(sy + 5);

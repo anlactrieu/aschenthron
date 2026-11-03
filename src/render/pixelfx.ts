@@ -6,8 +6,11 @@ import type Phaser from 'phaser';
  * Abgespielt als Phaser-Animation mit dem Pixelmaßstab der Figuren (2x).
  */
 
-export type FxName = 'hit' | 'crit' | 'levelup' | 'loot_magic' | 'loot_rare' | 'loot_set' | 'loot_legendary';
-export const FX_NAMES: FxName[] = ['hit', 'crit', 'levelup', 'loot_magic', 'loot_rare', 'loot_set', 'loot_legendary'];
+export const FX_NAMES = [
+  'hit', 'crit', 'levelup', 'loot_magic', 'loot_rare', 'loot_set', 'loot_legendary',
+  'frost_nova', 'whirl', 'slam', 'lightning', 'heal', 'learn',
+] as const;
+export type FxName = (typeof FX_NAMES)[number];
 /** Pixelmaßstab der Effekte = Maßstab der Figuren */
 export const FX_SCALE = 2;
 
@@ -50,12 +53,19 @@ export function preloadPixelfx(timeoutMs = 8000): Promise<void> {
 
 /** Texturen und Animationen in der Szene anlegen (einmal je Szene). */
 export function registerPixelfx(scene: Phaser.Scene): void {
-  for (const [n, { img, meta }] of store) {
-    const key = `pfx_${n}`;
-    if (scene.textures.exists(key)) continue;
-    scene.textures.addSpriteSheet(key, img, { frameWidth: meta.frameSize[0], frameHeight: meta.frameSize[1], endFrame: meta.frames - 1 });
-    scene.anims.create({ key, frames: scene.anims.generateFrameNumbers(key, { start: 0, end: meta.frames - 1 }), frameRate: meta.fps, repeat: meta.loop ? -1 : 0 });
-  }
+  for (const n of store.keys()) registerOne(scene, n);
+}
+
+/** Legt Textur + Animation eines geladenen Effekts an (auch nachträglich, wenn das Sheet erst nach dem Szenenstart kam). */
+function registerOne(scene: Phaser.Scene, n: FxName): boolean {
+  const l = store.get(n);
+  if (!l) return false;
+  const key = `pfx_${n}`;
+  if (scene.textures.exists(key)) return true;
+  const { img, meta } = l;
+  scene.textures.addSpriteSheet(key, img, { frameWidth: meta.frameSize[0], frameHeight: meta.frameSize[1], endFrame: meta.frames - 1 });
+  if (!scene.anims.exists(key)) scene.anims.create({ key, frames: scene.anims.generateFrameNumbers(key, { start: 0, end: meta.frames - 1 }), frameRate: meta.fps, repeat: meta.loop ? -1 : 0 });
+  return true;
 }
 
 export interface PlayOpts {
@@ -65,6 +75,8 @@ export interface PlayOpts {
   /** Phaser.BlendModes (0 normal, 1 add) */
   blend?: number;
   scale?: number;
+  /** ab dieser Sekunde abspielen (Vorlauf des Effekts überspringen, wenn der Treffer schon feststeht) */
+  from?: number;
 }
 
 /**
@@ -74,11 +86,11 @@ export interface PlayOpts {
 export function playPixelfx(scene: Phaser.Scene, name: FxName, x: number, y: number, o: PlayOpts): Phaser.GameObjects.Sprite | undefined {
   const m = store.get(name)?.meta;
   const key = `pfx_${name}`;
-  if (!m || !scene.textures.exists(key)) return undefined;
+  if (!m || !registerOne(scene, name)) return undefined;
   const s = scene.add.sprite(x, y, key, 0).setOrigin(m.pivot[0] / m.frameSize[0], m.pivot[1] / m.frameSize[1]).setScale(o.scale ?? FX_SCALE).setDepth(o.depth).setAlpha(o.alpha ?? 1);
   if (o.flip) s.setFlipX(true);
   if (o.blend) s.setBlendMode(o.blend);
-  s.play(key);
+  s.play({ key, startFrame: Math.min(m.frames - 1, Math.max(0, Math.round((o.from ?? 0) * m.fps))) });
   if (!m.loop) s.once('animationcomplete', () => s.destroy());
   return s;
 }

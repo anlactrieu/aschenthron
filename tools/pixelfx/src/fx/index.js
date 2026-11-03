@@ -96,6 +96,7 @@ import * as melee_whip_crack from "./melee/whip-crack.js";
 import * as impacts_blunt_hit from "./impacts/blunt-hit.js";
 import * as impacts_bullet_impact from "./impacts/bullet-impact.js";
 import * as impacts_crit_hit from "./impacts/crit-hit.js";
+import * as impacts_crit_compact from "./impacts/crit-compact.js";
 import * as impacts_ground_slam from "./impacts/ground-slam.js";
 import * as impacts_heavy_landing from "./impacts/heavy-landing.js";
 import * as impacts_hit_flash from "./impacts/hit-flash.js";
@@ -219,6 +220,7 @@ import * as pickups_gem_spin from "./pickups/gem-spin.js";
 import * as pickups_heart_pickup from "./pickups/heart-pickup.js";
 import * as pickups_key_glint from "./pickups/key-glint.js";
 import * as pickups_loot_beam from "./pickups/loot-beam.js";
+import * as pickups_loot_pillar from "./pickups/loot-pillar.js";
 import * as pickups_potion from "./pickups/potion.js";
 import * as pickups_power_star from "./pickups/power-star.js";
 import * as pickups_xp_orb from "./pickups/xp-orb.js";
@@ -344,6 +346,7 @@ export const effects = {
   "impacts/blunt-hit": impacts_blunt_hit,
   "impacts/bullet-impact": impacts_bullet_impact,
   "impacts/crit-hit": impacts_crit_hit,
+  "impacts/crit-compact": impacts_crit_compact,
   "impacts/ground-slam": impacts_ground_slam,
   "impacts/heavy-landing": impacts_heavy_landing,
   "impacts/hit-flash": impacts_hit_flash,
@@ -467,6 +470,7 @@ export const effects = {
   "pickups/heart-pickup": pickups_heart_pickup,
   "pickups/key-glint": pickups_key_glint,
   "pickups/loot-beam": pickups_loot_beam,
+  "pickups/loot-pillar": pickups_loot_pillar,
   "pickups/potion": pickups_potion,
   "pickups/power-star": pickups_power_star,
   "pickups/xp-orb": pickups_xp_orb,
