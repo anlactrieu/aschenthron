@@ -7,6 +7,7 @@
  */
 import { DOOR_ICONS, TOWN_GID, drawDoorIcon, type DoorIcon } from './town';
 import { PIXEL } from './ninjaProps';
+import { gradeRgb } from './ninja';
 
 /** Bis zu dieser Zeilenzahl reicht das Dach; Kerbe an der Türseite (Kachelspalte/-zeile im Dachbild) */
 export interface RoofNotch { col: number; row: number; rows: number }
@@ -78,7 +79,10 @@ const ctx = (c: Cv): G => {
   return g;
 };
 const cl = (v: number): number => Math.max(0, Math.min(255, Math.round(v)));
-const col = (c: Rgb, k = 1): string => `rgb(${cl(c[0] * k)},${cl(c[1] * k)},${cl(c[2] * k)})`;
+const col = (c: Rgb, k = 1): string => {
+  const [r, g, b] = gradeRgb(c);
+  return `rgb(${cl(r * k)},${cl(g * k)},${cl(b * k)})`;
+};
 const mix = (a: Rgb, b: Rgb, t: number): Rgb => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 /** Kleiner Hash 0..n-1 aus drei Zahlen */
 const hh = (a: number, b: number, c: number, n: number): number => {

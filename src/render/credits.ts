@@ -34,6 +34,11 @@ function build(): HTMLDivElement {
       `<b>Welt, Oberfläche und Schrift:</b> „Ninja Adventure Asset Pack“ von <i>Pixel-Boy</i> und <i>AAA</i> (Gelände, Häuser, Bäume, Props, Fenster- und Knopfrahmen „Theme Wood“, Porträt, Pixelschrift). Lizenz: <b>CC0</b> – keine Namensnennung nötig, hier als Dankeschön.`,
     ),
     mk(`Quelle: <span style="color:#ffd24a">pixel-boy.itch.io/ninja-adventure-asset-pack</span>`),
+    mk(
+      `<b>Kampf-, Zauber- und Beute-Effekte:</b> gebacken aus <i>pixelfx</i> von Patch und Hugo Duprez (Sprite Fusion), in dunkler Palette, teils angepasst. ` +
+        `Lizenz: <b>MIT</b> – Copyright (c) 2026 Patch, Copyright (c) 2026 Hugo Duprez; Lizenztext in <span style="color:#e8c040">tools/pixelfx/LICENSE</span>.`,
+    ),
+    mk(`Quelle: <span style="color:#e8c040">github.com/patch-gg/pixelfx</span>`),
     mk(`<span style="opacity:.7">Verwendet (Dungeon Crawl): ${allSpritePaths().length} Bilddateien. Einzelheiten stehen in ASSETS.md.</span>`),
   );
   const close = document.createElement('button');

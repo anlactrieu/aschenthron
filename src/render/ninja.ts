@@ -11,6 +11,67 @@ export function ninjaImg(path: string): HTMLImageElement | null {
   return store.get(path) ?? null;
 }
 
+/**
+ * Zentrale Stellschraube für den Dark-Fantasy-Look: alle Kachel-Sheets (Boden, Häuser, Props) werden beim Laden
+ * entsättigt, leicht gekühlt und abgedunkelt, damit sie neben den DCSS-Figuren nicht bunt und weich wirken.
+ * Figuren-Sheets (Character, Items …) bleiben unberührt.
+ */
+export const NINJA_GRADE = {
+  /** Sättigung bleibt zu diesem Anteil (0.6 = −40 %) */
+  sat: 0.6,
+  /** Für überwiegend blaue Pixel (Wasser): schwächere Entsättigung */
+  satWater: 0.85,
+  /** Helligkeitsfaktor */
+  lum: 0.9,
+  /** Kühlung: Rot-/Blau-Faktor */
+  r: 0.96,
+  b: 1.05,
+  /** Sheets mit abweichendem Helligkeitsfaktor (Dungeons sind schon sehr dunkel) */
+  lumBySheet: { TilesetDungeon: 1 } as Record<string, number>,
+};
+
+/** Wendet `NINJA_GRADE` auf RGBA-Pixel an (in place, Alpha unberührt). */
+export function gradePixels(d: Uint8ClampedArray, lumFactor: number = NINJA_GRADE.lum): void {
+  const G = NINJA_GRADE;
+  for (let i = 0; i < d.length; i += 4) {
+    let r = d[i]!, g = d[i + 1]!, b = d[i + 2]!;
+    const y = r * 0.3 + g * 0.59 + b * 0.11;
+    const s = b > r && b > g * 0.95 ? G.satWater : G.sat;
+    r = y + (r - y) * s;
+    g = y + (g - y) * s;
+    b = y + (b - y) * s;
+    d[i] = r * G.r * lumFactor;
+    d[i + 1] = g * lumFactor;
+    d[i + 2] = b * G.b * lumFactor;
+  }
+}
+
+/** Dieselbe Abtönung für einzelne RGB-Werte (prozedurale Häuser-Paletten). */
+export function gradeRgb(c: readonly [number, number, number]): [number, number, number] {
+  const d = new Uint8ClampedArray([c[0], c[1], c[2], 255]);
+  gradePixels(d);
+  return [d[0]!, d[1]!, d[2]!];
+}
+
+const GRADED_DIR = 'Backgrounds/Tilesets/';
+
+/** Liefert für Kachel-Sheets eine abgetönte Canvas-Kopie (als Bildquelle verwendbar), sonst das Bild selbst. */
+function gradeSheet(path: string, img: HTMLImageElement): HTMLImageElement {
+  if (!path.startsWith(GRADED_DIR) || typeof document === 'undefined') return img;
+  const c = document.createElement('canvas');
+  c.width = img.width;
+  c.height = img.height;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  if (!g) return img;
+  g.drawImage(img, 0, 0);
+  const name = path.slice(GRADED_DIR.length).replace(/\.png$/, '');
+  const data = g.getImageData(0, 0, c.width, c.height);
+  gradePixels(data.data, NINJA_GRADE.lumBySheet[name] ?? NINJA_GRADE.lum);
+  g.putImageData(data, 0, 0);
+  // Canvas dient überall nur als drawImage-Quelle mit width/height – wie ein geladenes Bild.
+  return c as unknown as HTMLImageElement;
+}
+
 export function preloadNinja(paths: string[], timeoutMs = 8000): Promise<void> {
   if (typeof Image === 'undefined') return Promise.resolve();
   return new Promise((resolve) => {
@@ -25,7 +86,7 @@ export function preloadNinja(paths: string[], timeoutMs = 8000): Promise<void> {
     };
     for (const p of paths) {
       const img = new Image();
-      img.onload = () => { store.set(p, img); done(); };
+      img.onload = () => { store.set(p, gradeSheet(p, img)); done(); };
       img.onerror = done;
       img.src = NINJA_BASE + p;
     }

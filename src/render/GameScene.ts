@@ -1135,6 +1135,7 @@ export class GameScene extends Phaser.Scene {
               if (pos) this.fx.ring(pos.x, pos.y + 20, 140, 0xb07ade, 600);
             }
             if (sk) this.ui.banner(sk.passive ? `${sk.name} – Rang ${rank}` : `Neue Fertigkeit: ${sk.name}`, '#c8a0f0');
+            if (sk && !sk.passive) this.ui.pulseSkill(sk.id);
             this.glow(0x8448b8, 0.12, 500);
           }
           // neuer aktiver Zauber landet im ersten freien Platz der Schnellleiste

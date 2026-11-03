@@ -201,6 +201,8 @@ const CSS = `
 .a-slot.bad{box-shadow:inset 0 0 0 2px #d04a3a}
 .a-drop.ok{outline:2px dashed #5fd070;outline-offset:-3px;background:rgba(95,208,112,.08)}
 .pulse{animation:xpPulse 1.4s ease-in-out infinite}
+@keyframes hbNew{0%,100%{box-shadow:0 0 0 0 rgba(176,122,222,0)}50%{box-shadow:0 0 12px 4px rgba(176,122,222,.9)}}
+.hb.hb-new{animation:hbNew .7s ease-in-out 4}
 @keyframes xpPulse{0%,100%{box-shadow:0 0 0 0 rgba(216,162,74,0)}50%{box-shadow:0 0 10px 3px rgba(216,162,74,.85)}}
 .a-btn{padding:0 8px;cursor:pointer;font:15px/20px var(--ui-font)}
 .a-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:3px 0}
@@ -225,7 +227,7 @@ const CSS = `
 /* unten: Leben | Schnellleiste + XP | Mana */
 .hud>.pbar{width:150px;flex:0 1 auto;min-width:84px;margin-bottom:34px}
 #hud-tl{position:fixed;left:12px;top:12px;z-index:5;display:flex;align-items:stretch;gap:0;pointer-events:none}
-#hud-tl .face{width:76px;height:76px;image-rendering:pixelated;display:block}
+#hud-tl .face{width:76px;height:76px;image-rendering:pixelated;display:block;background:#17120f;box-shadow:inset 0 0 0 1px #4b3f3a}
 #hud-tl .hdr{display:flex;flex-direction:column;justify-content:center;min-width:168px;padding:0 4px 0 8px;gap:0}
 #hud-tl .nm{font-size:20px;line-height:1.1;color:var(--gold);text-shadow:0 2px var(--ink);max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #hud-tl .lv{font-size:16px;line-height:1.1;color:var(--txt);margin-bottom:2px}
@@ -303,6 +305,10 @@ export class Ui {
   private lastP: Actor | null = null;
   private lastW: World | null = null;
   private dollKey = '';
+  private face?: HTMLImageElement;
+  private faceKey = '';
+  /** neu gelernte Fertigkeit: ihr Schnellleisten-Platz pulsiert kurz (Säule 3) */
+  private newSkill: { id: string; until: number } | null = null;
   private dollUrl = '';
   private dollWidth = 104;
   private showSaveIo = false;
@@ -504,8 +510,9 @@ export class Ui {
     this.tl.id = 'hud-tl';
     const fc = el('div', 'fc');
     const face = el('img', 'face') as HTMLImageElement;
-    face.src = faceUrl(figureMode() === 'dcss' ? 'Knight' : HERO_BASE);
+    face.src = faceUrl(HERO_BASE);
     face.alt = '';
+    this.face = face;
     fc.append(face);
     const hdr = el('div', 'hdr');
     const hp = el('div', 'pbar hp');
@@ -515,8 +522,46 @@ export class Ui {
     this.tl.append(fc, hdr);
   }
 
+  /** DCSS-Modus: Brustbild (Kopf und Schultern) des Helden mit aktueller Ausrüstung, ganzzahlig skaliert. */
+  private updatePortrait(p: Actor): void {
+    const face = this.face;
+    if (!face || figureMode() !== 'dcss') return;
+    const look = lookOf(p);
+    const key = lookKey(look, 0, false);
+    if (key === this.faceKey) return;
+    const src = playerPortrait(look).canvas;
+    const sx = src.getContext('2d');
+    if (!sx || !src.width || !src.height) return;
+    const data = sx.getImageData(0, 0, src.width, src.height).data;
+    let top = src.height, minX = src.width, maxX = -1;
+    for (let y = 0; y < src.height; y++) for (let x = 0; x < src.width; x++) {
+      if ((data[(y * src.width + x) * 4 + 3] ?? 0) < 8) continue;
+      if (y < top) top = y;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+    }
+    if (maxX < 0) return; // Sprites noch nicht geladen: beim nächsten Update erneut
+    this.faceKey = key;
+    const box = 76;
+    const out = document.createElement('canvas');
+    out.width = out.height = box;
+    const ox = out.getContext('2d')!;
+    ox.fillStyle = '#17120f';
+    ox.fillRect(0, 0, box, box);
+    ox.imageSmoothingEnabled = false;
+    const cx = Math.round((minX + maxX) / 2);
+    ox.drawImage(src, cx - box / 2, top - 6, box, box, 0, 0, box, box);
+    face.src = out.toDataURL();
+  }
+
+  /** Lässt den Schnellleisten-Platz einer neu gelernten Fertigkeit pulsieren, sobald sie dort liegt. */
+  pulseSkill(id: string): void {
+    this.newSkill = { id, until: performance.now() + 3000 };
+  }
+
   update(w: World, p: Actor, target?: Actor): void {
     this.lastP = p;
+    this.updatePortrait(p);
     this.lastW = w;
     this.updateHud(p, target);
     this.updateTracker(w, p);
@@ -642,6 +687,11 @@ export class Ui {
         return { el: b, cd, txt };
       });
       this.hotbar.append(this.potionBtns.mana);
+    }
+    if (this.newSkill) {
+      const i = act.indexOf(this.newSkill.id);
+      if (performance.now() > this.newSkill.until) this.newSkill = null;
+      else if (i >= 0 && this.hotButtons[i] && !this.hotButtons[i]!.el.classList.contains('hb-new')) this.hotButtons[i]!.el.classList.add('hb-new');
     }
     const count = (k: 'heal' | 'mana') => p.inventory.filter((i) => i.slot === 'potion' && i[k] !== undefined).length;
     for (const k of ['heal', 'mana'] as const) {
