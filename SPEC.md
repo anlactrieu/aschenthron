@@ -378,3 +378,9 @@ User: „Wie in D4O kein Rang für Zauber, lieber mehr Zauber; neue Zauber desse
 - [x] Säule 4 (Darstellung): Boss-Aura, Boss-Auftritt, Gefahr-Warnung + rote Vignette
 - [x] Sheets verkleinert (15/20 fps): Level-up 0,5 MB, 15 Effekte zusammen 4,2 MB
 - [ ] Ungeprüft: Handy, Nacht/Regen mit neuem Look, Händler-/Truhenfenster
+
+## Probe: Held-Gang mit pixelfx-Skelett (2026-11-03, vom Nutzer gewählt)
+**Problem:** Der Held (DCSS, ein Standbild) „geht komisch“: `art.ts` täuscht das Gehen vor, indem das ganze Bild um ±4° kippt und der Teil unter der Hüfte seitlich versetzt wird (`FRAME_STEP_L/R`, `WALK_FRAMES` in `GameScene.ts`, `STEP_MS` 110).
+- **Entscheidung:** Erst eine **Probe**, keine Umstellung im Spiel. Probeseite `public/probe/gang/index.html` (Ordner `public/probe` ist ignoriert): pixelfx-Skelett (`tools/pixelfx/src/core/rig.js`, `poses.js`, Standardfigur 24x38) in DCSS-naher dunkler Palette, Laufzyklus in 4 Richtungen (rechts, links per Spiegeln, zur Kamera, vom Betrachter weg über `yaw`), Pixelmaßstab 2x, daneben der jetzige DCSS-Held mit seinem Gang zum Vergleich, beide auf einem Stück Stadtboden.
+- **Danach entscheidet der Nutzer:** Skelett-Held übernehmen (dann Ausrüstung als Ebenen neu planen) oder DCSS-Gang verbessern (Federn, Beine versetzt, Arme, kein Kippen).
+- **Bekannte Risiken:** anderer Stil als DCSS-Monster; sichtbare Ausrüstung müsste für das Skelett neu gebaut werden; pixelfx verbietet das Nachbauen fremder Spielfiguren (nur generische Motive).
