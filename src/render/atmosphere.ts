@@ -46,8 +46,12 @@ export function dayColor(hour: number): [number, number, number] {
   return KEYS[0]![1];
 }
 
-/** Dunkle Grundstimmung (Dark Fantasy, Asche): multipliziert auf die Tagesfarbe, auch im hellen Mittag nie volle Farbe. */
-export const DARK_GRADE: readonly [number, number, number] = [0.66, 0.64, 0.74];
+/**
+ * Dunkle Grundstimmung (Dark Fantasy, Asche): multipliziert auf die Tagesfarbe, auch im hellen Mittag nie volle Farbe.
+ * Die Code-Welt (world/*) ist selbst schon dunkel gemalt, darum nur noch ein leichter, fast neutraler Zug (vorher
+ * 0.66/0.64/0.74 für die bunten Ninja-Kacheln: Tag wirkte violett).
+ */
+export const DARK_GRADE: readonly [number, number, number] = [0.92, 0.9, 0.94];
 /** Wie weit Städte zum ungetönten Bild aufgehellt werden (vorher 0.4: Stadt wirkte bunt und hell). */
 const TOWN_LIFT = 0.12;
 

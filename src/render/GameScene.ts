@@ -13,7 +13,10 @@ import { toScreen, toTile } from './iso';
 import { NINJA_KEYS } from './ninjaProps';
 import { ninjaNpcDef } from './figureMap';
 import { detectHouses, houseDoor, houseDecor, houseFacade, houseFence, houseRoof, houseSign, houseWallTile, lowerKind, type House, type RoofNotch } from './houses';
-import { biomeOf, buildZoneMap, drawDetail, drawLavaTile, drawWaterTile, patchNoise, Z } from './groundLook';
+import { buildZoneMap, Z } from './groundLook';
+import { ART, ART_SCALE, Raster, toCanvas } from './world/raster';
+import { matOf, paintGround } from './world/ground';
+import { stampDetail, stampWaterDetail } from './world/details';
 import { DOOR_ICONS, TOWN_GID, WATER_PROP_GIDS, registerTownArt } from './town';
 import { Ui, describeItem, isUpgrade } from './ui';
 import { generateItem, type Item } from '../sim/items';
@@ -32,7 +35,7 @@ import { FIG_SCALE, heroMode, heroTexture, originOf } from './heroSheet';
 import { onSettings, settings } from './settings';
 import type { RemoteSession } from '../net/client';
 import {
-  ensureTexture, FEET_ORIGIN_Y, FRAME_STEP_L, FRAME_STEP_R, FRAME_WIND, FRAME_STRIKE, lookKey, lookOf, npcTextureKey, BIPED, monsterCanvas, npcCanvas, ninjaNpcCanvas, playerCanvas, registerStaticArt, tileCanvas, TILE_H, TILE_VARIANTS, TILE_W, WALL_VARIANTS,
+  ensureTexture, FEET_ORIGIN_Y, FRAME_STEP_L, FRAME_STEP_R, FRAME_WIND, FRAME_STRIKE, lookKey, lookOf, npcTextureKey, BIPED, monsterCanvas, npcCanvas, ninjaNpcCanvas, playerCanvas, registerStaticArt, TILE_H, TILE_W, WALL_VARIANTS,
 } from './art';
 
 const SAVE_BASE = 'aschenthron.save.v1';
@@ -175,6 +178,9 @@ export class GameScene extends Phaser.Scene {
   private fireballs = new Map<number, { impacts: (() => void)[]; target: number }>();
   private regionName = '';
   private zoneMap: Uint8Array | null = null;
+  /** Bodenmaterial und Landabstand je Kachel (Zeichen-Cache, siehe matAt/landDistance) */
+  private matMap: Int16Array | null = null;
+  private landDist: Int8Array | null = null;
   private armedSkill: string | null = null;
   private armedCursor = '';
   /** Zauber, der nach dem Anlaufen gewirkt wird (Ziel war außer Reichweite). */
@@ -1535,18 +1541,27 @@ export class GameScene extends Phaser.Scene {
     return this.zoneMap;
   }
 
-  /** Abstand (Kacheln, 1..6) zur nächsten Landkachel; 6 = mindestens 6 */
+  /** Abstand (Kacheln, 1..6) zur nächsten Landkachel; 6 = mindestens 6 (Lava zählt nicht als Land), je Kachel gemerkt */
   private landDistance(x: number, y: number): number {
-    for (let r = 1; r < 6; r++) {
+    const { w, h } = this.world.grid;
+    const inside = x >= 0 && y >= 0 && x < w && y < h;
+    if (inside) {
+      this.landDist ??= new Int8Array(w * h);
+      const c = this.landDist[y * w + x]!;
+      if (c) return c;
+    }
+    let out = 6;
+    search: for (let r = 1; r < 6; r++) {
       for (let dy = -r; dy <= r; dy++) {
         for (let dx = -r; dx <= r; dx++) {
           if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
           const g = this.gidAt(x + dx, y + dy);
-          if (g !== 6 && g !== 12 && g !== 0 && !WATER_PROP_GIDS.has(g)) return r;
+          if (g !== 6 && g !== 12 && g !== 0 && !WATER_PROP_GIDS.has(g)) { out = r; break search; }
         }
       }
     }
-    return 6;
+    if (inside) this.landDist![y * w + x] = out;
+    return out;
   }
 
   private nearDoor(x: number, y: number): boolean {
@@ -1554,96 +1569,50 @@ export class GameScene extends Phaser.Scene {
     return false;
   }
 
+  /** Bodenart einer Kachel fürs Zeichnen: Wasser unter Booten/Pfählen, Dielen in Häusern, unter Hindernissen der häufigste Nachbarboden */
+  private groundGid(x: number, y: number): number {
+    const gid = this.gidAt(x, y);
+    return WATER_PROP_GIDS.has(gid) ? 6 : this.houseAt.has(y * this.world.grid.w + x) ? 15 : PROP_GIDS.has(gid) ? this.groundUnder(x, y) : gid;
+  }
+
+  /** Bodenmaterial (world/ground.ts) je Kachel, gemerkt; außerhalb der Karte Wasser */
+  private matAt(x: number, y: number): number {
+    const { w, h } = this.world.grid;
+    if (x < 0 || y < 0 || x >= w || y >= h) return matOf(6, 0);
+    this.matMap ??= new Int16Array(w * h).fill(-1);
+    const i = y * w + x;
+    let m = this.matMap[i]!;
+    if (m < 0) {
+      m = matOf(this.groundGid(x, y), this.zones()[i] ?? 0);
+      this.matMap[i] = m;
+    }
+    return m;
+  }
+
+  /** Bodenchunk: im Kunstraster (24 px je Kachel) gemalt, Boden und Details in einem Bild, angezeigt mit Maßstab 2 */
   private makeChunk(cx: number, cy: number): void {
     const { w, h } = this.world.grid;
     const zones = this.zones();
     const x0 = cx * CHUNK;
     const y0 = cy * CHUNK;
-    const x1 = x0 + CHUNK - 1;
-    const y1 = y0 + CHUNK - 1;
-    const minSx = x0 * TILE_W - TILE_W / 2;
-    const maxSx = (x1 + 1) * TILE_W - TILE_W / 2;
-    const minSy = y0 * TILE_H - TILE_H / 2;
-    const maxSy = (y1 + 1) * TILE_H - TILE_H / 2;
-    const c = document.createElement('canvas');
-    c.width = maxSx - minSx;
-    c.height = maxSy - minSy;
-    const ctx = c.getContext('2d')!;
-    ctx.imageSmoothingEnabled = false;
-    for (let y = y0; y <= Math.min(y1, h - 1); y++) {
-      for (let x = x0; x <= Math.min(x1, w - 1); x++) {
-        const gid = this.tiles[y * w + x] ?? 0;
-        if (!gid) continue;
-        const ground = WATER_PROP_GIDS.has(gid) ? 6 : this.houseAt.has(y * w + x) ? 15 : PROP_GIDS.has(gid) ? this.groundUnder(x, y) : gid;
-        const { sx, sy } = toScreen(x, y);
-        const ox = sx - TILE_W / 2 - minSx;
-        const oy = sy - TILE_H / 2 - minSy;
-        const zone = zones[y * w + x] ?? 0;
-        ctx.drawImage(tileCanvas(ground, hash(x, y) % TILE_VARIANTS, zone), ox, oy);
-        this.dither(ctx, x, y, ground, zone, ox, oy);
-      }
-    }
-    // Zweiter Durchlauf: sanfte Helligkeitsflecken und Bodendetails (Gras, Blumen, Kiesel, Knochen …) nur auf freien Kacheln
-    for (let y = y0; y <= Math.min(y1, h - 1); y++) {
-      for (let x = x0; x <= Math.min(x1, w - 1); x++) {
+    const r = new Raster(CHUNK * ART, CHUNK * ART);
+    paintGround(r, x0, y0, CHUNK, CHUNK, { mat: (x, y) => this.matAt(x, y), waterDist: (x, y) => this.landDistance(x, y) }, (x, y) => x >= w || y >= h);
+    for (let y = y0; y < Math.min(y0 + CHUNK, h); y++) {
+      for (let x = x0; x < Math.min(x0 + CHUNK, w); x++) {
         const gid = this.tiles[y * w + x] ?? 0;
         if (!gid) continue;
         const zone = zones[y * w + x] ?? 0;
-        const { sx, sy } = toScreen(x, y);
-        const ox = sx - TILE_W / 2 - minSx;
-        const oy = sy - TILE_H / 2 - minSy;
-        if (gid === 6 || WATER_PROP_GIDS.has(gid)) {
-          drawWaterTile(ctx, x, y, zone, this.landDistance(x, y), ox, oy, TILE_W);
-          continue;
-        }
-        if (gid === 12) {
-          const nl = (dx: number, dy: number): boolean => this.gidAt(x + dx, y + dy) !== 12;
-          drawLavaTile(ctx, x, y, [nl(1, 0), nl(-1, 0), nl(0, 1), nl(0, -1)], ox, oy, TILE_W);
-          continue;
-        }
-        if (PROP_GIDS.has(gid) || this.houseAt.has(y * w + x) || !biomeOf(gid, 0)) continue;
-        const pn = patchNoise(x, y);
-        if (Math.abs(pn) > 0.25) {
-          ctx.fillStyle = pn > 0 ? `rgba(255,250,200,${(pn - 0.25) * 0.09})` : `rgba(0,20,30,${(-pn - 0.25) * 0.11})`;
-          ctx.fillRect(ox, oy, TILE_W, TILE_H);
-        }
-        if (this.nearDoor(x, y)) continue;
-        drawDetail(ctx, x, y, gid, zone, ox, oy, TILE_W);
+        const ox = (x - x0) * ART;
+        const oy = (y - y0) * ART;
+        const ground = this.groundGid(x, y);
+        if (ground === 6) stampWaterDetail(r, x, y, zone, this.landDistance(x, y), ox, oy);
+        else if (ground !== 12 && !PROP_GIDS.has(gid) && !this.houseAt.has(y * w + x) && !this.nearDoor(x, y)) stampDetail(r, x, y, ground, zone, ox, oy);
       }
     }
     const key = `chunk_${cx}_${cy}`;
     if (this.textures.exists(key)) this.textures.remove(key);
-    this.textures.addCanvas(key, c);
-    this.chunks.set(`${cx}_${cy}`, this.add.image(minSx, minSy, key).setOrigin(0, 0).setDepth(-1e6));
-  }
-
-  /**
-   * Übergang zwischen Bodenarten (Draufsicht): An jeder Kante zu einer anderen Bodenart schiebt die Nachbarkachel ihre
-   * eigenen Randpixel 0 bis 2 Bildpunkte (je 3 Bildschirmpixel) in diese Kachel hinein. Die Tiefe wechselt pro Spalte
-   * zufällig, so entsteht ein ausgefranster Rand ohne harte Gerade. Wasser und Lava bekommen selbst keinen Rand.
-   */
-  private dither(ctx: CanvasRenderingContext2D, x: number, y: number, ground: number, zone: number, ox: number, oy: number): void {
-    if (ground === 6 || ground === 12) return;
-    const px = TILE_W / 16;
-    const DEPTH = [0, 1, 1, 2, 2, 1];
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-      let ng = this.gidAt(x + dx, y + dy);
-      if (WATER_PROP_GIDS.has(ng)) ng = 6;
-      else if (this.houseAt.has((y + dy) * this.world.grid.w + x + dx)) ng = 15;
-      else if (PROP_GIDS.has(ng)) ng = this.groundUnder(x + dx, y + dy);
-      const nz = this.zones()[(y + dy) * this.world.grid.w + x + dx] ?? 0;
-      if ((ng === ground && nz === zone) || ng === 0) continue;
-      const nb = tileCanvas(ng, hash(x + dx, y + dy) % TILE_VARIANTS, nz);
-      for (let i = 0; i < 16; i++) {
-        const d = DEPTH[hash(x * 131 + i * 7 + dx * 3 + 11, y * 17 + dy * 5 + ground) % DEPTH.length]!;
-        if (!d) continue;
-        const t = d * px;
-        if (dx === 1) ctx.drawImage(nb, 0, i * px, t, px, ox + TILE_W - t, oy + i * px, t, px);
-        else if (dx === -1) ctx.drawImage(nb, TILE_W - t, i * px, t, px, ox, oy + i * px, t, px);
-        else if (dy === 1) ctx.drawImage(nb, i * px, 0, px, t, ox + i * px, oy + TILE_H - t, px, t);
-        else ctx.drawImage(nb, i * px, TILE_H - t, px, t, ox + i * px, oy, px, t);
-      }
-    }
+    this.textures.addCanvas(key, toCanvas(r, 1));
+    this.chunks.set(`${cx}_${cy}`, this.add.image(x0 * TILE_W - TILE_W / 2, y0 * TILE_H - TILE_H / 2, key).setOrigin(0, 0).setScale(ART_SCALE).setDepth(-1e6));
   }
 
   private updateProps(px: number, py: number): void {
