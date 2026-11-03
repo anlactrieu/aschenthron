@@ -2250,8 +2250,9 @@ export class GameScene extends Phaser.Scene {
       this.labels.set(id, t);
     }
     if (t.text !== text) t.setText(text);
-    // Namen wachsen beim Herauszoomen mit, damit sie auf dem Bildschirm mindestens ~10 px groß bleiben (Handy: Zoom bis 0.4)
-    const k = Math.max(1, 10 / (size * this.cameras.main.zoom));
+    // Namen wachsen beim Herauszoomen mit, damit sie auf dem Bildschirm mindestens ~9 px groß bleiben (Handy: Zoom bis 0.4);
+    // beim Standard-Zoom 0.75 bleibt der Faktor 1 (kein unscharfes Hochskalieren)
+    const k = Math.max(1, 9 / (size * this.cameras.main.zoom));
     if (t.scaleX !== k) t.setScale(k);
     t.setPosition(Math.round(x), Math.round(y)).setVisible(settings().labels || id[0] === 'm' || size > 12);
   }
