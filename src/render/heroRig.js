@@ -17,7 +17,7 @@
 
 const hex = (h) => parseInt(h.replace("#", ""), 16);
 // Schattierungscodes statt Farben: 0..3 Platten hell bis dunkel, 4..7 Gelenke, 8 Naht, 9 Tinte, 10 Brustmarke, 11 Stahl (Farbe in `color`)
-export const SHADE = { CORE: 4, SEAM: 8, INK: 9, MARK: 10, STEEL: 11 };
+export const SHADE = { CORE: 4, SEAM: 8, INK: 9, MARK: 10, STEEL: 11, EYE: 12 };
 const INK = SHADE.INK, SEAM = SHADE.SEAM, MARK = SHADE.MARK;
 const SHELL = [0, 1, 2, 3], CORE = [4, 5, 6, 7];
 const DEG = Math.PI / 180;
@@ -38,10 +38,36 @@ const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
 // ---- the body's measurements, in pixels
 // gedrungen: Beine 12,4 statt 16,9, Arme 11,8 statt 15, Schultern 6,6 statt 5,9 nach außen, Kopf größer (siehe drawBody)
-const M = {
+const BASE_M = {
   pelvis: 15.1, spine1: 2.5, spine2: 4.0, shoulderUp: 2.4, shoulderOut: 6.6, neckUp: 2.6, headUp: 3.4,
   hipDown: 1.0, hipOut: 3.0, thigh: 6.4, shin: 6.0, upper: 6.0, fore: 5.8, turn: 36 * DEG,
 };
+// Aschenthron: Körperbau je Figur (Held, Goblin, Troll, Boss …) statt fester Maße. Alles 1 = der Held. `size` skaliert die ganze
+// Figur samt Posen und Waffe (Bosse größer per Proportion, gleicher Pixelmaßstab); die übrigen Werte ändern nur ihre Teile.
+const BODY0 = { size: 1, legs: 1, arms: 1, torso: 1, head: 1, width: 1, limb: 1, belly: 1, neck: 1, rim: true };
+let M = BASE_M, BODY = BODY0, rimLight = true;
+function setBody(b) {
+  BODY = b ? { ...BODY0, ...b } : BODY0;
+  rimLight = BODY.rim;
+  if (!b) { M = BASE_M; return; }
+  const k = BODY.size, L = BODY.legs, T = BODY.torso;
+  M = {
+    ...BASE_M,
+    thigh: BASE_M.thigh * L * k, shin: BASE_M.shin * L * k, hipDown: BASE_M.hipDown * k, hipOut: BASE_M.hipOut * BODY.width * k,
+    pelvis: ((BASE_M.thigh + BASE_M.shin) * L + 2.7) * k,
+    spine1: BASE_M.spine1 * T * k, spine2: BASE_M.spine2 * T * k, shoulderUp: BASE_M.shoulderUp * T * k, shoulderOut: BASE_M.shoulderOut * BODY.width * k,
+    neckUp: BASE_M.neckUp * BODY.neck * k, headUp: BASE_M.headUp * BODY.head * k, upper: BASE_M.upper * BODY.arms * k, fore: BASE_M.fore * BODY.arms * k,
+  };
+}
+// Posenwerte in Pixeln, die mit `size` mitwachsen
+const SIZED = ["fx", "fy", "fz", "bx", "by", "bz", "ffx", "ffy", "fzz", "fbx", "fby", "bzz", "crouch", "lean", "y"];
+function sized(pose) {
+  const k = pose.body?.size ?? 1;
+  if (k === 1) return pose;
+  const q = { ...STAND, ...pose };
+  for (const f of SIZED) if (q[f] !== undefined) q[f] *= k;
+  return q;
+}
 /** Standing easy, in screen terms: hands and feet are where they should end up, y negative is up. */
 export const STAND = { lean: 0, crouch: 0, yaw: 0, fx: -3, fy: -11, bx: 5, by: -11, ffx: -2, ffy: -4, fbx: 3, fby: -4 };
 
@@ -72,16 +98,17 @@ function solve(pose) {
   const q = { ...STAND, ...pose }, lean = q.lean, W = q.weapon && weaponOf(q.weapon), OW = q.offWeapon && weaponOf(q.offWeapon);
   const sa = q.sa ?? 0, wl = q.wl ?? 1, axisZ = Math.sqrt(Math.max(0, 1 - wl * wl)) * (q.wz ?? 1);
   const axis = [Math.cos(sa) * wl, -Math.sin(sa) * wl, axisZ], side = [-Math.sin(sa), -Math.cos(sa), 0];
-  const two = !!(q.two && W), nearZ = q.fz ?? (two ? 3 : 4.5);
+  const two = !!(q.two && W), nearZ = q.fz ?? (two ? 3 : 4.5) * BODY.size * BODY.width;
   // how the chest is turned follows the hands: a hand driving forward brings its shoulder round; one drawn back opens him up
-  const fwd = (q.fx - STAND.fx) / 24, farFwd = two ? 0 : (q.bx - STAND.bx) / 22;
+  const zk = BODY.size, fwd = (q.fx - STAND.fx * zk) / (24 * zk), farFwd = two ? 0 : (q.bx - STAND.bx * zk) / (22 * zk);
   let turn = M.turn + (fwd >= 0 ? -44 * DEG * Math.min(1, fwd) : 28 * DEG * Math.min(1, -fwd * 1.8));
   turn += (farFwd > 0 ? 34 * DEG * Math.min(1, farFwd) : 0) + (q.twist ?? 0) * 4 * DEG;
   if (q.turn !== undefined) turn = q.turn;
-  const hipTurn = M.turn + (turn - M.turn) * 0.45, tilt = Math.atan2(lean, 13);
+  const hipTurn = M.turn + (turn - M.turn) * 0.45, tilt = Math.atan2(lean, 13 * zk);
   const Rp = mm(rotZ(-tilt * 0.25), rotY(-hipTurn)), Rc = mm(rotZ(-tilt), rotY(-turn));
   // feet first: the pelvis sinks if that's what it takes for both legs to reach them
-  const ankleN = [q.ffx, -q.ffy - 1.8, q.fzz ?? 2.4], ankleF = [q.fbx, -q.fby - 1.8, q.bzz ?? -2.4];
+  const ak = BODY.size, fw = 2.4 * ak * BODY.width;
+  const ankleN = [q.ffx, -q.ffy - 1.8 * ak, q.fzz ?? fw], ankleF = [q.fbx, -q.fby - 1.8 * ak, q.bzz ?? -fw];
   let pelvis = [lean * 0.2, M.pelvis - q.crouch, 0];
   const hipAt = (s) => add(pelvis, mv(Rp, [0, -M.hipDown, s * M.hipOut]));
   const maxLeg = (M.thigh + M.shin) * 0.995;
@@ -102,10 +129,10 @@ function solve(pose) {
   // the arms: shoulders reach a little towards a far hand
   const pick = (s, target) => {
     const base = add(chest, mv(Rc, [0, M.shoulderUp, s * M.shoulderOut])), to = sub(target, base), d = len(to);
-    return add(base, mul(unit(to), Math.min(1.8, Math.max(0, d - 11) * 0.35)));
+    return add(base, mul(unit(to), Math.min(1.8 * zk, Math.max(0, d - 11 * zk) * 0.35)));
   };
   const nearT = [q.fx, -q.fy, nearZ];
-  const farT = two ? [q.fx + axis[0] * W.two, -q.fy + axis[1] * W.two, nearZ + axis[2] * W.two] : [q.bx, -q.by, q.bz ?? (q.armsFront ? 5.5 : -4.5)];
+  const wk = BODY.size * (q.wscale ?? 1), farT = two ? [q.fx + axis[0] * W.two * wk, -q.fy + axis[1] * W.two * wk, nearZ + axis[2] * W.two * wk] : [q.bx, -q.by, q.bz ?? (q.armsFront ? 5.5 : -4.5) * BODY.size * BODY.width];
   const sN = pick(1, nearT), sF = pick(-1, farT);
   const pole = (s, T, shoulder, hold) => {
     // elbows hang down and back; overhead they go out and forward
@@ -192,45 +219,163 @@ function ellipsoid(c, R, r, part, mat, minY = -Infinity) {
     }
 }
 // parts: each has its own number, so edges between them can be seen
-export const PART = { pelvis: 1, waist: 2, chest: 3, neck: 4, head: 5, face: 6, upperN: 7, elbowN: 8, foreN: 9, handN: 10, upperF: 11, elbowF: 12, foreF: 13, handF: 14, thighN: 15, kneeN: 16, shinN: 17, footN: 18, thighF: 19, kneeF: 20, shinF: 21, footF: 22, weapon: 23, offWeapon: 24, helm: 25, pauldronN: 26, pauldronF: 27 };
+export const PART = { pelvis: 1, waist: 2, chest: 3, neck: 4, head: 5, face: 6, upperN: 7, elbowN: 8, foreN: 9, handN: 10, upperF: 11, elbowF: 12, foreF: 13, handF: 14, thighN: 15, kneeN: 16, shinN: 17, footN: 18, thighF: 19, kneeF: 20, shinF: 21, footF: 22, weapon: 23, offWeapon: 24, helm: 25, pauldronN: 26, pauldronF: 27,
+  // Aschenthron: Ausrüstung und Körpermerkmale als eigene Teile (eigene Farbe je Teil, Kanten dazwischen)
+  shield: 28, shieldRim: 29, shieldBoss: 30, cloak: 31, cloakHem: 32, robe: 33, robeHem: 34, quiver: 35, fletch: 36, crest: 37, ear: 38, horn: 39, tail: 40, wing: 41, hood: 42, belly: 43, beard: 44 };
+
+// a frame from three directions (made orthonormal, first one kept): columns = local x, y, z
+function axes(x, y) {
+  x = unit(x);
+  y = unit(sub(y, mul(x, dot(y, x))));
+  const z = cross(x, y);
+  return [x[0], y[0], z[0], x[1], y[1], z[1], x[2], y[2], z[2]];
+}
+const lerp3 = (a, b, u) => add(a, mul(sub(b, a), u));
 
 function drawBody(S) {
   const { B, armN, armF, legN, legF, sN, sF, hipN, hipF, turn } = S, F_ = (name) => B[name];
-  ellipsoid(add(F_("pelvis").t, mv(F_("pelvis").R, [0, -0.2, 0])), F_("pelvis").R, [3.2, 2.6, 4.7], PART.pelvis, 0);
-  sweep(F_("pelvis").t, F_("chest").t, 3.5, 3.8, PART.waist, 1);
-  ellipsoid(add(F_("chest").t, mv(F_("chest").R, [0.3, 0.8, 0])), F_("chest").R, [4.0, 4.3, 6.6], PART.chest, 0);
-  sweep(F_("neck").t, add(F_("neck").t, mv(F_("head").R, [0, 1.6, 0])), 1.7, 1.5, PART.neck, 1);
-  ellipsoid(F_("head").t, F_("head").R, [3.8, 4.0, 3.6], PART.head, 0);
-  ellipsoid(add(F_("head").t, mv(F_("head").R, [1.05, -0.55, 0])), F_("head").R, [3.0, 3.25, 2.95], PART.face, 0);
+  const k = BODY.size, tk = k * BODY.torso, wk = k * BODY.width, hk = k * BODY.head, lk = k * BODY.limb, bk = BODY.belly;
+  const at = (f, v) => add(F_(f).t, mv(F_(f).R, v));
   const gear = S.q.gear ?? {};
-  if (gear.helm) {
-    // Helm: Schale über Stirn und Hinterkopf, das Gesicht bleibt unterhalb der Krempe frei; Eisen mit Nasenkamm
-    const H = F_("head");
-    // Krempe auf Augenhöhe: darunter bleibt das Gesicht frei, hinten reicht die Schale tiefer (Nacken)
-    const back = mv(H.R, [1, 0, 0])[2];
-    ellipsoid(add(H.t, mv(H.R, [-0.25, 0.75, 0])), H.R, [4.3, 3.8, 4.1], PART.helm, 0, H.t[1] + 0.4 - (back < -0.5 ? 2.5 : 0));
-    if (gear.helm > 1) ellipsoid(add(H.t, mv(H.R, [3.4, -0.6, 0])), H.R, [0.9, 2.4, 0.8], PART.helm, 1);
+  const C = F_("chest"), fwd = mv(C.R, [1, 0, 0]), up = mv(C.R, [0, 1, 0]), across = mv(C.R, [0, 0, 1]);
+  const ghost = !!gear.ghost; // ohne Beine (Geister): Robe bis zum Boden, schwebt
+  ellipsoid(at("pelvis", [0, -0.2 * k, 0]), F_("pelvis").R, [3.2 * k * bk, 2.6 * k, 4.7 * wk], PART.pelvis, 0);
+  sweep(F_("pelvis").t, C.t, 3.5 * k * bk, 3.8 * wk, PART.waist, 1);
+  ellipsoid(at("chest", [0.3 * k, 0.8 * tk, 0]), C.R, [4.0 * k * Math.max(1, bk * 0.9), 4.3 * tk, 6.6 * wk], PART.chest, 0);
+  if (bk > 1.05) ellipsoid(at("waist", [1.2 * k * bk, -0.6 * k, 0]), C.R, [3.4 * k * bk, 3.4 * k, 4.6 * wk], PART.belly, 0);
+  sweep(F_("neck").t, add(F_("neck").t, mv(F_("head").R, [0, 1.6 * hk, 0])), 1.7 * lk * BODY.neck ** 0.3, 1.5 * lk, PART.neck, 1);
+  const H = F_("head"), hr = (v) => mv(H.R, v), atH = (v) => add(H.t, hr(v));
+  const back = hr([1, 0, 0])[2];
+  if (gear.helm === 3) {
+    // Topfhelm: ganzer Kopf in Eisen, Sehschlitz (Augenmarken) und Kamm/Krone obendrauf
+    ellipsoid(atH([0.4 * hk, 0.3 * hk, 0]), H.R, [4.4 * hk, 4.5 * hk, 4.1 * hk], PART.helm, 0);
+  } else {
+    ellipsoid(H.t, H.R, [3.8 * hk, 4.0 * hk, 3.6 * hk], PART.head, 0);
+    ellipsoid(atH([1.05 * hk, -0.55 * hk, 0]), H.R, [3.0 * hk * (gear.snout ?? 1), 3.25 * hk, 2.95 * hk], PART.face, 0);
   }
-  const arm = (far, A, sh, up, el, fo, ha, nameU, nameF) => {
-    sphere(sh, 2.9, up, 0);
-    sweep(sh, A.joint, 2.5, 1.9, up, 0);
+  if (gear.beard) ellipsoid(atH([2.6 * hk, -2.6 * hk, 0]), H.R, [1.8 * hk, 2.4 * hk * gear.beard, 2.6 * hk], PART.beard, 0);
+  if (gear.helm === 1 || gear.helm === 2 || gear.helm === 4) {
+    // Kappe/Helm: Schale über Stirn und Hinterkopf, das Gesicht bleibt unterhalb der Krempe frei; Eisen mit Nasenkamm
+    ellipsoid(atH([-0.25 * hk, 0.75 * hk, 0]), H.R, [4.3 * hk, 3.8 * hk, 4.1 * hk], PART.helm, 0, H.t[1] + 0.4 * hk - (back < -0.5 ? 2.5 * hk : 0));
+    if (gear.helm === 2) ellipsoid(atH([3.4 * hk, -0.6 * hk, 0]), H.R, [0.9 * hk, 2.4 * hk, 0.8 * hk], PART.helm, 1);
+  }
+  if (gear.helm === 4) {
+    // Kronenhelm: Zacken rundum über der Krempe
+    for (let j = 0; j < 5; j++) {
+      const a = (j / 5) * Math.PI * 2 + 0.3;
+      sweep(atH([Math.cos(a) * 3.2 * hk, 2.6 * hk, Math.sin(a) * 3.2 * hk]), atH([Math.cos(a) * 3.4 * hk, 5.2 * hk, Math.sin(a) * 3.4 * hk]), 0.9 * hk, 0.4 * hk, PART.crest, 0);
+    }
+  }
+  if (gear.helm === 5) {
+    // Kapuze: weite Haube um Kopf und Nacken, vorn offen
+    ellipsoid(atH([-1.3 * hk, 0.6 * hk, 0]), H.R, [4.4 * hk, 4.6 * hk, 4.4 * hk], PART.hood, 0, back < -0.5 ? -99 : H.t[1] - 3.5 * hk);
+    sweep(atH([-1.5 * hk, -2 * hk, 0]), at("chest", [-1.5 * k, 2.6 * tk, 0]), 3.6 * hk, 4.6 * wk, PART.hood, 1);
+  }
+  if (gear.hat) {
+    // Spitzhut (Hexe, Nekromant): Krempe und schiefe Spitze
+    ellipsoid(atH([0, 2.8 * hk, 0]), H.R, [6.2 * hk, 0.9 * hk, 6.2 * hk], PART.hood, 0);
+    sweep(atH([0, 3.2 * hk, 0]), atH([-3.2 * hk, 10.5 * hk, 0.6 * hk]), 3.6 * hk, 0.5 * hk, PART.hood, 0);
+  }
+  if (gear.crest) {
+    // Kamm/Federbusch von der Stirn zum Nacken (Seltenheitsfarbe)
+    for (let u = 0; u <= 1.001; u += 0.1) {
+      const a = (u - 0.35) * 2.4;
+      sphere(atH([Math.cos(a) * 3.6 * hk, (gear.helm === 3 ? 4.6 : 4.1) * hk + Math.sin(u * Math.PI) * 1.2 * hk, 0]), (1.1 - u * 0.5) * hk, PART.crest, 0);
+    }
+  }
+  if (gear.ears) {
+    // spitze Ohren (Goblins, Imps): vom Kopf schräg nach hinten oben
+    for (const s2 of [1, -1]) sweep(atH([-0.2 * hk, 0.6 * hk, s2 * 3.3 * hk]), atH([-1.6 * hk, 2.2 * hk, s2 * (3.3 + 3.2 * gear.ears) * hk]), 1.3 * hk, 0.35 * hk, PART.ear, 0);
+  }
+  if (gear.horns) {
+    for (const s2 of [1, -1]) {
+      const a0 = atH([0.6 * hk, 3.0 * hk, s2 * 2.2 * hk]), a1 = atH([-0.6 * hk, 5.2 * hk, s2 * 3.6 * hk]), a2 = atH([-2.4 * hk, (5.2 + 1.8 * gear.horns) * hk, s2 * 3.4 * hk]);
+      sweep(a0, a1, 1.1 * hk, 0.7 * hk, PART.horn, 0);
+      sweep(a1, a2, 0.7 * hk, 0.25 * hk, PART.horn, 0);
+    }
+  }
+  const arm = (far, A, sh, up2, el, fo, ha) => {
+    sphere(sh, 2.9 * lk, up2, 0);
+    sweep(sh, A.joint, 2.5 * lk, 1.9 * lk, up2, 0);
     // Schulterplatte: flache Kappe über dem Oberarmansatz
-    if (gear.pauldron) ellipsoid(add(sh, [0, 0.9, 0]), F_("chest").R, [3.1, 2.3, 3.3], far ? PART.pauldronF : PART.pauldronN, 0);
-    sphere(A.joint, 1.7, el, 1);
-    sweep(A.joint, A.end, 1.9, 1.5, fo, 0, 0.15);
-    sphere(A.end, 2.1, ha, 0);
+    if (gear.pauldron) ellipsoid(add(sh, [0, 0.9 * k, 0]), C.R, [3.1 * lk, 2.3 * lk, 3.3 * lk], far ? PART.pauldronF : PART.pauldronN, 0);
+    sphere(A.joint, 1.7 * lk, el, 1);
+    sweep(A.joint, A.end, 1.9 * lk, 1.5 * lk, fo, 0, 0.15 * lk);
+    sphere(A.end, 2.1 * lk * (gear.fists ?? 1), ha, 0);
   };
-  arm(false, armN, sN, PART.upperN, PART.elbowN, PART.foreN, PART.handN, "upperN", "foreN");
-  arm(true, armF, sF, PART.upperF, PART.elbowF, PART.foreF, PART.handF, "upperF", "foreF");
-  const leg = (far, L, hip, th, kn, sh, fo, nameT, nameS, nameFt) => {
-    sweep(hip, L.joint, 3.4, 2.5, th, 0);
-    sphere(L.joint, 2.1, kn, 1);
-    sweep(L.joint, L.end, 2.4, 1.8, sh, 0, 0.4);
+  arm(false, armN, sN, PART.upperN, PART.elbowN, PART.foreN, PART.handN);
+  arm(true, armF, sF, PART.upperF, PART.elbowF, PART.foreF, PART.handF);
+  const leg = (L, hip, th, kn, sh, fo, nameFt) => {
+    sweep(hip, L.joint, 3.4 * lk, 2.5 * lk, th, 0);
+    sphere(L.joint, 2.1 * lk, kn, 1);
+    sweep(L.joint, L.end, 2.4 * lk, 1.8 * lk, sh, 0, 0.4 * lk);
     const R = F_(nameFt).R, a = F_(nameFt).t;
-    sweep(add(a, mv(R, [-1.4, -0.6, 0])), add(a, mv(R, [3.9, -1.1, 0])), 2.0, 1.5, fo, 0);
+    sweep(add(a, mv(R, [-1.4 * k, -0.6 * k, 0])), add(a, mv(R, [3.9 * k * (gear.feet ?? 1), -1.1 * k, 0])), 2.0 * lk, 1.5 * lk, fo, 0);
   };
-  leg(false, legN, hipN, PART.thighN, PART.kneeN, PART.shinN, PART.footN, "thighN", "shinN", "footN");
-  leg(true, legF, hipF, PART.thighF, PART.kneeF, PART.shinF, PART.footF, "thighF", "shinF", "footF");
+  if (!ghost) {
+    leg(legN, hipN, PART.thighN, PART.kneeN, PART.shinN, PART.footN, "footN");
+    leg(legF, hipF, PART.thighF, PART.kneeF, PART.shinF, PART.footF, "footF");
+  }
+  if (gear.robe || ghost) {
+    // Robe als Rock: übereinander gestapelte Scheiben von der Hüfte bis über die Füße, unten weiter; folgt der Mitte der Füße
+    const P = F_("pelvis"), top = at("pelvis", [0, 0.6 * k, 0]);
+    const feet = lerp3(legN.end, legF.end, 0.5), bot = [feet[0] * 0.8 + top[0] * 0.2, (ghost ? 0.5 : 2.4) * k, feet[2] * 0.5];
+    const R = axes(sub(top, bot), mv(P.R, [1, 0, 0]));
+    const n = Math.ceil(len(sub(top, bot)) / 0.5);
+    for (let j = 0; j <= n; j++) {
+      const u = j / n, c = lerp3(top, bot, u), flare = 1 + u * (ghost ? 0.1 : 0.35);
+      const hem = u > 1 - 1.4 / Math.max(1, len(sub(top, bot)));
+      ellipsoid(c, mm(R, [1, 0, 0, 0, 1, 0, 0, 0, 1]), [0.6, 4.4 * k * bk * flare, 6.1 * wk * flare], hem ? PART.robeHem : PART.robe, 0);
+    }
+  }
+  if (gear.cloak) {
+    // Umhang hinter dem Rücken: Bahn von den Schultern bis zu den Kniekehlen, schwingt mit `sway`
+    const sway = (S.q.sway ?? 0) * k;
+    const top = add(C.t, add(mul(up, 3.0 * tk), mul(fwd, -3.4 * k)));
+    const bot = [C.t[0] - fwd[0] * (4.2 * k + sway), (ghost ? 2 : 4.2) * k * BODY.legs, C.t[2] - fwd[2] * (4.2 * k + sway)];
+    const R = axes(fwd, sub(top, bot));
+    const n = Math.ceil(len(sub(top, bot)) / 0.5);
+    for (let j = 0; j <= n; j++) {
+      const u = j / n, c = lerp3(top, bot, u), w = (5.6 + 2.0 * u) * wk;
+      ellipsoid(c, R, [0.9 * k, 0.7, w], u > 0.86 ? PART.cloakHem : PART.cloak, 0);
+    }
+  }
+  if (gear.quiver) {
+    // Köcher schräg über dem Rücken, Federn oben
+    const a = add(C.t, add(add(mul(up, 4.6 * tk), mul(fwd, -4.4 * k)), mul(across, -2.6 * wk)));
+    const b = add(C.t, add(add(mul(up, -3.4 * tk), mul(fwd, -4.0 * k)), mul(across, 2.4 * wk)));
+    sweep(a, b, 1.6 * k, 1.4 * k, PART.quiver, 0);
+    for (const o of [-0.9, 0.6]) sphere(add(a, add(mul(across, o * k), mul(up, 1.6 * k))), 0.9 * k, PART.fletch, 0);
+  }
+  if (gear.wings) {
+    // Flügel (Imp, Dämonen): zwei Hautsegel hinter den Schultern
+    for (const s2 of [1, -1]) {
+      const root = add(C.t, add(mul(up, 2.2 * tk), add(mul(fwd, -3.6 * k), mul(across, s2 * 2.4 * wk))));
+      const tip = add(root, add(mul(up, 6 * k * gear.wings), add(mul(fwd, -4.5 * k), mul(across, s2 * 5.5 * k * gear.wings))));
+      sweep(root, tip, 1.0 * k, 0.4 * k, PART.wing, 1);
+      ellipsoid(lerp3(root, tip, 0.5), axes(sub(tip, root), fwd), [3.9 * k * gear.wings, 3.2 * k * gear.wings, 0.5], PART.wing, 0);
+    }
+  }
+  if (gear.tail) {
+    const P = F_("pelvis");
+    let prev = at("pelvis", [-2.6 * k, 0.4 * k, 0]);
+    for (let j = 1; j <= 6; j++) {
+      const u = j / 6, nx = at("pelvis", [-2.6 * k - u * 7 * k * gear.tail, 0.4 * k - Math.sin(u * 2.4) * 3 * k + u * u * 4 * k, Math.sin(u * 3 + (S.q.sway ?? 0)) * 1.2 * k]);
+      sweep(prev, nx, (1.3 - u * 0.8) * k, (1.3 - u * 0.9) * k, PART.tail, 0);
+      prev = nx;
+    }
+    void P;
+  }
+  if (gear.shield) {
+    // Schild am Fernarm: Fläche vor der Faust, Vorderseite in Blickrichtung (etwas zur Kamera), Rand, Buckel
+    const hand = armF.end, nrm = unit(add(fwd, mul(across, 0.8))), R = axes(nrm, up);
+    const c = add(hand, add(mul(nrm, 1.4 * k), mul(up, -0.5 * k)));
+    const tall = gear.shield === 3 ? 1.35 : gear.shield === 2 ? 1.15 : 1, wide = gear.shield === 3 ? 0.95 : gear.shield === 2 ? 0.85 : 1;
+    ellipsoid(add(c, mul(nrm, -0.3)), R, [0.8, 5.4 * k * tall, 4.8 * k * wide], PART.shieldRim, 0);
+    ellipsoid(c, R, [0.9, 4.6 * k * tall, 4.0 * k * wide], PART.shield, 0);
+    if (gear.shield === 2) ellipsoid(add(c, mul(up, -4.6 * k)), R, [0.8, 2.6 * k, 2.4 * k], PART.shieldRim, 0);
+    sphere(add(c, mul(nrm, 0.9)), 1.3 * k, PART.shieldBoss, 0);
+  }
   void turn;
 }
 
@@ -238,6 +383,8 @@ function drawBody(S) {
 function along(H, axis, side, part) {
   const n = cross(axis, side);
   const T = (i, k, c, lift = 0) => {
+    i *= WK; k *= WK; lift *= WK;
+    if (TINT.has(c)) c = TINT.get(c);
     const x = H[0] + axis[0] * i + side[0] * k + n[0] * lift, y = H[1] + axis[1] * i + side[1] * k + n[1] * lift, z = H[2] + axis[2] * i + side[2] * k + n[2] * lift;
     const wx = Math.round(x), wy = Math.round(y);
     if (clipWeapon && wy < 0) return;
@@ -245,8 +392,21 @@ function along(H, axis, side, part) {
     if (idx < 0 || idx >= BW * BH) return;
     plot(idx, z + 0.05, 2, part, 2, wx, wy, c);
   };
-  T.at = (i, k) => [H[0] + axis[0] * i + side[0] * k, H[1] + axis[1] * i + side[1] * k, H[2] + axis[2] * i + side[2] * k];
+  T.at = (i, k) => [H[0] + axis[0] * i * WK + side[0] * k * WK, H[1] + axis[1] * i * WK + side[1] * k * WK, H[2] + axis[2] * i * WK + side[2] * k * WK];
   return T;
+}
+// Aschenthron: Waffengröße (wächst mit der Figur) und Umfärben je Pose: `accent` ersetzt Bronze (Seltenheit), `orb` die Stabkugel,
+// `blade` den Stahl (z. B. Knochen, rostig)
+let WK = 1;
+const TINT = new Map();
+function setTint(q) {
+  TINT.clear();
+  WK = BODY.size * (q.wscale ?? 1);
+  const ramp = (from, to) => { if (to) from.forEach((c, j) => TINT.set(c, to[j] >>> 0)); };
+  ramp([STEEL.gold, STEEL.goldD], q.accent);
+  ramp([STEEL.orb, STEEL.orbD], q.orb);
+  ramp([STEEL.hi, STEEL.a, STEEL.b, STEEL.d], q.blade);
+  ramp([STEEL.wood, STEEL.woodD], q.wood);
 }
 // gedämpfter als im Original: Eisen statt Chrom, Bronze statt Gold (dunkle Welt)
 const STEEL = Object.fromEntries(Object.entries({ hi: "#e8ecf0", a: "#b8c0cc", b: "#848c9c", d: "#565c6c", gold: "#c89a48", goldD: "#8a6430", grip: "#6a3a26", gripD: "#3e2016", wood: "#8a5a32", woodD: "#5a3820", dark: "#3a3448", darkD: "#262033", olive: "#58663f", oliveA: "#7d8c58", oliveD: "#3a4529", orb: "#8fd0ff", orbD: "#4a7ac8" }).map(([k, v]) => [k, hex(v) >>> 0]));
@@ -275,14 +435,57 @@ export const WEAPONS = {
       if (r <= 2.3) T(i, k, r < 1 && k < 0 ? STEEL.hi : k > 0.8 ? STEEL.orbD : STEEL.orb);
     }
   } },
-  // kleiner Bogen (Platzhalter): halb so lang wie der des Originals
-  smallbow: { across: true, draw(T) {
+  // kleiner Bogen: Sehne folgt der Zughand (`pull`), mit `nocked` liegt ein Pfeil auf
+  smallbow: { across: true, draw(T, q, off) {
     for (let u = -1; u <= 1.001; u += 0.04) {
       const k = u * 10, i = 3.6 * (1 - u * u) - 0.6;
       T(i, k, Math.abs(u) > 0.85 ? STEEL.goldD : STEEL.wood);
       T(i + 0.6, k, STEEL.woodD);
     }
-    for (let k = -10; k <= 10; k += 0.4) T(-0.6, k, STEEL.a);
+    const tipA = T.at(-0.6, -10), tipB = T.at(-0.6, 10), mid = q.pull ? off : T.at(-0.6, 0);
+    const line = (A, B, c) => {
+      const n = Math.max(2, Math.ceil(len(sub(B, A)) / 0.4));
+      for (let j = 0; j <= n; j++) {
+        const P = add(A, mul(sub(B, A), j / n)), wx = Math.round(P[0]), wy = Math.round(P[1]), idx = (OY - wy) * BW + (OX + wx);
+        if (idx >= 0 && idx < BW * BH) plot(idx, P[2] + 0.05, 2, PART.weapon, 2, wx, wy, c);
+      }
+    };
+    line(tipA, mid, STEEL.a);
+    line(tipB, mid, STEEL.a);
+    if (q.nocked) {
+      const tip = T.at(9, 0);
+      line(mid, tip, STEEL.wood);
+      for (let i = 7; i <= 10; i += 0.4) for (let k = -(10 - i) * 0.5; k <= (10 - i) * 0.5; k += 0.4) T(i, k, STEEL.hi);
+    }
+  } },
+  // Axt: Holzstiel, Blatt nach vorn
+  axe: { two: -4, draw(T) {
+    haft(T, -3, 12, STEEL.wood, STEEL.woodD, 0.6);
+    for (let i = 7; i <= 12.5; i += 0.4) {
+      const w = 1.2 + ((i - 7) / 5.5) * 3.4;
+      for (let k = -w; k <= 0.4; k += 0.4) T(i - k * 0.25, k - 0.6, k < -w + 0.9 ? STEEL.hi : k > -0.6 ? STEEL.d : STEEL.a);
+    }
+  } },
+  // Streitkolben/Hammer: kurzer Stiel, schwerer Kopf
+  mace: { two: -4, draw(T) {
+    haft(T, -3, 9, STEEL.grip, STEEL.gripD, 0.6);
+    for (let i = 8.5; i <= 13; i += 0.4) for (let k = -2.4; k <= 2.4; k += 0.4) T(i, k, k < -1.2 ? STEEL.a : k > 1.2 ? STEEL.d : i > 12.4 ? STEEL.hi : STEEL.b);
+    for (const k of [-3, 3]) for (let i = 9.5; i <= 12; i += 0.4) T(i, k, STEEL.d);
+  } },
+  // Keule: knorriger Holzprügel (Goblins, Trolle)
+  club: { two: -4, draw(T) {
+    for (let i = -2.5; i <= 13; i += 0.4) {
+      const r = 0.7 + Math.max(0, (i - 3) / 10) * 2.1 + (Math.abs(i - 9) < 0.5 ? 0.5 : 0);
+      for (let k = -r; k <= r; k += 0.4) T(i, k, k < -r * 0.4 ? STEEL.wood : k > r * 0.4 ? STEEL.darkD : STEEL.woodD);
+    }
+  } },
+  // Zauberstab: kurz, mit Kugel (Schamanen, Hexen)
+  wand: { draw(T) {
+    haft(T, -1.5, 8, STEEL.wood, STEEL.woodD, 0.5);
+    for (let i = 8; i <= 11.4; i += 0.4) for (let k = -1.6; k <= 1.6; k += 0.4) {
+      const r = Math.hypot(i - 9.7, k);
+      if (r <= 1.7) T(i, k, r < 0.7 && k < 0 ? STEEL.hi : k > 0.5 ? STEEL.orbD : STEEL.orb);
+    }
   } },
   // the fist is at i = 0; `two` is where the other hand goes; `across`: the handle lies across the weapon's length
   sword: { two: -4.4, draw(T, q) {
@@ -395,6 +598,12 @@ function finish(S) {
     }
     if (!same && votes.some((v) => v > 0)) tones.set(i, votes.indexOf(Math.max(...votes)));
   }
+  // Aschenthron: Lichtsaum. Wo über oder links neben einem Pixel nichts mehr ist (Licht von links oben), eine Stufe heller,
+  // damit die dunkle Figur sich vom dunklen Boden abhebt; nahe Teile (z hoch) bekommen ihn deutlicher als ferne
+  if (rimLight) for (const i of touched) {
+    if (Mat[i] === 2) continue;
+    if (Part[i - BW] === 0 || Part[i - 1] === 0) tones.set(i, Math.max(0, tones.get(i) - (Part[i - BW] === 0 && Part[i - 1] === 0 ? 2 : 1)));
+  }
   for (const i of touched) {
     if (Mat[i] === 2) continue;
     Col[i] = (Mat[i] === 1 ? CORE : SHELL)[tones.get(i)];
@@ -413,9 +622,20 @@ function finish(S) {
     }
   }
   for (const [i, c] of marks) Col[i] = c;
+  // Aschenthron: Augen, wo das Gesicht (oder der Topfhelm) zu sehen ist
+  const { B } = S;
+  if (S.q.eyes !== false) {
+    const H = B.head, hk = BODY.size * BODY.head, full = S.q.gear?.helm === 3, sn = full ? 1.45 : S.q.gear?.snout ?? 1;
+    const fc = full ? add(H.t, mv(H.R, [0.4 * hk, 0.3 * hk, 0])) : add(H.t, mv(H.R, [1.05 * hk, -0.55 * hk, 0]));
+    for (const s2 of [1, -1]) {
+      const e = add(fc, mv(H.R, [2.68 * sn * hk, (full ? 0.9 : 0.5) * hk, s2 * 1.3 * hk]));
+      const i = (OY - Math.round(e[1])) * BW + (OX + Math.round(e[0]));
+      if ((Part[i] === PART.face || (full && Part[i] === PART.helm)) && Zb[i] <= e[2] + 1.2) Col[i] = SHADE.EYE;
+    }
+  }
   // the mark on his chest, when it's facing us
-  const { B } = S, chestAt = add(B.chest.t, mv(B.chest.R, [3, 1.6, -1.8]));
-  if (mv(B.chest.R, [1, 0, 0])[2] > 0.15) {
+  const chestAt = add(B.chest.t, mv(B.chest.R, [3, 1.6, -1.8]));
+  if (S.q.mark !== false && mv(B.chest.R, [1, 0, 0])[2] > 0.15) {
     const i = (OY - Math.round(chestAt[1])) * BW + (OX + Math.round(chestAt[0]));
     if (Part[i] === PART.chest) Col[i] = MARK;
   }
@@ -442,18 +662,25 @@ function finish(S) {
   return out;
 }
 
-const turnAll = (S, a) => {
-  // the whole figure turned about the vertical through the feet
-  const R = rotY(-a), P = (v) => mv(R, v);
+const turnAll = (S, a) => moveAll(S, rotY(-a), [0, 0, 0]);
+// Aschenthron: die ganze Figur gedreht (R) und verschoben (d), z. B. beim Umfallen
+const moveAll = (S, R, d) => {
+  const P = (v) => add(mv(R, v), d);
   for (const f of Object.values(S.B)) { f.t = P(f.t); f.R = mm(R, f.R); }
   for (const A of [S.armN, S.armF, S.legN, S.legF]) { A.joint = P(A.joint); A.end = P(A.end); }
   S.sN = P(S.sN); S.sF = P(S.sF); S.hipN = P(S.hipN); S.hipF = P(S.hipF);
-  S.axis = P(S.axis); S.side = P(S.side);
+  S.axis = mv(R, S.axis); S.side = mv(R, S.side);
 };
 function render(pose) {
+  setBody(pose.body);
+  pose = sized(pose);
+  setTint(pose);
   const S = solve(pose), q = S.q, whole = (q.yaw ?? 0) + (q.face === -1 ? Math.PI : 0);
   if (whole) turnAll(S, whole);
-  const air = (q.y ?? 0) < -0.5;
+  // Umfallen: um die Füße in der Bildebene kippen (fall > 0 = nach hinten), dann verschieben (fallX, fallY in Bildpixeln)
+  if (q.fall) moveAll(S, rotZ(q.fall), [q.fallX ?? 0, -(q.fallY ?? 0), 0]);
+  if (q.y) moveAll(S, [1, 0, 0, 0, 1, 0, 0, 0, 1], [0, -q.y, 0]);
+  const air = (q.y ?? 0) < -0.5 || !!q.fall;
   clipBody = !air;
   clipWeapon = !air;
   drawBody(S);
@@ -471,6 +698,8 @@ function render(pose) {
 
 /** How far short of where the pose wants them the hands fall, in px: arms don't stretch. */
 export function shortfall(pose) {
+  setBody(pose.body);
+  pose = sized(pose);
   const S = solve(pose), q = S.q, near = len(sub(S.armN.end, [q.fx, -q.fy, S.armN.end[2]])), far = q.two ? 0 : len(sub(S.armF.end, [q.bx, -q.by, S.armF.end[2]]));
   return Math.max(near, far);
 }
@@ -486,6 +715,8 @@ export function posed(pose) {
  * are what a pose moves (hands and feet); everything else is solved from them.
  */
 export function skeleton(pose) {
+  setBody(pose.body);
+  pose = sized(pose);
   const S = solve(pose), q = S.q, whole = (q.yaw ?? 0) + (q.face === -1 ? Math.PI : 0);
   if (whole) turnAll(S, whole);
   const { B, armN, armF, legN, legF, sN, sF, hipN, hipF } = S, at = (f, v) => add(f.t, mv(f.R, v));

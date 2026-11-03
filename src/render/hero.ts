@@ -1,136 +1,238 @@
 /**
- * Skelett-Held (pixelfx-Rig-Remix `heroRig.js`): Posen für Stehen, Gehen und Nahkampf in drei Ansichten (Seite, zur Kamera,
- * weg; links = Seite gespiegelt), Material je Körperteil aus der Ausrüstung, gebacken zu einem RGBA-Sheet je Look.
+ * Skelett-Held (pixelfx-Rig-Remix `heroRig.js`): Posen für Stehen, Gehen, Angriff je Waffe (Hieb, Bogen, Stab), Getroffen und
+ * Sterben in drei Ansichten (Seite, zur Kamera, weg; links = Seite gespiegelt), sichtbare Ausrüstung (Helmform, Rüstung, Robe,
+ * Schild, Umhang, Köcher, Seltenheitsakzente) als Teile am Skelett, Material je Körperteil, gebacken über `figure.ts`.
  * Reine Daten und Rechnung ohne DOM: läuft in Node (Kontaktbögen `scripts/bake-hero.ts`, Tests) und im Browser (`heroSheet`).
  */
 import type { Look } from './art';
-import { PART, posed, SHADE, type RigPose } from './heroRig.js';
+import { bakeFigure, cycleLength, gaitFoot, type FigAnim, type FigureSheet, type FigureSpec, type FigView, type Ramp } from './figure';
+import { PART, posed, type HeroGear, type RigPose } from './heroRig.js';
 
-export type HeroView = 'side' | 'front' | 'back';
-export type HeroAnim = 'idle' | 'walk' | 'attack';
-export type HeroWeapon = 'none' | 'sword' | 'bow' | 'staff';
+export type HeroView = FigView;
+export type HeroAnim = FigAnim;
+export type HeroWeapon = 'none' | 'sword' | 'axe' | 'mace' | 'dagger' | 'greatsword' | 'bow' | 'staff';
 
 export const HERO_VIEWS: HeroView[] = ['side', 'front', 'back'];
 /** Bilder je Animation */
-export const HERO_ANIMS: Record<HeroAnim, number> = { idle: 4, walk: 8, attack: 6 };
+export const HERO_ANIMS: Record<HeroAnim, number> = { idle: 4, walk: 8, attack: 6, hit: 2, die: 5 };
 /** Bildgröße und Fußpunkt bei 1x (Pixelmaßstab im Spiel: 2x) */
-export const HERO_FRAME = { w: 64, h: 60, fx: 32, fy: 56 };
+export const HERO_FRAME = { w: 64, h: 64, fx: 30, fy: 58 };
 /** Angriff: so viele Bilder Ausholen, danach kommt das Schlagbild (passt zu 40 % Ausholen in `SWING_MS`) */
 export const HERO_WIND_FRAMES = 2;
 
+/** Materialien der Rüstung/Robe */
+export type HeroMat = 'cloth' | 'leather' | 'iron' | 'dread' | 'bone' | 'ash' | 'acolyte';
+
 export interface HeroLook {
-  /** 0 Tuch, 1 Leder, 2 Eisen */
-  armor: number;
-  /** 0 kein Helm, 1 Lederkappe, 2 Eisenhelm */
+  /** Rumpf: Material, Robe statt Rüstung */
+  armor: HeroMat;
+  robe: boolean;
+  /** Helmform: 0 kein, 1 Kappe, 2 Nasenhelm, 3 Topfhelm, 4 Kronenhelm, 5 Kapuze; Material */
   helm: number;
+  helmMat: HeroMat;
   /** 0 keine, 1 Leder, 2 Eisen */
   gloves: number;
+  /** Schienbeine/Stiefel: 0 Stoff, 1 Leder, 2 Eisen */
+  legs: number;
   weapon: HeroWeapon;
+  /** Stufe der Waffe (Kugelfarbe beim Stab) */
+  weaponTier: number;
+  /** 0 keins, 1 rund (Holz), 2 Kite (Eisen), 3 Turm */
+  shield: number;
+  /** Umhang: '' keiner, sonst Farbe nach Vorlage */
+  cloak: string;
+  quiver: boolean;
+  /** Seltenheit 0 normal … 4 legendär von Helm, Rumpf, Waffe */
+  rar: [number, number, number];
+}
+
+const has = (re: RegExp, id: string): boolean => re.test(id);
+
+function matOf(id: string, fallback: HeroMat): HeroMat {
+  if (has(/^dread/, id)) return 'dread';
+  if (has(/^bone/, id)) return 'bone';
+  if (has(/^ash/, id)) return 'ash';
+  return fallback;
 }
 
 /** Material aus der Vorlagen-ID (Eisen/Leder), sonst nach Stufe; 0 = nichts angelegt. */
-function material(id: string, t: number, iron: RegExp, leather: RegExp): number {
+function grade(id: string, t: number, iron: RegExp, leather: RegExp): number {
   if (!id) return 0;
   if (iron.test(id)) return 2;
   if (leather.test(id)) return 1;
   return t >= 2 ? 2 : 1;
 }
 
+function weaponOf(look: Look): HeroWeapon {
+  if (look.weapon < 0) return 'none';
+  if (look.weaponKind === 1) return 'bow';
+  if (look.weaponKind === 2) return 'staff';
+  const id = look.ids.weapon;
+  if (/dagger/.test(id)) return 'dagger';
+  if (/claymore|greatsword|great_axe/.test(id)) return 'greatsword';
+  if (/axe|cleaver/.test(id)) return 'axe';
+  if (/club|hammer/.test(id)) return 'mace';
+  return 'sword';
+}
+
 export function heroLookOf(look: Look): HeroLook {
   const i = look.ids;
+  const chest = i.chest;
+  let armor: HeroMat = 'cloth';
+  if (look.robe) armor = /acolyte/.test(chest) ? 'acolyte' : matOf(chest, 'cloth');
+  else if (chest) {
+    const g = grade(chest, look.chest, /plate|mail|cuirass/, /leather|vest/);
+    armor = matOf(chest, g === 2 ? 'iron' : 'leather');
+    if (armor !== 'iron' && armor !== 'leather' && /leather/.test(chest)) armor = 'leather';
+  }
+  const head = i.head;
+  const helm = !head ? 0 : /hood/.test(head) ? 5 : /cap/.test(head) ? 1 : /crown/.test(head) ? 4 : /visor|dread/.test(head) ? 3 : /helm/.test(head) ? 2 : look.head >= 3 ? 3 : 2;
+  const shieldId = i.offhand;
   return {
-    // Roben vorerst als Tuch (eigene Form kommt mit der nächsten Ausrüstungsrunde)
-    armor: look.robe ? 0 : material(i.chest, look.chest, /plate|mail|cuirass/, /leather|vest/),
-    helm: material(i.head, look.head, /helm|visor|crown/, /cap|hood/),
-    gloves: material(i.hands, look.hands, /gauntlet|fists/, /glove/),
-    weapon: look.weapon < 0 ? 'none' : look.weaponKind === 1 ? 'bow' : look.weaponKind === 2 ? 'staff' : 'sword',
+    armor,
+    robe: look.robe,
+    helm,
+    helmMat: helm === 1 ? 'leather' : helm === 5 ? 'cloth' : matOf(head, 'iron'),
+    gloves: grade(i.hands, look.hands, /gauntlet|fists/, /glove/),
+    legs: /greaves|steel_boots|chain|dread_legs|ash_legs|bone_legs/.test(i.feet + ' ' + i.legs) ? 2 : /leather|boots|treads/.test(i.feet + ' ' + i.legs) ? 1 : 0,
+    weapon: weaponOf(look),
+    weaponTier: Math.max(0, look.weapon),
+    shield: look.shield < 0 ? 0 : /tower|bulwark/.test(shieldId) ? 3 : /wood/.test(shieldId) ? 1 : 2,
+    cloak: i.cloak ? i.cloak.replace(/_cloak$/, '') : '',
+    quiver: look.quiver,
+    rar: [look.rar.head, look.rar.chest, look.rar.weapon],
   };
 }
 
 export function heroKey(h: HeroLook): string {
-  return `hero_${h.armor}${h.helm}${h.gloves}_${h.weapon}`;
+  return `hero_${h.armor}${h.robe ? 'R' : ''}_${h.helm}${h.helmMat}_${h.gloves}${h.legs}_${h.weapon}${h.weapon === 'staff' ? h.weaponTier : ''}_${h.shield}${h.cloak}${h.quiver ? 'Q' : ''}_${h.rar.join('')}`;
 }
 
 /* ------------------------------------------------ Posen (Bildschirm-Pixel bei 1x, y negativ = oben, Blick nach rechts) */
 
-const RIG_WEAPON: Record<HeroWeapon, string | undefined> = { none: undefined, sword: 'shortsword', bow: 'smallbow', staff: 'staff' };
-const STRIDE = 4.2;
-const LIFT = 2.4;
-const ARM = 3.4;
+const RIG_WEAPON: Record<HeroWeapon, string | undefined> = { none: undefined, sword: 'shortsword', axe: 'axe', mace: 'mace', dagger: 'dagger', greatsword: 'greatsword', bow: 'smallbow', staff: 'staff' };
+/** Laufschritt: Fuß ±STRIDE, Standbein STANCE des Zyklus am Boden (dazwischen kurze Flugphasen) */
+export const HERO_STRIDE = 5.6;
+export const HERO_STANCE = 0.4;
+const LIFT = 3;
+const ARM = 3.6;
+/** Strecke je Laufzyklus in Bildschirm-Pixeln bei Pixelmaßstab 2x: so gleiten die Füße nicht */
+export const HERO_CYCLE_PX = cycleLength(HERO_STRIDE, HERO_STANCE) * 2;
 
-/** Fuß in Phase p (0..1): Standbein gleitet zurück, Schwungbein hebt sich (aus der Gang-Probe, kürzere Beine). */
-function foot(p: number, lift: number): { x: number; y: number; toe: boolean } {
-  const q = ((p % 1) + 1) % 1;
-  if (q < 0.5) return { x: STRIDE - (q / 0.5) * 2 * STRIDE, y: -4, toe: q > 0.38 };
-  const s = (q - 0.5) / 0.5;
-  const e = 0.5 - 0.5 * Math.cos(s * Math.PI);
-  return { x: -STRIDE + e * 2 * STRIDE, y: -4 - Math.sin(s * Math.PI) * LIFT * lift, toe: false };
-}
+const melee = (w: HeroWeapon): boolean => w === 'sword' || w === 'axe' || w === 'mace' || w === 'dagger' || w === 'none';
 
 /** Haltung der Waffenhand im Stehen/Gehen je Waffe */
 function carry(weapon: HeroWeapon): RigPose {
-  if (weapon === 'sword') return { fx: 4, fy: -12.5, sa: 0.75 };
+  if (weapon === 'greatsword') return { fx: 4, fy: -11.5, sa: 1.0, two: true, wscale: 0.62 };
+  if (melee(weapon) && weapon !== 'none') return { fx: 4, fy: -12.5, sa: 0.75 };
   if (weapon === 'staff') return { fx: 3.5, fy: -13.5, sa: -1.45 };
   if (weapon === 'bow') return { fx: 3.5, fy: -13, sa: 0.15 }; // quer gehaltene Waffe: sa 0 = Bogen senkrecht
   return { fx: 1, fy: -11.5 };
 }
 
-function idlePose(i: number, weapon: HeroWeapon): RigPose {
+function idlePose(i: number, h: HeroLook): RigPose {
   const b = Math.sin((i / HERO_ANIMS.idle) * Math.PI * 2); // Atmen: Brust hebt und senkt sich
-  const c = carry(weapon);
-  return { ...c, crouch: 0.9 - b * 0.45, lean: 0.6, fy: (c.fy ?? -12) + b * 0.4, bx: -1.5, by: -11.6 + b * 0.4, ffx: 3, fbx: -3.2, hy: 0.2 };
+  const c = carry(h.weapon);
+  // mit Schild: Schildarm vor dem Körper
+  const off = h.shield ? { bx: 6, by: -13 + b * 0.4, bz: 2.5 } : { bx: -1.5, by: -11.6 + b * 0.4 };
+  return { ...c, crouch: 0.9 - b * 0.45, lean: 0.6, fy: (c.fy ?? -12) + b * 0.4, ...off, ffx: 3, ffy: -4, fbx: -3.2, fby: -4, hy: 0.2, sway: b * 0.3 };
 }
 
-function walkPose(i: number, weapon: HeroWeapon, view: HeroView): RigPose {
+function walkPose(i: number, h: HeroLook, view: HeroView): RigPose {
   const p = i / HERO_ANIMS.walk;
   const side = view === 'side';
-  const n = foot(p, side ? 1 : 1.6);
-  const f = foot(p + 0.5, side ? 1 : 1.6);
+  const lift = LIFT * (side ? 1 : 1.5);
+  const n = gaitFoot(p, HERO_STRIDE, lift, HERO_STANCE);
+  const f = gaitFoot(p + 0.5, HERO_STRIDE, lift, HERO_STANCE);
   const swing = Math.cos(p * Math.PI * 2);
-  const crouch = 1 + 0.8 * Math.cos((p - 0.08) * Math.PI * 4);
-  const c = carry(weapon);
-  const hold = weapon !== 'none';
+  // Laufschritt: tief beim Aufsetzen, oben in der Flugphase
+  const crouch = 1.3 + 0.9 * Math.cos((p - 0.12) * Math.PI * 4);
+  const c = carry(h.weapon);
+  const hold = h.weapon !== 'none';
+  const off = h.shield ? { bx: 6 + swing * 0.8, by: -13, bz: 2.5 } : { bx: 1 + swing * ARM * 1.2, by: -11.8 + Math.abs(swing) * 0.6 };
   return {
-    ...c, crouch, lean: 1,
-    ffx: n.x, ffy: n.y, toeF: n.toe, fbx: f.x, fby: f.y, toeB: f.toe,
+    ...c, crouch, lean: 1.6,
+    ffx: n.x, ffy: n.y - 4, toeF: n.toe, fbx: f.x, fby: f.y - 4, toeB: f.toe,
     fx: (c.fx ?? 1) - swing * ARM * (hold ? 0.45 : 1), fy: (c.fy ?? -12) + Math.abs(swing) * 0.5,
-    bx: 1 + swing * ARM * 1.2, by: -11.8 + Math.abs(swing) * 0.6,
+    ...off,
     hy: 0.3,
-    ...(c.sa !== undefined ? { sa: c.sa + (weapon === 'sword' ? swing * 0.15 : 0) } : {}),
+    sway: 1.4 + Math.sin(p * Math.PI * 4) * 0.6,
+    ...(c.sa !== undefined ? { sa: c.sa + (h.weapon === 'sword' ? swing * 0.15 : 0) } : {}),
   };
 }
 
-/** Nahkampf (alle Waffen holen über den Kopf aus und schlagen nach vorn-unten; Bogen/Stab vorerst Platzhalter). */
-function attackPose(i: number, weapon: HeroWeapon): RigPose {
-  const keys: RigPose[] = [
-    { fx: -1, fy: -21, sa: -2.2, bx: 6, by: -16, crouch: 1.6, lean: -2, ffx: 4, fbx: -5 },
-    { fx: -4, fy: -23, sa: -2.75, bx: 7, by: -18, armsFront: true, crouch: 2.4, lean: -3, ffx: 4, fbx: -5 },
-    { fx: 10, fy: -22, sa: -1.1, bx: -4, by: -16, crouch: 1.4, lean: 3, ffx: 7, fbx: -6 },
-    { fx: 12, fy: -13, sa: 0.55, bx: -5, by: -16, crouch: 3, lean: 4, ffx: 8, fbx: -6, toeB: true },
-    { fx: 10, fy: -12, sa: 0.9, bx: -3, by: -14, crouch: 2.6, lean: 3, ffx: 7, fbx: -5 },
-    { fx: 6, fy: -12.5, sa: 0.8, bx: -2, by: -12.5, crouch: 1.4, lean: 1.5, ffx: 4, fbx: -3.5 },
-  ];
-  const k = keys[Math.min(keys.length - 1, i)]!;
-  if (weapon === 'staff') return { ...k, sa: (k.sa ?? 0) - 1.4 };
-  if (weapon === 'bow') {
-    // Bogen: anheben, Sehnenhand zieht zurück, beim Schlagbild loslassen (Hand springt nach hinten), dann senken
-    const bow: RigPose[] = [
-      { fx: 8, fy: -17, sa: 0, bx: 4, by: -17, crouch: 1.2, lean: 0, ffx: 4, fbx: -4 },
-      { fx: 9, fy: -18, sa: 0, bx: 1, by: -18, crouch: 1.6, lean: -1, ffx: 4, fbx: -4 },
-      { fx: 9, fy: -18, sa: 0, bx: -3, by: -19, crouch: 1.6, lean: -1, ffx: 4, fbx: -4 },
-      { fx: 9, fy: -17.5, sa: 0.05, bx: -3.5, by: -18, crouch: 1.4, lean: -0.5, ffx: 4, fbx: -4 },
-      { fx: 7, fy: -15, sa: 0.1, bx: 0, by: -14, crouch: 1.2, lean: 0, ffx: 4, fbx: -4 },
-      { fx: 5, fy: -13.5, sa: 0.15, bx: -1, by: -12.5, crouch: 1, lean: 0.4, ffx: 3.5, fbx: -3.5 },
-    ];
-    return bow[Math.min(bow.length - 1, i)]!;
-  }
+/** Nahkampf: über den Kopf ausholen, nach vorn-unten schlagen, ausschwingen */
+const SWING: RigPose[] = [
+  { fx: -1, fy: -21, sa: -2.2, bx: 6, by: -16, crouch: 1.6, lean: -2, ffx: 4, fbx: -5 },
+  { fx: -4, fy: -23, sa: -2.75, bx: 7, by: -18, armsFront: true, crouch: 2.4, lean: -3, ffx: 4, fbx: -5 },
+  { fx: 10, fy: -22, sa: -1.1, bx: -4, by: -16, crouch: 1.4, lean: 3, ffx: 7, fbx: -6 },
+  { fx: 12, fy: -13, sa: 0.55, bx: -5, by: -16, crouch: 3, lean: 4, ffx: 8, fbx: -6, toeB: true },
+  { fx: 10, fy: -12, sa: 0.9, bx: -3, by: -14, crouch: 2.6, lean: 3, ffx: 7, fbx: -5 },
+  { fx: 6, fy: -12.5, sa: 0.8, bx: -2, by: -12.5, crouch: 1.4, lean: 1.5, ffx: 4, fbx: -3.5 },
+];
+/** Bogen: anheben, Sehne mit der Zughand ans Kinn ziehen (Pfeil liegt auf), beim Schlagbild loslassen, Bogen senken */
+const BOW: RigPose[] = [
+  { fx: 8, fy: -17, sa: 0, bx: 7, by: -17, pull: true, nocked: true, crouch: 1.2, lean: 0, ffx: 4, fbx: -4 },
+  { fx: 9.5, fy: -18, sa: 0, bx: 1, by: -18.5, pull: true, nocked: true, crouch: 1.6, lean: -1, ffx: 4.5, fbx: -4.5, turn: 0.15 },
+  { fx: 10, fy: -18, sa: 0, bx: -2.5, by: -18.5, crouch: 1.6, lean: -1.2, ffx: 4.5, fbx: -4.5, turn: 0.15, twist: -1 },
+  { fx: 10, fy: -17.5, sa: 0.05, bx: -3.5, by: -17, crouch: 1.5, lean: -0.8, ffx: 4.5, fbx: -4.5, turn: 0.2 },
+  { fx: 7, fy: -15, sa: 0.1, bx: 0, by: -14, crouch: 1.2, lean: 0, ffx: 4, fbx: -4 },
+  { fx: 5, fy: -13.5, sa: 0.15, bx: -1, by: -12.5, crouch: 1, lean: 0.4, ffx: 3.5, fbx: -3.5 },
+];
+/** Stab: beidhändig hoch über den Kopf heben (Kugel leuchtet), dann waagrecht nach vorn stoßen, zurücknehmen */
+const STAFF: RigPose[] = [
+  { fx: 3, fy: -20, sa: -1.25, bx: 0, by: -16, crouch: 1.2, lean: -1, ffx: 3.5, fbx: -4, hy: -0.6 },
+  { fx: 1, fy: -24, sa: -1.5, bx: -1, by: -21, crouch: 2.2, lean: -2.4, ffx: 3.5, fbx: -4.5, hy: -1 },
+  { fx: 13, fy: -16, sa: -0.15, two: true, crouch: 2.4, lean: 4, ffx: 8, fbx: -6, toeB: true },
+  { fx: 14, fy: -15, sa: -0.05, two: true, crouch: 2.8, lean: 4.5, ffx: 8, fbx: -6, toeB: true },
+  { fx: 9, fy: -15, sa: -0.6, bx: 2, by: -13.5, crouch: 1.8, lean: 2, ffx: 6, fbx: -4.5 },
+  { fx: 4.5, fy: -14, sa: -1.3, bx: -0.5, by: -12.5, crouch: 1.2, lean: 0.8, ffx: 4, fbx: -3.5 },
+];
+/** Zweihänder: beidhändiger Hieb */
+const GREAT: RigPose[] = SWING.map((k0, j) => {
+  const k: RigPose = { ...k0, two: true, wscale: 0.62, crouch: (k0.crouch ?? 0) + (j === 3 ? 0.6 : 0) };
+  delete k.bx;
+  delete k.by;
   return k;
+});
+
+function attackPose(i: number, h: HeroLook): RigPose {
+  const at = (keys: RigPose[]): RigPose => keys[Math.min(keys.length - 1, i)]!;
+  if (h.weapon === 'bow') return at(BOW);
+  if (h.weapon === 'staff') return at(STAFF);
+  if (h.weapon === 'greatsword') return at(GREAT);
+  const k = at(SWING);
+  // Schild bleibt beim Hieb vorn (Fernarm deckt), statt nach hinten auszuschwingen
+  return h.shield ? { ...k, bx: 6.5, by: -14, bz: 2.5, armsFront: false } : k;
 }
 
+/** Getroffen: Oberkörper zuckt zurück, Kopf nach hinten, Arme öffnen sich */
+function hitPose(i: number, h: HeroLook): RigPose {
+  const c = carry(h.weapon);
+  const k = i === 0 ? 1 : 0.55;
+  return { ...c, fx: (c.fx ?? 1) - 2 * k, fy: (c.fy ?? -12) - 1.5 * k, bx: -4 * k, by: -14, crouch: 1.6 * k, lean: -3.2 * k, hy: -1.4 * k, ffx: 3.5, ffy: -4, fbx: -4, fby: -4, sway: -1 };
+}
+
+/** Sterben: in die Knie, nach hinten kippen, liegen */
+const DIE: RigPose[] = [
+  { fx: 2, fy: -15, bx: -3, by: -16, crouch: 2.4, lean: -3, hy: -1.4, ffx: 3, fbx: -4, fall: 0.12 },
+  { fx: 1, fy: -13, bx: -4, by: -14, crouch: 4.2, lean: -3.5, hy: -1.6, ffx: 4, fbx: -2, fall: 0.45, fallX: 3 },
+  { fx: -2, fy: -14, bx: -6, by: -13, crouch: 4.6, lean: -3, hy: -1.2, ffx: 5, fbx: -1, fall: 0.95, fallX: 7, fallY: -1 },
+  { fx: -4, fy: -15, bx: -8, by: -12, crouch: 1.4, lean: -2, hy: -0.5, ffx: 3, fbx: -1, fall: 1.4, fallX: 11, fallY: -4.4 },
+  { fx: -5, fy: -15.5, bx: -9, by: -13, crouch: 0.6, lean: -1.5, hy: 0, ffx: 2.5, fbx: -0.5, fall: 1.55, fallX: 12, fallY: -5.6 },
+];
+
 export function heroPose(anim: HeroAnim, view: HeroView, i: number, h: HeroLook): RigPose {
-  const base = anim === 'walk' ? walkPose(i, h.weapon, view) : anim === 'attack' ? attackPose(i, h.weapon) : idlePose(i, h.weapon);
-  const pose: RigPose = { ...base, weapon: RIG_WEAPON[h.weapon], gear: { helm: h.helm, pauldron: h.armor >= 2 } };
-  if (view === 'side') pose.turn = 0.34 + (anim === 'walk' ? Math.cos((i / HERO_ANIMS.walk) * Math.PI * 2) * 0.08 : 0);
+  const base = anim === 'walk' ? walkPose(i, h, view) : anim === 'attack' ? attackPose(i, h) : anim === 'hit' ? hitPose(i, h) : anim === 'die' ? DIE[Math.min(DIE.length - 1, i)]! : idlePose(i, h);
+  const gear: HeroGear = {
+    helm: h.helm, pauldron: !h.robe && (h.armor === 'iron' || h.armor === 'dread' || h.armor === 'ash' || h.armor === 'bone'),
+    robe: h.robe, cloak: !!h.cloak, quiver: h.quiver, shield: h.shield, crest: h.rar[0] >= 2 && h.helm >= 2 && h.helm <= 4,
+  };
+  const pose: RigPose = { ...base, weapon: anim === 'die' && i >= 2 ? undefined : RIG_WEAPON[h.weapon], gear, mark: !h.robe };
+  const acc = ACCENT[h.rar[2]];
+  if (acc) pose.accent = [acc[0], acc[2]];
+  if (h.weapon === 'staff') pose.orb = ORBS[Math.min(ORBS.length - 1, h.weaponTier)];
+  if (view === 'side') pose.turn = base.turn ?? 0.34 + (anim === 'walk' ? Math.cos((i / HERO_ANIMS.walk) * Math.PI * 2) * 0.08 : 0);
   else {
     // zur Kamera / weg: ganze Figur gedreht; Schritte gehen in die Tiefe, darum Füße auseinander und Knie höher (walkPose)
     pose.yaw = view === 'front' ? Math.PI / 2 : -Math.PI / 2;
@@ -139,7 +241,7 @@ export function heroPose(anim: HeroAnim, view: HeroView, i: number, h: HeroLook)
     pose.bzz = -3.3;
     if (anim === 'walk') {
       // Schräge Draufsicht: der Fuß weiter weg von der Kamera steht höher im Bild, so sieht man den Schritt
-      const away = (x: number): number => (view === 'front' ? STRIDE - x : x + STRIDE) * 0.32;
+      const away = (x: number): number => (view === 'front' ? HERO_STRIDE - x : x + HERO_STRIDE) * 0.32;
       pose.ffy = (pose.ffy ?? -4) - away(pose.ffx ?? 0);
       pose.fby = (pose.fby ?? -4) - away(pose.fbx ?? 0);
     }
@@ -149,139 +251,118 @@ export function heroPose(anim: HeroAnim, view: HeroView, i: number, h: HeroLook)
 
 /* ------------------------------------------------ Farben je Material (hell -> dunkel, dazu Naht) */
 
-type Ramp = readonly [number, number, number, number, number];
-const MAT: Record<string, Ramp> = {
-  skin: [0xe0b08a, 0xc08a66, 0x96664c, 0x6a4434, 0x4a3024],
-  hair: [0x6a4a30, 0x4e3422, 0x3a2618, 0x2a1a10, 0x1e120a],
-  tunic: [0x6a7a94, 0x4e5c76, 0x3a4458, 0x2a3040, 0x1e222e],
-  leather: [0xa87a4a, 0x845a34, 0x624026, 0x452c1a, 0x301e12],
-  leatherD: [0x7e5a3a, 0x5e4028, 0x452e1c, 0x302014, 0x22160e],
-  iron: [0xc4ccd8, 0x939cac, 0x687082, 0x474d5c, 0x323642],
-  chain: [0x8c929e, 0x6c727e, 0x50545e, 0x383b44, 0x282a32],
-  cloth: [0x5a5466, 0x443f50, 0x332e3c, 0x25212c, 0x1a1720],
-  tabard: [0x9a3a30, 0x7a2a24, 0x5a1e1a, 0x3e1412, 0x2a0e0c],
-  sleeve: [0x7a2e26, 0x5e221c, 0x461814, 0x32100e, 0x240c0a],
-  boot: [0x6a4a30, 0x4e3622, 0x3a2818, 0x2a1c10, 0x1e140c],
-  belt: [0x6a4a2a, 0x50361e, 0x3a2614, 0x2a1a0e, 0x1e1208],
+// Grundpalette bewusst heller als die Welt: das Spiel legt noch eine dunkle Multiplikation (DARK_GRADE) darüber
+const MAT = {
+  skin: [0xf0c49c, 0xd29a72, 0xa87254, 0x7a4e3a, 0x4a3024],
+  hair: [0x8a6440, 0x6a4a30, 0x4e3422, 0x36241a, 0x22160e],
+  cloth: [0x8c9ab4, 0x6c7a96, 0x505c78, 0x3a4258, 0x262a3a],
+  trousers: [0x7a7088, 0x5e566c, 0x463f52, 0x322c3c, 0x221e2a],
+  leather: [0xc8945a, 0xa07040, 0x7a5030, 0x553620, 0x382414],
+  leatherD: [0x98704a, 0x765434, 0x583c24, 0x3e2a18, 0x281a10],
+  iron: [0xdce4ee, 0xaab4c4, 0x7c8698, 0x575f72, 0x3a3f4e],
+  chain: [0xa4aab6, 0x80868f, 0x60656e, 0x45484f, 0x2e3036],
+  dread: [0x8a84a8, 0x625c80, 0x45405e, 0x302c44, 0x1e1a2c],
+  bone: [0xeee6cc, 0xccc2a4, 0xa49a7e, 0x7a725c, 0x4e483a],
+  ash: [0xa08478, 0x7c5e56, 0x5c423e, 0x402c2a, 0x2a1c1a],
+  acolyte: [0x7a8ed8, 0x5a6cb4, 0x42508c, 0x2e3864, 0x1e2442],
+  tabard: [0xc04a3c, 0x9a382e, 0x742822, 0x521a16, 0x340e0c],
+  boot: [0x8a6440, 0x6a4a30, 0x4e3622, 0x36241a, 0x22160e],
+  belt: [0x8a643a, 0x6a4a2a, 0x50361e, 0x382414, 0x22160c],
+  wood: [0xb08050, 0x8a6038, 0x684628, 0x48301c, 0x2e1e12],
+  fletch: [0xf0ece0, 0xc8c0b0, 0x9a9080, 0x6a6458, 0x403c34],
+} satisfies Record<string, Ramp>;
+const CLOAKS: Record<string, Ramp> = {
+  rag: [0x9a8a72, 0x7a6c58, 0x5c5042, 0x40382e, 0x2a241e],
+  wool: [0xa8504a, 0x843a36, 0x642a28, 0x461c1c, 0x2e1212],
+  hunter: [0x72905a, 0x567044, 0x405432, 0x2c3a22, 0x1c2616],
+  wolf: [0xb4b0aa, 0x8e8a86, 0x6a6764, 0x4a4846, 0x302e2e],
+  dread: [0x6a5a8a, 0x4e4268, 0x38304c, 0x262034, 0x181420],
+  ash: [0x6e6260, 0x544a48, 0x3e3634, 0x2a2424, 0x1a1616],
+  ember: [0xd2643a, 0xa84a2a, 0x7e361e, 0x582414, 0x38160c],
+  rime: [0xa8d0e8, 0x80a8c8, 0x5e82a4, 0x42607c, 0x2a3e52],
 };
+/** Seltenheitsakzent (Saum, Kamm, Parierstange): magisch blau, selten gold, Set grün, legendär glut */
+const ACCENT: (Ramp | undefined)[] = [
+  undefined,
+  [0x9ab4ff, 0x6f8fff, 0x4a64c8, 0x34468e, 0x222e5c],
+  [0xffe08a, 0xf2c94c, 0xc09a30, 0x86681e, 0x544010],
+  [0x9ae88a, 0x5fd070, 0x3e9a4e, 0x2a6a36, 0x184020],
+  [0xffb066, 0xff8a2a, 0xc8601a, 0x8a4010, 0x562608],
+];
+const ORBS: number[][] = [[0x9ad0ff, 0x4a7ac8], [0x8ae0ff, 0x3a8ab8], [0xc0a0ff, 0x6a48c8], [0x8af0e8, 0x2a9a90], [0xffb060, 0xc8601a], [0xd890ff, 0x8a3ac8]];
 const OUTLINE = 0x0c0a0e;
-const MARK_COL = 0xb08a3a; // Gürtelschnalle/Brustmarke: Bronze
+const MARK_COL = 0xc8a048; // Gürtelschnalle/Brustmarke: Bronze
 
 function materials(h: HeroLook): Record<number, Ramp> {
-  const body = h.armor === 2 ? MAT.iron! : h.armor === 1 ? MAT.leather! : MAT.tunic!;
-  const sleeve = h.armor === 2 ? MAT.chain! : h.armor === 1 ? MAT.sleeve! : MAT.tunic!;
-  // Eisen trägt einen roten Wappenrock um die Hüfte, Leder einen dunkleren Lederwams-Saum
-  const waist = h.armor === 2 ? MAT.tabard! : h.armor === 1 ? MAT.leatherD! : MAT.tunic!;
-  const fore = h.gloves === 2 ? MAT.iron! : h.gloves === 1 ? MAT.leather! : h.armor === 2 ? MAT.chain! : MAT.skin!;
-  const hand = h.gloves === 2 ? MAT.iron! : h.gloves === 1 ? MAT.leatherD! : MAT.skin!;
-  const shin = h.armor === 2 ? MAT.iron! : MAT.cloth!;
+  const metal = (m: HeroMat): Ramp => (m === 'iron' ? MAT.iron : m === 'dread' ? MAT.dread : m === 'bone' ? MAT.bone : m === 'ash' ? MAT.ash : m === 'leather' ? MAT.leather : m === 'acolyte' ? MAT.acolyte : MAT.cloth);
+  const heavy = h.armor === 'iron' || h.armor === 'dread' || h.armor === 'ash' || h.armor === 'bone';
+  const body = metal(h.armor);
+  const sleeve = h.robe ? body : heavy ? MAT.chain : h.armor === 'leather' ? MAT.leatherD : MAT.cloth;
+  const acc = ACCENT[h.rar[1]];
+  // schwere Rüstung trägt einen Wappenrock um die Hüfte (rot, ab magisch in Seltenheitsfarbe), Leder einen dunklen Wams-Saum
+  const waist = h.robe ? body : heavy ? acc ?? MAT.tabard : h.armor === 'leather' ? MAT.leatherD : MAT.cloth;
+  const fore = h.gloves === 2 ? MAT.iron : h.gloves === 1 ? MAT.leather : heavy ? MAT.chain : MAT.skin;
+  const hand = h.gloves === 2 ? MAT.iron : h.gloves === 1 ? MAT.leatherD : MAT.skin;
+  const shin = h.legs === 2 ? MAT.iron : MAT.boot;
   const m: Record<number, Ramp> = {};
-  const set = (names: string[], r: Ramp): void => {
+  const set = (names: (keyof typeof PART)[], r: Ramp): void => {
     for (const n of names) m[PART[n]!] = r;
   };
-  set(['chest'], body);
+  set(['chest', 'belly'], body);
   set(['waist'], waist);
-  set(['pelvis'], MAT.belt!);
-  set(['neck'], h.armor === 2 ? MAT.chain! : MAT.skin!);
-  set(['head'], h.helm === 2 ? MAT.iron! : MAT.hair!);
-  set(['face'], MAT.skin!);
-  set(['helm'], h.helm === 2 ? MAT.iron! : MAT.leather!);
+  set(['pelvis'], MAT.belt);
+  set(['neck'], heavy ? MAT.chain : MAT.skin);
+  set(['head'], MAT.hair);
+  set(['face'], MAT.skin);
+  set(['helm'], metal(h.helmMat));
+  set(['hood'], h.helmMat === 'cloth' ? CLOAKS[h.cloak] ?? MAT.trousers : metal(h.helmMat));
   set(['upperN', 'elbowN', 'upperF', 'elbowF'], sleeve);
   set(['foreN', 'foreF'], fore);
   set(['handN', 'handF'], hand);
-  set(['thighN', 'kneeN', 'thighF', 'kneeF'], MAT.cloth!);
+  set(['thighN', 'kneeN', 'thighF', 'kneeF'], h.legs === 2 ? MAT.chain : MAT.trousers);
   set(['shinN', 'shinF'], shin);
-  set(['footN', 'footF'], MAT.boot!);
-  set(['pauldronN', 'pauldronF'], MAT.iron!);
+  set(['footN', 'footF'], h.legs === 2 ? MAT.iron : MAT.boot);
+  set(['pauldronN', 'pauldronF'], body);
+  set(['robe'], body);
+  set(['robeHem'], acc ?? MAT.belt);
+  const cloak = CLOAKS[h.cloak] ?? CLOAKS.rag!;
+  set(['cloak'], cloak);
+  set(['cloakHem'], ACCENT[Math.max(h.rar[1], 0)] ?? cloak);
+  set(['quiver'], MAT.leatherD);
+  set(['fletch'], MAT.fletch);
+  set(['crest'], ACCENT[h.rar[0]] ?? MAT.tabard);
+  set(['shield'], h.shield === 1 ? MAT.wood : h.shield === 3 ? MAT.tabard : MAT.iron);
+  set(['shieldRim'], h.shield === 1 ? MAT.iron : MAT.chain);
+  set(['shieldBoss'], MAT.iron);
   return m;
 }
 
 /* ------------------------------------------------ Backen */
 
-export interface HeroSheet {
-  /** Breite/Höhe des Sheets bei 1x */
-  w: number;
-  h: number;
-  data: Uint8ClampedArray;
-  /** Bildname `${anim}_${view}_${i}` -> Ecke links oben bei 1x */
-  frames: Record<string, { x: number; y: number }>;
-  /** Kopfhöhe über dem Fußpunkt und Körperbreite (ohne Waffe), 1x */
-  top: number;
-  bodyW: number;
-}
+export type HeroSheet = FigureSheet;
 
-/** Zeilen des Sheets: je Ansicht eine Zeile, Spalten = idle, walk, attack hintereinander */
-const COLS = HERO_ANIMS.idle + HERO_ANIMS.walk + HERO_ANIMS.attack;
+export function heroSpec(h: HeroLook): FigureSpec {
+  return {
+    key: heroKey(h),
+    frame: HERO_FRAME,
+    anims: HERO_ANIMS,
+    render: (anim, view, i) => posed(heroPose(anim, view, i, h)),
+    mats: materials(h),
+    fallback: MAT.cloth,
+    outline: OUTLINE,
+    eye: 0x2a1c18,
+    mark: MARK_COL,
+    loose: new Set([PART.weapon!, PART.offWeapon!]),
+    cyclePx: HERO_CYCLE_PX,
+    wind: HERO_WIND_FRAMES,
+  };
+}
 
 export function bakeHero(h: HeroLook): HeroSheet {
-  const { w: FW, h: FH, fx: FX, fy: FY } = HERO_FRAME;
-  const W = FW * COLS;
-  const H = FH * HERO_VIEWS.length;
-  const data = new Uint8ClampedArray(W * H * 4);
-  const frames: HeroSheet['frames'] = {};
-  const mats = materials(h);
-  let top = 0;
-  let bodyW = 0;
-  HERO_VIEWS.forEach((view, row) => {
-    let col = 0;
-    for (const anim of ['idle', 'walk', 'attack'] as HeroAnim[]) {
-      for (let i = 0; i < HERO_ANIMS[anim]; i++, col++) {
-        const r = posed(heroPose(anim, view, i, h));
-        const ox = col * FW;
-        const oy = row * FH;
-        frames[`${anim}_${view}_${i}`] = { x: ox, y: oy };
-        let bx0 = 1e9;
-        let bx1 = -1e9;
-        for (let k = 0; k < r.n; k++) {
-          const x = r.xs[k]! + FX;
-          const y = r.ys[k]! + FY;
-          if (x < 0 || y < 0 || x >= FW || y >= FH) continue;
-          const sh = r.shade[k]!;
-          const part = r.part[k]!;
-          let c: number;
-          if (sh === SHADE.INK) c = OUTLINE;
-          else if (sh === SHADE.STEEL) c = r.color[k]!;
-          else if (sh === SHADE.MARK) c = MARK_COL;
-          else {
-            const ramp = mats[part] ?? MAT.cloth!;
-            c = sh === SHADE.SEAM ? ramp[4] : ramp[sh >= SHADE.CORE ? Math.min(3, sh - SHADE.CORE + 1) : sh]!;
-          }
-          const o = ((oy + y) * W + ox + x) * 4;
-          data[o] = (c >> 16) & 255;
-          data[o + 1] = (c >> 8) & 255;
-          data[o + 2] = c & 255;
-          data[o + 3] = 255;
-          if (part !== PART.weapon && part !== PART.offWeapon) {
-            bx0 = Math.min(bx0, x);
-            bx1 = Math.max(bx1, x);
-            if (anim === 'idle') top = Math.max(top, FY - y);
-          }
-        }
-        if (anim === 'idle') bodyW = Math.max(bodyW, bx1 - bx0 + 1);
-      }
-    }
-  });
-  return { w: W, h: H, data, frames, top, bodyW };
-}
-
-/**
- * Bild der Laufanimation aus der zurückgelegten Strecke (Bildschirm-Pixel), damit die Füße nicht übers Pflaster gleiten:
- * ein Zyklus = HERO_CYCLE_PX.
- */
-export const HERO_CYCLE_PX = 64;
-export function walkFrame(dist: number): number {
-  const n = HERO_ANIMS.walk;
-  return ((Math.floor((dist / HERO_CYCLE_PX) * n) % n) + n) % n;
-}
-
-/** Angriffsbild aus dem Fortschritt 0..1 des Hiebs: Ausholen bis 0,4, ab dort Schlag und Ausschwingen. */
-export function attackFrame(k: number): number {
-  const n = HERO_ANIMS.attack;
-  if (k < 0.4) return Math.min(HERO_WIND_FRAMES - 1, Math.floor((k / 0.4) * HERO_WIND_FRAMES));
-  return Math.min(n - 1, HERO_WIND_FRAMES + Math.floor(((k - 0.4) / 0.6) * (n - HERO_WIND_FRAMES)));
+  return bakeFigure(heroSpec(h));
 }
 
 /** Atembild im Stehen: ein Atemzug ca. 2,8 s (Aufrufer versetzt die Zeit je Figur) */
-export function idleFrame(time: number): number {
-  return Math.floor(time / 700) % HERO_ANIMS.idle;
+export function idleFrame(time: number, n = HERO_ANIMS.idle): number {
+  return Math.floor(time / 700) % n;
 }

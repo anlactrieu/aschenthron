@@ -26,8 +26,9 @@ import { isTouch } from './touch';
 import { Atmosphere, isDungeon } from './atmosphere';
 import { Fx } from './fx';
 import { playPixelfx, registerPixelfx, type FxName } from './pixelfx';
-import { attackFrame, idleFrame, walkFrame } from './hero';
-import { HERO_ORIGIN, heroMode, heroTexture } from './heroSheet';
+import { attackFrame, onceFrame, walkFrame, type FigureSheet } from './figure';
+import { idleFrame } from './hero';
+import { FIG_SCALE, heroMode, heroTexture, originOf } from './heroSheet';
 import { onSettings, settings } from './settings';
 import type { RemoteSession } from '../net/client';
 import {
@@ -71,6 +72,8 @@ const PROP_GIDS = new Set([2, 10, 11, 13, 14, ...Array.from({ length: TOWN_GID.d
 const OVERLAY_DEPTH = 1e7;
 /** Dauer eines Hiebs/Wurfs in ms (Ausholen 40 %, Schlag 60 %) */
 const SWING_MS = 240;
+/** Sterbeanimation der Skelett-Figuren */
+const DIE_MS = 650;
 const STEP_MS = 110;
 const WALK_FRAMES = [FRAME_STEP_L, 0, FRAME_STEP_R, 0];
 
@@ -2042,6 +2045,15 @@ export class GameScene extends Phaser.Scene {
     return toTile(wp.x, wp.y);
   }
 
+  /** Skelett-Figur eines Akteurs (Textur + Sheet) oder `null` = alte Figur (DCSS/Ninja/prozedural) */
+  private skelFigure(a: Actor): { key: string; sheet: FigureSheet } | null {
+    if (a.kind === 'player') {
+      if (heroMode() !== 'skelett') return null;
+      return heroTexture(this, lookOf(a), () => new Set([...this.actorViews.values()].map((av) => av.img.texture.key)));
+    }
+    return null;
+  }
+
   private updateActors(time: number, p: Actor, g: Phaser.GameObjects.Graphics): void {
     const seen = new Set<string>();
     const active = new Set<number>();
@@ -2080,20 +2092,32 @@ export class GameScene extends Phaser.Scene {
       const stepPhase = time / STEP_MS;
       const frame = swinging ? (swingK < 0.4 ? FRAME_WIND : FRAME_STRIKE) : time < view.movingUntil ? WALK_FRAMES[Math.floor(stepPhase) % 4]! : 0;
       const img = view.img;
-      const skel = a.kind === 'player' && heroMode() === 'skelett';
-      if (skel) {
-        // Skelett-Held: ein Sheet je Look, Bild nach Animation/Ansicht; links = Seitenansicht gespiegelt (figDir)
-        const look = lookOf(a);
+      // Skelett-Figur (Held; Monster/NPCs folgen): ein Sheet je Look/Art, Bild nach Animation und Ansicht; links = Seite gespiegelt
+      const fig3 = this.skelFigure(a);
+      const skel = !!fig3;
+      if (fig3) {
+        const { key, sheet } = fig3;
+        const A = sheet.anims;
         const v3 = view.side ? 'side' : view.up ? 'back' : 'front';
-        const fname = swinging ? `attack_${v3}_${attackFrame(swingK)}` : time < view.movingUntil ? `walk_${v3}_${walkFrame(view.dist ?? 0)}` : `idle_${v3}_${idleFrame(time + a.id * 977)}`;
-        img.setTexture(heroTexture(this, look, () => new Set([...this.actorViews.values()].map((av) => av.img.texture.key))), fname).setOrigin(HERO_ORIGIN.x, HERO_ORIGIN.y);
+        const hitLeft = (this.flash.get(a.id) ?? 0) - time;
+        const fname = !a.alive
+          ? `die_${v3}_${onceFrame(((this.world.tick - a.diedAt) / TICK_RATE) * 1000, A.die, DIE_MS)}`
+          : swinging
+            ? `attack_${v3}_${attackFrame(swingK, A.attack, sheet.wind)}`
+            : hitLeft > 0
+              ? `hit_${v3}_${hitLeft > 60 * this.ts ? 0 : 1}`
+              : time < view.movingUntil
+                ? `walk_${v3}_${walkFrame(view.dist ?? 0, A.walk, sheet.cyclePx)}`
+                : `idle_${v3}_${idleFrame(time + a.id * 977, A.idle)}`;
+        const o = originOf(sheet);
+        img.setTexture(key, fname).setOrigin(o.x, o.y);
       } else if (a.kind === 'player') {
         const look = lookOf(a);
         img.setTexture(ensureTexture(this, lookKey(look, frame, !!view.up && !view.side, !!view.side), () => playerCanvas(look, frame, !!view.up && !view.side, !!view.side)));
       } else {
         const k = monsterKind(a.kindId!);
         const key = `mon_${k.id}_${frame}${view.up && !view.side ? 'b' : ''}${view.side ? 's' : ''}`;
-        img.setTexture(ensureTexture(this, key, () => monsterCanvas(k.id, k.family, k.color, !!k.boss, frame, !!view.up && !view.side, !!view.side)));
+        img.setTexture(ensureTexture(this, key, () => monsterCanvas(k.id, k.family, k.color, !!k.boss, frame, !!view.up && !view.side, !!view.side))).setOrigin(0.5, FEET_ORIGIN_Y);
       }
       // Rückstoß/Ausfallschritt aus Treffern, klingt schnell ab
       const kk = this.kicks.get(a.id);
@@ -2122,6 +2146,13 @@ export class GameScene extends Phaser.Scene {
         // DCSS-Monster blicken von Haus aus nach links; nur die vorab gespiegelte Seitenansicht (Zweibeiner) blickt nach rechts
         fig ? (fig.dir ? !!view.side && view.flip : view.flip) : a.kind === 'monster' && !(view.side && BIPED.has(monsterKind(a.kindId!).family)) ? !view.flip : view.flip,
       );
+      if (!a.alive && skel) {
+        // Skelett-Figur: eigenes Sterbebild (liegt am Ende), Monster verblassen erst danach
+        const age = a.kind === 'monster' ? Math.max(0, (this.world.tick - a.diedAt) / TICK_RATE - 2) / 2 : 0;
+        img.setAngle(0).setAlpha(Math.max(0, 1 - age)).setTintMode(Phaser.TintModes.MULTIPLY).setTint(0xb0a0a0).setScale(FIG_SCALE);
+        img.setDepth(sy);
+        continue;
+      }
       if (!a.alive) {
         const age = a.kind === 'monster' ? (this.world.tick - a.diedAt) / (TICK_RATE * 4) : 0;
         img.setAngle(view.flip ? -90 : 90).setAlpha(Math.max(0, 0.6 - age * 0.6)).setTintMode(Phaser.TintModes.MULTIPLY).setTint(0x664444).setScale(1);
@@ -2130,7 +2161,7 @@ export class GameScene extends Phaser.Scene {
       }
       // leichtes Atmen, wenn sie stehen (Skalierung um die Füße)
       const breath = !walking && !swinging && !skel ? 1 + Math.sin(time / 420 + a.id * 1.7) * 0.014 : 1;
-      img.setAngle(0).setAlpha(1).setScale(1 / breath ** 0.5, breath);
+      img.setAngle(0).setAlpha(1).setScale((skel ? FIG_SCALE : 1) / breath ** 0.5, (skel ? FIG_SCALE : 1) * breath);
       // Treffer-Blitz: Phaser-Tint multipliziert (Weiß = unsichtbar) → echter Blitz über den Füllmodus; sonst Modus immer zurücksetzen
       const flashing = (this.flash.get(a.id) ?? 0) > time;
       if (flashing) img.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
