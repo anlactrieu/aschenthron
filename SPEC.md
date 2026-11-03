@@ -359,3 +359,22 @@ User: „Wie in D4O kein Rang für Zauber, lieber mehr Zauber; neue Zauber desse
 - **HUD:** Minimap kleiner, Willkommenstext in gerahmtes Fenster, Leisten nah an die Hotbar, einheitliche Pixelschrift auch im Titelbild.
 - **pixelfx (patch-gg, geprüft APPROVE):** erst nach dem Look-Umbau als Projekt-Skill, Palette dunkel/passend zur Rarität.
 - **Erster Schnitt (frische Session):** Standard auf DCSS + einheitliche Skalierung, Stadt dunkler tönen, HUD-Fixes, dann 3 Effekte: Treffer, Loot-Strahl, Level-up.
+
+## Status der Richtung (Stand 2026-11-03, Abend)
+**Erledigt (Commits 80e8193, 6aa331e, ea8b52d, c273b24; tsc, Lint, 311 Tests grün):**
+- [x] Figuren-Standard DCSS, ein Pixelmaßstab (Bosse 2x); Ninja nur noch Boden/Häuser/HUD (`?figuren=mix|ninja` zum Vergleich)
+- [x] Dunklere Stimmung über `DARK_GRADE`/`TOWN_LIFT` in `atmosphere.ts`
+- [x] HUD: kleine Minimap, gerahmtes Willkommensfenster, Leisten an der Hotbar, Pixelschrift im Titelbild
+- [x] pixelfx als Projekt-Skill + `tools/pixelfx`; Effekte Treffer, Krit, Loot-Strahl nach Seltenheit, Level-up
+
+**Offen:**
+- [ ] Treffer-/Krit-Effekt im echten Kampf prüfen (bisher nur per Konsole), Krit-Effekt zu groß (216x136 px)
+- [ ] Loot-Strahl: bei vielen Drops unruhig, Kern blass
+- [ ] Alter heller Kamerablitz bei Seltenem/Legendärem dämpfen (`cameras.main.flash`)
+- [ ] Stadtboden/Häuser (Ninja) trotz Abdunkelung noch bunt: weiter abdunkeln
+- [ ] Heldenporträt zum Helden/DCSS passend machen
+- [ ] Säule 1 Wucht: Wackeln, Schadenszahlen, Zauber-/Pfeil-Effekte aus pixelfx
+- [ ] Säule 3 Skillgewinn spürbar machen
+- [ ] Säule 4 gefährliche Orte, Bosse, Atmosphäre
+- [ ] Level-up-Sheet 1,5 MB (alle Effekt-Sheets ca. 4 MB): verkleinern
+- [ ] Ungeprüft: Handy, Nacht/Regen mit neuem Look, Händler-/Truhenfenster
