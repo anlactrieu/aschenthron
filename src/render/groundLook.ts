@@ -4,7 +4,7 @@
  * Chunk-Textur zeichnet. Alles reine Optik (nichts davon steht in der Sim); ohne Ninja-Bilder (Tests/Node) bleibt der
  * bisherige Boden unverändert.
  */
-import { ninjaImg } from './ninja';
+import { ninjaImg, type NinjaSrc } from './ninja';
 import { ninjaProp, PIXEL } from './ninjaProps';
 
 const FIELD = 'Backgrounds/Tilesets/TilesetField.png';
@@ -78,7 +78,7 @@ export function tintCanvas(c: HTMLCanvasElement, tint: readonly [number, number,
   x.restore();
 }
 
-export function lookImage(cell: LookCell): HTMLImageElement | null {
+export function lookImage(cell: LookCell): NinjaSrc | null {
   return ninjaImg(cell.f);
 }
 

@@ -307,6 +307,8 @@ export class Ui {
   private dollKey = '';
   private face?: HTMLImageElement;
   private faceKey = '';
+  /** nächster Versuch für das Brustbild, solange die Sprites noch laden */
+  private faceRetryAt = 0;
   /** neu gelernte Fertigkeit: ihr Schnellleisten-Platz pulsiert kurz (Säule 3) */
   private newSkill: { id: string; until: number } | null = null;
   private dollUrl = '';
@@ -510,7 +512,8 @@ export class Ui {
     this.tl.id = 'hud-tl';
     const fc = el('div', 'fc');
     const face = el('img', 'face') as HTMLImageElement;
-    face.src = faceUrl(HERO_BASE);
+    // DCSS: leer (dunkler Grund) bis das Brustbild steht, sonst blitzt kurz das Ninja-Gesicht auf
+    if (figureMode() !== 'dcss') face.src = faceUrl(HERO_BASE);
     face.alt = '';
     this.face = face;
     fc.append(face);
@@ -528,7 +531,7 @@ export class Ui {
     if (!face || figureMode() !== 'dcss') return;
     const look = lookOf(p);
     const key = lookKey(look, 0, false);
-    if (key === this.faceKey) return;
+    if (key === this.faceKey || performance.now() < this.faceRetryAt) return;
     const src = playerPortrait(look).canvas;
     const sx = src.getContext('2d');
     if (!sx || !src.width || !src.height) return;
@@ -540,7 +543,11 @@ export class Ui {
       if (x < minX) minX = x;
       if (x > maxX) maxX = x;
     }
-    if (maxX < 0) return; // Sprites noch nicht geladen: beim nächsten Update erneut
+    if (maxX < 0) {
+      // Sprites noch nicht geladen: in einer halben Sekunde erneut (nicht jeden Frame neu zeichnen und scannen)
+      this.faceRetryAt = performance.now() + 500;
+      return;
+    }
     this.faceKey = key;
     const box = 76;
     const out = document.createElement('canvas');

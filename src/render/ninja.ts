@@ -5,9 +5,11 @@
  */
 
 export const NINJA_BASE = `${(import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/'}assets/ninja/`;
-const store = new Map<string, HTMLImageElement>();
+/** Geladenes Sheet: Bild, bei Kachel-Sheets eine abgetönte Canvas-Kopie (beides taugt als drawImage-Quelle) */
+export type NinjaSrc = HTMLImageElement | HTMLCanvasElement;
+const store = new Map<string, NinjaSrc>();
 
-export function ninjaImg(path: string): HTMLImageElement | null {
+export function ninjaImg(path: string): NinjaSrc | null {
   return store.get(path) ?? null;
 }
 
@@ -56,7 +58,7 @@ export function gradeRgb(c: readonly [number, number, number]): [number, number,
 const GRADED_DIR = 'Backgrounds/Tilesets/';
 
 /** Liefert für Kachel-Sheets eine abgetönte Canvas-Kopie (als Bildquelle verwendbar), sonst das Bild selbst. */
-function gradeSheet(path: string, img: HTMLImageElement): HTMLImageElement {
+function gradeSheet(path: string, img: HTMLImageElement): NinjaSrc {
   if (!path.startsWith(GRADED_DIR) || typeof document === 'undefined') return img;
   const c = document.createElement('canvas');
   c.width = img.width;
@@ -68,8 +70,7 @@ function gradeSheet(path: string, img: HTMLImageElement): HTMLImageElement {
   const data = g.getImageData(0, 0, c.width, c.height);
   gradePixels(data.data, NINJA_GRADE.lumBySheet[name] ?? NINJA_GRADE.lum);
   g.putImageData(data, 0, 0);
-  // Canvas dient überall nur als drawImage-Quelle mit width/height – wie ein geladenes Bild.
-  return c as unknown as HTMLImageElement;
+  return c;
 }
 
 export function preloadNinja(paths: string[], timeoutMs = 8000): Promise<void> {
@@ -103,13 +104,14 @@ export const GROUND: Record<number, [number, number, number]> = {
   8: [120, 142, 100], 9: [122, 100, 96], 12: [236, 110, 30], 15: [170, 116, 64], 16: [168, 160, 146], 17: [106, 168, 58],
 };
 
-export interface Cell { img: HTMLImageElement; tx: number; ty: number }
+export interface Cell { img: NinjaSrc; tx: number; ty: number }
 const found = new Map<number, Cell | null>();
 
 /** Sucht über alle geladenen Sheets die Zelle mit kleinstem Farbabstand plus Streuungsstrafe (flach = Füllfläche). */
 export function groundCell(gid: number): Cell | null {
   if (found.has(gid)) return found.get(gid)!;
-  const t = GROUND[gid];
+  // Sheets sind beim Laden abgetönt (gradeSheet): Zielfarbe genauso abtönen, sonst passt die Suche nicht mehr
+  const t = GROUND[gid] ? gradeRgb(GROUND[gid]) : undefined;
   let best: Cell | null = null;
   if (t && typeof document !== 'undefined') {
     let bestScore = Infinity;

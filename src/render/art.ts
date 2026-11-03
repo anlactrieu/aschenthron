@@ -394,7 +394,7 @@ const tileCache = new Map<string, HTMLCanvasElement>();
 /** Boden aus dem Ninja-Paket: Zelle 3x hochskaliert, getönt, mit ein paar Punkten je Variante gegen Wiederholung. */
 function ninjaTile(gid: number, variant: number, zone: number): HTMLCanvasElement | null {
   const look = tileLook(gid, zone);
-  let img: HTMLImageElement | null = null;
+  let img: CanvasImageSource | null = null;
   let sx = 0;
   let sy = 0;
   if (look?.cells) {

@@ -53,7 +53,7 @@ function mixc(a: number, b: number, t: number): number {
 }
 
 /** Ein Bild des Sheets (16x16 usw.), optional multiplikativ gefärbt (Alpha bleibt). */
-function frameCanvas(img: HTMLImageElement, sx: number, sy: number, w: number, h: number, tint?: number): HTMLCanvasElement {
+function frameCanvas(img: CanvasImageSource, sx: number, sy: number, w: number, h: number, tint?: number): HTMLCanvasElement {
   const c = mk(w, h);
   const g = ctx(c);
   g.drawImage(img, sx, sy, w, h, 0, 0, w, h);

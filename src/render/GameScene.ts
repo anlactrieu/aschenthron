@@ -152,6 +152,8 @@ export class GameScene extends Phaser.Scene {
   private bossAuras = new Map<number, { s: Phaser.GameObjects.Sprite; rage: boolean }>();
   /** Boss-Auftritt: wann ein Boss zuletzt angekündigt wurde (nicht bei jedem erneuten Kontakt) */
   private bossIntroAt = new Map<number, number>();
+  /** Bosse in der Nähe, alle 30 Frames neu gesammelt (nicht jeden Frame alle Akteure durchgehen) */
+  private nearBosses: Actor[] = [];
   private vignette!: HTMLDivElement;
   private ambientKind: 'embers' | 'mist' | null = null;
   private lastTime = 0;
@@ -835,8 +837,8 @@ export class GameScene extends Phaser.Scene {
         if (once()) {
           this.fx.ring(from.x, from.y + 18, 210, 0x7fd0ff, 460);
           if (!pfx('frost_nova', feetFrom, { from: 0.4 })) this.fx.burst(from.x, from.y, 0xaee4ff, 520);
+          if (e.skill === 'glacial_burst') this.cameras.main.shake(140, 0.005);
         }
-        if (e.skill === 'glacial_burst' && fxSeen.has(tag)) this.cameras.main.shake(140, 0.005);
         break;
       case 'shockwave':
         if (once()) {
@@ -1111,6 +1113,8 @@ export class GameScene extends Phaser.Scene {
           break;
         }
         case 'levelUp': {
+          // Vignette hängt an der eigenen Stufe: nach dem Aufstieg neu bewerten (ohne erneutes Zonenbanner)
+          this.applyVignette(regionAt(w, this.player().x, this.player().y), this.player());
           this.achBump('level', e.level);
           say(`LEVEL ${e.level}! +5 Attributpunkte (C), +1 Skillpunkt`);
           this.sfx.levelUp();
@@ -1389,8 +1393,9 @@ export class GameScene extends Phaser.Scene {
   /** Schattenflammen-Aura hinter jedem lebenden Boss in Sichtweite; wird bei Wut glutrot. */
   private updateBossAuras(p: Actor): void {
     const keep = new Set<number>();
-    for (const a of this.world.actors) {
-      if (a.kind !== 'monster' || !a.boss || !a.alive || Math.hypot(a.x - p.x, a.y - p.y) > 18) continue;
+    if (this.frame % 30 === 0) this.nearBosses = this.world.actors.filter((a) => a.kind === 'monster' && a.boss && Math.hypot(a.x - p.x, a.y - p.y) <= 22);
+    for (const a of this.nearBosses) {
+      if (!a.alive || Math.hypot(a.x - p.x, a.y - p.y) > 18) continue;
       const v = this.actorViews.get(a.id);
       const f = this.feetPos(a);
       if (!v || !v.img.visible || !f) continue;
@@ -1437,6 +1442,22 @@ export class GameScene extends Phaser.Scene {
     this.sfx.setMood(boss ? 'boss' : this.zoneMood);
   }
 
+  /**
+   * Bildrand je Zone; Säule 4: gefährliche Orte (Zone deutlich über der eigenen Stufe) färben ihn blutrot.
+   * Liefert, ob die Zone gefährlich ist.
+   */
+  private applyVignette(hit: { name: string; levels?: string } | undefined, p: Actor): boolean {
+    const dungeon = isDungeon(hit?.name ?? '');
+    const lv = /^(\d+)-(\d+)$/.exec(hit?.levels ?? '');
+    const danger = !!lv && Number(lv[1]) >= p.level + 3;
+    this.vignette.style.background = danger
+      ? `radial-gradient(ellipse at center,rgba(0,0,0,0) ${dungeon ? 30 : 50}%,rgba(34,0,4,${dungeon ? 0.88 : 0.62}) 100%)`
+      : dungeon
+        ? 'radial-gradient(ellipse at center,rgba(8,6,20,.15) 30%,rgba(2,0,10,.82) 100%)'
+        : 'radial-gradient(ellipse at center,rgba(0,0,0,0) 58%,rgba(0,0,0,.45) 100%)';
+    return danger;
+  }
+
   private updateRegion(p: Actor): void {
     if (this.frame % 30 === 0) {
       this.applyMusic();
@@ -1448,14 +1469,7 @@ export class GameScene extends Phaser.Scene {
     if (name !== this.regionName) {
       this.regionName = name;
       const dungeon = isDungeon(name);
-      // Säule 4: gefährliche Orte – Zone deutlich über der eigenen Stufe färbt den Bildrand blutrot und warnt
-      const lv = /^(\d+)-(\d+)$/.exec(hit?.levels ?? '');
-      const danger = !!lv && Number(lv[1]) >= p.level + 3;
-      this.vignette.style.background = danger
-        ? `radial-gradient(ellipse at center,rgba(0,0,0,0) ${dungeon ? 30 : 50}%,rgba(34,0,4,${dungeon ? 0.88 : 0.62}) 100%)`
-        : dungeon
-          ? 'radial-gradient(ellipse at center,rgba(8,6,20,.15) 30%,rgba(2,0,10,.82) 100%)'
-          : 'radial-gradient(ellipse at center,rgba(0,0,0,0) 58%,rgba(0,0,0,.45) 100%)';
+      const danger = this.applyVignette(hit, p);
       this.atmo.setRegion(name);
       const ash = name === 'Aschenöde' || name === 'Aschengrund' || name === 'Thron der Asche';
       this.zoneMood = ash ? 'ash' : dungeon ? (name.includes('Moorhexe') || name === 'Katakomben' ? 'moor' : 'dungeon') : name === 'Aschenhafen' || name === 'Felsenwacht' ? 'town' : name === 'Moorlande' || name === 'Totenacker' ? 'moor' : 'field';
