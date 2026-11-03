@@ -148,6 +148,10 @@ export class GameScene extends Phaser.Scene {
   private lootBorn = new Map<number, { t: number; dx: number }>();
   /** Lichtstrahl (pixelfx) je Beuteteil ab magisch */
   private lootBeams = new Map<number, Phaser.GameObjects.Sprite>();
+  /** Säule 4: Schattenflammen hinter Bossen in Sichtweite (Glutrot, sobald wütend) */
+  private bossAuras = new Map<number, { s: Phaser.GameObjects.Sprite; rage: boolean }>();
+  /** Boss-Auftritt: wann ein Boss zuletzt angekündigt wurde (nicht bei jedem erneuten Kontakt) */
+  private bossIntroAt = new Map<number, number>();
   private vignette!: HTMLDivElement;
   private ambientKind: 'embers' | 'mist' | null = null;
   private lastTime = 0;
@@ -1381,6 +1385,50 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** Schattenflammen-Aura hinter jedem lebenden Boss in Sichtweite; wird bei Wut glutrot. */
+  private updateBossAuras(p: Actor): void {
+    const keep = new Set<number>();
+    for (const a of this.world.actors) {
+      if (a.kind !== 'monster' || !a.boss || !a.alive || Math.hypot(a.x - p.x, a.y - p.y) > 18) continue;
+      const v = this.actorViews.get(a.id);
+      const f = this.feetPos(a);
+      if (!v || !v.img.visible || !f) continue;
+      keep.add(a.id);
+      let au = this.bossAuras.get(a.id);
+      if (au && au.rage !== a.enraged) {
+        au.s.destroy();
+        this.bossAuras.delete(a.id);
+        au = undefined;
+      }
+      if (!au) {
+        const s = playPixelfx(this, a.enraged ? 'boss_rage' : 'boss_aura', f.x, f.y + 8, { depth: v.img.depth - 0.5, alpha: a.enraged ? 1 : 0.85, from: ((a.id * 0.53) % 1) * 2.4 });
+        if (!s) continue;
+        au = { s, rage: a.enraged };
+        this.bossAuras.set(a.id, au);
+      }
+      au.s.setPosition(f.x, f.y + 8).setDepth(v.img.depth - 0.5);
+    }
+    for (const [id, au] of this.bossAuras) {
+      if (keep.has(id)) continue;
+      au.s.destroy();
+      this.bossAuras.delete(id);
+    }
+  }
+
+  /** Boss-Auftritt beim ersten Kontakt (höchstens alle 3 Minuten je Boss): Banner, dunkler Schimmer, Beben, Boss-Ton. */
+  private bossIntro(p: Actor): void {
+    for (const a of this.world.actors) {
+      if (a.kind !== 'monster' || !a.boss || !a.alive || a.targetId !== p.id || Math.hypot(a.x - p.x, a.y - p.y) > 14) continue;
+      const last = this.bossIntroAt.get(a.id);
+      if (last !== undefined && this.now - last < 180_000) continue;
+      this.bossIntroAt.set(a.id, this.now);
+      this.ui.banner(a.name, '#ff7a4a');
+      this.glow(0x3a0408, 0.35, 900, false);
+      this.cameras.main.shake(220, 0.004);
+      this.sfx.boss();
+    }
+  }
+
   /** Bossmusik, solange ein lebender Boss in der Nähe auf den Spieler zielt; sonst Stimmung der Zone. */
   private applyMusic(): void {
     const p = this.player();
@@ -1389,22 +1437,34 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateRegion(p: Actor): void {
-    if (this.frame % 30 === 0) this.applyMusic();
+    if (this.frame % 30 === 0) {
+      this.applyMusic();
+      this.bossIntro(p);
+    }
     // Dungeons liegen innerhalb der Landkarte; kleinste passende Zone gewinnt
     const hit = regionAt(this.world, p.x, p.y);
     const name = hit?.name ?? '';
     if (name !== this.regionName) {
       this.regionName = name;
       const dungeon = isDungeon(name);
-      this.vignette.style.background = dungeon
-        ? 'radial-gradient(ellipse at center,rgba(8,6,20,.15) 30%,rgba(2,0,10,.82) 100%)'
-        : 'radial-gradient(ellipse at center,rgba(0,0,0,0) 58%,rgba(0,0,0,.45) 100%)';
+      // Säule 4: gefährliche Orte – Zone deutlich über der eigenen Stufe färbt den Bildrand blutrot und warnt
+      const lv = /^(\d+)-(\d+)$/.exec(hit?.levels ?? '');
+      const danger = !!lv && Number(lv[1]) >= p.level + 3;
+      this.vignette.style.background = danger
+        ? `radial-gradient(ellipse at center,rgba(0,0,0,0) ${dungeon ? 30 : 50}%,rgba(34,0,4,${dungeon ? 0.88 : 0.62}) 100%)`
+        : dungeon
+          ? 'radial-gradient(ellipse at center,rgba(8,6,20,.15) 30%,rgba(2,0,10,.82) 100%)'
+          : 'radial-gradient(ellipse at center,rgba(0,0,0,0) 58%,rgba(0,0,0,.45) 100%)';
       this.atmo.setRegion(name);
       const ash = name === 'Aschenöde' || name === 'Aschengrund' || name === 'Thron der Asche';
       this.zoneMood = ash ? 'ash' : dungeon ? (name.includes('Moorhexe') || name === 'Katakomben' ? 'moor' : 'dungeon') : name === 'Aschenhafen' || name === 'Felsenwacht' ? 'town' : name === 'Moorlande' || name === 'Totenacker' ? 'moor' : 'field';
       this.applyMusic();
       this.sfx.ambient(name === 'Moorlande' || name === 'Gruft der Moorhexe' ? 'wind' : ash ? 'embers' : dungeon ? 'cave' : null);
-      if (hit) this.ui.banner(`${hit.name}${hit.levels && hit.levels !== 'Stadt' ? ` · Stufe ${hit.levels}` : ''}`);
+      if (hit && danger) {
+        this.ui.banner(`${hit.name} · Stufe ${hit.levels} – Gefahr!`, '#ff5a4a');
+        this.glow(0x2a0004, 0.3, 800, false);
+        this.sfx.warn();
+      } else if (hit) this.ui.banner(`${hit.name}${hit.levels && hit.levels !== 'Stadt' ? ` · Stufe ${hit.levels}` : ''}`);
     }
   }
 
@@ -2103,6 +2163,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
     for (const [id, v] of this.actorViews) if (!active.has(id)) v.img.setVisible(false);
+    this.updateBossAuras(p);
     // Figuren, die es in der Welt nicht mehr gibt (entfernte Beschwörungen, gegangene Spieler): Bild und Zwischenspeicher freigeben
     if (this.frame % 120 === 0) {
       const present = new Set(this.world.actors.map((x) => x.id));
