@@ -28,13 +28,21 @@ export interface HeroLook {
   weapon: HeroWeapon;
 }
 
-const tier = (t: number): number => (t < 0 ? 0 : t < 2 ? 1 : 2);
+/** Material aus der Vorlagen-ID (Eisen/Leder), sonst nach Stufe; 0 = nichts angelegt. */
+function material(id: string, t: number, iron: RegExp, leather: RegExp): number {
+  if (!id) return 0;
+  if (iron.test(id)) return 2;
+  if (leather.test(id)) return 1;
+  return t >= 2 ? 2 : 1;
+}
 
 export function heroLookOf(look: Look): HeroLook {
+  const i = look.ids;
   return {
-    armor: tier(look.chest),
-    helm: tier(look.head),
-    gloves: tier(look.hands),
+    // Roben vorerst als Tuch (eigene Form kommt mit der nächsten Ausrüstungsrunde)
+    armor: look.robe ? 0 : material(i.chest, look.chest, /plate|mail|cuirass/, /leather|vest/),
+    helm: material(i.head, look.head, /helm|visor|crown/, /cap|hood/),
+    gloves: material(i.hands, look.hands, /gauntlet|fists/, /glove/),
     weapon: look.weapon < 0 ? 'none' : look.weaponKind === 1 ? 'bow' : look.weaponKind === 2 ? 'staff' : 'sword',
   };
 }

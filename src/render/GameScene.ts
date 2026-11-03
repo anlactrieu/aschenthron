@@ -26,6 +26,8 @@ import { isTouch } from './touch';
 import { Atmosphere, isDungeon } from './atmosphere';
 import { Fx } from './fx';
 import { playPixelfx, registerPixelfx, type FxName } from './pixelfx';
+import { attackFrame, idleFrame, walkFrame } from './hero';
+import { HERO_ORIGIN, heroMode, heroTexture } from './heroSheet';
 import { onSettings, settings } from './settings';
 import type { RemoteSession } from '../net/client';
 import {
@@ -94,6 +96,8 @@ interface ActorView {
   up?: boolean;
   /** läuft im Bild überwiegend seitlich: Seitenansicht */
   side?: boolean;
+  /** zurückgelegte Strecke in Bildschirm-Pixeln (Laufbild des Skelett-Helden) */
+  dist?: number;
 }
 
 export class GameScene extends Phaser.Scene {
@@ -925,6 +929,8 @@ export class GameScene extends Phaser.Scene {
               v.swingUntil = this.now + SWING_MS * this.ts;
               v.flip = sxv < 0;
               v.up = syv < 0;
+              // Skelett-Held: Ansicht nach Schlagrichtung (sonst bliebe nach seitlichem Laufen die Seitenansicht beim Hieb nach oben)
+              if (at.id === this.playerId && heroMode() === 'skelett') v.side = Math.abs(sxv) > Math.abs(syv) * 0.8;
             }
             delay = SWING_MS * 0.4 * this.ts;
             this.later(delay, () => this.kick(at.id, (sxv / len) * (projectile ? -1 : 10), (syv / len) * (projectile ? -0.5 : 10)));
@@ -2055,6 +2061,7 @@ export class GameScene extends Phaser.Scene {
       const dy = pos.y - view.lastY;
       if (Math.abs(dx) + Math.abs(dy) > 0.001) {
         view.movingUntil = time + 160;
+        view.dist = (view.dist ?? 0) + Math.hypot(dx * TILE_W, dy * TILE_H);
         // Bildschirm-Richtung: Draufsicht, Kachelschritt = Bildschirmschritt
         const screenDx = dx;
         if (Math.abs(screenDx) > 0.0005) view.flip = screenDx < 0;
@@ -2070,7 +2077,14 @@ export class GameScene extends Phaser.Scene {
       const stepPhase = time / STEP_MS;
       const frame = swinging ? (swingK < 0.4 ? FRAME_WIND : FRAME_STRIKE) : time < view.movingUntil ? WALK_FRAMES[Math.floor(stepPhase) % 4]! : 0;
       const img = view.img;
-      if (a.kind === 'player') {
+      const skel = a.kind === 'player' && heroMode() === 'skelett';
+      if (skel) {
+        // Skelett-Held: ein Sheet je Look, Bild nach Animation/Ansicht; links = Seitenansicht gespiegelt (figDir)
+        const look = lookOf(a);
+        const v3 = view.side ? 'side' : view.up ? 'back' : 'front';
+        const fname = swinging ? `attack_${v3}_${attackFrame(swingK)}` : time < view.movingUntil ? `walk_${v3}_${walkFrame(view.dist ?? 0)}` : `idle_${v3}_${idleFrame(time)}`;
+        img.setTexture(heroTexture(this, look), fname).setOrigin(HERO_ORIGIN.x, HERO_ORIGIN.y);
+      } else if (a.kind === 'player') {
         const look = lookOf(a);
         img.setTexture(ensureTexture(this, lookKey(look, frame, !!view.up && !view.side, !!view.side), () => playerCanvas(look, frame, !!view.up && !view.side, !!view.side)));
       } else {
@@ -2092,7 +2106,7 @@ export class GameScene extends Phaser.Scene {
       // Schritt-Wippen beim Gehen, Bodenschatten bleibt fest unter den Füßen
       const walking = time < view.movingUntil && a.alive;
       // Wippe: im Schritt (Fuß setzt auf) unten, im Durchgang (Stand-Bild) oben; Monster hüpfen stärker, Bosse weniger
-      const bob = walking && !swinging ? -Math.abs(Math.sin(stepPhase * Math.PI * 0.5)) * (a.boss ? 0.8 : a.kind === 'monster' ? 1.6 : 1.2) : 0;
+      const bob = walking && !swinging && !skel ? -Math.abs(Math.sin(stepPhase * Math.PI * 0.5)) * (a.boss ? 0.8 : a.kind === 'monster' ? 1.6 : 1.2) : 0;
       const fig = this.figSize(img);
       if (a.alive) {
         const wide = fig ? Math.max(16, Math.min(56, fig.w * 0.55)) : a.boss ? 46 : a.kind === 'monster' && (monsterKind(a.kindId!).family === 'beast' || monsterKind(a.kindId!).family === 'spider') ? 30 : a.kind === 'monster' && monsterKind(a.kindId!).family === 'golem' ? 34 : 22;
@@ -2112,7 +2126,7 @@ export class GameScene extends Phaser.Scene {
         continue;
       }
       // leichtes Atmen, wenn sie stehen (Skalierung um die Füße)
-      const breath = !walking && !swinging ? 1 + Math.sin(time / 420 + a.id * 1.7) * 0.014 : 1;
+      const breath = !walking && !swinging && !skel ? 1 + Math.sin(time / 420 + a.id * 1.7) * 0.014 : 1;
       img.setAngle(0).setAlpha(1).setScale(1 / breath ** 0.5, breath);
       // Treffer-Blitz: Phaser-Tint multipliziert (Weiß = unsichtbar) → echter Blitz über den Füllmodus; sonst Modus immer zurücksetzen
       const flashing = (this.flash.get(a.id) ?? 0) > time;

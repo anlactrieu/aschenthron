@@ -13,6 +13,7 @@ import type { AchievementTracker } from './achievements';
 import { ACHIEVEMENTS } from './achievements';
 import { type NextStep, giverLocation, questAvailable, questChains, questWhere, targetName } from '../sim/quests';
 import { lookKey, lookOf, playerPortrait } from './art';
+import { heroMode } from './heroSheet';
 import { initCredits, toggleCredits } from './credits';
 import { goFullscreen, isFullscreen, isTouch } from './touch';
 import { BAR_CSS, faceUrl, installTheme } from './theme';
@@ -516,7 +517,7 @@ export class Ui {
     const fc = el('div', 'fc');
     const face = el('img', 'face') as HTMLImageElement;
     // DCSS: leer (dunkler Grund) bis das Brustbild steht, sonst blitzt kurz das Ninja-Gesicht auf
-    if (figureMode() !== 'dcss') face.src = faceUrl(HERO_BASE);
+    if (figureMode() !== 'dcss' && heroMode() !== 'skelett') face.src = faceUrl(HERO_BASE);
     face.alt = '';
     this.face = face;
     fc.append(face);
@@ -531,7 +532,7 @@ export class Ui {
   /** DCSS-Modus: Brustbild (Kopf und Schultern) des Helden mit aktueller Ausrüstung, ganzzahlig skaliert. */
   private updatePortrait(p: Actor): void {
     const face = this.face;
-    if (!face || figureMode() !== 'dcss') return;
+    if (!face || (figureMode() !== 'dcss' && heroMode() !== 'skelett')) return;
     const look = lookOf(p);
     const key = lookKey(look, 0, false);
     if (key === this.faceKey || performance.now() < this.faceRetryAt) return;
