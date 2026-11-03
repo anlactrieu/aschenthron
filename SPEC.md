@@ -368,13 +368,13 @@ User: „Wie in D4O kein Rang für Zauber, lieber mehr Zauber; neue Zauber desse
 - [x] pixelfx als Projekt-Skill + `tools/pixelfx`; Effekte Treffer, Krit, Loot-Strahl nach Seltenheit, Level-up
 
 **Offen:**
-- [ ] Treffer-/Krit-Effekt im echten Kampf prüfen (bisher nur per Konsole), Krit-Effekt zu groß (216x136 px)
-- [ ] Loot-Strahl: bei vielen Drops unruhig, Kern blass
-- [ ] Alter heller Kamerablitz bei Seltenem/Legendärem dämpfen (`cameras.main.flash`)
-- [ ] Stadtboden/Häuser (Ninja) trotz Abdunkelung noch bunt: weiter abdunkeln
-- [ ] Heldenporträt zum Helden/DCSS passend machen
-- [ ] Säule 1 Wucht: Wackeln, Schadenszahlen, Zauber-/Pfeil-Effekte aus pixelfx
-- [ ] Säule 3 Skillgewinn spürbar machen
-- [ ] Säule 4 gefährliche Orte, Bosse, Atmosphäre
-- [ ] Level-up-Sheet 1,5 MB (alle Effekt-Sheets ca. 4 MB): verkleinern
+- [x] Treffer-/Krit-Effekt im echten Kampf geprüft, Krit als kompakter Remix (136x92)
+- [x] Loot-Strahl: kürzer, schmal, Kern farbig, Phase je Beute versetzt
+- [x] Kamerablitze durch gedämpften `glow()` ersetzt
+- [x] Stadtboden/Häuser zentral entsättigt (`NINJA_GRADE`)
+- [x] Heldenporträt = Brustbild des DCSS-Helden
+- [x] Säule 1 Wucht: Zauber-Effekte aus pixelfx (Blitz, Frostnova, Wirbelhieb, Bodenschlag, Heilung); Wackeln/Zahlen gab es schon. Offen: Feuerball-Einschlag
+- [x] Säule 3 Skillgewinn: Runenkreis, Banner, Schnellleisten-Platz pulsiert
+- [x] Säule 4 (Darstellung): Boss-Aura, Boss-Auftritt, Gefahr-Warnung + rote Vignette
+- [x] Sheets verkleinert (15/20 fps): Level-up 0,5 MB, 15 Effekte zusammen 4,2 MB
 - [ ] Ungeprüft: Handy, Nacht/Regen mit neuem Look, Händler-/Truhenfenster
