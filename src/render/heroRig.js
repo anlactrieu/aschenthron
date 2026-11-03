@@ -142,11 +142,10 @@ function solve(pose) {
 
 // ---- drawing: every part goes through one depth buffer
 const BW = 300, BH = 240, OX = 150, OY = 180; // the scratch grid, big enough for a raised scythe; feet at (OX, OY)
-const Zb = new Float32Array(BW * BH), Tone = new Float32Array(BW * BH), Part = new Int8Array(BW * BH), Mat = new Int8Array(BW * BH), Fr = new Int8Array(BW * BH), LX = new Float32Array(BW * BH), LY = new Float32Array(BW * BH), Col = new Uint32Array(BW * BH);
+const Zb = new Float32Array(BW * BH), Tone = new Float32Array(BW * BH), Part = new Int8Array(BW * BH), Mat = new Int8Array(BW * BH), Col = new Uint32Array(BW * BH);
 const touched = [];
 const LIGHT = unit([-0.55, 0.72, 0.5]);
-let clipBody = false, clipWeapon = false, curFrameIndex = 0;
-const FRAME_IDS = ["pelvis", "waist", "chest", "head", "neck", "upperN", "foreN", "upperF", "foreF", "thighN", "shinN", "thighF", "shinF", "footN", "footF"];
+let clipBody = false, clipWeapon = false;
 function plot(i, z, tone, part, mat, wx, wy, color) {
   if (Part[i] === 0) touched.push(i);
   else if (z <= Zb[i]) return;
@@ -154,9 +153,6 @@ function plot(i, z, tone, part, mat, wx, wy, color) {
   Tone[i] = tone;
   Part[i] = part;
   Mat[i] = mat;
-  Fr[i] = curFrameIndex;
-  LX[i] = wx;
-  LY[i] = wy;
   Col[i] = color;
 }
 function sphere(c, r, part, mat) {
@@ -197,19 +193,13 @@ function ellipsoid(c, R, r, part, mat, minY = -Infinity) {
 }
 // parts: each has its own number, so edges between them can be seen
 export const PART = { pelvis: 1, waist: 2, chest: 3, neck: 4, head: 5, face: 6, upperN: 7, elbowN: 8, foreN: 9, handN: 10, upperF: 11, elbowF: 12, foreF: 13, handF: 14, thighN: 15, kneeN: 16, shinN: 17, footN: 18, thighF: 19, kneeF: 20, shinF: 21, footF: 22, weapon: 23, offWeapon: 24, helm: 25, pauldronN: 26, pauldronF: 27 };
-const useFrame = (name) => { curFrameIndex = FRAME_IDS.indexOf(name); };
 
 function drawBody(S) {
   const { B, armN, armF, legN, legF, sN, sF, hipN, hipF, turn } = S, F_ = (name) => B[name];
-  useFrame("pelvis");
   ellipsoid(add(F_("pelvis").t, mv(F_("pelvis").R, [0, -0.2, 0])), F_("pelvis").R, [3.2, 2.6, 4.7], PART.pelvis, 0);
-  useFrame("waist");
   sweep(F_("pelvis").t, F_("chest").t, 3.5, 3.8, PART.waist, 1);
-  useFrame("chest");
   ellipsoid(add(F_("chest").t, mv(F_("chest").R, [0.3, 0.8, 0])), F_("chest").R, [4.0, 4.3, 6.6], PART.chest, 0);
-  useFrame("neck");
   sweep(F_("neck").t, add(F_("neck").t, mv(F_("head").R, [0, 1.6, 0])), 1.7, 1.5, PART.neck, 1);
-  useFrame("head");
   ellipsoid(F_("head").t, F_("head").R, [3.8, 4.0, 3.6], PART.head, 0);
   ellipsoid(add(F_("head").t, mv(F_("head").R, [1.05, -0.55, 0])), F_("head").R, [3.0, 3.25, 2.95], PART.face, 0);
   const gear = S.q.gear ?? {};
@@ -222,25 +212,20 @@ function drawBody(S) {
     if (gear.helm > 1) ellipsoid(add(H.t, mv(H.R, [3.4, -0.6, 0])), H.R, [0.9, 2.4, 0.8], PART.helm, 1);
   }
   const arm = (far, A, sh, up, el, fo, ha, nameU, nameF) => {
-    useFrame(nameU);
     sphere(sh, 2.9, up, 0);
     sweep(sh, A.joint, 2.5, 1.9, up, 0);
     // Schulterplatte: flache Kappe über dem Oberarmansatz
     if (gear.pauldron) ellipsoid(add(sh, [0, 0.9, 0]), F_("chest").R, [3.1, 2.3, 3.3], far ? PART.pauldronF : PART.pauldronN, 0);
     sphere(A.joint, 1.7, el, 1);
-    useFrame(nameF);
     sweep(A.joint, A.end, 1.9, 1.5, fo, 0, 0.15);
     sphere(A.end, 2.1, ha, 0);
   };
   arm(false, armN, sN, PART.upperN, PART.elbowN, PART.foreN, PART.handN, "upperN", "foreN");
   arm(true, armF, sF, PART.upperF, PART.elbowF, PART.foreF, PART.handF, "upperF", "foreF");
   const leg = (far, L, hip, th, kn, sh, fo, nameT, nameS, nameFt) => {
-    useFrame(nameT);
     sweep(hip, L.joint, 3.4, 2.5, th, 0);
     sphere(L.joint, 2.1, kn, 1);
-    useFrame(nameS);
     sweep(L.joint, L.end, 2.4, 1.8, sh, 0, 0.4);
-    useFrame(nameFt);
     const R = F_(nameFt).R, a = F_(nameFt).t;
     sweep(add(a, mv(R, [-1.4, -0.6, 0])), add(a, mv(R, [3.9, -1.1, 0])), 2.0, 1.5, fo, 0);
   };
@@ -258,7 +243,6 @@ function along(H, axis, side, part) {
     if (clipWeapon && wy < 0) return;
     const idx = (OY - wy) * BW + (OX + wx);
     if (idx < 0 || idx >= BW * BH) return;
-    curFrameIndex = -1;
     plot(idx, z + 0.05, 2, part, 2, wx, wy, c);
   };
   T.at = (i, k) => [H[0] + axis[0] * i + side[0] * k, H[1] + axis[1] * i + side[1] * k, H[2] + axis[2] * i + side[2] * k];
@@ -361,7 +345,6 @@ export const WEAPONS = {
       const n = Math.max(2, Math.ceil(len(sub(B, A)) / 0.4)), Z = STEEL.a;
       for (let k = 0; k <= n; k++) {
         const P = add(A, mul(sub(B, A), k / n)), wx = Math.round(P[0]), wy = Math.round(P[1]), idx = (OY - wy) * BW + (OX + wx);
-        curFrameIndex = -1;
         plot(idx, P[2] + 0.05, 2, PART.weapon, 2, wx, wy, c ?? Z);
       }
     };
@@ -491,7 +474,7 @@ export function shortfall(pose) {
   const S = solve(pose), q = S.q, near = len(sub(S.armN.end, [q.fx, -q.fy, S.armN.end[2]])), far = q.two ? 0 : len(sub(S.armF.end, [q.bx, -q.by, S.armF.end[2]]));
   return Math.max(near, far);
 }
-/** The pixels of a pose: { n, xs, ys, color, src, ink, x0, y0, x1, y1 }, in local space with the feet at (0, 0). */
+/** The pixels of a pose: { n, xs, ys, color, shade, part, x0, y0, x1, y1 }, in local space with the feet at (0, 0). */
 // Ohne Cache (das Original rundet Posenwerte auf ganze Pixel für seinen Cache): das Spiel cacht ganze Sheets je Look.
 export function posed(pose) {
   return render(pose);

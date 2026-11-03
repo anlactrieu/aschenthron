@@ -281,7 +281,7 @@ export function attackFrame(k: number): number {
   return Math.min(n - 1, HERO_WIND_FRAMES + Math.floor(((k - 0.4) / 0.6) * (n - HERO_WIND_FRAMES)));
 }
 
-/** Atembild im Stehen */
+/** Atembild im Stehen: ein Atemzug ca. 2,8 s (Aufrufer versetzt die Zeit je Figur) */
 export function idleFrame(time: number): number {
-  return Math.floor(time / 260) % HERO_ANIMS.idle;
+  return Math.floor(time / 700) % HERO_ANIMS.idle;
 }

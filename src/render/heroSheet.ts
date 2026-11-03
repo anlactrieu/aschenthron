@@ -34,7 +34,7 @@ function sheetOf(look: Look): { key: string; sheet: HeroSheet; canvas: FigCanvas
     const one = document.createElement('canvas');
     one.width = sheet.w;
     one.height = sheet.h;
-    one.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(sheet.data), sheet.w, sheet.h), 0, 0);
+    one.getContext('2d')!.putImageData(new ImageData(sheet.data as Uint8ClampedArray<ArrayBuffer>, sheet.w, sheet.h), 0, 0);
     const canvas: FigCanvas = document.createElement('canvas');
     canvas.width = sheet.w * HERO_SCALE;
     canvas.height = sheet.h * HERO_SCALE;
@@ -51,9 +51,21 @@ function sheetOf(look: Look): { key: string; sheet: HeroSheet; canvas: FigCanvas
   return { key, ...hit };
 }
 
+/** So viele Looks bleiben gebacken (je ca. 3 MB als 2x-Canvas); ältere werden samt Textur verworfen */
+const KEEP = 6;
+
 /** Texturschlüssel des Helden-Sheets für diesen Look; legt die Textur samt Bildern beim ersten Mal an. */
 export function heroTexture(scene: Phaser.Scene, look: Look): string {
   const { key, sheet, canvas } = sheetOf(look);
+  // zuletzt benutzt ans Ende (Map hält die Einfügereihenfolge), Älteste verwerfen
+  const hit = sheets.get(key)!;
+  sheets.delete(key);
+  sheets.set(key, hit);
+  for (const old of sheets.keys()) {
+    if (sheets.size <= KEEP) break;
+    sheets.delete(old);
+    if (scene.textures.exists(old)) scene.textures.remove(old);
+  }
   if (!scene.textures.exists(key)) {
     const tex = scene.textures.addCanvas(key, canvas)!;
     for (const [name, f] of Object.entries(sheet.frames)) {

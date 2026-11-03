@@ -529,7 +529,7 @@ export class Ui {
     this.tl.append(fc, hdr);
   }
 
-  /** DCSS-Modus: Brustbild (Kopf und Schultern) des Helden mit aktueller Ausrüstung, ganzzahlig skaliert. */
+  /** Skelett-Held oder DCSS-Modus: Brustbild (Kopf und Schultern) des Helden mit aktueller Ausrüstung, ganzzahlig skaliert. */
   private updatePortrait(p: Actor): void {
     const face = this.face;
     if (!face || (figureMode() !== 'dcss' && heroMode() !== 'skelett')) return;

@@ -930,7 +930,7 @@ export class GameScene extends Phaser.Scene {
               v.flip = sxv < 0;
               v.up = syv < 0;
               // Skelett-Held: Ansicht nach Schlagrichtung (sonst bliebe nach seitlichem Laufen die Seitenansicht beim Hieb nach oben)
-              if (at.id === this.playerId && heroMode() === 'skelett') v.side = Math.abs(sxv) > Math.abs(syv) * 0.8;
+              if (at.kind === 'player' && heroMode() === 'skelett') v.side = Math.abs(sxv) > Math.abs(syv) * 0.8;
             }
             delay = SWING_MS * 0.4 * this.ts;
             this.later(delay, () => this.kick(at.id, (sxv / len) * (projectile ? -1 : 10), (syv / len) * (projectile ? -0.5 : 10)));
@@ -2082,7 +2082,7 @@ export class GameScene extends Phaser.Scene {
         // Skelett-Held: ein Sheet je Look, Bild nach Animation/Ansicht; links = Seitenansicht gespiegelt (figDir)
         const look = lookOf(a);
         const v3 = view.side ? 'side' : view.up ? 'back' : 'front';
-        const fname = swinging ? `attack_${v3}_${attackFrame(swingK)}` : time < view.movingUntil ? `walk_${v3}_${walkFrame(view.dist ?? 0)}` : `idle_${v3}_${idleFrame(time)}`;
+        const fname = swinging ? `attack_${v3}_${attackFrame(swingK)}` : time < view.movingUntil ? `walk_${v3}_${walkFrame(view.dist ?? 0)}` : `idle_${v3}_${idleFrame(time + a.id * 977)}`;
         img.setTexture(heroTexture(this, look), fname).setOrigin(HERO_ORIGIN.x, HERO_ORIGIN.y);
       } else if (a.kind === 'player') {
         const look = lookOf(a);
