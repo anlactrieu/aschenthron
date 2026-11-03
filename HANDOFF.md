@@ -3,6 +3,10 @@
 ## AKTUELL (2026-11-03, Sonnet-Session „optik-rest“, Branch `neuer-look`)
 - **Erledigt:** (1) Stadtstraße (gid **1**, Zone none) und Felsenwacht-Platz: `groundLook.ts tileLook` case 1 = `FLAGS` mit dunklerer Tönung (96,82,112,0.5). (2) Boss-Aura: hellere Paletten (violett / Glutorange), alpha 1, Skalierung 3,4 (`updateBossAuras`). (3) Heilung: neuer Remix `tools/pixelfx/src/fx/holy/heal-clean.js` (Original zeichnete die graue Standardfigur mit ins Sheet, das war das „blasse Gespenst“), hellere grüne Palette, Skalierung 2,5, zusätzlich `glow(0x1c6a34, 0.3, 450)`. pixelfx-Skill war geladen und wurde genutzt (Kontaktbögen per `tools/render.mjs`).
 - **Geprüft:** tsc, Lint, 313 Tests, Build grün; im Browser Straße, Felsenwacht, Heilung (Frame 11) und Boss-Aura normal/wütend (Räuberfürst Harkon) gesehen. Screenshots des versteckten Browsers sind niedrig aufgelöst und hinken.
+- **Letzte 3 Entscheidungen:** (1) gid 1 nur in Zone none pflastern, damit Dungeon-Böden unverändert bleiben. (2) Heilung als Remix `heal-clean` statt Palette allein, weil das Original die Standardfigur mitbackt. (3) Boss-Aura über Skalierung 3,4 und Alpha 1 statt Blend-Änderung, damit der Boss nicht überstrahlt wird.
+- **Offen:** Heil-Effekt im Peak-Frame (ca. 23) prüfen; Boss-Aura normal ggf. noch kräftiger; Branch nicht gepusht.
+- **Stellen:** `groundLook.ts: tileLook`, `GameScene.ts: updateBossAuras/healed`, `scripts/bake-fx.sh`, `tools/pixelfx/src/fx/holy/heal-clean.js`.
+- **Learnings:** `render.mjs --no-actor` entfernt bei Effekten mit `recolor(p, A, …)` (heal) die Figur nicht: im Kontaktbogen prüfen, ob eine graue Figur im Sheet steckt. Frames per `s.frame.name` pollen (10 ms), sonst verpasst der gedrosselte Browser sie. Nach HMR kann der Boden kurz veraltet/schwarz erscheinen: Seite mit `&x=N` neu laden.
 - **Mängel:** Heil-Effekt nur in einem frühen Frame gesehen (Ring + Blätter); Glow-Wirkung nicht einzeln beurteilt. Boss-Aura normal ist eher flankierend lavendel als wuchtig. Straße gid 1 gilt nur in Zone none (Dungeon-gid-1 unverändert).
 
 ## AKTUELL (2026-11-03, später Abend): Spaßsäulen 1, 3, 4 + offene Mängel (Branch `neuer-look`, Commits a9167f5 … 2ce06fa)
