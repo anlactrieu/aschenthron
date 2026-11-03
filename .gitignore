@@ -2,7 +2,5 @@
 node_modules/
 dist/
 .env
-Browserspiele/
-Spiele/
 server-saves.json
 public/probe/
