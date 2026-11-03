@@ -351,3 +351,11 @@ User: „Wie in D4O kein Rang für Zauber, lieber mehr Zauber; neue Zauber desse
 - **Bekannte Abstriche:** Ton wird bunter/weicher (Monster teils niedlich, kein klassisches Goblin/Ork/Untoten-Set; Skelett/Schädel, Schleim, Schlange, Spinne, Drache, Geist vorhanden); Ausrüstung am Helden einfacher als bisher (DCSS-Ebenen).
 - **Prüfung je Schritt:** tsc, Lint, Tests, Build, im Browser ansehen; Golden-Snapshots der Sim bleiben unberührt (nur Darstellung).
 - **Ergebnis Ausrüstungs-Probe (2026-10-09, `public/probe/equip/index.html`):** Ninja-Figuren sind ~10 von 16 Pixelzeilen Kopf, Körper nur 3-4 Zeilen. Probe mit 4 Stufen (Leder/Eisen/Gold/Arkan): Helm-Overlay (Kuppel + Federbusch), Rumpf-Farbtausch, Schulterplatten, Schild, Waffe aus `SpriteInHand.png` (Pack-Ordner `Items/Weapons/<Name>/`) ist auf einen Blick unterscheidbar, aber gröber als DCSS. Verbesserungen für die echte Umsetzung: Helm-Formen pro Typ (Kappe, Topfhelm, Kronenhelm, Haube), Haare unter dem Helm abdecken, Rückansicht/Seitenansicht (Zeilen 1-3 des Sheets) und Gehen-Frames mit demselben Overlay mitbewegen.
+
+## Richtung (2026-11-03, vom Nutzer entschieden)
+**Problem:** Sechs Runden Umgestaltung nur der Optik, ohne feste Richtung. Figuren-Mix (Ninja + DCSS, Pixelgröße 2x–5x), zu bunte Stimmung, HUD und flacher Kampf stören.
+- **Look:** DCSS durchgehend, dunkel (Dark Fantasy passend zur Story). Ninja Adventure bleibt nur für Boden/Häuser/HUD-Rahmen, Stadt und Palette dunkler tönen. Ein Pixelmaßstab für alle Figuren. Standard `?figuren=dcss`.
+- **Spaßsäulen (alle vier):** (1) Trefferfeeling: Wucht bei Hieb/Pfeil/Zauber (Funken, Wackeln, Zahlen). (2) Loot-Jagd: Lichtstrahl/Glanz nach Seltenheit. (3) Fortschritt: spürbares Level-up und Skillgewinn. (4) Erkunden: gefährliche Orte, Bosse, Atmosphäre.
+- **HUD:** Minimap kleiner, Willkommenstext in gerahmtes Fenster, Leisten nah an die Hotbar, einheitliche Pixelschrift auch im Titelbild.
+- **pixelfx (patch-gg, geprüft APPROVE):** erst nach dem Look-Umbau als Projekt-Skill, Palette dunkel/passend zur Rarität.
+- **Erster Schnitt (frische Session):** Standard auf DCSS + einheitliche Skalierung, Stadt dunkler tönen, HUD-Fixes, dann 3 Effekte: Treffer, Loot-Strahl, Level-up.
