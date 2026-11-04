@@ -416,7 +416,9 @@ function tables(): Tables {
 }
 
 /** Höchste Verschiebung der Abtastposition (Kunstpixel): Grenzen werden zu Kurven statt Kachelkanten */
-const WARP = 6;
+const WARP = 3.5;
+/** Abstand zur Kachelmitte (0..0.5) → Gewicht der Nachbarkachel: bis 0.2 null, dann steil bis 0.5 */
+const sharp = (a: number): number => (a < 0.2 ? 0 : (a - 0.2) * (0.5 / 0.3));
 const BANK_HI = abgr(0x2a1f19);
 const BANK_LO = abgr(0x18120f);
 const RIM = 4; // Rand um den Chunk für Nachbarprüfungen (Kunstpixel)
@@ -504,8 +506,9 @@ export function paintGround(out: Raster, tx0: number, ty0: number, ntx: number, 
           const fy = (fyw - ty * A_ + 0.5) / A_ - 0.5;
           const sx = fx < 0 ? -1 : 1;
           const sy = fy < 0 ? -cw : cw;
-          const ax = fx < 0 ? -fx : fx;
-          const ay = fy < 0 ? -fy : fy;
+          // Übergang nur im äußeren Teil der Halbkachel: Kacheln bleiben voll, Ecken runden mit ~7 px statt zur Raute
+          const ax = sharp(fx < 0 ? -fx : fx);
+          const ay = sharp(fy < 0 ? -fy : fy);
           const b = (ty - ty0 + M) * cw + tx - tx0 + M;
           const m00 = tm[b]!;
           const m10 = tm[b + sx]!;
@@ -529,7 +532,7 @@ export function paintGround(out: Raster, tx0: number, ty0: number, ntx: number, 
             let bestScore = -9;
             for (let c = 0; c < n; c++) {
               const k = cand[c]!;
-              const sc = wsum[c]! + PR[k]! * 0.022 + NT[((wy + k * 29) & PM) * P + ((wx + k * 41) & PM)]! * amp;
+              const sc = wsum[c]! + (KD[k] ? 0.25 : PR[k]! * 0.022) + NT[((wy + k * 29) & PM) * P + ((wx + k * 41) & PM)]! * amp;
               if (sc > bestScore) { bestScore = sc; best = k; }
             }
           }

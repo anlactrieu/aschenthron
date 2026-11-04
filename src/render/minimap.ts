@@ -4,11 +4,12 @@ import { uniqueDef } from '../sim/data';
 import { isTouch } from './touch';
 import { NINJA_BASE } from './ninja';
 
+/** Farben je gid, aus der Palette der Code-Welt (world/ground.ts, props.ts, houses.ts), eine Stufe heller für die kleine Karte */
 const COLORS: Record<number, string> = {
-  1: '#a8a29a', 2: '#4a4650', 3: '#6e8038', 4: '#7cae48', 5: '#847e96', 6: '#4a9ad0', 7: '#cc8a58',
-  8: '#9c9c5a', 9: '#8c7468', 10: '#3f7a3c', 11: '#8c8c94', 12: '#f06a20', 13: '#a8a8b0', 14: '#8a8694',
-  15: '#a8794a', 16: '#a09a90', 17: '#7cae48', 18: '#c0583c', 19: '#8a5c38', 20: '#8a5c38', 21: '#8a8890', 22: '#e0c060', 23: '#7a5a40', 24: '#d0504a', 25: '#7a5a3c', 26: '#a88650', 27: '#8a5c38',
-  28: '#a8794a', 29: '#a8794a', 30: '#a8794a', 31: '#a8794a', 32: '#a8794a', 33: '#a8794a', 34: '#a8794a', 35: '#a8794a', 36: '#a8794a',
+  1: '#5e5764', 2: '#16141a', 3: '#47522f', 4: '#527036', 5: '#403b48', 6: '#1f3853', 7: '#6c533a',
+  8: '#5d624c', 9: '#4d4448', 10: '#28452a', 11: '#7a7680', 12: '#e86416', 13: '#8a8690', 14: '#7a7680',
+  15: '#6c4831', 16: '#5a535e', 17: '#527036', 18: '#663226', 19: '#7c5a36', 20: '#7c5a36', 21: '#7a7680', 22: '#ff9a38', 23: '#604428', 24: '#903c30', 25: '#604428', 26: '#7c5a36', 27: '#7c5a36',
+  28: '#6c4831', 29: '#6c4831', 30: '#6c4831', 31: '#6c4831', 32: '#6c4831', 33: '#6c4831', 34: '#6c4831', 35: '#6c4831', 36: '#6c4831', 37: '#6c4831',
 };
 
 // Standard klein (B: größer / noch kleiner); neuer Speicherschlüssel, damit alte Wahl der großen Karte nicht greift
@@ -41,7 +42,7 @@ export class Minimap {
     this.view.width = gw * zoom;
     this.view.height = gh * zoom;
     Object.assign(this.view.style, {
-      position: 'fixed', right: '12px', top: '12px', border: '10px solid transparent', borderImage: `url("${NINJA_BASE}Ui/Theme/Theme%20Wood/nine_path_panel.png") 5 / 10px stretch`, background: '#26222c', backgroundClip: 'padding-box',
+      position: 'fixed', right: '12px', top: '12px', border: '10px solid transparent', borderImage: `url("${NINJA_BASE}Ui/Theme/Theme%20Wood/nine_path_panel.png") 5 / 10px stretch`, background: '#0a1220', backgroundClip: 'padding-box',
       imageRendering: 'pixelated', opacity: '0.88', pointerEvents: 'none', zIndex: '3',
     } as Partial<CSSStyleDeclaration>);
     document.body.appendChild(this.view);
