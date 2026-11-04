@@ -507,6 +507,13 @@ Allgemein: je Paket frische Session, Entscheidungen vorher per AskUserQuestion, 
 - **Welle 2:** P2 Gespräche (nach P3, beide in `data.ts`/`save.ts`/`ui.ts`) parallel zu P5 Wildnis, solange P5 nur `wildlife.ts`/`props.ts`/Karte anfasst. Danach P4 Kampf → P6 Tag/Nacht (beide `world.ts`/`data.ts`, nacheinander; die kämpfende Patrouille aus P5 erst nach P4).
 - **Welle 3:** P8 Insel; P9 Ansicht, falls gewählt (blockiert dann alle Render-Pakete, also nicht parallel zu P1/P5).
 
+### Entscheidungen des Nutzers (2026-11-04)
+1. **Ansicht:** erst Inhalte (P1–P7), Iso-Entscheidung später (P9 zurückgestellt).
+2. **Level-Tempo:** auf **20–30 h** bis Stufe 30 strecken, Cap bleibt 30.
+3. **Beute:** **fast nur benannte, feste Gegenstände** wie bei T4C (Zufallsaffixe nur noch Ausnahme).
+4. **Gespräche:** Stichworte **nur anklicken**, kein Eintippen.
+Noch offen: 5 Todesstrafe, 6 Fertigkeiten, 7 Wegweiser, 8 zweite Insel (siehe unten).
+
 ### Offene Entscheidungen für den Nutzer
 1. **Ansicht:** Draufsicht behalten · auf Iso umbauen (4–6 Sessions, Probe `probe/iso/`) · erst Inhalte (P1–P7), Ansicht später.
 2. **Level-Tempo:** Stufe 30 heute nach ≈ 8 h (Bot). Strecken (z. B. 20–30 h), Levelcap anheben oder lassen?
