@@ -150,8 +150,8 @@ export const SPIDER_STRIDE = 3.4;
 const SPIDER_DIE = [
   { roll: 0, drop: 0.3, curl: 0, spread: -0.6, lift: 3 },
   { roll: 0, drop: 1, curl: 0.05, spread: 1, lift: 0 },
-  { roll: 0.45, drop: 1, curl: 0.45, spread: 0, lift: 0 },
-  { roll: 2.8, drop: 1, curl: 0.55, spread: 0, lift: 0 },
+  { roll: 1.2, drop: 1, curl: 0.3, spread: 0.4, lift: -2 },
+  { roll: 3.0, drop: 1, curl: 0.2, spread: 0.7, lift: -5 },
 ];
 
 function spider(b, ph, M0) {
@@ -226,9 +226,9 @@ function worm(b, ph, M0) {
     const u = j / segs;
     const head = Math.max(0, (u - 0.55) / 0.45);
     const x = -L * 0.55 + u * L * 0.9 + head * strike * 1.6 * k;
-    const y = g * 0.85 + head * head * (12 * k * rise) + Math.sin(u * TAU * 1.2 - t * TAU) * 0.4 * k * (1 - head);
+    const y = g * 0.85 + head * head * (12 * k * rise * (1 + Math.abs(ph.coil ?? 0) * 0.35)) + Math.sin(u * TAU * 1.2 - t * TAU) * 0.4 * k * (1 - head);
     // zur Kamera / weg: der Leib liegt in einem seitlichen Bogen, sonst verdeckt der Kopf alle Segmente
-    const coil = (ph.coil ?? 0) * Math.sin((1 - u) * Math.PI * 1.7) * 8.5 * k * (1 - head);
+    const coil = (ph.coil ?? 0) * Math.sin((1 - u) * Math.PI * 1.7) * 13 * k * (1 - head);
     const z = Math.sin(u * TAU * 0.9 + t * TAU) * 2.2 * k * (1 - head * 0.8) + coil;
     pts.push([x * (1 - (ph.coil ?? 0) * 0.25), y, z]);
   }

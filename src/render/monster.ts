@@ -283,6 +283,15 @@ const SLAM: RigPose[] = [
   { fx: 6, fy: -7, bx: 4, by: -7, crouch: 2.2, lean: 2, ffx: 4.5, fbx: -4 },
 ];
 
+/** Golem stirbt: sackt in die Knie, Arme schwer nach vorn, kippt vornüber und bleibt als Haufen liegen (anders als die Helden: nach vorn) */
+const GOLEM_DIE: RigPose[] = [
+  { fx: 3, fy: -5, bx: 2, by: -5, crouch: 2, lean: 2, hy: 0.6, ffx: 4, fbx: -4 },
+  { fx: 7, fy: -6, bx: 6, by: -6, crouch: 5, lean: 4.5, hy: 1, ffx: 5, fbx: -4 },
+  { fx: 9, fy: -5, bx: 8, by: -5, crouch: 7, lean: 6, hy: 1.4, ffx: 5, fbx: -4, fall: -0.5, fallX: 2 },
+  { fx: 10, fy: -4, bx: 9, by: -4, crouch: 5, lean: 4, hy: 1.4, ffx: 5, fbx: -4, fall: -1.2, fallX: 6, fallY: -3 },
+  { fx: 11, fy: -4, bx: 10, by: -4, crouch: 3, lean: 2, hy: 1, ffx: 4.5, fbx: -4, fall: -1.5, fallX: 9, fallY: -4.5 },
+];
+
 /** Golem: Arme hängen bis fast zum Boden neben dem Körper und pendeln schwer; Angriff = Doppelfaust */
 function golemPose(p: RigPose, anim: FigAnim, view: FigView, i: number): void {
   const side = view === 'side';
@@ -291,18 +300,21 @@ function golemPose(p: RigPose, anim: FigAnim, view: FigView, i: number): void {
     if (!side) p.shear = SHEAR_REACH;
     return;
   }
-  if (anim === 'die') return;
+  if (anim === 'die') {
+    Object.assign(p, GOLEM_DIE[Math.min(GOLEM_DIE.length - 1, i)]!);
+    return;
+  }
   const sw = anim === 'walk' ? Math.cos((i / HUM_ANIMS.walk) * Math.PI * 2) : 0;
   const b = anim === 'idle' ? Math.sin((i / HUM_ANIMS.idle) * Math.PI * 2) : 0;
   const hit = anim === 'hit' ? (i === 0 ? 1 : 0.5) : 0;
   // von der Seite stark vorgebeugt, Fäuste vor dem Körper, Brust zur Kamera gedreht (breite Schultern); von vorn hängen die Arme senkrecht
   Object.assign(p, {
-    fx: (side ? 4.5 : 3) - sw * 4 - hit * 2, fy: -4 + Math.abs(sw) * 1.2 + b * 0.4 - hit * 2, fz: side ? 7 : 9.5,
-    bx: (side ? 2.5 : 1.5) + sw * 4 - hit * 3, by: -4 + Math.abs(sw) * 1.2 + b * 0.4 - hit * 1.5, bz: side ? -7 : -9.5,
+    fx: 3 - sw * (side ? 3 : 4) - hit * 2, fy: -4 + Math.abs(sw) * 1.2 + b * 0.4 - hit * 2, fz: side ? 9 : 9.5,
+    bx: 1.5 + sw * (side ? 3 : 4) - hit * 3, by: -4 + Math.abs(sw) * 1.2 + b * 0.4 - hit * 1.5, bz: side ? -9 : -9.5,
     armsFront: false, armOut: 0,
   });
   if (side) {
-    p.turn = 0.62 + sw * 0.08;
+    p.turn = 0.95 + sw * 0.05;
     p.lean = (p.lean ?? 0) + 1.5;
   }
 }

@@ -760,6 +760,9 @@ function render(pose) {
   pose = sized(pose);
   setTint(pose);
   const S = solve(pose), q = S.q, whole = (q.yaw ?? 0) + (q.face === -1 ? Math.PI : 0);
+  // Aschenthron: zur Kamera / weg erst in der Figurenebene nach hinten kippen (um die Bild-x-Achse nach dem Drehen), dann drehen
+  const tipFirst = !!q.fall && !!q.yaw;
+  if (tipFirst) moveAll(S, rotZ(q.fall), [q.fallX ?? 0, -(q.fallY ?? 0), 0]);
   if (whole) turnAll(S, whole);
   // Aschenthron: zur Kamera / weg von oben schräg gesehen: was näher zur Kamera liegt (z > 0), rückt im Bild nach unten. Eine
   // Scherung statt Drehung, damit die Figur gleich hoch bleibt: so sieht man Schritt, Knie und Armschwung in der Tiefe
@@ -770,7 +773,7 @@ function render(pose) {
     [S.B.head.R, S.B.neck.R] = keep;
   }
   // Umfallen: um die Füße in der Bildebene kippen (fall > 0 = nach hinten), dann verschieben (fallX, fallY in Bildpixeln)
-  if (q.fall) moveAll(S, rotZ(q.fall), [q.fallX ?? 0, -(q.fallY ?? 0), 0]);
+  if (q.fall && !tipFirst) moveAll(S, rotZ(q.fall), [q.fallX ?? 0, -(q.fallY ?? 0), 0]);
   if (q.y) moveAll(S, [1, 0, 0, 0, 1, 0, 0, 0, 1], [0, -q.y, 0]);
   const air = (q.y ?? 0) < -0.5 || !!q.fall;
   clipBody = !air;

@@ -7,7 +7,7 @@
  * (halb so teuer wie ein Canvas). Fertige Sheets liegen im Cache (älteste ungenutzte fliegen raus).
  */
 import type Phaser from 'phaser';
-import { FigureBaker, type FigureSheet, type FigureSpec } from './figure';
+import { FigureBaker, type FigView, type FigureSheet, type FigureSpec } from './figure';
 import { addSheetTexture, FIG_SCALE, pixelSource, type FigSource } from './heroSheet';
 import { SHADE } from './heroRig.js';
 import { heroSpec, type HeroLook } from './hero';
@@ -223,7 +223,7 @@ export function bakeInWorker(key: string, req: FigReq, done: (s: FigSource) => v
 /* ------------------------------------------------ Platzhalter */
 
 /**
- * Bis ein Sheet da ist, steht an seiner Stelle ein dunkler Schattenriss der Art (ihr Stehbild von der Seite, im Spielthread in
+ * Bis ein Sheet da ist, steht an seiner Stelle ein dunkler Schattenriss der Art (ihr Stehbild in der gerade gezeigten Ansicht, Seite/vorn/hinten, im Spielthread in
  * 0,1-2 ms gerechnet) in Artgröße: anklickbar, mit Namen, Balken und Trefferblitz. Alle Risse liegen in einer gemeinsamen
  * Leinwand-Textur, die beim Start einmal angelegt wird; neue GL-Texturen im Spiel stocken einzeln bis über 1 s.
  */
@@ -231,7 +231,7 @@ export const SIL_TEX = 'fig_sil';
 /** Feldgröße bei 1x (größtes Bild: Aschenkönig 116x102), Felder je Zeile/Spalte */
 const SIL_SLOT = 120;
 const SIL_COLS = 8;
-const SIL_ROWS = 4;
+const SIL_ROWS = 12;
 /** neue Risse je Frame (je ein Bild rechnen und die Leinwand neu hochladen) */
 const SIL_PER_FRAME = 3;
 
@@ -259,15 +259,16 @@ export const silhouetteOf = (frame: string): Silhouette | undefined => sils.get(
  * Schattenriss der Figur `key` (rechnet ihn beim ersten Mal, höchstens `SIL_PER_FRAME` je Frame), `null` = (noch) keiner.
  * `ahead`: nur vorab für Arten in der Nähe, deren Sheet noch fehlt; lässt einen Riss des Budgets für Sichtbare übrig.
  */
-export function silhouette(scene: Phaser.Scene, key: string, req: FigReq, ahead = false): Silhouette | null {
-  const got = sils.get(key);
+export function silhouette(scene: Phaser.Scene, key: string, req: FigReq, ahead = false, view: FigView = 'side'): Silhouette | null {
+  const frame = view === 'side' ? key : `${key}|${view}`;
+  const got = sils.get(frame);
   if (got) return got;
-  if (silBudget <= (ahead ? 1 : 0) || none.has(key) || silNone.has(key) || (ahead && scene.textures.exists(key))) return null;
+  if (silBudget <= (ahead ? 1 : 0) || none.has(key) || silNone.has(frame) || (ahead && scene.textures.exists(key))) return null;
   const tex = scene.textures.exists(SIL_TEX) ? (scene.textures.get(SIL_TEX) as Phaser.Textures.CanvasTexture) : null;
   const spec = specOf(req);
   if (!tex) return null;
   if (!spec || spec.frame.w > SIL_SLOT || spec.frame.h > SIL_SLOT) {
-    silNone.add(key);
+    silNone.add(frame);
     return null;
   }
   // Feld: ein freies, sonst das älteste, dessen Sheet schon fertig ist (dessen Riss wird nicht mehr gezeigt); sonst keins
@@ -275,7 +276,7 @@ export function silhouette(scene: Phaser.Scene, key: string, req: FigReq, ahead 
   let slot = -1;
   for (let i = 0; i < SIL_COLS * SIL_ROWS; i++) if (!used.has(i)) { slot = i; break; }
   if (slot < 0) {
-    const old = [...silSlot.keys()].find((k) => scene.textures.exists(k));
+    const old = [...silSlot.keys()].find((k) => scene.textures.exists(k.split('|')[0]!));
     if (!old) return null;
     slot = silSlot.get(old)!;
     silSlot.delete(old);
@@ -286,9 +287,9 @@ export function silhouette(scene: Phaser.Scene, key: string, req: FigReq, ahead 
   const { w: FW, h: FH, fx: FX, fy: FY } = spec.frame;
   let r;
   try {
-    r = spec.render('idle', 'side', 0);
+    r = spec.render('idle', view, 0);
   } catch {
-    silNone.add(key);
+    silNone.add(frame);
     return null;
   }
   const px = new ImageData(FW, FH);
@@ -318,11 +319,11 @@ export function silhouette(scene: Phaser.Scene, key: string, req: FigReq, ahead 
   const sy = Math.floor(slot / SIL_COLS) * SIL_SLOT;
   tex.context.clearRect(sx, sy, SIL_SLOT, SIL_SLOT);
   tex.context.putImageData(px, sx, sy);
-  if (tex.has(key)) tex.remove(key);
-  tex.add(key, 0, sx, sy, FW, FH);
+  if (tex.has(frame)) tex.remove(frame);
+  tex.add(frame, 0, sx, sy, FW, FH);
   tex.refresh();
-  const s: Silhouette = { frame: key, ox: FX / FW, oy: FY / FH, top: top * FIG_SCALE, w: Math.max(0, bx1 - bx0 + 1) * FIG_SCALE };
-  sils.set(key, s);
-  silSlot.set(key, slot);
+  const s: Silhouette = { frame, ox: FX / FW, oy: FY / FH, top: top * FIG_SCALE, w: Math.max(0, bx1 - bx0 + 1) * FIG_SCALE };
+  sils.set(frame, s);
+  silSlot.set(frame, slot);
   return s;
 }

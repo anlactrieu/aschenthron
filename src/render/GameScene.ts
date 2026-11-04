@@ -29,7 +29,7 @@ import { isTouch } from './touch';
 import { Atmosphere, isDungeon } from './atmosphere';
 import { Fx } from './fx';
 import { playPixelfx, registerPixelfx, type FxName } from './pixelfx';
-import { attackFrame, onceFrame, walkFrame, type FigureSheet } from './figure';
+import { attackFrame, onceFrame, walkFrame, type FigView, type FigureSheet } from './figure';
 import { heroKey, heroLookOf, idleFrame } from './hero';
 import { FIG_SCALE, heroMode, heroTexture, originOf, prefetchHero } from './heroSheet';
 import { monsterKey } from './monster';
@@ -2074,7 +2074,8 @@ export class GameScene extends Phaser.Scene {
       const nHasSkel = !!nfigKey && !!npcDef(n.kind, n.name);
       const nGot = nHasSkel ? figureTexture(this, nfigKey, { t: 'n', kind: n.kind, name: n.name }) : null;
       // noch im Worker: Schattenriss, keine alte Figur (deren Zeichnen kostete beim ersten Mal bis 80 ms)
-      const nSil = nGot === 'wait' ? silhouette(this, nfigKey, { t: 'n', kind: n.kind, name: n.name }) : null;
+      const nd0 = this.npcDir.get(n.id);
+      const nSil = nGot === 'wait' ? silhouette(this, nfigKey, { t: 'n', kind: n.kind, name: n.name }, false, nd0 ? (nd0.side ? 'side' : nd0.up ? 'back' : 'front') : 'side') : null;
       const nWait = nGot === 'wait' && !nSil;
       const nSkel = nGot === 'wait' ? null : nGot;
       const chestLike = n.kind === 'stash' && !nj && !nHasSkel;
@@ -2281,13 +2282,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Schattenriss eines Akteurs, dessen Skelett-Figur noch gebacken wird (`null`: in diesem Frame noch keiner) */
-  private skelSilhouette(a: Actor): Silhouette | null {
+  private skelSilhouette(a: Actor, view: FigView): Silhouette | null {
     if (a.kind === 'player') {
       const look = heroLookOf(lookOf(a));
-      return silhouette(this, heroKey(look), { t: 'h', look });
+      return silhouette(this, heroKey(look), { t: 'h', look }, false, view) ?? (view === 'side' ? null : silhouette(this, heroKey(look), { t: 'h', look }));
     }
     const req: FigReq = { t: 'm', id: a.kindId! };
-    return silhouette(this, monsterKey(a.kindId!), req);
+    // noch kein Riss dieser Ansicht (Budget): bis dahin der seitliche
+    return silhouette(this, monsterKey(a.kindId!), req, false, view) ?? (view === 'side' ? null : silhouette(this, monsterKey(a.kindId!), req));
   }
 
   /** Skelett-Figur eines Akteurs (Textur + Sheet), `'wait'` = wird noch gebacken (Schattenriss), `null` = alte Figur (DCSS/Ninja/prozedural) */
@@ -2376,7 +2378,7 @@ export class GameScene extends Phaser.Scene {
       // Skelett-Figur noch im Worker: Schattenriss in Artgröße, keine alte Figur (deren Zeichnen kostete beim ersten Mal bis 110 ms)
       const waiting = got === 'wait';
       const fig3 = waiting ? null : got;
-      const sil = waiting ? this.skelSilhouette(a) : null;
+      const sil = waiting ? this.skelSilhouette(a, view.side ? 'side' : view.up ? 'back' : 'front') : null;
       const skel = !!fig3 || !!sil;
       // ohne Riss (nur im ersten Frame einer Art möglich) bleibt nur der Bodenschatten
       const shown = !waiting || !!sil;
