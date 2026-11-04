@@ -31,9 +31,9 @@ import { Fx } from './fx';
 import { playPixelfx, registerPixelfx, type FxName } from './pixelfx';
 import { attackFrame, onceFrame, walkFrame, type FigureSheet } from './figure';
 import { idleFrame } from './hero';
-import { FIG_SCALE, heroMode, heroTexture, originOf } from './heroSheet';
+import { FIG_SCALE, heroMode, heroTexture, originOf, prefetchHero } from './heroSheet';
 import { monsterKey } from './monster';
-import { figureTexture, pumpFigures } from './monsterSheet';
+import { figureTexture, prefetchFigure, pumpFigures, uploadAhead } from './monsterSheet';
 import { npcDef, npcFigKey } from './npc';
 import { onSettings, settings } from './settings';
 import type { RemoteSession } from '../net/client';
@@ -1925,6 +1925,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateNpcs(time: number): void {
+    // Skelett-Figuren: Upload-Budget des Frames, ohne Worker im Spielthread backen, Cache aufräumen
+    pumpFigures(this, () => this.figuresInUse());
     const p = this.player();
     const seen = new Set<string>();
     for (const n of this.world.npcs) {
@@ -1938,8 +1940,12 @@ export class GameScene extends Phaser.Scene {
       const nj = ninjaNpcDef(n.kind, n.name);
       // Skelett-NPC (Modus skelett): Mensch mit Kleidung nach Rolle; Truhen ohne Verwalter bleiben Truhen
       const nfigKey = figureMode() === 'skelett' ? npcFigKey(n.kind, n.name) : '';
-      const nSkel = nfigKey && npcDef(n.kind, n.name) ? figureTexture(this, nfigKey, { t: 'n', kind: n.kind, name: n.name }) : null;
-      const chestLike = n.kind === 'stash' && !nj && !(nfigKey && npcDef(n.kind, n.name));
+      const nHasSkel = !!nfigKey && !!npcDef(n.kind, n.name);
+      const nGot = nHasSkel ? figureTexture(this, nfigKey, { t: 'n', kind: n.kind, name: n.name }) : null;
+      // noch im Worker: nur der Schatten, keine alte Figur (deren Zeichnen kostete beim ersten Mal bis 80 ms)
+      const nWait = nGot === 'wait';
+      const nSkel = nWait ? null : nGot;
+      const chestLike = n.kind === 'stash' && !nj && !nHasSkel;
       this.gfxGround.fillStyle(0x000000, 0.2);
       this.gfxGround.fillEllipse(sx, sy + 9, chestLike ? 34 : 26, chestLike ? 13 : 10);
       let dir = this.npcDir.get(n.id);
@@ -1964,6 +1970,9 @@ export class GameScene extends Phaser.Scene {
         const o = originOf(nSkel.sheet);
         img.setTexture(nSkel.key, time < dir.movingUntil ? `walk_${v3}_${walkFrame(dir.dist ?? 0, A.walk, nSkel.sheet.cyclePx)}` : `idle_${v3}_${idleFrame(time + n.id * 1231, A.idle)}`);
         img.setOrigin(o.x, o.y).setScale(FIG_SCALE).setFlipX(dir.side && dir.flip);
+      } else if (nWait) {
+        // unsichtbar bis fertig; leere Textur, denn die vorige kann schon aus dem Cache geflogen sein
+        img.setTexture('__DEFAULT');
       } else if (!chestLike) {
         img.setOrigin(0.5, FEET_ORIGIN_Y).setScale(1);
         const nf = time < dir.movingUntil ? WALK_FRAMES[Math.floor(time / STEP_MS) % 4]! : 0;
@@ -1981,7 +1990,8 @@ export class GameScene extends Phaser.Scene {
         img.setFlipX(nfig?.dir ? nSide && dir.flip : dir.flip);
       }
       const nBob = !chestLike && !nSkel && time < dir.movingUntil ? -Math.abs(Math.sin((time / STEP_MS) * Math.PI * 0.5)) * 1.2 : 0;
-      img.setPosition(sx, sy + 8 + nBob).setDepth(sy + 8);
+      img.setVisible(!nWait).setPosition(sx, sy + 8 + nBob).setDepth(sy + 8);
+      if (nWait) continue;
       this.label(`n${n.id}`, n.name, sx, sy + 8 - (this.figSize(img)?.top ?? 56) - 4, '#e8d9b0', seen);
       const mark = this.questMark(n, p);
       if (mark) this.label(`m${n.id}`, mark, sx, sy - 70 + Math.sin(time / 200) * 2, mark === '!' ? '#ffe45a' : mark === '…' ? '#8fd0ff' : '#7fe08a', seen, 22);
@@ -2136,16 +2146,33 @@ export class GameScene extends Phaser.Scene {
     return toTile(wp.x, wp.y);
   }
 
-  /** Skelett-Figur eines Akteurs (Textur + Sheet) oder `null` = alte Figur (DCSS/Ninja/prozedural) */
-  private skelFigure(a: Actor): { key: string; sheet: FigureSheet } | null {
+  /** Skelett-Figur eines Akteurs (Textur + Sheet), `'wait'` = wird noch gebacken (unsichtbar), `null` = alte Figur (DCSS/Ninja/prozedural) */
+  private skelFigure(a: Actor): { key: string; sheet: FigureSheet } | 'wait' | null {
     if (a.kind === 'player') {
       if (heroMode() !== 'skelett') return null;
       const cur = this.actorViews.get(a.id)?.img.texture.key;
-      return heroTexture(this, lookOf(a), () => this.figuresInUse(), cur?.startsWith('hero_') ? cur : undefined);
+      return heroTexture(this, lookOf(a), () => this.figuresInUse(), cur?.startsWith('hero_') ? cur : undefined) ?? 'wait';
     }
     if (figureMode() !== 'skelett') return null;
     const id = a.kindId!;
     return figureTexture(this, monsterKey(id), { t: 'm', id });
+  }
+
+  /**
+   * Arten und NPCs knapp außerhalb der Sicht vorausbacken, damit sie beim Hinlaufen schon fertig sind. Im Umkreis liegen auf der
+   * ganzen Karte höchstens 30 verschiedene, also weniger als der Cache hält (sonst würde er Vorausgebackenes gleich wieder verwerfen).
+   */
+  private prefetchNear(p: Actor): void {
+    const R = VIEW + 14;
+    const near = (x: number, y: number): boolean => Math.abs(x - p.x) <= R && Math.abs(y - p.y) <= R;
+    // nächste zuerst: die Warteschlange arbeitet in Anfragereihenfolge
+    const near2 = this.world.actors.filter((a) => a.kind === 'monster' && a.alive && near(a.x, a.y)).map((a) => ({ id: a.kindId!, d: (a.x - p.x) ** 2 + (a.y - p.y) ** 2 }));
+    const ids = new Set(near2.sort((a, b) => a.d - b.d).map((a) => a.id));
+    if (figureMode() === 'skelett') {
+      for (const id of ids) prefetchFigure(monsterKey(id), { t: 'm', id });
+      for (const n of this.world.npcs) if (near(n.x, n.y) && npcDef(n.kind, n.name)) prefetchFigure(npcFigKey(n.kind, n.name), { t: 'n', kind: n.kind, name: n.name });
+    }
+    if (heroMode() === 'skelett') prefetchHero(lookOf(p));
   }
 
   /** Texturen der gerade gezeigten Figuren (dürfen nicht aus dem Cache fliegen) */
@@ -2158,8 +2185,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateActors(time: number, p: Actor, g: Phaser.GameObjects.Graphics): void {
-    // Skelett-Figuren im Hintergrund backen (Zeitbudget je Frame), bis dahin zeigt jede Art ihre alte Figur
-    pumpFigures(this, () => this.figuresInUse());
+    if (this.frame % 20 === 1) this.prefetchNear(p);
     const seen = new Set<string>();
     const active = new Set<number>();
     for (const a of this.world.actors) {
@@ -2198,7 +2224,10 @@ export class GameScene extends Phaser.Scene {
       const frame = swinging ? (swingK < 0.4 ? FRAME_WIND : FRAME_STRIKE) : time < view.movingUntil ? WALK_FRAMES[Math.floor(stepPhase) % 4]! : 0;
       const img = view.img;
       // Skelett-Figur (Held; Monster/NPCs folgen): ein Sheet je Look/Art, Bild nach Animation und Ansicht; links = Seite gespiegelt
-      const fig3 = this.skelFigure(a);
+      const got = this.skelFigure(a);
+      // Skelett-Figur noch im Worker: nur der Schatten, keine alte Figur (deren Zeichnen kostete beim ersten Mal bis 110 ms)
+      const waiting = got === 'wait';
+      const fig3 = waiting ? null : got;
       const skel = !!fig3;
       if (fig3) {
         const { key, sheet } = fig3;
@@ -2216,6 +2245,9 @@ export class GameScene extends Phaser.Scene {
                 : `idle_${v3}_${idleFrame(time + a.id * 977, A.idle)}`;
         const o = originOf(sheet);
         img.setTexture(key, fname).setOrigin(o.x, o.y);
+      } else if (waiting) {
+        // unsichtbar bis fertig; leere Textur, denn die vorige kann schon aus dem Cache geflogen sein
+        img.setTexture('__DEFAULT');
       } else if (a.kind === 'player') {
         const look = lookOf(a);
         img.setTexture(ensureTexture(this, lookKey(look, frame, !!view.up && !view.side, !!view.side), () => playerCanvas(look, frame, !!view.up && !view.side, !!view.side)));
@@ -2247,10 +2279,11 @@ export class GameScene extends Phaser.Scene {
         this.gfxGround.fillStyle(0x000000, 0.22);
         this.gfxGround.fillEllipse(sx + ox, sy + 9 + oy, wide * 0.85, wide * 0.34);
       }
-      img.setVisible(true).setPosition(sx + ox, sy + 8 + oy + bob).setDepth(sy + 8).setFlipX(
+      img.setVisible(!waiting).setPosition(sx + ox, sy + 8 + oy + bob).setDepth(sy + 8).setFlipX(
         // DCSS-Monster blicken von Haus aus nach links; nur die vorab gespiegelte Seitenansicht (Zweibeiner) blickt nach rechts
         fig ? (fig.dir ? (fig.all || !!view.side) && view.flip : view.flip) : a.kind === 'monster' && !(view.side && BIPED.has(monsterKind(a.kindId!).family)) ? !view.flip : view.flip,
       );
+      if (waiting) continue;
       if (!a.alive && skel) {
         // Skelett-Figur: eigenes Sterbebild (liegt am Ende), Monster verblassen erst danach
         const age = a.kind === 'monster' ? Math.max(0, (this.world.tick - a.diedAt) / TICK_RATE - 2) / 2 : 0;
@@ -2351,6 +2384,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.cleanLabels(seen, ['a']);
+    uploadAhead(this);
   }
 
   /** Position vor dem letzten Simulationsschritt, damit die Darstellung zwischen den 20 Schritten pro Sekunde gleiten kann. */
