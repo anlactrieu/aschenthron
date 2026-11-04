@@ -14,7 +14,7 @@ import { figureMode, ninjaNpcDef } from './figureMap';
 import { detectHouses, houseDoor, houseDecor, houseFacade, houseFence, houseGlow, houseRoof, houseSign, houseWallTile, lowerKind, WINDOW_LIGHT, type House, type RoofNotch } from './houses';
 import { buildZoneMap, Z } from './groundLook';
 import { ART, ART_SCALE, Raster, bytes, toCanvas } from './world/raster';
-import { matOf, paintGround } from './world/ground';
+import { matOf, paintGround, warmGround } from './world/ground';
 import { stampDetail, stampWaterDetail } from './world/details';
 import { glow, wallTile } from './world/props';
 import { DOOR_ICONS, TOWN_GID, WATER_PROP_GIDS, WORLD_TOWN_KEYS, registerTownArt } from './town';
@@ -30,10 +30,10 @@ import { Atmosphere, isDungeon } from './atmosphere';
 import { Fx } from './fx';
 import { playPixelfx, registerPixelfx, type FxName } from './pixelfx';
 import { attackFrame, onceFrame, walkFrame, type FigureSheet } from './figure';
-import { idleFrame } from './hero';
+import { heroKey, heroLookOf, idleFrame } from './hero';
 import { FIG_SCALE, heroMode, heroTexture, originOf, prefetchHero } from './heroSheet';
 import { monsterKey } from './monster';
-import { figureTexture, prefetchFigure, pumpFigures, uploadAhead } from './monsterSheet';
+import { figureTexture, initSilhouettes, prefetchFigure, pumpFigures, silhouette, silhouetteOf, SIL_TEX, uploadAhead, type FigReq, type Silhouette } from './monsterSheet';
 import { npcDef, npcFigKey } from './npc';
 import { onSettings, settings } from './settings';
 import type { RemoteSession } from '../net/client';
@@ -97,6 +97,9 @@ function safeStorage(): Storage | null {
   }
 }
 
+/** Hausbild: Schlüssel und Zeichner (siehe initHouses/houseTileArt) */
+type HouseArt = { key: string; make: () => HTMLCanvasElement };
+
 const hash = (x: number, y: number): number => ((x * 73856093) ^ (y * 19349663)) >>> 0;
 
 interface ActorView {
@@ -113,6 +116,11 @@ interface ActorView {
   side?: boolean;
   /** zurückgelegte Strecke in Bildschirm-Pixeln (Laufbild des Skelett-Helden) */
   dist?: number;
+  /** zeigte zuletzt den Schattenriss (Sheet noch im Worker); `fadeAt`: Zeitpunkt, ab dem das fertige Sheet einblendet */
+  waited?: boolean;
+  fadeAt?: number;
+  /** starb als Schattenriss: das später fertige Sheet zeigt keine Leiche mehr */
+  silDead?: boolean;
 }
 
 export class GameScene extends Phaser.Scene {
@@ -122,6 +130,9 @@ export class GameScene extends Phaser.Scene {
   private houses: House[] = [];
   private houseAt = new Map<number, House>();
   private houseSigns = new Map<number, Phaser.GameObjects.Image>();
+  /** Hausbilder im Atlas: Schlüssel -> [Textur, Bildname] (siehe initHouses) */
+  private houseFrames = new Map<string, [string, string]>();
+  private houseAtlasCount = 0;
   private roofs: { img: Phaser.GameObjects.Image; house: House }[] = [];
   /** Fenster- und Laternenlicht, Deckkraft = Nacht-Faktor der Atmosphäre */
   private nightLights: { img: Phaser.GameObjects.Image; k: number; follow?: Phaser.GameObjects.Image }[] = [];
@@ -177,6 +188,9 @@ export class GameScene extends Phaser.Scene {
   /** Bosse in der Nähe, alle 30 Frames neu gesammelt (nicht jeden Frame alle Akteure durchgehen) */
   private nearBosses: Actor[] = [];
   private vignette!: HTMLDivElement;
+  /** Vorhang über der Welt, bis der Boden im Bildausschnitt gebaut ist (siehe updateChunks), mit Startzeit */
+  private curtain: HTMLDivElement | null = null;
+  private curtainAt = 0;
   private ambientKind: 'embers' | 'mist' | null = null;
   private lastTime = 0;
   private now = 0;
@@ -250,6 +264,7 @@ export class GameScene extends Phaser.Scene {
     this.sfx.setVolume(settings().volume);
     onSettings(() => this.sfx.setVolume(settings().volume));
     registerPixelfx(this);
+    initSilhouettes(this);
     this.atmo = new Atmosphere(this, this.sfx);
     this.minimap = new Minimap(this.world, this.tiles);
     if (this.remote) this.ui.say(`Verbunden als ${p.name}${this.remote.pvp ? ' – PvP außerhalb der Städte aktiv, Angreifer werden zu Mördern' : ''}. Klick auf Spieler greift an.`);
@@ -275,6 +290,13 @@ export class GameScene extends Phaser.Scene {
     this.vignette = document.createElement('div');
     this.vignette.style.cssText = 'position:fixed;inset:0;pointer-events:none;transition:opacity 1.2s,background 1.2s;opacity:1;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 58%,rgba(0,0,0,.45) 100%)';
     document.body.appendChild(this.vignette);
+    this.curtain = document.createElement('div');
+    this.curtain.style.cssText = 'position:fixed;inset:0;z-index:3;pointer-events:none;background:#0b0a0d;transition:opacity .35s;opacity:1';
+    document.body.appendChild(this.curtain);
+    // einmalige Vorarbeit des Bodens (Muster, Zonenkarte) jetzt statt im ersten Frame
+    warmGround();
+    this.zones();
+    this.curtainAt = performance.now();
     if (new URLSearchParams(location.search).has('fps')) {
       this.fpsText = this.add.text(0, 0, '', { fontSize: '14px', color: '#9fff9f', backgroundColor: '#000a' }).setScrollFactor(0).setDepth(OVERLAY_DEPTH + 5);
     }
@@ -1563,7 +1585,8 @@ export class GameScene extends Phaser.Scene {
 
   /**
    * Boden-Chunks im Sichtbereich bauen: nächstgelegener fehlender Chunk zuerst, in Etappen (Bodenstreifen, Details und
-   * Wände, Upload), pro Bild nur so viele Etappen, wie in ~6 ms passen. Beim Start alles.
+   * Wände, Upload), pro Bild nur so viele Etappen, wie in ~6 ms passen. Beim Start erst der Bildausschnitt, in Etappen zu
+   * ~15 ms hinter dem Vorhang (früher alles in einem Frame, 450-900 ms); er hebt sich, sobald der Ausschnitt steht.
    */
   private updateChunks(px: number, py: number): void {
     const { w, h } = this.world.grid;
@@ -1571,8 +1594,15 @@ export class GameScene extends Phaser.Scene {
     const cx1 = Math.min(Math.floor((w - 1) / CHUNK), Math.floor((px + VIEW) / CHUNK));
     const cy0 = Math.max(0, Math.floor((py - VIEW) / CHUNK));
     const cy1 = Math.min(Math.floor((h - 1) / CHUNK), Math.floor((py + VIEW) / CHUNK));
+    // Bildausschnitt in Kacheln (Draufsicht: 1 Kachel = TILE_W Bildpunkte), eine Kachel Rand
+    const zoom = this.cameras.main.zoom;
+    const hw = this.scale.width / zoom / 2 / TILE_W + 1;
+    const hh = this.scale.height / zoom / 2 / TILE_H + 1;
+    const onScreen = (cx: number, cy: number): boolean =>
+      (cx + 1) * CHUNK > px - hw && cx * CHUNK < px + hw && (cy + 1) * CHUNK > py - hh && cy * CHUNK < py + hh;
     const t0 = performance.now();
-    const budget = this.frame < 3 ? Infinity : 6;
+    const starting = !!this.curtain;
+    const budget = starting ? 15 : 6;
     while (performance.now() - t0 < budget) {
       if (!this.chunkJob) {
         let best: [number, number] | null = null;
@@ -1580,7 +1610,8 @@ export class GameScene extends Phaser.Scene {
         for (let cy = cy0; cy <= cy1; cy++) {
           for (let cx = cx0; cx <= cx1; cx++) {
             if (this.chunks.has(`${cx}_${cy}`)) continue;
-            const d = Math.hypot((cx + 0.5) * CHUNK - px, (cy + 0.5) * CHUNK - py);
+            // beim Start der Bildausschnitt vor dem Rand
+            const d = Math.hypot((cx + 0.5) * CHUNK - px, (cy + 0.5) * CHUNK - py) + (starting && !onScreen(cx, cy) ? 1e6 : 0);
             if (d < bestD) { bestD = d; best = [cx, cy]; }
           }
         }
@@ -1591,6 +1622,17 @@ export class GameScene extends Phaser.Scene {
         this.chunkJob = { cx: best[0], cy: best[1], r: this.chunkRaster, step: 0 };
       }
       if (this.stepChunk(this.chunkJob)) this.chunkJob = null;
+    }
+    if (starting) {
+      let ready = true;
+      for (let cy = cy0; cy <= cy1 && ready; cy++) for (let cx = cx0; cx <= cx1; cx++) if (onScreen(cx, cy) && !this.chunks.has(`${cx}_${cy}`)) { ready = false; break; }
+      // spätestens nach 3 s (z. B. ohne Frames im Hintergrund-Tab)
+      if (ready || performance.now() - this.curtainAt > 3000) {
+        const c = this.curtain!;
+        this.curtain = null;
+        c.style.opacity = '0';
+        window.setTimeout(() => c.remove(), 400);
+      }
     }
     if (this.frame % 30 === 0) {
       for (const [key, img] of this.chunks) {
@@ -1743,10 +1785,15 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** Erkennt die Häuser und legt Dach-, Fassaden- und Lichtbilder an (ohne Dokument, z. B. in Tests, nichts). */
+  /**
+   * Erkennt die Häuser und legt Dach-, Fassaden- und Lichtbilder an (ohne Dokument, z. B. in Tests, nichts). Alle Hausbilder,
+   * auch Wände und Türen, die erst beim Hinlaufen als Props erscheinen, kommen vorab in wenige Atlas-Texturen: jede neue
+   * GL-Textur im Spiel kostete 2-4 ms, einzelne stockten 60 ms bis über 1 s.
+   */
   private initHouses(): void {
     this.houses = [];
     this.houseAt.clear();
+    this.houseFrames.clear();
     this.roofs = [];
     this.nightLights = [];
     if (!houseRoof(8, 6, 0)) return;
@@ -1758,19 +1805,43 @@ export class GameScene extends Phaser.Scene {
           if (dx === 0 || dy === 0 || dx === hs.w - 1 || dy === hs.h - 1) this.houseAt.set((hs.y0 + dy) * w + hs.x0 + dx, hs);
         }
       }
+    }
+    const art = new Map<string, HTMLCanvasElement>();
+    const want = (a: HouseArt | undefined): void => {
+      if (a && !art.has(a.key)) art.set(a.key, a.make());
+    };
+    // je Haus Dach, Fassade, Licht, Zaun (zu große bleiben außerhalb des Atlas und werden eigene Texturen)
+    const shell = (hs: House): Record<'roof' | 'fac' | 'glow' | 'fence', HouseArt> => {
       const seed = hs.x0 * 31 + hs.y0 * 17;
-      const notch = this.roofNotch(hs);
-      const key = ensureTexture(this, `nh_roof_${hs.x0}_${hs.y0}`, () => houseRoof(hs.w, hs.h - 1, hs.variant, seed, notch)!);
+      return {
+        roof: { key: `nh_roof_${hs.x0}_${hs.y0}`, make: () => houseRoof(hs.w, hs.h - 1, hs.variant, seed, this.roofNotch(hs))! },
+        fac: { key: `nh_fac_${hs.x0}_${hs.y0}`, make: () => houseFacade(hs.w, hs.variant, seed)! },
+        glow: { key: `nh_glow_${hs.x0}_${hs.y0}`, make: () => houseGlow(hs)! },
+        fence: { key: `nh_fence_${hs.variant % 2}`, make: () => houseFence(hs.variant)! },
+      };
+    };
+    for (const hs of this.houses) for (const a of Object.values(shell(hs))) want(a);
+    // Wand- und Türkacheln genau so, wie houseProp sie später anfragt
+    for (const [idx, hs] of this.houseAt) {
+      const x = idx % w;
+      const y = Math.floor(idx / w);
+      const gid = this.tiles[idx] ?? 0;
+      if (!PROP_GIDS.has(gid) || gid === 2) continue;
+      const t = this.houseTileArt(x, y, gid, hs);
+      want(t);
+      want(t.sign);
+    }
+    this.packHouseArt(art);
+    for (const hs of this.houses) {
+      const sh = shell(hs);
       const { sx, sy } = toScreen(hs.x0, hs.y0 - 1);
-      const roof = this.add.image(sx - TILE_W / 2, sy - TILE_H / 2, key).setOrigin(0, 0).setDepth(this.roofDepth(hs));
+      const roof = this.add.image(sx - TILE_W / 2, sy - TILE_H / 2, ...this.houseTex(sh.roof.key, sh.roof.make)).setOrigin(0, 0).setDepth(this.roofDepth(hs));
       this.roofs.push({ img: roof, house: hs });
-      const fkey = ensureTexture(this, `nh_fac_${hs.x0}_${hs.y0}`, () => houseFacade(hs.w, hs.variant, seed)!);
       const f = toScreen(hs.x0, hs.y0 + hs.h - 2);
-      const fac = this.add.image(f.sx - TILE_W / 2, f.sy - TILE_H / 2, fkey).setOrigin(0, 0).setDepth(this.roofDepth(hs) + 1);
+      const fac = this.add.image(f.sx - TILE_W / 2, f.sy - TILE_H / 2, ...this.houseTex(sh.fac.key, sh.fac.make)).setOrigin(0, 0).setDepth(this.roofDepth(hs) + 1);
       this.roofs.push({ img: fac, house: hs });
       // Fensterlicht (nachts, additiv über Ober- und Erdgeschoss der Vorderwand)
-      const gkey = ensureTexture(this, `nh_glow_${hs.x0}_${hs.y0}`, () => houseGlow(hs)!);
-      const gimg = this.add.image(f.sx - TILE_W / 2, f.sy - TILE_H / 2, gkey).setOrigin(0, 0).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0)
+      const gimg = this.add.image(f.sx - TILE_W / 2, f.sy - TILE_H / 2, ...this.houseTex(sh.glow.key, sh.glow.make)).setOrigin(0, 0).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0)
         .setDepth((hs.y0 + hs.h - 1) * TILE_H + TILE_H / 2 + 1);
       // blendet mit der Fassade aus, wenn der Spieler im Haus steht
       this.nightLights.push({ img: gimg, k: 1, follow: fac });
@@ -1782,8 +1853,7 @@ export class GameScene extends Phaser.Scene {
       for (const dc of houseDecor(hs, free)) {
         const p = toScreen(dc.x, dc.y);
         if (dc.kind === 'fence') {
-          const fk = ensureTexture(this, `nh_fence_${hs.variant % 2}`, () => houseFence(hs.variant)!);
-          this.add.image(p.sx, p.sy + 6, fk).setOrigin(0.5, 1).setDepth(p.sy + 6);
+          this.add.image(p.sx, p.sy + 6, ...this.houseTex(sh.fence.key, sh.fence.make)).setOrigin(0.5, 1).setDepth(p.sy + 6);
         } else if (this.textures.exists(dc.kind === 'barrel' ? 'twn_barrel' : 'twn_crates')) {
           this.add.image(p.sx, p.sy + TILE_H / 2 - 2, dc.kind === 'barrel' ? 'twn_barrel' : 'twn_crates').setOrigin(0.5, 1).setDepth(p.sy + TILE_H / 2);
         }
@@ -1827,25 +1897,81 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** Haus-Kachel (Wandring oder Tür): Südreihe als Vorderwand mit Fenstern, übrige Wand schlicht, Tür mit Schild. */
-  private houseProp(x: number, y: number, gid: number, hs: House, sx: number, sy: number): Phaser.GameObjects.Image {
+  /** Bild einer Haus-Kachel (Wandring oder Tür): Südreihe als Vorderwand mit Fenstern, übrige Wand schlicht, Nordtür mit Schild */
+  private houseTileArt(x: number, y: number, gid: number, hs: House): HouseArt & { sign?: HouseArt } {
     const seed = hs.x0 * 31 + hs.y0 * 17;
     if (gid >= TOWN_GID.doorFirst && hs.door) {
-      const side = hs.door.side;
+      const { icon, side } = hs.door;
       const tall = side !== 'N';
-      const key = ensureTexture(this, `nh_door_${hs.door.icon}_${hs.variant}_${tall ? 't' : 's'}`, () => houseDoor(hs.door!.icon, hs.variant, tall, seed)!);
-      if (!tall) {
-        // Nordtür: das Schild hängt im Vorhof (Reihe davor), hinter der Figur, die davor steht
-        const sk = ensureTexture(this, `nh_sign_${hs.door.icon}`, () => houseSign(hs.door!.icon)!);
-        const idx = y * this.world.grid.w + x;
-        if (!this.houseSigns.has(idx)) this.houseSigns.set(idx, this.add.image(sx, sy - TILE_H / 2, sk).setOrigin(0.5, 1).setDepth(sy - TILE_H + 6));
-      }
-      return this.add.image(sx, sy + TILE_H / 2, key).setOrigin(0.5, 1).setDepth(sy + TILE_H / 2);
+      const door = { key: `nh_door_${icon}_${hs.variant}_${tall ? 't' : 's'}`, make: () => houseDoor(icon, hs.variant, tall, seed)! };
+      return tall ? door : { ...door, sign: { key: `nh_sign_${icon}`, make: () => houseSign(icon)! } };
     }
-    const south = y === hs.y0 + hs.h - 1;
-    const kind = south ? lowerKind(x - hs.x0, hs.w) : 'brace';
-    const key = ensureTexture(this, `nh_lo_${kind}_${hs.variant}_${seed}`, () => houseWallTile('lower', kind, hs.variant, seed + x)!);
-    return this.add.image(sx, sy + TILE_H / 2, key).setOrigin(0.5, 1).setDepth(sy + TILE_H / 2);
+    const kind = y === hs.y0 + hs.h - 1 ? lowerKind(x - hs.x0, hs.w) : 'brace';
+    return { key: `nh_lo_${kind}_${hs.variant}_${seed}`, make: () => houseWallTile('lower', kind, hs.variant, seed + x)! };
+  }
+
+  /** Haus-Kachel als Prop; die Nordtür hängt ihr Schild in den Vorhof (Reihe davor), hinter die Figur, die davor steht */
+  private houseProp(x: number, y: number, gid: number, hs: House, sx: number, sy: number): Phaser.GameObjects.Image {
+    const t = this.houseTileArt(x, y, gid, hs);
+    if (t.sign) {
+      const idx = y * this.world.grid.w + x;
+      if (!this.houseSigns.has(idx)) this.houseSigns.set(idx, this.add.image(sx, sy - TILE_H / 2, ...this.houseTex(t.sign.key, t.sign.make)).setOrigin(0.5, 1).setDepth(sy - TILE_H + 6));
+    }
+    return this.add.image(sx, sy + TILE_H / 2, ...this.houseTex(t.key, t.make)).setOrigin(0.5, 1).setDepth(sy + TILE_H / 2);
+  }
+
+  /** Textur und Bildname eines Hausbildes: aus dem Atlas, sonst (nicht vorab erkannt) als eigene Textur */
+  private houseTex(key: string, make: () => HTMLCanvasElement): [string, string | undefined] {
+    return this.houseFrames.get(key) ?? [ensureTexture(this, key, make), undefined];
+  }
+
+  /** Hausbilder zeilenweise in Atlas-Seiten (höchstens 2048 px, 2 px Abstand gegen Überlaufen beim Zoom) packen und je Seite einmal hochladen */
+  private packHouseArt(art: Map<string, HTMLCanvasElement>): void {
+    const PAGE = 2048;
+    const PAD = 2;
+    const items = [...art].filter(([, c]) => c.width + PAD <= PAGE && c.height + PAD <= PAGE).sort((a, b) => b[1].height - a[1].height);
+    let page: { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; frames: [string, number, number, number, number][]; h: number } | null = null;
+    let x = 0;
+    let y = 0;
+    let rowH = 0;
+    const flush = (): void => {
+      if (!page) return;
+      // Seite nur so hoch wie nötig zuschneiden
+      const out = document.createElement('canvas');
+      out.width = PAGE;
+      out.height = page.h;
+      out.getContext('2d')!.drawImage(page.canvas, 0, 0);
+      const key = `nh_atlas_${this.houseAtlasCount++}`;
+      const tex = this.textures.addCanvas(key, out)!;
+      for (const [name, fx, fy, fw, fh] of page.frames) {
+        tex.add(name, 0, fx, fy, fw, fh);
+        this.houseFrames.set(name, [key, name]);
+      }
+      page = null;
+    };
+    for (const [name, c] of items) {
+      if (x + c.width + PAD > PAGE) {
+        x = 0;
+        y += rowH;
+        rowH = 0;
+      }
+      if (page && y + c.height + PAD > PAGE) flush();
+      if (!page) {
+        const canvas = document.createElement('canvas');
+        canvas.width = PAGE;
+        canvas.height = PAGE;
+        page = { canvas, ctx: canvas.getContext('2d')!, frames: [], h: 0 };
+        x = 0;
+        y = 0;
+        rowH = 0;
+      }
+      page.ctx.drawImage(c, x, y);
+      page.frames.push([name, x, y, c.width, c.height]);
+      page.h = Math.max(page.h, y + c.height + PAD);
+      x += c.width + PAD;
+      rowH = Math.max(rowH, c.height + PAD);
+    }
+    flush();
   }
 
   private makeProp(x: number, y: number, gid: number, sx: number, sy: number): Phaser.GameObjects.Image {
@@ -1908,11 +2034,16 @@ export class GameScene extends Phaser.Scene {
   /** Körperkasten einer Skelett-Figur (Bildschirm-Pixel) oder `null` für alte Figuren */
   private bodyBox(img: Phaser.GameObjects.Image): Phaser.Geom.Rectangle | null {
     const src = img.texture.getSourceImage() as { figSheet?: unknown } | undefined;
-    const fig = src?.figSheet ? this.figSize(img) : null;
+    const fig = src?.figSheet || img.texture.key === SIL_TEX ? this.figSize(img) : null;
     return fig ? new Phaser.Geom.Rectangle(img.x - fig.w / 2, img.y - fig.top, fig.w, fig.top) : null;
   }
 
   private figSize(img: Phaser.GameObjects.Image): { top: number; w: number; dir: boolean; all: boolean } | null {
+    // Schattenriss (Seitenbild, blickt nach rechts): in jeder Ansicht nach Laufrichtung spiegeln
+    if (img.texture.key === SIL_TEX) {
+      const s = silhouetteOf(img.frame.name);
+      return s ? { top: s.top, w: s.w, dir: true, all: true } : null;
+    }
     const src = img.texture.getSourceImage() as { figTop?: number; figW?: number; figDir?: boolean; figSheet?: { mirrorAll?: boolean } } | undefined;
     return src && src.figTop !== undefined ? { top: src.figTop, w: src.figW ?? 0, dir: !!src.figDir, all: !!src.figSheet?.mirrorAll } : null;
   }
@@ -1942,9 +2073,10 @@ export class GameScene extends Phaser.Scene {
       const nfigKey = figureMode() === 'skelett' ? npcFigKey(n.kind, n.name) : '';
       const nHasSkel = !!nfigKey && !!npcDef(n.kind, n.name);
       const nGot = nHasSkel ? figureTexture(this, nfigKey, { t: 'n', kind: n.kind, name: n.name }) : null;
-      // noch im Worker: nur der Schatten, keine alte Figur (deren Zeichnen kostete beim ersten Mal bis 80 ms)
-      const nWait = nGot === 'wait';
-      const nSkel = nWait ? null : nGot;
+      // noch im Worker: Schattenriss, keine alte Figur (deren Zeichnen kostete beim ersten Mal bis 80 ms)
+      const nSil = nGot === 'wait' ? silhouette(this, nfigKey, { t: 'n', kind: n.kind, name: n.name }) : null;
+      const nWait = nGot === 'wait' && !nSil;
+      const nSkel = nGot === 'wait' ? null : nGot;
       const chestLike = n.kind === 'stash' && !nj && !nHasSkel;
       this.gfxGround.fillStyle(0x000000, 0.2);
       this.gfxGround.fillEllipse(sx, sy + 9, chestLike ? 34 : 26, chestLike ? 13 : 10);
@@ -1969,7 +2101,9 @@ export class GameScene extends Phaser.Scene {
         const A = nSkel.sheet.anims;
         const o = originOf(nSkel.sheet);
         img.setTexture(nSkel.key, time < dir.movingUntil ? `walk_${v3}_${walkFrame(dir.dist ?? 0, A.walk, nSkel.sheet.cyclePx)}` : `idle_${v3}_${idleFrame(time + n.id * 1231, A.idle)}`);
-        img.setOrigin(o.x, o.y).setScale(FIG_SCALE).setFlipX(dir.side && dir.flip);
+        img.setOrigin(o.x, o.y).setScale(FIG_SCALE).setFlipX(dir.side && dir.flip).setAlpha(1);
+      } else if (nSil) {
+        img.setTexture(SIL_TEX, nSil.frame).setOrigin(nSil.ox, nSil.oy).setScale(FIG_SCALE).setFlipX(dir.flip).setAlpha(0.75);
       } else if (nWait) {
         // unsichtbar bis fertig; leere Textur, denn die vorige kann schon aus dem Cache geflogen sein
         img.setTexture('__DEFAULT');
@@ -1989,7 +2123,7 @@ export class GameScene extends Phaser.Scene {
         const nfig = this.figSize(img);
         img.setFlipX(nfig?.dir ? nSide && dir.flip : dir.flip);
       }
-      const nBob = !chestLike && !nSkel && time < dir.movingUntil ? -Math.abs(Math.sin((time / STEP_MS) * Math.PI * 0.5)) * 1.2 : 0;
+      const nBob = !chestLike && !nSkel && !nSil && time < dir.movingUntil ? -Math.abs(Math.sin((time / STEP_MS) * Math.PI * 0.5)) * 1.2 : 0;
       img.setVisible(!nWait).setPosition(sx, sy + 8 + nBob).setDepth(sy + 8);
       if (nWait) continue;
       this.label(`n${n.id}`, n.name, sx, sy + 8 - (this.figSize(img)?.top ?? 56) - 4, '#e8d9b0', seen);
@@ -2146,7 +2280,17 @@ export class GameScene extends Phaser.Scene {
     return toTile(wp.x, wp.y);
   }
 
-  /** Skelett-Figur eines Akteurs (Textur + Sheet), `'wait'` = wird noch gebacken (unsichtbar), `null` = alte Figur (DCSS/Ninja/prozedural) */
+  /** Schattenriss eines Akteurs, dessen Skelett-Figur noch gebacken wird (`null`: in diesem Frame noch keiner) */
+  private skelSilhouette(a: Actor): Silhouette | null {
+    if (a.kind === 'player') {
+      const look = heroLookOf(lookOf(a));
+      return silhouette(this, heroKey(look), { t: 'h', look });
+    }
+    const req: FigReq = { t: 'm', id: a.kindId! };
+    return silhouette(this, monsterKey(a.kindId!), req);
+  }
+
+  /** Skelett-Figur eines Akteurs (Textur + Sheet), `'wait'` = wird noch gebacken (Schattenriss), `null` = alte Figur (DCSS/Ninja/prozedural) */
   private skelFigure(a: Actor): { key: string; sheet: FigureSheet } | 'wait' | null {
     if (a.kind === 'player') {
       if (heroMode() !== 'skelett') return null;
@@ -2169,7 +2313,11 @@ export class GameScene extends Phaser.Scene {
     const near2 = this.world.actors.filter((a) => a.kind === 'monster' && a.alive && near(a.x, a.y)).map((a) => ({ id: a.kindId!, d: (a.x - p.x) ** 2 + (a.y - p.y) ** 2 }));
     const ids = new Set(near2.sort((a, b) => a.d - b.d).map((a) => a.id));
     if (figureMode() === 'skelett') {
-      for (const id of ids) prefetchFigure(monsterKey(id), { t: 'm', id });
+      for (const id of ids) {
+        prefetchFigure(monsterKey(id), { t: 'm', id });
+        // Schattenriss schon vorab (sonst steht die Art ihren ersten Frame ohne Klickfläche da)
+        silhouette(this, monsterKey(id), { t: 'm', id }, true);
+      }
       for (const n of this.world.npcs) if (near(n.x, n.y) && npcDef(n.kind, n.name)) prefetchFigure(npcFigKey(n.kind, n.name), { t: 'n', kind: n.kind, name: n.name });
     }
     if (heroMode() === 'skelett') prefetchHero(lookOf(p));
@@ -2225,10 +2373,15 @@ export class GameScene extends Phaser.Scene {
       const img = view.img;
       // Skelett-Figur (Held; Monster/NPCs folgen): ein Sheet je Look/Art, Bild nach Animation und Ansicht; links = Seite gespiegelt
       const got = this.skelFigure(a);
-      // Skelett-Figur noch im Worker: nur der Schatten, keine alte Figur (deren Zeichnen kostete beim ersten Mal bis 110 ms)
+      // Skelett-Figur noch im Worker: Schattenriss in Artgröße, keine alte Figur (deren Zeichnen kostete beim ersten Mal bis 110 ms)
       const waiting = got === 'wait';
       const fig3 = waiting ? null : got;
-      const skel = !!fig3;
+      const sil = waiting ? this.skelSilhouette(a) : null;
+      const skel = !!fig3 || !!sil;
+      // ohne Riss (nur im ersten Frame einer Art möglich) bleibt nur der Bodenschatten
+      const shown = !waiting || !!sil;
+      if (fig3 && view.waited) view.fadeAt = time;
+      view.waited = waiting;
       if (fig3) {
         const { key, sheet } = fig3;
         const A = sheet.anims;
@@ -2245,8 +2398,10 @@ export class GameScene extends Phaser.Scene {
                 : `idle_${v3}_${idleFrame(time + a.id * 977, A.idle)}`;
         const o = originOf(sheet);
         img.setTexture(key, fname).setOrigin(o.x, o.y);
+      } else if (sil) {
+        img.setTexture(SIL_TEX, sil.frame).setOrigin(sil.ox, sil.oy);
       } else if (waiting) {
-        // unsichtbar bis fertig; leere Textur, denn die vorige kann schon aus dem Cache geflogen sein
+        // leere Textur, denn die vorige kann schon aus dem Cache geflogen sein
         img.setTexture('__DEFAULT');
       } else if (a.kind === 'player') {
         const look = lookOf(a);
@@ -2279,14 +2434,17 @@ export class GameScene extends Phaser.Scene {
         this.gfxGround.fillStyle(0x000000, 0.22);
         this.gfxGround.fillEllipse(sx + ox, sy + 9 + oy, wide * 0.85, wide * 0.34);
       }
-      img.setVisible(!waiting).setPosition(sx + ox, sy + 8 + oy + bob).setDepth(sy + 8).setFlipX(
+      img.setVisible(shown).setPosition(sx + ox, sy + 8 + oy + bob).setDepth(sy + 8).setFlipX(
         // DCSS-Monster blicken von Haus aus nach links; nur die vorab gespiegelte Seitenansicht (Zweibeiner) blickt nach rechts
         fig ? (fig.dir ? (fig.all || !!view.side) && view.flip : view.flip) : a.kind === 'monster' && !(view.side && BIPED.has(monsterKind(a.kindId!).family)) ? !view.flip : view.flip,
       );
-      if (waiting) continue;
+      if (!shown) continue;
       if (!a.alive && skel) {
         // Skelett-Figur: eigenes Sterbebild (liegt am Ende), Monster verblassen erst danach
-        const age = a.kind === 'monster' ? Math.max(0, (this.world.tick - a.diedAt) / TICK_RATE - 2) / 2 : 0;
+        // (ein Schattenriss hat kein Sterbebild: er verblasst gleich)
+        const dead = (this.world.tick - a.diedAt) / TICK_RATE;
+        if (sil) view.silDead = true;
+        const age = sil ? dead * 2 + 0.25 : view.silDead ? 1 : a.kind === 'monster' ? Math.max(0, dead - 2) / 2 : 0;
         img.setAngle(0).setAlpha(Math.max(0, 1 - age)).setTintMode(Phaser.TintModes.MULTIPLY).setTint(0xb0a0a0).setScale(FIG_SCALE);
         img.setDepth(sy);
         continue;
@@ -2299,7 +2457,11 @@ export class GameScene extends Phaser.Scene {
       }
       // leichtes Atmen, wenn sie stehen (Skalierung um die Füße)
       const breath = !walking && !swinging && !skel ? 1 + Math.sin(time / 420 + a.id * 1.7) * 0.014 : 1;
-      img.setAngle(0).setAlpha(1).setScale((skel ? FIG_SCALE : 1) / breath ** 0.5, (skel ? FIG_SCALE : 1) * breath);
+      view.silDead = false;
+      // Schattenriss halb durchsichtig, das fertige Sheet blendet danach kurz ein
+      const fade = sil ? 0.75 : view.fadeAt !== undefined ? Math.min(1, 0.4 + (time - view.fadeAt) / 300) : 1;
+      if (fade >= 1) view.fadeAt = undefined;
+      img.setAngle(0).setAlpha(fade).setScale((skel ? FIG_SCALE : 1) / breath ** 0.5, (skel ? FIG_SCALE : 1) * breath);
       // Treffer-Blitz: Phaser-Tint multipliziert (Weiß = unsichtbar) → echter Blitz über den Füllmodus; sonst Modus immer zurücksetzen
       const flashing = (this.flash.get(a.id) ?? 0) > time;
       if (flashing) img.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);

@@ -8,7 +8,8 @@
  */
 import type Phaser from 'phaser';
 import { FigureBaker, type FigureSheet, type FigureSpec } from './figure';
-import { addSheetTexture, pixelSource, type FigSource } from './heroSheet';
+import { addSheetTexture, FIG_SCALE, pixelSource, type FigSource } from './heroSheet';
+import { SHADE } from './heroRig.js';
 import { heroSpec, type HeroLook } from './hero';
 import { monsterSpec } from './monster';
 import { npcSpec } from './npc';
@@ -171,6 +172,7 @@ export function prefetchFigure(key: string, req: FigReq, ahead = true): void {
  */
 export function pumpFigures(scene: Phaser.Scene, inUse: () => Set<string>, budget = BUDGET_MS): void {
   uploads = UPLOADS_PER_FRAME;
+  silBudget = SIL_PER_FRAME;
   if (local.size) {
     const t0 = performance.now();
     for (const [key, baker] of local) {
@@ -216,4 +218,111 @@ export function bakeInWorker(key: string, req: FigReq, done: (s: FigSource) => v
   // schlug im Worker fehl: nicht in jedem Frame neu schicken (der Aufrufer backt dann selbst)
   if (none.has(key)) return false;
   return enqueue(key, req, true, done);
+}
+
+/* ------------------------------------------------ Platzhalter */
+
+/**
+ * Bis ein Sheet da ist, steht an seiner Stelle ein dunkler Schattenriss der Art (ihr Stehbild von der Seite, im Spielthread in
+ * 0,1-2 ms gerechnet) in Artgröße: anklickbar, mit Namen, Balken und Trefferblitz. Alle Risse liegen in einer gemeinsamen
+ * Leinwand-Textur, die beim Start einmal angelegt wird; neue GL-Texturen im Spiel stocken einzeln bis über 1 s.
+ */
+export const SIL_TEX = 'fig_sil';
+/** Feldgröße bei 1x (größtes Bild: Aschenkönig 116x102), Felder je Zeile/Spalte */
+const SIL_SLOT = 120;
+const SIL_COLS = 8;
+const SIL_ROWS = 4;
+/** neue Risse je Frame (je ein Bild rechnen und die Leinwand neu hochladen) */
+const SIL_PER_FRAME = 3;
+
+/** Schattenriss einer Figur: Bildname in `SIL_TEX`, Ursprung, Kopfhöhe und Körperbreite wie beim fertigen Sheet (Bildschirm-Pixel) */
+export type Silhouette = { frame: string; ox: number; oy: number; top: number; w: number };
+
+const sils = new Map<string, Silhouette>();
+/** Stehbild warf: kein Riss (nicht in jedem Frame neu versuchen) */
+const silNone = new Set<string>();
+const silSlot = new Map<string, number>();
+let silBudget = SIL_PER_FRAME;
+
+/** Gemeinsame Textur der Schattenrisse anlegen (beim Szenenstart, solange noch nichts zu sehen ist) */
+export function initSilhouettes(scene: Phaser.Scene): void {
+  if (!scene.textures.exists(SIL_TEX)) scene.textures.createCanvas(SIL_TEX, SIL_SLOT * SIL_COLS, SIL_SLOT * SIL_ROWS);
+  sils.clear();
+  silSlot.clear();
+  silNone.clear();
+}
+
+/** Angaben am Bild eines Schattenrisses (für Klickfläche, Namen, Schatten) oder `undefined` */
+export const silhouetteOf = (frame: string): Silhouette | undefined => sils.get(frame);
+
+/**
+ * Schattenriss der Figur `key` (rechnet ihn beim ersten Mal, höchstens `SIL_PER_FRAME` je Frame), `null` = (noch) keiner.
+ * `ahead`: nur vorab für Arten in der Nähe, deren Sheet noch fehlt; lässt einen Riss des Budgets für Sichtbare übrig.
+ */
+export function silhouette(scene: Phaser.Scene, key: string, req: FigReq, ahead = false): Silhouette | null {
+  const got = sils.get(key);
+  if (got) return got;
+  if (silBudget <= (ahead ? 1 : 0) || none.has(key) || silNone.has(key) || (ahead && scene.textures.exists(key))) return null;
+  const tex = scene.textures.exists(SIL_TEX) ? (scene.textures.get(SIL_TEX) as Phaser.Textures.CanvasTexture) : null;
+  const spec = specOf(req);
+  if (!tex) return null;
+  if (!spec || spec.frame.w > SIL_SLOT || spec.frame.h > SIL_SLOT) {
+    silNone.add(key);
+    return null;
+  }
+  // Feld: ein freies, sonst das älteste, dessen Sheet schon fertig ist (dessen Riss wird nicht mehr gezeigt); sonst keins
+  const used = new Set(silSlot.values());
+  let slot = -1;
+  for (let i = 0; i < SIL_COLS * SIL_ROWS; i++) if (!used.has(i)) { slot = i; break; }
+  if (slot < 0) {
+    const old = [...silSlot.keys()].find((k) => scene.textures.exists(k));
+    if (!old) return null;
+    slot = silSlot.get(old)!;
+    silSlot.delete(old);
+    sils.delete(old);
+    tex.remove(old);
+  }
+  silBudget--;
+  const { w: FW, h: FH, fx: FX, fy: FY } = spec.frame;
+  let r;
+  try {
+    r = spec.render('idle', 'side', 0);
+  } catch {
+    silNone.add(key);
+    return null;
+  }
+  const px = new ImageData(FW, FH);
+  let bx0 = 1e9;
+  let bx1 = -1e9;
+  let top = 0;
+  for (let k = 0; k < r.n; k++) {
+    const x = r.xs[k]! + FX;
+    const y = r.ys[k]! + FY;
+    if (x < 0 || y < 0 || x >= FW || y >= FH) continue;
+    const part = r.part[k]!;
+    // Körper dunkel mit einem Hauch der Körperfarbe, Umriss als heller Rauchsaum (sonst verschwindet er auf dunklem Boden)
+    const ink = r.shade[k] === SHADE.INK;
+    const c = (spec.mats[part] ?? spec.fallback)[3];
+    const o = (y * FW + x) * 4;
+    px.data[o] = ink ? 112 : 14 + (((c >> 16) & 255) >> 3);
+    px.data[o + 1] = ink ? 104 : 12 + (((c >> 8) & 255) >> 3);
+    px.data[o + 2] = ink ? 120 : 16 + ((c & 255) >> 3);
+    px.data[o + 3] = 255;
+    if (!spec.loose?.has(part)) {
+      bx0 = Math.min(bx0, x);
+      bx1 = Math.max(bx1, x);
+      top = Math.max(top, FY - y);
+    }
+  }
+  const sx = (slot % SIL_COLS) * SIL_SLOT;
+  const sy = Math.floor(slot / SIL_COLS) * SIL_SLOT;
+  tex.context.clearRect(sx, sy, SIL_SLOT, SIL_SLOT);
+  tex.context.putImageData(px, sx, sy);
+  if (tex.has(key)) tex.remove(key);
+  tex.add(key, 0, sx, sy, FW, FH);
+  tex.refresh();
+  const s: Silhouette = { frame: key, ox: FX / FW, oy: FY / FH, top: top * FIG_SCALE, w: Math.max(0, bx1 - bx0 + 1) * FIG_SCALE };
+  sils.set(key, s);
+  silSlot.set(key, slot);
+  return s;
 }

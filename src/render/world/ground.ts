@@ -384,6 +384,8 @@ interface Tables {
 }
 
 let TAB: Tables | null = null;
+/** Muster und Tabellen vorab rechnen (im Browser ~100 ms, sonst beim ersten Bodenstreifen); beim Szenenstart, solange noch nichts zu sehen ist */
+export const warmGround = (): void => void tables();
 function tables(): Tables {
   if (TAB) return TAB;
   const PT = pats();
