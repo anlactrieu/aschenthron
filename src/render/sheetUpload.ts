@@ -11,7 +11,8 @@ const BYTES_PER_FRAME = 1 << 20;
 interface Job {
   key: string;
   src: FigSource & Uint8Array;
-  wrapper: Phaser.Renderer.WebGL.Wrappers.WebGLTextureWrapper;
+  /** erst beim ersten Füllen angelegt: je Frame werden so höchstens so viele Texturen angelegt, wie das Byte-Budget füllt */
+  wrapper: Phaser.Renderer.WebGL.Wrappers.WebGLTextureWrapper | null;
   w: number;
   h: number;
   row: number;
@@ -35,9 +36,7 @@ export function queueUpload(scene: Phaser.Scene, key: string, src: FigSource, ur
     if (urgent && at > 0) jobs.unshift(...jobs.splice(at, 1));
     return true;
   }
-  const gl = r.gl;
-  const wrapper = r.createTexture2D(0, gl.NEAREST, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.CLAMP_TO_EDGE, gl.RGBA, undefined, sheet.w, sheet.h, true, true, true);
-  const job: Job = { key, src: src as FigSource & Uint8Array, wrapper, w: sheet.w, h: sheet.h, row: 0 };
+  const job: Job = { key, src: src as FigSource & Uint8Array, wrapper: null, w: sheet.w, h: sheet.h, row: 0 };
   if (urgent) jobs.unshift(job);
   else jobs.push(job);
   return true;
@@ -48,7 +47,7 @@ export function cancelUpload(scene: Phaser.Scene, key: string): void {
   const at = jobs.findIndex((j) => j.key === key);
   if (at < 0) return;
   const [j] = jobs.splice(at, 1);
-  (scene.game.renderer as Phaser.Renderer.WebGL.WebGLRenderer).deleteTexture(j!.wrapper);
+  if (j!.wrapper) (scene.game.renderer as Phaser.Renderer.WebGL.WebGLRenderer).deleteTexture(j!.wrapper);
 }
 
 /** Jeden Frame: die vorderen Aufträge um bis zu `BYTES_PER_FRAME` weiter füllen; fertige Texturen samt Bildnamen eintragen */
@@ -59,8 +58,10 @@ export function pumpUploads(scene: Phaser.Scene): void {
   let left = BYTES_PER_FRAME;
   while (left > 0 && jobs.length) {
     const j = jobs[0]!;
+    j.wrapper ??= r.createTexture2D(0, gl.NEAREST, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.CLAMP_TO_EDGE, gl.RGBA, undefined, j.w, j.h, true, true, true);
+    const wrapper = j.wrapper;
     const rows = Math.min(j.h - j.row, Math.max(1, Math.floor(left / (j.w * 4))));
-    r.glTextureUnits.bind(j.wrapper, 0);
+    r.glTextureUnits.bind(wrapper, 0);
     r.glWrapper.updateTexturing({ texturing: { flipY: true, premultiplyAlpha: true } });
     // mit UNPACK_FLIP_Y wird die Scheibe in sich gespiegelt: sie gehört deshalb an die gespiegelte Stelle
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, j.h - j.row - rows, j.w, rows, gl.RGBA, gl.UNSIGNED_BYTE, j.src.subarray(j.row * j.w * 4, (j.row + rows) * j.w * 4));
@@ -69,9 +70,9 @@ export function pumpUploads(scene: Phaser.Scene): void {
     if (j.row < j.h) break;
     jobs.shift();
     const sheet = j.src.figSheet!;
-    Object.assign(j.wrapper, { figTop: j.src.figTop, figW: j.src.figW, figDir: j.src.figDir, figScale: j.src.figScale, figSheet: sheet });
+    Object.assign(wrapper, { figTop: j.src.figTop, figW: j.src.figW, figDir: j.src.figDir, figScale: j.src.figScale, figSheet: sheet });
     if (scene.textures.exists(j.key)) {
-      r.deleteTexture(j.wrapper);
+      r.deleteTexture(wrapper);
       continue;
     }
     // Phaser setzt beim Eintragen mit pixelArt den Filter neu und lädt dabei `wrapper.pixels` (hier leer) noch einmal hoch,
@@ -81,12 +82,12 @@ export function pumpUploads(scene: Phaser.Scene): void {
     cfg.antialias = true;
     let tex: Phaser.Textures.Texture;
     try {
-      tex = scene.textures.addGLTexture(j.key, j.wrapper)!;
+      tex = scene.textures.addGLTexture(j.key, wrapper)!;
     } finally {
       cfg.antialias = aa;
     }
     // für die Wiederherstellung nach Verlust des GL-Kontexts (Phaser lädt `pixels` dann neu hoch)
-    j.wrapper.pixels = j.src;
+    wrapper.pixels = j.src;
     for (const [name, f] of Object.entries(sheet.frames)) tex.add(name, 0, f.x, f.y, sheet.frame.w, sheet.frame.h);
   }
 }

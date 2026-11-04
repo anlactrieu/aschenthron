@@ -203,7 +203,8 @@ export function pumpFigures(scene: Phaser.Scene, inUse: () => Set<string>, budge
     const busy = inUse();
     for (const old of [...ready.keys()]) {
       if (ready.size <= KEEP) break;
-      if (busy.has(old)) continue;
+      // läuft noch der Upload, zeigt das Spiel den Schattenriss: nicht verwerfen (sonst wird die Art gleich neu gebacken)
+      if (busy.has(old) || uploading(old)) continue;
       ready.delete(old);
       noAhead.delete(old);
       cancelUpload(scene, old);
