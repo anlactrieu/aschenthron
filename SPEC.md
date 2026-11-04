@@ -358,6 +358,7 @@ User: „Wie in D4O kein Rang für Zauber, lieber mehr Zauber; neue Zauber desse
 - **Spaßsäulen (alle vier):** (1) Trefferfeeling: Wucht bei Hieb/Pfeil/Zauber (Funken, Wackeln, Zahlen). (2) Loot-Jagd: Lichtstrahl/Glanz nach Seltenheit. (3) Fortschritt: spürbares Level-up und Skillgewinn. (4) Erkunden: gefährliche Orte, Bosse, Atmosphäre.
 - **HUD:** Minimap kleiner, Willkommenstext in gerahmtes Fenster, Leisten nah an die Hotbar, einheitliche Pixelschrift auch im Titelbild.
 - **pixelfx (patch-gg, geprüft APPROVE):** erst nach dem Look-Umbau als Projekt-Skill, Palette dunkel/passend zur Rarität.
+- **Status Figuren (2026-11-04, Commits 6549b67, aa876be, a8d1a12, 160cc8b):** Held mit kompletter Ausrüstung am Skelett und allen Posen (Stehen, Laufschritt ohne Gleiten, Angriff je Waffe inkl. Bogen/Stab, Getroffen, Sterben); alle 63 Monsterarten als Skelett-Figuren (Zweibeiner über den Rig-Remix mit Körperbau je Art, Tiere über `monsterRig.js`), Bosse per Proportion größer mit goldener Kontur; NPCs als Skelett-Menschen nach Rolle; Backen in Web Workern, Cache begrenzt; Standard-Modus `skelett`, DCSS nur Rückfall (`?figuren=dcss`, `?held=dcss`). Offen: Held im Worker backen, Golem/Spinne/Wurm nachschärfen (Details in HANDOFF „Figuren-Umbau“).
 - **Erster Schnitt (frische Session):** Standard auf DCSS + einheitliche Skalierung, Stadt dunkler tönen, HUD-Fixes, dann 3 Effekte: Treffer, Loot-Strahl, Level-up.
 
 ## Status der Richtung (Stand 2026-11-03, Abend)
