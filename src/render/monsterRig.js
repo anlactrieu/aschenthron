@@ -11,6 +11,8 @@ const TAU = Math.PI * 2;
 export const BEAST_PART = { fur: 50, belly: 51, head: 52, snout: 53, ear: 54, paw: 55, tail: 56, mane: 57, horn: 58, legN: 59, legF: 60, mark: 61, eyeRing: 62 };
 const P_ = BEAST_PART;
 
+/** Schräge Draufsicht zur Kamera / weg (wie `SHEAR` in hero.ts) */
+const BEAST_SHEAR = 0.32;
 const rotX = (t) => { const c = Math.cos(t), s = Math.sin(t); return [1, 0, 0, 0, c, -s, 0, s, c]; };
 
 /** Fuß in Phase p (0..1), Standbein am Boden `stance` des Zyklus (wie `gaitFoot` in figure.ts) */
@@ -225,8 +227,10 @@ function worm(b, ph, M0) {
     const head = Math.max(0, (u - 0.55) / 0.45);
     const x = -L * 0.55 + u * L * 0.9 + head * strike * 1.6 * k;
     const y = g * 0.85 + head * head * (12 * k * rise) + Math.sin(u * TAU * 1.2 - t * TAU) * 0.4 * k * (1 - head);
-    const z = Math.sin(u * TAU * 0.9 + t * TAU) * 2.2 * k * (1 - head * 0.8);
-    pts.push([x, y, z]);
+    // zur Kamera / weg: der Leib liegt in einem seitlichen Bogen, sonst verdeckt der Kopf alle Segmente
+    const coil = (ph.coil ?? 0) * Math.sin((1 - u) * Math.PI * 1.7) * 8.5 * k * (1 - head);
+    const z = Math.sin(u * TAU * 0.9 + t * TAU) * 2.2 * k * (1 - head * 0.8) + coil;
+    pts.push([x * (1 - (ph.coil ?? 0) * 0.25), y, z]);
   }
   for (let j = 0; j < segs; j++) {
     const u = j / segs, r = g * (0.62 + 0.38 * Math.sin(Math.min(1, u * 1.3) * Math.PI * 0.62));
@@ -273,8 +277,13 @@ function wisp(b, ph, M0) {
  */
 export function beastPosed(b, anim, view, i, n) {
   const ph = phaseOf(anim, i, n);
-  // zur Kamera / weg schräg (60°), damit man Länge und Beine sieht
-  const yaw = view === "side" ? 0.42 : view === "front" ? 1.05 : -1.05;
-  const M = rotY(-yaw);
+  if (b.type === "worm" && view !== "side") ph.coil = view === "front" ? 1 : -1;
+  // Würmer zur Kamera / weg echt von vorn/hinten (Maul zur Kamera, Leib im seitlichen Bogen). Vierbeiner bleiben schräg (60°):
+  // echt von vorn sind sie bei Spielgröße nur ein schmaler Strich (Ratten ein Punkt); dafür schräg von oben gesehen (Scherung wie
+  // beim Helden: näher = tiefer im Bild), so steht der fernere Fuß höher und man sieht den Schritt. Spinnen/Irrlichter: schräg, ungeschert
+  const straight = view !== "side" && b.type === "worm";
+  const yaw = view === "side" ? 0.42 : straight ? (view === "front" ? Math.PI / 2 : -Math.PI / 2) : view === "front" ? 1.05 : -1.05;
+  const sheared = view !== "side" && (b.type === "worm" || b.type === "quad");
+  const M = sheared ? mm([1, 0, 0, 0, 1, -BEAST_SHEAR, 0, 0, 1], rotY(-yaw)) : rotY(-yaw);
   return shape(() => (b.type === "quad" ? quad(b, ph, M) : b.type === "spider" ? spider(b, ph, M) : b.type === "worm" ? worm(b, ph, M) : wisp(b, ph, M)));
 }
