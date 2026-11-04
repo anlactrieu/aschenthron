@@ -13,7 +13,7 @@ import { toScreen, toTile } from './iso';
 import { figureMode, ninjaNpcDef } from './figureMap';
 import { detectHouses, houseDoor, houseDecor, houseFacade, houseFence, houseGlow, houseRoof, houseSign, houseWallTile, lowerKind, WINDOW_LIGHT, type House, type RoofNotch } from './houses';
 import { buildZoneMap, Z } from './groundLook';
-import { ART, ART_SCALE, Raster, toCanvas } from './world/raster';
+import { ART, ART_SCALE, Raster, bytes, toCanvas } from './world/raster';
 import { matOf, paintGround } from './world/ground';
 import { stampDetail, stampWaterDetail } from './world/details';
 import { glow, wallTile } from './world/props';
@@ -65,6 +65,8 @@ const ZOOM_MIN = isTouch ? 0.4 : 0.55;
 const ZOOM_MAX = isTouch ? 1.4 : 1.1;
 const ZOOM_KEY = 'aschenthron.zoom';
 const CHUNK = 16;
+/** Bodenstreifen je Chunk (Etappen beim Bauen, siehe stepChunk) */
+const CHUNK_STRIPS = 8;
 /** Pfeiltasten → Kachelrichtung (Draufsicht: oben = −y, rechts = +x) */
 const ARROW_DIRS: Record<string, [number, number]> = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
 
@@ -188,6 +190,10 @@ export class GameScene extends Phaser.Scene {
   private landDist: Int8Array | null = null;
   /** Boden-Chunk im Bau (siehe updateChunks/stepChunk) */
   private chunkJob: { cx: number; cy: number; r: Raster; step: number } | null = null;
+  /** Freie Chunk-Texturen (Canvas-Texturen fester Größe, werden neu befüllt statt neu angelegt) */
+  private chunkTexPool: string[] = [];
+  private chunkTexCount = 0;
+  private chunkRaster: Raster | null = null;
   private armedSkill: string | null = null;
   private armedCursor = '';
   /** Zauber, der nach dem Anlaufen gewirkt wird (Ziel war außer Reichweite). */
@@ -1396,14 +1402,16 @@ export class GameScene extends Phaser.Scene {
           const phase = ((hh % 1000) / 1000 + time / 2400) % 1;
           if (phase < 0.2) {
             const a = Math.sin((phase / 0.2) * Math.PI);
-            g.fillStyle(0xcfe8ff, 0.32 * a);
-            g.fillRect(sx - 10 + (hh % 17), sy - 4 + (hh % 7), 7, 1);
-            g.fillRect(sx - 4 + (hh % 9), sy + 1 + (hh % 5), 4, 1);
+            // Glanzstriche im 2er-Raster der Code-Welt (gerade Koordinaten, 2 px hoch)
+            const ev = (n: number): number => n & ~1;
+            g.fillStyle(0x8fb0c8, 0.3 * a);
+            g.fillRect(ev(sx - 10 + (hh % 17)), ev(sy - 4 + (hh % 7)), 8, 2);
+            g.fillRect(ev(sx - 4 + (hh % 9)), ev(sy + 2 + (hh % 5)), 4, 2);
           }
         } else {
           const pulse = 0.5 + 0.5 * Math.sin(time / 420 + (hh % 100));
           g.fillStyle(0xffd070, 0.12 + 0.2 * pulse);
-          g.fillRect(sx - 12 + (hh % 19), sy - 3 + (hh % 9), 9, 2);
+          g.fillRect((sx - 12 + (hh % 19)) & ~1, (sy - 3 + (hh % 9)) & ~1, 10, 2);
         }
       }
     }
@@ -1522,8 +1530,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Boden-Chunks im Sichtbereich bauen: nächstgelegener fehlender Chunk zuerst, in Etappen (vier Bodenstreifen, Details
-   * und Wände, Upload), pro Bild nur so viele Etappen, wie in ~6 ms passen (eine Etappe kostet 3–8 ms). Beim Start alles.
+   * Boden-Chunks im Sichtbereich bauen: nächstgelegener fehlender Chunk zuerst, in Etappen (Bodenstreifen, Details und
+   * Wände, Upload), pro Bild nur so viele Etappen, wie in ~6 ms passen. Beim Start alles.
    */
   private updateChunks(px: number, py: number): void {
     const { w, h } = this.world.grid;
@@ -1545,7 +1553,10 @@ export class GameScene extends Phaser.Scene {
           }
         }
         if (!best) break;
-        this.chunkJob = { cx: best[0], cy: best[1], r: new Raster(CHUNK * ART, CHUNK * ART), step: 0 };
+        // ein Raster für alle Chunks: nach dem Upload ist es frei (Kacheln außerhalb der Karte bleiben leer)
+        this.chunkRaster ??= new Raster(CHUNK * ART, CHUNK * ART);
+        this.chunkRaster.d.fill(0);
+        this.chunkJob = { cx: best[0], cy: best[1], r: this.chunkRaster, step: 0 };
       }
       if (this.stepChunk(this.chunkJob)) this.chunkJob = null;
     }
@@ -1553,8 +1564,8 @@ export class GameScene extends Phaser.Scene {
       for (const [key, img] of this.chunks) {
         const [cx, cy] = key.split('_').map(Number) as [number, number];
         if (cx < cx0 - 2 || cx > cx1 + 2 || cy < cy0 - 2 || cy > cy1 + 2) {
+          this.chunkTexPool.push(img.texture.key);
           img.destroy();
-          this.textures.remove(`chunk_${key}`);
           this.chunks.delete(key);
         }
       }
@@ -1615,24 +1626,30 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Eine Etappe am Bodenchunk (Kunstraster, 24 px je Kachel, angezeigt mit Maßstab 2): 0–3 Bodenstreifen zu je vier
-   * Kachelreihen, 4 Details und Wände, 5 Upload als Textur. Liefert true, wenn der Chunk fertig ist.
+   * Eine Etappe am Bodenchunk (Kunstraster, 24 px je Kachel, angezeigt mit Maßstab 2): Bodenstreifen zu je zwei
+   * Kachelreihen (CHUNK_STRIPS Stück, je 2–6 ms), dann Details und Wände, dann Upload in eine Pool-Textur. Liefert true, wenn fertig.
    */
   private stepChunk(job: { cx: number; cy: number; r: Raster; step: number }): boolean {
     const { w, h } = this.world.grid;
     const { cx, cy, r } = job;
     const x0 = cx * CHUNK;
     const y0 = cy * CHUNK;
-    const strip = CHUNK / 4;
-    if (job.step < 4) {
+    const strip = CHUNK / CHUNK_STRIPS;
+    if (job.step < CHUNK_STRIPS) {
       const ys = y0 + job.step * strip;
       paintGround(r, x0, ys, CHUNK, strip, { mat: (x, y) => this.matAt(x, y), waterDist: (x, y) => this.landDistance(x, y) }, (x, y) => x >= w || y >= h, job.step * strip * ART);
-    } else if (job.step === 4) {
+    } else if (job.step === CHUNK_STRIPS) {
       this.chunkDecor(r, x0, y0);
     } else {
-      const key = `chunk_${cx}_${cy}`;
-      if (this.textures.exists(key)) this.textures.remove(key);
-      this.textures.addCanvas(key, toCanvas(r, 1));
+      // Textur aus dem Pool wiederverwenden (neue GL-Texturen und Leinwände je Chunk kosteten Spitzen bis 900 ms)
+      let key = this.chunkTexPool.pop();
+      if (!key) {
+        key = `chunktex_${this.chunkTexCount++}`;
+        this.textures.createCanvas(key, CHUNK * ART, CHUNK * ART);
+      }
+      const tex = this.textures.get(key) as Phaser.Textures.CanvasTexture;
+      tex.context.putImageData(new ImageData(bytes(r) as Uint8ClampedArray<ArrayBuffer>, r.w, r.h), 0, 0);
+      tex.refresh();
       this.chunks.set(`${cx}_${cy}`, this.add.image(x0 * TILE_W - TILE_W / 2, y0 * TILE_H - TILE_H / 2, key).setOrigin(0, 0).setScale(ART_SCALE).setDepth(-1e6));
       return true;
     }
