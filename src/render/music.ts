@@ -1,7 +1,9 @@
 /**
- * Generative Hintergrundmusik (WebAudio, keine Dateien, keine Lizenzen). Je Stimmung eine Tonleiter,
- * eine Akkordfolge, Tempo und Instrumente; Melodie und Rhythmus entstehen zufällig, klingen aber
- * wegen der festen Tonleiter immer stimmig. Der Planer arbeitet mit kurzem Vorlauf.
+ * Hintergrundmusik (WebAudio, keine Dateien, keine Lizenzen). Je Stimmung eine Tonleiter,
+ * eine Akkordfolge, Tempo und Instrumente. Darüber liegt ein festes, selbst komponiertes Leitmotiv
+ * (`theme`), das sich je Durchlauf der Akkordfolge wiederholt; Orte erkennt man so am Klang. Zwischen
+ * den Themennoten streut die generative Melodie nur noch sparsam Verzierungen. Der Planer arbeitet
+ * mit kurzem Vorlauf.
  */
 export type Mood = 'town' | 'field' | 'moor' | 'dungeon' | 'ash' | 'boss';
 
@@ -24,25 +26,72 @@ interface MoodDef {
   bright: number;
   /** Lautstärke 0–1 */
   vol: number;
+  /**
+   * Leitmotiv in Notenschrift: Takte durch `|`, Noten als `Stufe:Schläge` (Stufe der Tonleiter, 0 =
+   * Grundton eine Oktave über dem Pad, 7 = Oktave darüber), `r:Schläge` ist Pause. Jeder Takt hat 4
+   * Schläge, die Taktzahl ist ein Vielfaches der Akkordfolge.
+   */
+  theme: string;
 }
 
-const MOODS: Record<Mood, MoodDef> = {
+export interface ThemeNote {
+  /** Beginn in Schlägen ab Themenanfang */
+  at: number;
+  degree: number;
+  len: number;
+}
+
+/** Notenschrift in Noten zerlegen; Pausen entfallen, die Länge des Themas in Schlägen kommt mit. */
+export function parseTheme(src: string): { notes: ThemeNote[]; beats: number } {
+  const notes: ThemeNote[] = [];
+  let at = 0;
+  for (const tok of src.split(/[\s|]+/).filter(Boolean)) {
+    const [d, l] = tok.split(':');
+    const len = Number(l);
+    if (d !== 'r') notes.push({ at, degree: Number(d), len });
+    at += len;
+  }
+  return { notes, beats: at };
+}
+
+export const MOODS: Record<Mood, MoodDef> = {
   // Warm, dorisch: Laute und weiches Pad
-  town: { root: 146.83, scale: [0, 2, 3, 5, 7, 9, 10], prog: [0, 3, 4, 0, 5, 3, 4, 0], bpm: 72, melody: 0.5, lead: 'triangle', drum: 0, pad: 'sine', bright: 1400, vol: 0.9 },
+  town: { root: 146.83, scale: [0, 2, 3, 5, 7, 9, 10], prog: [0, 3, 4, 0, 5, 3, 4, 0], bpm: 72, melody: 0.5, lead: 'triangle', drum: 0, pad: 'sine', bright: 1400, vol: 0.9,
+    theme: '4:1.5 2:.5 0:1 2:1 | 5:1.5 3:.5 5:1 7:1 | 6:1.5 4:.5 6:1 8:1 | 7:2 4:1 r:1 | 5:1.5 7:.5 9:1 7:1 | 7:1.5 5:.5 3:1 5:1 | 6:1 4:1 6:1 8:1 | 7:1.5 4:.5 0:2',
+  },
   // Weit, äolisch, ruhig
-  field: { root: 130.81, scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 5, 3, 4], bpm: 64, melody: 0.38, lead: 'sine', drum: 0, pad: 'triangle', bright: 1000, vol: 0.85 },
+  field: { root: 130.81, scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 5, 3, 4], bpm: 64, melody: 0.38, lead: 'sine', drum: 0, pad: 'triangle', bright: 1000, vol: 0.85,
+    theme: '4:2 2:1 4:1 | 7:2 5:1 7:1 | 5:2 3:1 5:1 | 6:2 5:1 4:1 | 11:2 9:1 7:1 | 7:2 9:1 7:1 | 10:2 8:1 7:1 | 6:1 5:1 4:2',
+  },
   // Phrygisch, dünn und unheimlich
-  moor: { root: 123.47, scale: [0, 1, 3, 5, 7, 8, 10], prog: [0, 1, 0, 6], bpm: 52, melody: 0.26, lead: 'sine', drum: 0, pad: 'sawtooth', bright: 520, vol: 0.8 },
+  moor: { root: 123.47, scale: [0, 1, 3, 5, 7, 8, 10], prog: [0, 1, 0, 6], bpm: 52, melody: 0.26, lead: 'sine', drum: 0, pad: 'sawtooth', bright: 520, vol: 0.8,
+    theme: '4:2 5:1 4:1 | 3:2 r:1 2:1 | 4:1 5:1 4:1 2:1 | 3:3 r:1',
+  },
   // Tief, fast nur Brummen und seltene Töne
-  dungeon: { root: 82.41, scale: [0, 1, 3, 5, 6, 8, 10], prog: [0, 0, 1, 0], bpm: 46, melody: 0.14, lead: 'triangle', drum: 0, pad: 'sawtooth', bright: 380, vol: 0.85 },
+  dungeon: { root: 82.41, scale: [0, 1, 3, 5, 6, 8, 10], prog: [0, 0, 1, 0], bpm: 46, melody: 0.14, lead: 'triangle', drum: 0, pad: 'sawtooth', bright: 380, vol: 0.85,
+    theme: '0:1 r:1 4:2 | r:1 1:1 0:2 | r:1 5:1 4:1 1:1 | 0:3 r:1',
+  },
   // Harmonisch Moll, schwere Pauken
-  ash: { root: 110, scale: [0, 2, 3, 5, 7, 8, 11], prog: [0, 5, 6, 0, 3, 5, 6, 0], bpm: 60, melody: 0.3, lead: 'sawtooth', drum: 2, pad: 'sawtooth', bright: 700, vol: 0.85 },
+  ash: { root: 110, scale: [0, 2, 3, 5, 7, 8, 11], prog: [0, 5, 6, 0, 3, 5, 6, 0], bpm: 60, melody: 0.3, lead: 'sawtooth', drum: 2, pad: 'sawtooth', bright: 700, vol: 0.85,
+    theme: '4:1 4:.5 5:.5 4:1 2:1 | 5:1.5 4:.5 2:2 | 6:1 7:1 9:1 7:1 | 7:2 4:2 | 5:1 3:1 5:1 7:1 | 9:1.5 7:.5 5:1 7:1 | 6:1 7:1 8:1 6:1 | 7:1.5 4:.5 0:2',
+  },
   // Bossmusik: schneller, dicht, jeder Schlag Trommel
-  boss: { root: 98, scale: [0, 1, 3, 5, 6, 8, 11], prog: [0, 1, 0, 5, 0, 6, 1, 0], bpm: 104, melody: 0.55, lead: 'sawtooth', drum: 1, pad: 'sawtooth', bright: 900, vol: 1 },
+  boss: { root: 98, scale: [0, 1, 3, 5, 6, 8, 11], prog: [0, 1, 0, 5, 0, 6, 1, 0], bpm: 104, melody: 0.55, lead: 'sawtooth', drum: 1, pad: 'sawtooth', bright: 900, vol: 1,
+    theme: '0:.5 0:.5 2:.5 0:.5 3:1 2:1 | 1:.5 1:.5 3:.5 1:.5 4:1 3:1 | 0:.5 0:.5 2:.5 0:.5 3:1 4:1 | 5:2 4:1 3:1 | 7:.5 7:.5 9:.5 7:.5 10:1 9:1 | 6:1 7:1 9:1 6:1 | 8:.5 8:.5 7:.5 8:.5 10:1 8:1 | 7:1 4:1 3:1 0:1',
+  },
 };
+
+/** Ausgang einer Stimmung: beim Wechsel blendet der alte aus, der neue ein (keine harten Schnitte). */
+interface MoodBus {
+  dry: GainNode;
+  send: GainNode;
+}
+
+const THEMES = Object.fromEntries((Object.keys(MOODS) as Mood[]).map((m) => [m, parseTheme(MOODS[m].theme)])) as Record<Mood, ReturnType<typeof parseTheme>>;
 
 export class Music {
   private mood: Mood | null = null;
+  private out: MoodBus | null = null;
   private next = 0;
   private beat = 0;
   private timer = 0;
@@ -84,14 +133,42 @@ export class Music {
     this.mood = m;
     this.beat = 0;
     this.next = Math.max(this.next, this.ctx.currentTime + 0.3);
+    this.swapBus();
     this.fade();
+  }
+
+  /** Neuer Ausgang für die neue Stimmung; der alte (samt schon eingeplanter Noten) klingt aus. */
+  private swapBus(): void {
+    const t = this.ctx.currentTime;
+    const old = this.out;
+    if (old) {
+      old.dry.gain.cancelScheduledValues(t);
+      old.dry.gain.setTargetAtTime(0, t, 0.6);
+      old.send.gain.cancelScheduledValues(t);
+      old.send.gain.setTargetAtTime(0, t, 0.6);
+      window.setTimeout(() => {
+        old.dry.disconnect();
+        old.send.disconnect();
+      }, 6000);
+    }
+    this.out = null;
+    if (!this.mood) return;
+    const dry = this.ctx.createGain();
+    const send = this.ctx.createGain();
+    dry.gain.value = 0;
+    send.gain.value = 0;
+    dry.connect(this.bus);
+    send.connect(this.echo);
+    const v = MOODS[this.mood].vol;
+    dry.gain.setTargetAtTime(v, t + 0.3, 0.8);
+    send.gain.setTargetAtTime(v, t + 0.3, 0.8);
+    this.out = { dry, send };
   }
 
   private fade(): void {
     const t = this.ctx.currentTime;
-    const v = this.enabled && this.mood ? 0.5 * MOODS[this.mood].vol : 0;
     this.bus.gain.cancelScheduledValues(t);
-    this.bus.gain.setTargetAtTime(v, t, 1.5);
+    this.bus.gain.setTargetAtTime(this.enabled ? 0.5 : 0, t, 1.5);
   }
 
   private hz(d: MoodDef, degree: number, octave = 0): number {
@@ -118,6 +195,17 @@ export class Music {
   private play(d: MoodDef, beat: number, t: number, spb: number): void {
     const inBar = beat % 4;
     const bar = Math.floor(beat / 4);
+    const theme = THEMES[this.mood!];
+    const tBeat = beat % theme.beats;
+    let themed = false;
+    for (const n of theme.notes) {
+      if (n.at < tBeat || n.at >= tBeat + 1) continue;
+      themed = true;
+      const nt = t + (n.at - tBeat) * spb;
+      const f = this.hz(d, n.degree, 1);
+      this.pluck(f, d.lead, nt, spb * n.len * 1.15, 0.12);
+      this.pluck(f, 'sine', nt, spb * n.len * 1.15, 0.05);
+    }
     const chord = d.prog[bar % d.prog.length]!;
     if (inBar === 0) {
       // Pad: Grundton, Terz und Quinte der Stufe, lang ein- und ausgeblendet
@@ -125,7 +213,8 @@ export class Music {
       this.voice(this.hz(d, chord, -2), 'sine', t, spb * 4, 0.16, 300);
     }
     if (d.drum && (d.drum === 1 || inBar % 2 === 0)) this.drum(t, inBar === 0 ? 1 : 0.6, d.drum === 1 && inBar % 2 === 1);
-    if (Math.random() < d.melody) {
+    // Zwischen den Themennoten nur gelegentlich Verzierung, damit das Thema erkennbar bleibt
+    if (!themed && Math.random() < d.melody * 0.35) {
       // Melodieton: Akkordton oder Nachbar, eine Oktave höher; manchmal zwei Achtel
       const degree = chord + [0, 1, 2, 3, 4, 6][Math.floor(Math.random() * 6)]!;
       this.pluck(this.hz(d, degree, 1), d.lead, t, spb * (1.2 + Math.random()), 0.1);
@@ -134,6 +223,7 @@ export class Music {
   }
 
   private voice(f: number, type: OscillatorType, t: number, dur: number, vol: number, cutoff: number): void {
+    if (!this.out) return;
     const c = this.ctx;
     const o = c.createOscillator();
     o.type = type;
@@ -146,12 +236,13 @@ export class Music {
     g.gain.setValueAtTime(0.0001, t);
     g.gain.linearRampToValueAtTime(vol, t + dur * 0.35);
     g.gain.linearRampToValueAtTime(0.0001, t + dur);
-    o.connect(lp).connect(g).connect(this.bus);
+    o.connect(lp).connect(g).connect(this.out.dry);
     o.start(t);
     o.stop(t + dur + 0.05);
   }
 
   private pluck(f: number, type: OscillatorType, t: number, dur: number, vol: number): void {
+    if (!this.out) return;
     const c = this.ctx;
     const o = c.createOscillator();
     o.type = type;
@@ -165,13 +256,14 @@ export class Music {
     g.gain.linearRampToValueAtTime(vol, t + 0.015);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     o.connect(lp).connect(g);
-    g.connect(this.bus);
-    g.connect(this.echo);
+    g.connect(this.out.dry);
+    g.connect(this.out.send);
     o.start(t);
     o.stop(t + dur + 0.05);
   }
 
   private drum(t: number, vol: number, light: boolean): void {
+    if (!this.out) return;
     const c = this.ctx;
     if (!light) {
       const o = c.createOscillator();
@@ -180,7 +272,7 @@ export class Music {
       const g = c.createGain();
       g.gain.setValueAtTime(0.5 * vol, t);
       g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
-      o.connect(g).connect(this.bus);
+      o.connect(g).connect(this.out.dry);
       o.start(t);
       o.stop(t + 0.4);
     }
@@ -192,7 +284,7 @@ export class Music {
     const g2 = c.createGain();
     g2.gain.setValueAtTime((light ? 0.07 : 0.14) * vol, t);
     g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
-    s.connect(f).connect(g2).connect(this.bus);
+    s.connect(f).connect(g2).connect(this.out.dry);
     s.start(t, Math.random() * 0.5);
     s.stop(t + 0.12);
   }
