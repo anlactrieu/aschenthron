@@ -125,7 +125,7 @@ const demon = (c: number, o: Partial<HumDef> = {}, b: RigBody = {}): HumDef => (
 
 const RAT_FRAME = { w: 44, h: 32, fx: 22, fy: 28 };
 const DOG_FRAME = { w: 60, h: 48, fx: 30, fy: 43 };
-const SPIDER_FRAME = { w: 60, h: 44, fx: 30, fy: 39 };
+const SPIDER_FRAME = { w: 68, h: 50, fx: 34, fy: 45 };
 const rat = (c: number, size = 1): BeastDef => ({
   rig: 'beast', eye: 0xff4a3a, frame: size > 1.2 ? { w: 56, h: 40, fx: 28, fy: 36 } : RAT_FRAME,
   body: { type: 'quad', size, len: 8, height: 4.2, girth: 3.4, head: 2.6, snout: 2.6, ears: 1.5, earsRound: true, tail: 11, tailR: 0.7, legR: 0.9 },
@@ -137,8 +137,8 @@ const dog = (c: number, size = 1, o: Partial<BeastBody> = {}, pal: Partial<Recor
   pal: { fur: rampOf(c), belly: rampOf(c, 1.55), snout: rampOf(c, 1.2), paw: rampOf(c, 0.9), ear: rampOf(c, 0.9), tail: rampOf(c), ...pal },
 });
 const spider = (c: number, size = 1, o: Partial<BeastBody> = {}): BeastDef => ({
-  rig: 'beast', eye: 0xff3a2a, frame: size > 1.3 ? { w: 92, h: 66, fx: 46, fy: 60 } : size > 1.05 ? { w: 72, h: 52, fx: 36, fy: 47 } : SPIDER_FRAME,
-  body: { type: 'spider', size, len: 9, height: 5, girth: 4.6, head: 3.2, legR: 0.8, ...o },
+  rig: 'beast', eye: 0xff3a2a, frame: size > 1.3 ? { w: 104, h: 74, fx: 52, fy: 68 } : size > 1.05 ? { w: 84, h: 60, fx: 42, fy: 54 } : SPIDER_FRAME,
+  body: { type: 'spider', size: size * 1.15, len: 9, height: 5, girth: 4.6, head: 3.2, legR: 0.85, ...o },
   pal: { fur: rampOf(c), belly: rampOf(c, 1.5), paw: rampOf(c, 0.8), snout: rampOf(c, 1.15), mark: rampOf(0xc83a3a) },
 });
 const worm = (c: number, o: Partial<BeastBody> = {}): BeastDef => ({
@@ -203,9 +203,9 @@ export const MONSTER_DEFS: Record<string, MonsterDef> = {
   acid_worm: worm(0x8aa04a, { spikes: true }),
   // Asche und Feuer
   ash_walker: ghoul(0x6a5a52, { style: 'sword', weapon: 'shortsword', blade: RUST, hunch: 1.2, eye: 0xff8a3a, gear: { helm: 5 }, pal: { hood: rampOf(0x3a3230), top: rampOf(0x4a3e3a) } }, { arms: 1.1, limb: 0.95 }),
-  cinder_wisp: { rig: 'beast', eye: 0xffffe0, frame: { w: 44, h: 52, fx: 22, fy: 46 }, body: { type: 'wisp', size: 1, girth: 5.5, height: 12 }, pal: { fur: LAVA, belly: rampOf(0xffe080, 1.2), mark: CHAR } },
+  cinder_wisp: { rig: 'beast', eye: 0xffffe0, frame: { w: 60, h: 68, fx: 30, fy: 62 }, body: { type: 'wisp', size: 1.55, girth: 5.5, height: 11 }, pal: { fur: LAVA, belly: rampOf(0xffe080, 1.2), mark: CHAR } },
   ember_elemental: golem(CHAR, 0xfff0a0, { size: 1.35 }, { pal: { chest: LAVA, belly: LAVA, head: LAVA, handN: LAVA, handF: LAVA } }),
-  imp: demon(0xd05a3a, { gear: { horns: 0.6, tail: 0.8, wings: 0.75, ears: 0.7 } }, { size: 0.72, head: 1.3, legs: 0.85 }),
+  imp: demon(0xd05a3a, { gear: { horns: 0.6, tail: 0.8, wings: 0.75, ears: 0.7 } }, { size: 0.8, head: 1.3, legs: 0.85 }),
   hell_spawn: demon(0xc0402a, { hunch: 1.5 }, { size: 1.1, limb: 1.2, arms: 1.15 }),
   // Aschengrund
   hell_hound: { ...dog(0xb03020, 1.15, { mane: 1.2, horns: 1 }, { mane: CHAR, horn: rampOf(0x3a3030) }), eye: 0xfff080 },

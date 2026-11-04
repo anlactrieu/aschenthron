@@ -5,7 +5,7 @@
 import { join } from 'node:path';
 import { bakeFigure } from '../src/render/figure';
 import { MONSTER_DEFS, monsterSpec } from '../src/render/monster';
-import { writeContact } from './contact';
+import { writeContact, writeGallery } from './contact';
 
 const argv = process.argv.slice(2);
 const opt = (name: string): string | undefined => {
@@ -20,6 +20,9 @@ const flag = (name: string): boolean => {
 const pick = opt('--cols')?.split(',').map(Number);
 const K = +(opt('--k') ?? 3);
 const ground = flag('--ground');
+// --gallery: alle gewählten Arten in eine Galerie (Stehen seitlich/vorn/hinten, Gehen, Schlag, liegend)
+const gallery = flag('--gallery');
+const sheets = [];
 for (const id of argv.length ? argv : Object.keys(MONSTER_DEFS)) {
   const spec = monsterSpec(id);
   if (!spec) {
@@ -29,6 +32,12 @@ for (const id of argv.length ? argv : Object.keys(MONSTER_DEFS)) {
   const t = performance.now();
   const s = bakeFigure(spec);
   const ms = performance.now() - t;
+  sheets.push(s);
+  if (gallery) continue;
   const file = writeContact(join('monster', `contact-${id}${pick ? '-sel' : ''}.png`), s, { cols: pick, k: K, ground });
   console.log(`${file.replace(/.*probe\//, '')}  ${ms.toFixed(0)} ms, ${s.w}x${s.h}, Kopf ${s.top}, Breite ${s.bodyW}, abgeschnitten ${s.clipped}`);
+}
+if (gallery) {
+  const names = ['idle_side_0', 'walk_side_2', 'attack_side_3', 'idle_front_0', 'walk_front_5', 'idle_back_0', 'hit_side_0', `die_side_3`];
+  console.log(writeGallery(join('monster', `galerie${argv.length ? '-' + argv[0] : ''}.png`), sheets, names, K, ground));
 }

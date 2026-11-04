@@ -47,3 +47,35 @@ export function writeContact(rel: string, s: FigureSheet, o: { cols?: number[]; 
   writeFileSync(file, encodePNG(CW, CH, px));
   return file;
 }
+
+/** Galerie: je Sheet eine Zeile mit den genannten Bildern (z. B. `idle_side_0`), Zellen so groß wie das größte Bild */
+export function writeGallery(rel: string, sheets: FigureSheet[], names: string[], k = 3, ground = true): string {
+  const CW = Math.max(...sheets.map((s) => s.frame.w));
+  const CH = Math.max(...sheets.map((s) => s.frame.h));
+  const W = names.length * CW * k;
+  const H = sheets.length * CH * k;
+  const px = new Uint8Array(W * H * 4);
+  const g = (c: number[]): number[] => (ground ? c.map((v, j) => Math.round(v * GRADE[j]!)) : c);
+  sheets.forEach((s, r) => names.forEach((name, c) => {
+    const bg = g(GROUNDS[(r + c) % 2]!);
+    for (let y = 0; y < CH * k; y++) for (let x = 0; x < CW * k; x++) px.set([...bg, 255], ((r * CH * k + y) * W + c * CW * k + x) * 4);
+    const f = s.frames[name];
+    if (!f) return;
+    // Füße aller Figuren auf dieselbe Linie
+    const ox = Math.round(CW / 2 - s.frame.fx);
+    const oy = CH - 4 - s.frame.fy;
+    for (let y = 0; y < s.frame.h; y++) for (let x = 0; x < s.frame.w; x++) {
+      const o = ((f.y + y) * s.w + f.x + x) * 4;
+      if (!s.data[o + 3]) continue;
+      const col = g([s.data[o]!, s.data[o + 1]!, s.data[o + 2]!]);
+      const X = x + ox;
+      const Y = y + oy;
+      if (X < 0 || Y < 0 || X >= CW || Y >= CH) continue;
+      for (let j = 0; j < k * k; j++) px.set([...col, 255], ((r * CH * k + Y * k + Math.floor(j / k)) * W + c * CW * k + X * k + (j % k)) * 4);
+    }
+  }));
+  const file = join(ROOT, 'public', 'probe', rel);
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, encodePNG(W, H, px));
+  return file;
+}

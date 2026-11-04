@@ -230,12 +230,14 @@ function wisp(b, ph, M0) {
   const c = [(ph.lunge ?? 0) * 0.6 * k, H + Math.sin(t * TAU) * 1.2 * k - die * H * 0.5, 0];
   ball(c, g * grow, P_.fur);
   ball(add(c, [g * 0.15, g * 0.1, 0]), g * 0.62 * grow, P_.belly);
-  // Flammenzungen steigen auf und werden schmaler
-  for (let j = 0; j < 6; j++) {
-    const a = j * 2.4 + t * TAU, rr = g * (0.55 + 0.2 * Math.sin(j * 1.7 + t * TAU));
-    const up = (((j * 0.37 + t) % 1) + 1) % 1;
-    ball(add(c, [Math.cos(a) * g * 0.45, g * (0.55 + up * 1.4), Math.sin(a) * g * 0.45]), rr * (1 - up * 0.7) * grow, P_.fur);
+  // Flammenzungen: spitze Kegel, die flackernd nach oben züngeln
+  for (let j = 0; j < 5; j++) {
+    const a = j * 2.5 + t * TAU * 0.5, flick = Math.sin(j * 1.7 + t * TAU * 2);
+    const base = add(c, [Math.cos(a) * g * 0.42, g * 0.35, Math.sin(a) * g * 0.42]);
+    const tip = add(base, [Math.cos(a) * g * 0.2 - 0.8 * k, g * (1.5 + 0.35 * flick) * grow, Math.sin(a) * g * 0.2]);
+    sweep(P(base), P(tip), g * 0.52 * grow, 0.3 * k, P_.fur, 0);
   }
+  sweep(P(add(c, [0, g * 0.2, 0])), P(add(c, [-0.6 * k, g * 2.3 * grow, 0])), g * 0.6 * grow, 0.35 * k, P_.belly, 0);
   // Glutbrocken kreisen
   for (let j = 0; j < 3; j++) {
     const a = (j / 3) * TAU + t * TAU;
