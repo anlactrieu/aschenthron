@@ -22,19 +22,19 @@ function make(draw: (c: CanvasRenderingContext2D) => void, scale = 3): string {
   const base = document.createElement('canvas');
   base.width = 16;
   base.height = 16;
-  const x = base.getContext('2d')!;
+  const x = base.getContext('2d', { willReadFrequently: true })!;
   draw(x);
   // Umriss
   const d = x.getImageData(0, 0, 16, 16).data;
   const out = document.createElement('canvas');
   out.width = 16 * scale;
   out.height = 16 * scale;
-  const oc = out.getContext('2d')!;
+  const oc = out.getContext('2d', { willReadFrequently: true })!;
   oc.imageSmoothingEnabled = false;
   const o2 = document.createElement('canvas');
   o2.width = 16;
   o2.height = 16;
-  const o2c = o2.getContext('2d')!;
+  const o2c = o2.getContext('2d', { willReadFrequently: true })!;
   const a = (px: number, py: number) => (px < 0 || py < 0 || px > 15 || py > 15 ? 0 : d[(py * 16 + px) * 4 + 3]!);
   o2c.fillStyle = '#120e12';
   for (let py = 0; py < 16; py++) for (let px = 0; px < 16; px++) if (!a(px, py) && (a(px - 1, py) || a(px + 1, py) || a(px, py - 1) || a(px, py + 1))) o2c.fillRect(px, py, 1, 1);
@@ -51,7 +51,7 @@ function spriteIcon(path: string | undefined): string | null {
   const base = document.createElement('canvas');
   base.width = n + 2;
   base.height = n + 2;
-  const x = base.getContext('2d')!;
+  const x = base.getContext('2d', { willReadFrequently: true })!;
   x.imageSmoothingEnabled = false;
   x.drawImage(img, 1, 1);
   const d = x.getImageData(0, 0, n + 2, n + 2).data;
@@ -59,12 +59,12 @@ function spriteIcon(path: string | undefined): string | null {
   const out = document.createElement('canvas');
   out.width = (n + 2) * 2;
   out.height = (n + 2) * 2;
-  const oc = out.getContext('2d')!;
+  const oc = out.getContext('2d', { willReadFrequently: true })!;
   oc.imageSmoothingEnabled = false;
   const o2 = document.createElement('canvas');
   o2.width = n + 2;
   o2.height = n + 2;
-  const o2c = o2.getContext('2d')!;
+  const o2c = o2.getContext('2d', { willReadFrequently: true })!;
   o2c.fillStyle = '#120e12';
   for (let py = 0; py < n + 2; py++) for (let px = 0; px < n + 2; px++) if (!a(px, py) && (a(px - 1, py) || a(px + 1, py) || a(px, py - 1) || a(px, py + 1))) o2c.fillRect(px, py, 1, 1);
   o2c.drawImage(base, 0, 0);
@@ -433,7 +433,7 @@ export function skillCursor(s: SkillDef): string {
   const n = 32;
   const c = document.createElement('canvas');
   c.width = c.height = n;
-  const x = c.getContext('2d')!;
+  const x = c.getContext('2d', { willReadFrequently: true })!;
   x.imageSmoothingEnabled = false;
   x.drawImage(img, 0, 0, n, n);
   const im = x.getImageData(0, 0, n, n);

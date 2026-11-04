@@ -12,6 +12,7 @@ import { addSheetTexture, FIG_SCALE, pixelSource, type FigSource } from './heroS
 import { SHADE } from './heroRig.js';
 import { heroSpec, type HeroLook } from './hero';
 import { monsterSpec } from './monster';
+import { cancelUpload, pendingUploads, pumpUploads, queueUpload, uploading } from './sheetUpload';
 import { npcSpec } from './npc';
 
 /** Was gebacken werden soll (für den Worker: nur Daten) */
@@ -122,8 +123,10 @@ export function startFigureWorkers(): void {
  * GPU-Textur eines Sheets anlegen, falls es sie noch nicht gibt; `false`, wenn in diesem Frame schon eine neue hochgeladen
  * wurde (dann im nächsten Frame wieder fragen).
  */
-export function uploadSheet(scene: Phaser.Scene, key: string, src: FigSource): boolean {
+export function uploadSheet(scene: Phaser.Scene, key: string, src: FigSource, urgent = true): boolean {
   if (scene.textures.exists(key)) return true;
+  // WebGL: scheibenweise über mehrere Frames (`pumpUploads`), die Textur ist erst danach da
+  if (queueUpload(scene, key, src, urgent)) return false;
   if (uploads <= 0) return false;
   uploads--;
   addSheetTexture(scene, key, src);
@@ -166,13 +169,18 @@ export function prefetchFigure(key: string, req: FigReq, ahead = true): void {
   enqueue(key, req, false);
 }
 
+/** Ganz am Anfang jedes Frames (`draw`): Upload- und Riss-Budget auffrischen, bevor irgendetwas hochlädt. */
+export function resetFigureBudgets(scene: Phaser.Scene): void {
+  pumpUploads(scene);
+  uploads = UPLOADS_PER_FRAME;
+  silBudget = SIL_PER_FRAME;
+}
+
 /**
- * Am Anfang jedes Frames: Upload-Budget auffrischen, ohne Worker aus der Warteschlange backen, bis das Zeitbudget verbraucht ist,
+ * Am Anfang der Figurenpflege: ohne Worker aus der Warteschlange backen, bis das Zeitbudget verbraucht ist,
  * und alte Sheets aus dem Cache werfen.
  */
 export function pumpFigures(scene: Phaser.Scene, inUse: () => Set<string>, budget = BUDGET_MS): void {
-  uploads = UPLOADS_PER_FRAME;
-  silBudget = SIL_PER_FRAME;
   if (local.size) {
     const t0 = performance.now();
     for (const [key, baker] of local) {
@@ -198,6 +206,7 @@ export function pumpFigures(scene: Phaser.Scene, inUse: () => Set<string>, budge
       if (busy.has(old)) continue;
       ready.delete(old);
       noAhead.delete(old);
+      cancelUpload(scene, old);
       if (scene.textures.exists(old)) scene.textures.remove(old);
     }
   }
@@ -205,10 +214,11 @@ export function pumpFigures(scene: Phaser.Scene, inUse: () => Set<string>, budge
 
 /** Am Ende jedes Frames: ist das Upload-Budget übrig, ein vorausgebackenes Sheet schon hochladen (dann kostet sein Erscheinen nichts). */
 export function uploadAhead(scene: Phaser.Scene): void {
-  if (uploads <= 0) return;
+  // höchstens zwei Aufträge auf einmal, damit Sichtbares nicht hinter Vorausgeladenem wartet und nicht alles Fertige auf einmal Speicher belegt
+  if (uploads <= 0 || pendingUploads() >= 2) return;
   for (const [key, src] of ready) {
-    if (noAhead.has(key) || scene.textures.exists(key)) continue;
-    uploadSheet(scene, key, src);
+    if (noAhead.has(key) || scene.textures.exists(key) || uploading(key)) continue;
+    uploadSheet(scene, key, src, false);
     return;
   }
 }

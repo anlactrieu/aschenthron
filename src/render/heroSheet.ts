@@ -9,6 +9,7 @@ import type { Look } from './art';
 import { bakeFigure, type FigureSheet } from './figure';
 import { bakeHero, heroKey, heroLookOf, heroSpec } from './hero';
 import { bakeInWorker, uploadSheet } from './monsterSheet';
+import { cancelUpload } from './sheetUpload';
 
 /** Pixelmaßstab aller Skelett-Figuren in der Welt */
 export const FIG_SCALE = 2;
@@ -107,6 +108,7 @@ export function heroTexture(scene: Phaser.Scene, look: Look, inUse?: () => Set<s
       if (sheets.size <= KEEP) break;
       if (old === key || busy.has(old)) continue;
       sheets.delete(old);
+      cancelUpload(scene, old);
       if (scene.textures.exists(old)) scene.textures.remove(old);
     }
   }

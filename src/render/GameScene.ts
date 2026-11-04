@@ -22,7 +22,7 @@ import { Ui, describeItem, isUpgrade } from './ui';
 import { generateItem, type Item } from '../sim/items';
 import type { Mood } from './music';
 import { AchievementTracker, type Stats } from './achievements';
-import { itemIcon, skillCursor } from './icons';
+import { skillCursor } from './icons';
 import { Sfx } from './audio';
 import { Minimap } from './minimap';
 import { isTouch } from './touch';
@@ -33,8 +33,9 @@ import { attackFrame, onceFrame, walkFrame, type FigView, type FigureSheet } fro
 import { heroKey, heroLookOf, idleFrame } from './hero';
 import { FIG_SCALE, heroMode, heroTexture, originOf, prefetchHero } from './heroSheet';
 import { monsterKey } from './monster';
-import { figureTexture, initSilhouettes, prefetchFigure, pumpFigures, silhouette, silhouetteOf, SIL_TEX, uploadAhead, type FigReq, type Silhouette } from './monsterSheet';
+import { figureTexture, initSilhouettes, prefetchFigure, pumpFigures, resetFigureBudgets, silhouette, silhouetteOf, SIL_TEX, uploadAhead, type FigReq, type Silhouette } from './monsterSheet';
 import { npcDef, npcFigKey } from './npc';
+import { initLootAtlas, pumpLootIcons, useLootIcon } from './lootAtlas';
 import { onSettings, settings } from './settings';
 import type { RemoteSession } from '../net/client';
 import {
@@ -58,6 +59,28 @@ const sessionSlot = storedSlot();
 const activeSlot = (): number => sessionSlot;
 const slotKey = (n: number): string => (n === 1 ? SAVE_BASE : `${SAVE_BASE}.s${n}`);
 const saveKey = (): string => slotKey(sessionSlot);
+
+/** Benannte Karten-NPCs in der Umgebung des Spielstands (Position aus dem Speicherplatz, sonst Kartenstart): nur die backt der Ladevorgang vor. */
+export function npcsNearSave(): { kind: string; name: string }[] {
+  const objs = (mapJson as unknown as TiledMap).layers.find((l) => l.type === 'objectgroup')?.objects ?? [];
+  const ts = (mapJson as unknown as TiledMap).tilewidth;
+  const start = objs.find((o) => o.type === 'start');
+  let x = start ? start.x / ts : 0;
+  let y = start ? start.y / ts : 0;
+  try {
+    const raw = window.localStorage.getItem(saveKey());
+    const pl = raw && !new URLSearchParams(location.search).has('neu') ? (JSON.parse(raw) as { player?: { x?: number; y?: number } }).player : undefined;
+    if (typeof pl?.x === 'number' && typeof pl.y === 'number') { x = pl.x; y = pl.y; }
+  } catch { /* ohne Speicher oder kaputter Spielstand: Kartenstart */ }
+  const R = VIEW + 14;
+  const out: { kind: string; name: string }[] = [];
+  for (const o of objs) {
+    if (o.type !== 'npc' || Math.abs(o.x / ts - x) > R || Math.abs(o.y / ts - y) > R) continue;
+    const kind = o.properties?.find((q) => q.name === 'kind')?.value;
+    if (kind && npcDef(kind, o.name)) out.push({ kind, name: o.name });
+  }
+  return out;
+}
 const VIEW = 30;
 /**
  * Kamera-Zoom nur in Stufen, bei denen 1 Kunstpixel (= 2 Weltpixel, `FIG_SCALE`) ganze Bildschirmpixel misst:
@@ -267,6 +290,7 @@ export class GameScene extends Phaser.Scene {
     onSettings(() => this.sfx.setVolume(settings().volume));
     registerPixelfx(this);
     initSilhouettes(this);
+    initLootAtlas(this);
     this.atmo = new Atmosphere(this, this.sfx);
     this.minimap = new Minimap(this.world, this.tiles);
     if (this.remote) this.ui.say(`Verbunden als ${p.name}${this.remote.pvp ? ' – PvP außerhalb der Städte aktiv, Angreifer werden zu Mördern' : ''}. Klick auf Spieler greift an.`);
@@ -1369,6 +1393,7 @@ export class GameScene extends Phaser.Scene {
     const g = this.gfx;
     g.clear();
     this.gfxGround.clear();
+    resetFigureBudgets(this);
     if (this.frame % 3 === 0) this.updateHover();
     const px = Math.round(p.x);
     const py = Math.round(p.y);
@@ -2058,7 +2083,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateNpcs(time: number): void {
-    // Skelett-Figuren: Upload-Budget des Frames, ohne Worker im Spielthread backen, Cache aufräumen
+    // Skelett-Figuren: ohne Worker im Spielthread backen, Cache aufräumen (Upload-Budget setzt `draw` zurück)
     pumpFigures(this, () => this.figuresInUse());
     const p = this.player();
     const seen = new Set<string>();
@@ -2194,18 +2219,7 @@ export class GameScene extends Phaser.Scene {
   /** Tränke und Edelsteine liegen mit ihrem eigenen Symbol am Boden (bis es geladen ist: Standard-Beutesymbol). */
   private useItemTexture(img: Phaser.GameObjects.Image, it: Item): void {
     if (it.slot !== 'potion' && it.slot !== 'gem') return;
-    const key = `lootitem_${it.templateId}`;
-    const apply = () => img.setTexture(key).setDisplaySize(30, 30);
-    if (this.textures.exists(key)) {
-      apply();
-      return;
-    }
-    const im = new Image();
-    im.onload = () => {
-      if (!this.textures.exists(key)) this.textures.addImage(key, im);
-      if (img.scene) apply();
-    };
-    im.src = itemIcon(it);
+    useLootIcon(img, it.templateId);
   }
 
   private updateLoot(time: number, g: Phaser.GameObjects.Graphics): void {
@@ -2551,6 +2565,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.cleanLabels(seen, ['a']);
     uploadAhead(this);
+    pumpLootIcons(this);
   }
 
   /** Position vor dem letzten Simulationsschritt, damit die Darstellung zwischen den 20 Schritten pro Sekunde gleiten kann. */

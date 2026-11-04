@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import mapJson from './data/aschenthron.json';
-import { GameScene } from './render/GameScene';
+import { GameScene, npcsNearSave } from './render/GameScene';
 import { RemoteSession } from './net/client';
 import type { TiledMap } from './sim/tiled';
 import { preloadSprites } from './render/sprites';
@@ -12,7 +12,7 @@ import { preloadPixelfx } from './render/pixelfx';
 import { FIG_MODES, figureLists, figureMode } from './render/figureMap';
 import { MONSTERS } from './sim/data';
 import { prefetchFigure, startFigureWorkers } from './render/monsterSheet';
-import { NPC_FIG_NAMES, npcFigKey } from './render/npc';
+import { npcFigKey } from './render/npc';
 
 function showError(msg: string): void {
   const d = document.createElement('div');
@@ -42,11 +42,11 @@ async function boot(): Promise<void> {
       return;
     }
   }
-  // Skelett-Figuren: Worker starten und die benannten NPCs schon backen, während die Bilder laden (Monster und Held folgen im
+  // Skelett-Figuren: Worker starten und die benannten NPCs der Gegend des Spielstands schon backen, während die Bilder laden (Monster und Held folgen im
   // Spiel nach Nähe, sobald Welt und Spielstand stehen)
   if (figureMode() === 'skelett') {
     startFigureWorkers();
-    for (const name of NPC_FIG_NAMES) prefetchFigure(npcFigKey('quest', name), { t: 'n', kind: 'quest', name }, false);
+    for (const { kind, name } of npcsNearSave()) prefetchFigure(npcFigKey(kind, name), { t: 'n', kind, name }, false);
   }
   // Fremd-Sprites (CC0) vorladen; Fehler/Zeitüberschreitung ist erlaubt, dann greift die prozedurale Grafik
   await preloadSprites(allSpritePaths());
