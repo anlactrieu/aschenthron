@@ -1,662 +1,662 @@
 {
  "frames": [
   {
-   "filename": "heal-clean 0",
+   "filename": "heal-big 0",
    "frame": {
     "x": 0,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "sourceSize": {
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "duration": 67
   },
   {
-   "filename": "heal-clean 1",
+   "filename": "heal-big 1",
    "frame": {
-    "x": 80,
+    "x": 100,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "sourceSize": {
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "duration": 67
   },
   {
-   "filename": "heal-clean 2",
+   "filename": "heal-big 2",
    "frame": {
-    "x": 160,
+    "x": 200,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "sourceSize": {
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "duration": 67
   },
   {
-   "filename": "heal-clean 3",
+   "filename": "heal-big 3",
    "frame": {
-    "x": 240,
+    "x": 300,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "sourceSize": {
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "duration": 67
   },
   {
-   "filename": "heal-clean 4",
-   "frame": {
-    "x": 320,
-    "y": 0,
-    "w": 80,
-    "h": 104
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 80,
-    "h": 104
-   },
-   "sourceSize": {
-    "w": 80,
-    "h": 104
-   },
-   "duration": 67
-  },
-  {
-   "filename": "heal-clean 5",
+   "filename": "heal-big 4",
    "frame": {
     "x": 400,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "sourceSize": {
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "duration": 67
   },
   {
-   "filename": "heal-clean 6",
+   "filename": "heal-big 5",
    "frame": {
-    "x": 480,
+    "x": 500,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "sourceSize": {
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "duration": 67
   },
   {
-   "filename": "heal-clean 7",
+   "filename": "heal-big 6",
    "frame": {
-    "x": 0,
-    "y": 104,
-    "w": 80,
-    "h": 104
+    "x": 600,
+    "y": 0,
+    "w": 100,
+    "h": 130
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "sourceSize": {
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "duration": 67
   },
   {
-   "filename": "heal-clean 8",
-   "frame": {
-    "x": 80,
-    "y": 104,
-    "w": 80,
-    "h": 104
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 80,
-    "h": 104
-   },
-   "sourceSize": {
-    "w": 80,
-    "h": 104
-   },
-   "duration": 67
-  },
-  {
-   "filename": "heal-clean 9",
-   "frame": {
-    "x": 160,
-    "y": 104,
-    "w": 80,
-    "h": 104
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 80,
-    "h": 104
-   },
-   "sourceSize": {
-    "w": 80,
-    "h": 104
-   },
-   "duration": 67
-  },
-  {
-   "filename": "heal-clean 10",
-   "frame": {
-    "x": 240,
-    "y": 104,
-    "w": 80,
-    "h": 104
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 80,
-    "h": 104
-   },
-   "sourceSize": {
-    "w": 80,
-    "h": 104
-   },
-   "duration": 67
-  },
-  {
-   "filename": "heal-clean 11",
-   "frame": {
-    "x": 320,
-    "y": 104,
-    "w": 80,
-    "h": 104
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 80,
-    "h": 104
-   },
-   "sourceSize": {
-    "w": 80,
-    "h": 104
-   },
-   "duration": 67
-  },
-  {
-   "filename": "heal-clean 12",
-   "frame": {
-    "x": 400,
-    "y": 104,
-    "w": 80,
-    "h": 104
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 80,
-    "h": 104
-   },
-   "sourceSize": {
-    "w": 80,
-    "h": 104
-   },
-   "duration": 67
-  },
-  {
-   "filename": "heal-clean 13",
-   "frame": {
-    "x": 480,
-    "y": 104,
-    "w": 80,
-    "h": 104
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 80,
-    "h": 104
-   },
-   "sourceSize": {
-    "w": 80,
-    "h": 104
-   },
-   "duration": 67
-  },
-  {
-   "filename": "heal-clean 14",
+   "filename": "heal-big 7",
    "frame": {
     "x": 0,
-    "y": 208,
-    "w": 80,
-    "h": 104
+    "y": 130,
+    "w": 100,
+    "h": 130
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "sourceSize": {
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "duration": 67
   },
   {
-   "filename": "heal-clean 15",
+   "filename": "heal-big 8",
    "frame": {
-    "x": 80,
-    "y": 208,
-    "w": 80,
-    "h": 104
+    "x": 100,
+    "y": 130,
+    "w": 100,
+    "h": 130
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "sourceSize": {
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "duration": 67
   },
   {
-   "filename": "heal-clean 16",
+   "filename": "heal-big 9",
    "frame": {
-    "x": 160,
-    "y": 208,
-    "w": 80,
-    "h": 104
+    "x": 200,
+    "y": 130,
+    "w": 100,
+    "h": 130
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "sourceSize": {
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "duration": 67
   },
   {
-   "filename": "heal-clean 17",
+   "filename": "heal-big 10",
    "frame": {
-    "x": 240,
-    "y": 208,
-    "w": 80,
-    "h": 104
+    "x": 300,
+    "y": 130,
+    "w": 100,
+    "h": 130
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "sourceSize": {
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "duration": 67
   },
   {
-   "filename": "heal-clean 18",
-   "frame": {
-    "x": 320,
-    "y": 208,
-    "w": 80,
-    "h": 104
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 80,
-    "h": 104
-   },
-   "sourceSize": {
-    "w": 80,
-    "h": 104
-   },
-   "duration": 67
-  },
-  {
-   "filename": "heal-clean 19",
+   "filename": "heal-big 11",
    "frame": {
     "x": 400,
-    "y": 208,
-    "w": 80,
-    "h": 104
+    "y": 130,
+    "w": 100,
+    "h": 130
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "sourceSize": {
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "duration": 67
   },
   {
-   "filename": "heal-clean 20",
+   "filename": "heal-big 12",
    "frame": {
-    "x": 480,
-    "y": 208,
-    "w": 80,
-    "h": 104
+    "x": 500,
+    "y": 130,
+    "w": 100,
+    "h": 130
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "sourceSize": {
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "duration": 67
   },
   {
-   "filename": "heal-clean 21",
+   "filename": "heal-big 13",
+   "frame": {
+    "x": 600,
+    "y": 130,
+    "w": 100,
+    "h": 130
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 130
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 130
+   },
+   "duration": 67
+  },
+  {
+   "filename": "heal-big 14",
    "frame": {
     "x": 0,
-    "y": 312,
-    "w": 80,
-    "h": 104
+    "y": 260,
+    "w": 100,
+    "h": 130
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "sourceSize": {
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "duration": 67
   },
   {
-   "filename": "heal-clean 22",
+   "filename": "heal-big 15",
    "frame": {
-    "x": 80,
-    "y": 312,
-    "w": 80,
-    "h": 104
+    "x": 100,
+    "y": 260,
+    "w": 100,
+    "h": 130
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "sourceSize": {
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "duration": 67
   },
   {
-   "filename": "heal-clean 23",
+   "filename": "heal-big 16",
    "frame": {
-    "x": 160,
-    "y": 312,
-    "w": 80,
-    "h": 104
+    "x": 200,
+    "y": 260,
+    "w": 100,
+    "h": 130
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "sourceSize": {
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "duration": 67
   },
   {
-   "filename": "heal-clean 24",
+   "filename": "heal-big 17",
    "frame": {
-    "x": 240,
-    "y": 312,
-    "w": 80,
-    "h": 104
+    "x": 300,
+    "y": 260,
+    "w": 100,
+    "h": 130
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "sourceSize": {
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "duration": 67
   },
   {
-   "filename": "heal-clean 25",
-   "frame": {
-    "x": 320,
-    "y": 312,
-    "w": 80,
-    "h": 104
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 80,
-    "h": 104
-   },
-   "sourceSize": {
-    "w": 80,
-    "h": 104
-   },
-   "duration": 67
-  },
-  {
-   "filename": "heal-clean 26",
+   "filename": "heal-big 18",
    "frame": {
     "x": 400,
-    "y": 312,
-    "w": 80,
-    "h": 104
+    "y": 260,
+    "w": 100,
+    "h": 130
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "sourceSize": {
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "duration": 67
   },
   {
-   "filename": "heal-clean 27",
+   "filename": "heal-big 19",
    "frame": {
-    "x": 480,
-    "y": 312,
-    "w": 80,
-    "h": 104
+    "x": 500,
+    "y": 260,
+    "w": 100,
+    "h": 130
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "sourceSize": {
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "duration": 67
   },
   {
-   "filename": "heal-clean 28",
+   "filename": "heal-big 20",
    "frame": {
-    "x": 0,
-    "y": 416,
-    "w": 80,
-    "h": 104
+    "x": 600,
+    "y": 260,
+    "w": 100,
+    "h": 130
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "sourceSize": {
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "duration": 67
   },
   {
-   "filename": "heal-clean 29",
+   "filename": "heal-big 21",
    "frame": {
-    "x": 80,
-    "y": 416,
-    "w": 80,
-    "h": 104
+    "x": 0,
+    "y": 390,
+    "w": 100,
+    "h": 130
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
    },
    "sourceSize": {
-    "w": 80,
-    "h": 104
+    "w": 100,
+    "h": 130
+   },
+   "duration": 67
+  },
+  {
+   "filename": "heal-big 22",
+   "frame": {
+    "x": 100,
+    "y": 390,
+    "w": 100,
+    "h": 130
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 130
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 130
+   },
+   "duration": 67
+  },
+  {
+   "filename": "heal-big 23",
+   "frame": {
+    "x": 200,
+    "y": 390,
+    "w": 100,
+    "h": 130
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 130
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 130
+   },
+   "duration": 67
+  },
+  {
+   "filename": "heal-big 24",
+   "frame": {
+    "x": 300,
+    "y": 390,
+    "w": 100,
+    "h": 130
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 130
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 130
+   },
+   "duration": 67
+  },
+  {
+   "filename": "heal-big 25",
+   "frame": {
+    "x": 400,
+    "y": 390,
+    "w": 100,
+    "h": 130
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 130
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 130
+   },
+   "duration": 67
+  },
+  {
+   "filename": "heal-big 26",
+   "frame": {
+    "x": 500,
+    "y": 390,
+    "w": 100,
+    "h": 130
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 130
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 130
+   },
+   "duration": 67
+  },
+  {
+   "filename": "heal-big 27",
+   "frame": {
+    "x": 600,
+    "y": 390,
+    "w": 100,
+    "h": 130
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 130
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 130
+   },
+   "duration": 67
+  },
+  {
+   "filename": "heal-big 28",
+   "frame": {
+    "x": 0,
+    "y": 520,
+    "w": 100,
+    "h": 130
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 130
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 130
+   },
+   "duration": 67
+  },
+  {
+   "filename": "heal-big 29",
+   "frame": {
+    "x": 100,
+    "y": 520,
+    "w": 100,
+    "h": 130
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 130
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 130
    },
    "duration": 67
   }
@@ -664,34 +664,34 @@
  "meta": {
   "app": "https://github.com/patch-gg/pixelfx",
   "version": "1",
-  "image": "heal-clean.png",
+  "image": "heal-big.png",
   "format": "RGBA8888",
   "size": {
-   "w": 560,
-   "h": 520
+   "w": 700,
+   "h": 650
   },
   "scale": "1",
   "frameTags": [
    {
-    "name": "heal-clean",
+    "name": "heal-big",
     "from": 0,
     "to": 29,
     "direction": "forward"
    }
   ],
   "pixelfx": {
-   "id": "holy/heal-clean",
-   "name": "Heal (no body)",
+   "id": "holy/heal-big",
+   "name": "Heal (big, no body)",
    "fps": 15,
    "loop": false,
    "frames": 30,
    "frameSize": [
-    80,
-    104
+    100,
+    130
    ],
    "pivot": [
-    40,
-    92
+    50,
+    115
    ],
    "columns": 7,
    "act": {

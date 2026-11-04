@@ -26,12 +26,12 @@ bake frost_nova ice/frost-nova '{"palette":["#06101e","#0e2440","#1a4470","#3274
 bake whirl melee/spin-slash '{"palette":["#0e1018","#262a38","#4a5068","#7a8098","#b0b6cc","#e0e4f0","#ffffff"]}'
 bake slam impacts/ground-slam '{"palette":["#1a0a06","#3c1a0c","#6e3414","#a8561c","#e08a32","#ffc870","#fff0c8","#ffffff"]}' 15
 bake lightning lightning/lightning-strike '{"palette":["#080c22","#141e48","#26387a","#4060b0","#6a90e0","#a8c4ff","#e0ecff","#ffffff"]}' 15
-bake heal holy/heal-clean '{"palette":["#0a2c14","#14582a","#22903c","#3cc860","#6cf088","#a8ffb4","#e0ffe0","#ffffff"]}' 15
+bake heal holy/heal-big '{"palette":["#0a2c14","#14582a","#22903c","#3cc860","#6cf088","#a8ffb4","#e0ffe0","#ffffff"]}' 15
 # Säule 3: neue Fertigkeit gelernt (Runenkreis mit Lichtsäule, gedämpftes Violett)
 bake learn arcane/magic-circle-cast '{"palette":["#100818","#24103a","#3e1c62","#5e2e8e","#8448b8","#b07ade","#dcc0f6","#ffffff"]}' 15
 # Feuerball-Einschlag: Remix explosions/fire-burst (kurze small-explosion, Rauch blendet das Spiel aus)
 bake fire_burst explosions/fire-burst '{"palette":["#1a0806","#4a1208","#8a2a0c","#c84a14","#f07a24","#ffb04a","#ffe0a0","#ffffff"]}' 20
-# Säule 4: Boss-Aura hinter dem Boss (Schattenflammen, Asche-Violett), bei Wut Glutrot
-bake boss_aura shadow/shadow-flames '{"palette":["#1a0a2a","#3a1060","#6a22a0","#9a3cd0","#c070f0","#e0a8ff","#f6dcff","#ffffff"]}' 15
-bake boss_rage shadow/shadow-flames '{"palette":["#2a0806","#5a1208","#9a2008","#d04010","#f87020","#ffa850","#ffd890","#fff4d0"]}' 15
+# Säule 4: Boss-Aura hinter dem Boss (Remix shadow-flames-big: 1,7x größer gebacken, 7 Zungen, dichter; spielt bei Maßstab 2), bei Wut Glutrot
+bake boss_aura shadow/shadow-flames-big '{"palette":["#1a0a2a","#3a1060","#6a22a0","#9a3cd0","#c070f0","#e0a8ff","#f6dcff","#ffffff"]}' 15
+bake boss_rage shadow/shadow-flames-big '{"palette":["#2a0806","#5a1208","#9a2008","#d04010","#f87020","#ffa850","#ffd890","#fff4d0"]}' 15
 rm -rf "$OUT/_t"

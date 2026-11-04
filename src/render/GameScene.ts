@@ -1256,7 +1256,7 @@ export class GameScene extends Phaser.Scene {
           const pos = this.bodyPos(this.player());
           if (pos) {
             const f = this.feetPos(this.player());
-            if (!f || !playPixelfx(this, 'heal', f.x, f.y, { depth: OVERLAY_DEPTH - 1, scale: 2.5 })) this.fx.sparkle(pos.x, pos.y, 0x6fff9a);
+            if (!f || !playPixelfx(this, 'heal', f.x, f.y, { depth: OVERLAY_DEPTH - 1 })) this.fx.sparkle(pos.x, pos.y, 0x6fff9a);
             this.glow(0x1c6a34, 0.3, 450);
             this.fx.floatText(pos.x, pos.y - 30, `+${e.amount}`, '#6fff9a', 16);
           }
@@ -1507,7 +1507,7 @@ export class GameScene extends Phaser.Scene {
         au = undefined;
       }
       if (!au) {
-        const s = playPixelfx(this, a.enraged ? 'boss_rage' : 'boss_aura', f.x, f.y + 8, { depth: v.img.depth - 0.5, alpha: 1, scale: 3.4, from: ((a.id * 0.53) % 1) * 2.4 });
+        const s = playPixelfx(this, a.enraged ? 'boss_rage' : 'boss_aura', f.x, f.y + 8, { depth: v.img.depth - 0.5, alpha: 1, from: ((a.id * 0.53) % 1) * 2.4 });
         if (!s) continue;
         au = { s, rage: a.enraged };
         this.bossAuras.set(a.id, au);

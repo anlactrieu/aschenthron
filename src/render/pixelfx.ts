@@ -68,12 +68,18 @@ function registerOne(scene: Phaser.Scene, n: FxName): boolean {
   return true;
 }
 
+/** Nur ganzzahlige Pixelmaßstäbe (mind. 1): ein krummer Wert würde das Pixelraster der Figuren brechen. Größe kommt aus dem Backen (Remix), nicht aus dem Skalieren. */
+export function fxScale(s?: number): number {
+  return s === undefined ? FX_SCALE : Math.max(1, Math.round(s));
+}
+
 export interface PlayOpts {
   depth: number;
   flip?: boolean;
   alpha?: number;
   /** Phaser.BlendModes (0 normal, 1 add) */
   blend?: number;
+  /** ganzzahlig (wird gerundet), Standard FX_SCALE */
   scale?: number;
   /** ab dieser Sekunde abspielen (Vorlauf des Effekts überspringen, wenn der Treffer schon feststeht) */
   from?: number;
@@ -87,7 +93,7 @@ export function playPixelfx(scene: Phaser.Scene, name: FxName, x: number, y: num
   const m = store.get(name)?.meta;
   const key = `pfx_${name}`;
   if (!m || !registerOne(scene, name)) return undefined;
-  const s = scene.add.sprite(x, y, key, 0).setOrigin(m.pivot[0] / m.frameSize[0], m.pivot[1] / m.frameSize[1]).setScale(o.scale ?? FX_SCALE).setDepth(o.depth).setAlpha(o.alpha ?? 1);
+  const s = scene.add.sprite(x, y, key, 0).setOrigin(m.pivot[0] / m.frameSize[0], m.pivot[1] / m.frameSize[1]).setScale(fxScale(o.scale)).setDepth(o.depth).setAlpha(o.alpha ?? 1);
   if (o.flip) s.setFlipX(true);
   if (o.blend) s.setBlendMode(o.blend);
   s.play({ key, startFrame: Math.min(m.frames - 1, Math.max(0, Math.round((o.from ?? 0) * m.fps))) });
