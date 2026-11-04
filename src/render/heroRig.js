@@ -31,6 +31,7 @@ const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a
 const len = (a) => Math.hypot(a[0], a[1], a[2]);
 const unit = (a) => mul(a, 1 / (len(a) || 1e-6));
 const rotY = (t) => { const c = Math.cos(t), s = Math.sin(t); return [c, 0, s, 0, 1, 0, -s, 0, c]; };
+const rotX = (t) => { const c = Math.cos(t), s = Math.sin(t); return [1, 0, 0, 0, c, -s, 0, s, c]; };
 const rotZ = (t) => { const c = Math.cos(t), s = Math.sin(t); return [c, -s, 0, s, c, 0, 0, 0, 1]; };
 const mm = (A, B) => { const o = new Array(9); for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) o[r * 3 + c] = A[r * 3] * B[c] + A[r * 3 + 1] * B[3 + c] + A[r * 3 + 2] * B[6 + c]; return o; };
 const mv = (M, v) => [M[0] * v[0] + M[1] * v[1] + M[2] * v[2], M[3] * v[0] + M[4] * v[1] + M[5] * v[2], M[6] * v[0] + M[7] * v[1] + M[8] * v[2]];
@@ -98,14 +99,16 @@ function solve(pose) {
   const q = { ...STAND, ...pose }, lean = q.lean, W = q.weapon && weaponOf(q.weapon), OW = q.offWeapon && weaponOf(q.offWeapon);
   const sa = q.sa ?? 0, wl = q.wl ?? 1, axisZ = Math.sqrt(Math.max(0, 1 - wl * wl)) * (q.wz ?? 1);
   const axis = [Math.cos(sa) * wl, -Math.sin(sa) * wl, axisZ], side = [-Math.sin(sa), -Math.cos(sa), 0];
-  const two = !!(q.two && W), nearZ = q.fz ?? (two ? 3 : 4.5) * BODY.size * BODY.width;
+  const two = !!(q.two && W), out = (q.armOut ?? 0) * BODY.size, nearZ = (q.fz ?? (two ? 3 : 4.5) * BODY.size * BODY.width) + (two ? 0 : out);
   // how the chest is turned follows the hands: a hand driving forward brings its shoulder round; one drawn back opens him up
   const zk = BODY.size, fwd = (q.fx - STAND.fx * zk) / (24 * zk), farFwd = two ? 0 : (q.bx - STAND.bx * zk) / (22 * zk);
   let turn = M.turn + (fwd >= 0 ? -44 * DEG * Math.min(1, fwd) : 28 * DEG * Math.min(1, -fwd * 1.8));
   turn += (farFwd > 0 ? 34 * DEG * Math.min(1, farFwd) : 0) + (q.twist ?? 0) * 4 * DEG;
   if (q.turn !== undefined) turn = q.turn;
   const hipTurn = M.turn + (turn - M.turn) * 0.45, tilt = Math.atan2(lean, 13 * zk);
-  const Rp = mm(rotZ(-tilt * 0.25), rotY(-hipTurn)), Rc = mm(rotZ(-tilt), rotY(-turn));
+  // Aschenthron: `roll` kippt die Hüfte zur Seite (Spielbein-Seite sinkt), die Schultern halb so weit dagegen
+  const hipRoll = q.roll ?? 0;
+  const Rp = mm(mm(rotZ(-tilt * 0.25), rotY(-hipTurn)), rotX(hipRoll)), Rc = mm(mm(rotZ(-tilt), rotY(-turn)), rotX(-hipRoll * 0.5));
   // feet first: the pelvis sinks if that's what it takes for both legs to reach them
   const ak = BODY.size, fw = 2.4 * ak * BODY.width;
   const ankleN = [q.ffx, -q.ffy - 1.8 * ak, q.fzz ?? fw], ankleF = [q.fbx, -q.fby - 1.8 * ak, q.bzz ?? -fw];
@@ -132,7 +135,7 @@ function solve(pose) {
     return add(base, mul(unit(to), Math.min(1.8 * zk, Math.max(0, d - 11 * zk) * 0.35)));
   };
   const nearT = [q.fx, -q.fy, nearZ];
-  const wk = BODY.size * (q.wscale ?? 1), farT = two ? [q.fx + axis[0] * W.two * wk, -q.fy + axis[1] * W.two * wk, nearZ + axis[2] * W.two * wk] : [q.bx, -q.by, q.bz ?? (q.armsFront ? 5.5 : -4.5) * BODY.size * BODY.width];
+  const wk = BODY.size * (q.wscale ?? 1), farT = two ? [q.fx + axis[0] * W.two * wk, -q.fy + axis[1] * W.two * wk, nearZ + axis[2] * W.two * wk] : [q.bx, -q.by, q.bz ?? (q.armsFront ? 5.5 : -4.5) * BODY.size * BODY.width - out];
   const sN = pick(1, nearT), sF = pick(-1, farT);
   const pole = (s, T, shoulder, hold) => {
     // elbows hang down and back; overhead they go out and forward
@@ -173,6 +176,8 @@ const Zb = new Float32Array(BW * BH), Tone = new Float32Array(BW * BH), Part = n
 const touched = [];
 const LIGHT = unit([-0.55, 0.72, 0.5]);
 let clipBody = false, clipWeapon = false;
+// Aschenthron: Schräge Draufsicht (`shear`): der Boden liegt bei y = -shear * z, also schneidet auch die Bodenkante schräg
+let clipShear = 0;
 function plot(i, z, tone, part, mat, wx, wy, color) {
   if (Part[i] === 0) touched.push(i);
   else if (z <= Zb[i]) return;
@@ -187,7 +192,7 @@ function sphere(c, r, part, mat) {
   for (let wy = y0; wy <= y1; wy++)
     for (let wx = x0; wx <= x1; wx++) {
       const dx = wx - c[0], dy = wy - c[1], d2 = dx * dx + dy * dy;
-      if (d2 > r * r || (clipBody && wy < 1.5)) continue;
+      if (d2 > r * r || (clipBody && wy < 1.5 - clipShear * c[2])) continue;
       const dz = Math.sqrt(r * r - d2), n = [dx / r, dy / r, dz / r], i = (OY - wy) * BW + (OX + wx);
       plot(i, c[2] + dz, dot(n, LIGHT), part, mat, wx, wy, 0);
     }
@@ -209,7 +214,7 @@ function ellipsoid(c, R, r, part, mat, minY = -Infinity) {
   void Rt;
   for (let wy = y0; wy <= y1; wy++)
     for (let wx = x0; wx <= x1; wx++) {
-      if ((clipBody && wy < 1.5) || wy < minY) continue;
+      if ((clipBody && wy < 1.5 - clipShear * c[2]) || wy < minY) continue;
       const dx = wx - c[0], dy = wy - c[1];
       const qa = A[8], qb = 2 * (A[2] * dx + A[5] * dy), qc = A[0] * dx * dx + 2 * A[1] * dx * dy + A[4] * dy * dy - 1, disc = qb * qb - 4 * qa * qc;
       if (disc < 0) continue;
@@ -380,8 +385,11 @@ function drawBody(S) {
   }
   if (gear.shield) {
     // Schild am Fernarm: Fläche vor der Faust, Vorderseite in Blickrichtung (etwas zur Kamera), Rand, Buckel
-    const hand = armF.end, nrm = unit(add(fwd, mul(across, 0.8))), R = axes(nrm, up);
-    const c = add(hand, add(mul(nrm, 1.4 * k), mul(up, -0.5 * k)));
+    // von der Seite weiter zur Kamera gedreht, sonst sieht man nur die Kante
+    // (Richtungen ohne die Scherung der Schrägsicht: eine Scheibe, die zur Kamera zeigt, bleibt so im Bild nur verschoben)
+    const sh = S.q.shear ?? 0, flat = (v) => [v[0], v[1] + sh * v[2], v[2]];
+    const hand = armF.end, nrm = unit(add(flat(fwd), mul(flat(across), S.q.yaw ? 0.8 : 1.7))), R = axes(nrm, flat(up));
+    const c = add(hand, add(mul(nrm, (S.q.yaw ? 1.4 : 3.4) * k), mul(up, -0.5 * k)));
     const tall = gear.shield === 3 ? 1.35 : gear.shield === 2 ? 1.15 : 1, wide = gear.shield === 3 ? 0.95 : gear.shield === 2 ? 0.85 : 1;
     ellipsoid(add(c, mul(nrm, -0.3)), R, [0.8, 5.4 * k * tall, 4.8 * k * wide], PART.shieldRim, 0);
     ellipsoid(c, R, [0.9, 4.6 * k * tall, 4.0 * k * wide], PART.shield, 0);
@@ -399,7 +407,7 @@ function along(H, axis, side, part) {
     if (TINT.has(c)) c = TINT.get(c);
     const x = H[0] + axis[0] * i + side[0] * k + n[0] * lift, y = H[1] + axis[1] * i + side[1] * k + n[1] * lift, z = H[2] + axis[2] * i + side[2] * k + n[2] * lift;
     const wx = Math.round(x), wy = Math.round(y);
-    if (clipWeapon && wy < 0) return;
+    if (clipWeapon && wy < -clipShear * z) return;
     const idx = (OY - wy) * BW + (OX + wx);
     if (idx < 0 || idx >= BW * BH) return;
     plot(idx, z + 0.05, 2, part, 2, wx, wy, c);
@@ -690,12 +698,21 @@ function render(pose) {
   setTint(pose);
   const S = solve(pose), q = S.q, whole = (q.yaw ?? 0) + (q.face === -1 ? Math.PI : 0);
   if (whole) turnAll(S, whole);
+  // Aschenthron: zur Kamera / weg von oben schräg gesehen: was näher zur Kamera liegt (z > 0), rückt im Bild nach unten. Eine
+  // Scherung statt Drehung, damit die Figur gleich hoch bleibt: so sieht man Schritt, Knie und Armschwung in der Tiefe
+  // (der Kopf wird nur verschoben, nicht geschert: sonst rutscht das Haar übers Gesicht)
+  if (q.shear) {
+    const keep = [S.B.head.R, S.B.neck.R];
+    moveAll(S, [1, 0, 0, 0, 1, -q.shear, 0, 0, 1], [0, 0, 0]);
+    [S.B.head.R, S.B.neck.R] = keep;
+  }
   // Umfallen: um die Füße in der Bildebene kippen (fall > 0 = nach hinten), dann verschieben (fallX, fallY in Bildpixeln)
   if (q.fall) moveAll(S, rotZ(q.fall), [q.fallX ?? 0, -(q.fallY ?? 0), 0]);
   if (q.y) moveAll(S, [1, 0, 0, 0, 1, 0, 0, 0, 1], [0, -q.y, 0]);
   const air = (q.y ?? 0) < -0.5 || !!q.fall;
   clipBody = !air;
   clipWeapon = !air;
+  clipShear = q.shear ?? 0;
   drawBody(S);
   clipBody = false;
   if (S.W) S.W.draw(along(S.armN.end, S.axis, S.side, PART.weapon), q, S.armF.end);
@@ -706,6 +723,7 @@ function render(pose) {
     S.OW.draw(along(S.armF.end, ax, sd, PART.offWeapon), q, S.armF.end);
   }
   clipWeapon = false;
+  clipShear = 0;
   const out = finish(S);
   return q.fall ? onGround(out) : out;
 }

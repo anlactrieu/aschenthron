@@ -30,6 +30,8 @@ const flag = (name: string): boolean => {
   return i >= 0;
 };
 const pick = opt('--cols')?.split(',').map(Number);
+// --rows 1,2: nur diese Ansichten (0 Seite, 1 zur Kamera, 2 weg)
+const rows = opt('--rows')?.split(',').map(Number);
 const K = +(opt('--k') ?? 4);
 const ground = flag('--ground');
 const names = argv.length ? argv : Object.keys(LOOKS);
@@ -38,6 +40,6 @@ for (const name of names) {
   const t = performance.now();
   const s = bakeHero(look);
   const ms = performance.now() - t;
-  const file = writeContact(join('held', `contact-${name}${pick ? '-sel' : ''}${ground ? '-boden' : ''}.png`), s, { cols: pick, k: K, ground });
+  const file = writeContact(join('held', `contact-${name}${pick || rows ? '-sel' : ''}${ground ? '-boden' : ''}.png`), s, { cols: pick, rows, k: K, ground });
   console.log(`${file}  ${ms.toFixed(0)} ms, Kopf ${s.top} px, Körper ${s.bodyW} px breit, abgeschnitten ${s.clipped}`);
 }

@@ -117,6 +117,8 @@ export const HERO_STRIDE = 5.6;
 export const HERO_STANCE = 0.4;
 const LIFT = 3;
 const ARM = 3.6;
+/** Schräge Draufsicht zur Kamera / weg (Bild-y je Pixel Tiefe) */
+const SHEAR = 0.32;
 /** Strecke je Laufzyklus in Bildschirm-Pixeln bei Pixelmaßstab 2x: so gleiten die Füße nicht */
 export const HERO_CYCLE_PX = cycleLength(HERO_STRIDE, HERO_STANCE) * 2;
 
@@ -158,11 +160,14 @@ function walkPose(i: number, h: HeroLook, view: HeroView, g: Gait): RigPose {
   const crouch = (g.stance < 0.45 ? 1.3 : 0.9) + (g.stance < 0.45 ? 0.9 : 0.5) * Math.cos((p - 0.12) * Math.PI * 4);
   const c = carry(h.weapon);
   const hold = h.weapon !== 'none';
-  const off = h.shield ? { bx: 6 + swing * 0.8, by: -13, bz: 2.5 } : { bx: 1 + swing * ARM * 1.2, by: -11.8 + Math.abs(swing) * 0.6 };
+  // von vorn/hinten geht der Armschwung in die Tiefe: kräftiger, und am Umkehrpunkt etwas nach außen, damit man ihn sieht
+  const armK = side ? 1 : 1.6, out = side ? 0 : Math.abs(swing) * 1.4;
+  const off = h.shield ? { bx: 6 + swing * 0.8, by: -13, bz: 2.5 } : { bx: 1 + swing * ARM * 1.2 * armK, by: -11.8 + Math.abs(swing) * 0.6 };
   return {
     ...c, crouch, lean: 1.6,
     ffx: n.x, ffy: n.y - 4, toeF: n.toe, fbx: f.x, fby: f.y - 4, toeB: f.toe,
-    fx: (c.fx ?? 1) - swing * ARM * (hold ? 0.45 : 1), fy: (c.fy ?? -12) + Math.abs(swing) * 0.5,
+    fx: (c.fx ?? 1) - swing * ARM * (hold ? 0.45 : 1) * armK, fy: (c.fy ?? -12) + Math.abs(swing) * 0.5,
+    armOut: out,
     ...off,
     hy: 0.3,
     sway: 1.4 + Math.sin(p * Math.PI * 4) * 0.6,
@@ -248,11 +253,14 @@ export function heroPose(anim: HeroAnim, view: HeroView, i: number, h: HeroLook,
     pose.turn = 0.05;
     pose.fzz = 3.3;
     pose.bzz = -3.3;
+    // schräge Draufsicht: was näher zur Kamera ist, steht tiefer im Bild (Füße, Knie, Hände), so sieht man Schritt und Armschwung
+    // (beim Hieb und mit dem Zweihänder weniger, sonst fährt die Klinge zur Kamera unter den Bildrand; liegend keine)
+    pose.shear = anim === 'die' ? SHEAR * Math.max(0, 1 - i / 2) : anim === 'attack' || h.weapon === 'greatsword' ? SHEAR * 0.55 : SHEAR;
     if (anim === 'walk') {
-      // Schräge Draufsicht: der Fuß weiter weg von der Kamera steht höher im Bild, so sieht man den Schritt
-      const away = (x: number): number => (view === 'front' ? g.stride - x : x + g.stride) * 0.32;
-      pose.ffy = (pose.ffy ?? -4) - away(pose.ffx ?? 0);
-      pose.fby = (pose.fby ?? -4) - away(pose.fbx ?? 0);
+      const p = i / HERO_ANIMS.walk;
+      // Hüfte kippt zum Spielbein, Schultern drehen gegen die Beine
+      pose.roll = -0.2 * Math.sin((p + 0.05) * Math.PI * 2);
+      pose.turn = 0.05 + Math.cos(p * Math.PI * 2) * 0.14;
     }
   }
   return pose;

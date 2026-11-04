@@ -79,6 +79,12 @@ export interface RigPose {
   fall?: number;
   fallX?: number;
   fallY?: number;
+  /** Schräge Draufsicht zur Kamera / weg: Bild-y sinkt um shear * z (näher = tiefer) */
+  shear?: number;
+  /** Hände seitlich nach außen (Pixel, Armschwung von vorn/hinten) */
+  armOut?: number;
+  /** Hüfte/Schultern seitlich kippen (Bogenmaß, Gehen von vorn/hinten) */
+  roll?: number;
   /** ganze Figur anheben (negativ = hoch) */
   y?: number;
   /** Umhang/Schwanz schwingen */

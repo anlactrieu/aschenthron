@@ -11,14 +11,15 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const GRADE = [0.66, 0.64, 0.74];
 const GROUNDS = [[86, 78, 92], [58, 74, 46]];
 
-export function writeContact(rel: string, s: FigureSheet, o: { cols?: number[]; k?: number; ground?: boolean } = {}): string {
+export function writeContact(rel: string, s: FigureSheet, o: { cols?: number[]; rows?: number[]; k?: number; ground?: boolean } = {}): string {
   const F = s.frame;
   const K = o.k ?? 4;
   const G = 4;
   const all = Array.from({ length: s.w / F.w }, (_, i) => i);
   const sel = o.cols ?? all;
   const cols = sel.length;
-  const rows = s.h / F.h;
+  const rowSel = o.rows ?? Array.from({ length: s.h / F.h }, (_, i) => i);
+  const rows = rowSel.length;
   const CW = cols * (F.w * K + G);
   const CH = rows * (F.h * K + G);
   const px = new Uint8Array(CW * CH * 4);
@@ -32,7 +33,7 @@ export function writeContact(rel: string, s: FigureSheet, o: { cols?: number[]; 
     }
     if (!o.ground) for (let x = 0; x < F.w * K; x++) px.set([60, 54, 66, 255], ((r * (F.h * K + G) + F.fy * K + 1) * CW + c * (F.w * K + G) + x) * 4);
     for (let y = 0; y < F.h; y++) for (let x = 0; x < F.w; x++) {
-      const o2 = ((r * F.h + y) * s.w + sel[c]! * F.w + x) * 4;
+      const o2 = ((rowSel[r]! * F.h + y) * s.w + sel[c]! * F.w + x) * 4;
       if (!s.data[o2 + 3]) continue;
       const col = grade([s.data[o2]!, s.data[o2 + 1]!, s.data[o2 + 2]!]);
       for (let j = 0; j < K * K; j++) {
