@@ -1,4 +1,5 @@
 import type { Rng } from './rng';
+import { NAMED } from './named';
 
 export type Slot = 'weapon' | 'head' | 'chest' | 'hands' | 'feet' | 'ring' | 'amulet' | 'offhand' | 'belt' | 'cloak' | 'legs';
 /** Alle Ausrüstungsslots (Gegenstände); `ring2` ist nur ein zweites Feld für Ringe. */
@@ -124,6 +125,27 @@ export interface Item {
   setId?: string;
   /** Legendär: Vorlagen-ID des Unikats */
   unique?: string;
+  /** Benannter Fund: ID in `NAMED` (feste Werte, unveränderbar) */
+  named?: string;
+}
+
+/** Benannter Fund: fester Gegenstand mit eigenem Namen und festen Werten (T4C-Art statt Zufallsaffixe). */
+export interface NamedDef {
+  id: string;
+  name: string;
+  /** Grundvorlage (Slot, Grundwerte, Anforderungen) */
+  base: string;
+  /** Stufenband 1/6/11/16/21/26: je Band und Slot genau ein Fund */
+  band: 1 | 6 | 11 | 16 | 21 | 26;
+  /** Beute-Gruppe, die ihn fallen lässt (`LOOT_GROUPS` in data.ts) */
+  group: string;
+  /** magic: 2 feste Werte; rare: 3 feste Werte, halbe Fallchance */
+  rarity: 'magic' | 'rare';
+  affixes: Affix[];
+  /** feste Sockelzahl (nur Waffe, Brust, Kopf, Beine, Schild) */
+  sockets?: 0 | 1 | 2;
+  /** kurzer Flavor-Satz für Tooltip und Bestiarium */
+  lore?: string;
 }
 
 export const TEMPLATES: ItemTemplate[] = [
@@ -370,7 +392,7 @@ export function rollGem(rng: Rng, nextId: () => number, level: number, minQualit
 
 /* ------------------------------------------------ Affixe, Stufen und Namen */
 
-interface AffixDef {
+export interface AffixDef {
   stat: Stat;
   /** Suffix ("des Zorns") */
   name: string;
@@ -380,7 +402,7 @@ interface AffixDef {
   max: number;
 }
 
-const AFFIXES: AffixDef[] = [
+export const AFFIXES: AffixDef[] = [
   { stat: 'damage', name: 'des Zorns', pre: 'Scharf', min: 1, max: 4 },
   { stat: 'armor', name: 'der Härte', pre: 'Gehärtet', min: 1, max: 3 },
   { stat: 'maxHp', name: 'der Zähigkeit', pre: 'Zäh', min: 5, max: 20 },
@@ -655,14 +677,64 @@ export function legendaryById(id: string): LegendaryDef {
 export function generateLegendary(rng: Rng, id: number, defId: string): Item {
   const d = legendaryById(defId);
   const t = templateById(d.base);
-  const affixes = d.affixes.map((a) => ({ stat: a.stat, value: rng.int(a.min, a.max) }));
-  const sockets = rollSockets(rng, t, 'legendary');
+  // P3: feste Werte (aufgerundete Mitte) und feste Sockelzahl statt Würfeln; `rng` bleibt für die Signatur
+  const affixes = d.affixes.map((a) => ({ stat: a.stat, value: Math.ceil((a.min + a.max) / 2) }));
+  const sockets = fixedSockets(t, 2);
   return {
     id, templateId: d.base, name: d.name, slot: t.slot, rarity: 'legendary', weight: t.weight,
     damage: t.damage ? [...t.damage] : undefined, armor: t.armor, reqKraft: t.reqKraft, req: reqOfTemplate(t), kind: t.kind, hands: t.hands, speed: t.speed,
     value: t.value * RARITY_VALUE.legendary + 100, affixes, power: { ...d.power }, unique: d.id,
     ...(sockets ? { sockets } : {}),
   };
+}
+
+/** Feste Sockelzahl (höchstens das, was der Slot erlaubt). */
+function fixedSockets(t: ItemTemplate, n: number): (GemInfo | null)[] | undefined {
+  const max = SOCKET_MAX[t.slot];
+  if (!max || n <= 0 || (t.slot === 'offhand' && t.off !== 'shield')) return undefined;
+  return Array.from({ length: Math.min(max, n) }, () => null);
+}
+
+export function namedById(id: string): NamedDef {
+  const d = NAMED.find((x) => x.id === id);
+  if (!d) throw new Error(`Unbekannter Fund: ${id}`);
+  return d;
+}
+
+/** Benannter Fund als Gegenstand: immer gleich (keine Würfe). */
+export function generateNamed(id: number, defId: string): Item {
+  const d = namedById(defId);
+  const t = templateById(d.base);
+  const affixes = [...(t.base ?? []).map((a) => ({ ...a })), ...d.affixes.map((a) => ({ stat: a.stat, value: a.value }))];
+  const sockets = fixedSockets(t, d.sockets ?? 0);
+  return {
+    id, templateId: d.base, name: d.name, slot: t.slot, rarity: d.rarity, weight: t.weight,
+    damage: t.damage ? [...t.damage] : undefined, armor: t.armor, reqKraft: t.reqKraft, req: reqOfTemplate(t), kind: t.kind, hands: t.hands, speed: t.speed,
+    off: t.off, arrowBonus: t.arrowBonus,
+    value: t.value * RARITY_VALUE[d.rarity] + d.affixes.length * 8, affixes, named: d.id,
+    ...(sockets ? { sockets } : {}),
+  };
+}
+
+/** Benannte Funde, die bei dieser Stufe fallen können: aktuelles und voriges Stufenband. */
+export function namedPool(level: number, group?: string): NamedDef[] {
+  const all = NAMED.filter((d) => d.band <= level && d.band >= level - 9);
+  if (!group) return all;
+  const own = all.filter((d) => d.group === group);
+  return own.length ? own : all;
+}
+
+/** Würfelt einen benannten Fund (magic doppelt so oft wie rare; `preferRare` dreht das um). */
+export function rollNamed(rng: Rng, nextId: () => number, level: number, group?: string, preferRare = false): Item | null {
+  const pool = namedPool(level, group);
+  if (!pool.length) return null;
+  const weight = (d: NamedDef) => (d.rarity === 'rare' ? (preferRare ? 3 : 1) : preferRare ? 1 : 2);
+  let r = rng.next() * pool.reduce((n, d) => n + weight(d), 0);
+  for (const d of pool) {
+    r -= weight(d);
+    if (r < 0) return generateNamed(nextId(), d.id);
+  }
+  return generateNamed(nextId(), pool[pool.length - 1]!.id);
 }
 
 export interface SetBonus {

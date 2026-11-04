@@ -249,6 +249,45 @@ export const MONSTERS: MonsterKind[] = [
   mk('ash_king', 'Aschenkönig', 30, 'demon', 0xd86a2a, { boss: true, speed: 0.085, abil: ['slam', 'summon', 'charge'], summon: 'imp' }),
 ];
 
+/** Beute-Gruppen: eine Tabelle für benannte Funde, Kill-Zähler und Bestiarium (`family` taugt nicht, `humanoid` mischt Goblins, Räuber und Hexen). */
+export type LootGroup = 'rats' | 'hounds' | 'goblins' | 'bandits' | 'spiders' | 'bog' | 'undead' | 'golems' | 'worms' | 'ember' | 'demons';
+export interface LootGroupDef {
+  id: LootGroup;
+  name: string;
+  /** Titel nach 100 bzw. 500 Kills der Gruppe */
+  titles: [string, string];
+  monsters: string[];
+}
+export const LOOT_GROUPS: LootGroupDef[] = [
+  { id: 'rats', name: 'Ratten', titles: ['Rattenfänger', 'Plage der Plagen'], monsters: ['field_rat', 'burrow_rat', 'giant_rat'] },
+  { id: 'hounds', name: 'Hunde und Wölfe', titles: ['Wolfsjäger', 'Herr der Meute'], monsters: ['wild_hound', 'feral_hound', 'wolf', 'dire_wolf', 'shadow_wolf', 'night_stalker'] },
+  { id: 'goblins', name: 'Goblins', titles: ['Goblinschreck', 'Albtraum der Goblins'], monsters: ['goblin', 'goblin_scout', 'goblin_warrior', 'goblin_shaman', 'goblin_archer', 'goblin_chief', 'goblin_brute', 'goblin_warlord', 'goblin_king'] },
+  { id: 'bandits', name: 'Räuber', titles: ['Räuberfänger', 'Schrecken der Landstraße'], monsters: ['bandit_novice', 'highwayman', 'bandit_archer', 'bandit', 'bandit_captain', 'bandit_lord'] },
+  { id: 'spiders', name: 'Spinnen', titles: ['Netzreißer', 'Spinnentod'], monsters: ['forest_spider', 'venom_spider', 'giant_spider', 'cave_spider', 'brood_spider', 'web_stalker', 'nest_matron', 'spider_queen', 'web_mother'] },
+  { id: 'bog', name: 'Moorvolk', titles: ['Moorgänger', 'Moorbezwinger'], monsters: ['bog_ghoul', 'marsh_corpse', 'bog_witch', 'ghoul_alpha', 'bog_queen'] },
+  { id: 'undead', name: 'Untote', titles: ['Grabwächter', 'Totenbanner'], monsters: ['skeleton', 'wraith', 'bone_acolyte', 'zombie', 'bone_knight', 'necromancer', 'crypt_guard', 'death_knight', 'doom_knight', 'bone_lord'] },
+  { id: 'golems', name: 'Trolle und Golems', titles: ['Steinbrecher', 'Bergbezwinger'], monsters: ['hill_troll', 'stone_golem', 'rock_troll', 'iron_golem', 'stone_colossus'] },
+  { id: 'worms', name: 'Würmer', titles: ['Wurmtöter', 'Schrecken der Tiefe'], monsters: ['pit_worm', 'acid_worm'] },
+  { id: 'ember', name: 'Glutwesen', titles: ['Glutlöscher', 'Aschenwanderer'], monsters: ['ash_walker', 'cinder_wisp', 'ember_elemental'] },
+  { id: 'demons', name: 'Dämonen', titles: ['Dämonenjäger', 'Geißel der Hölle'], monsters: ['imp', 'hell_spawn', 'hell_hound', 'pit_fiend', 'ash_king'] },
+];
+const GROUP_OF = new Map<string, LootGroup>(LOOT_GROUPS.flatMap((g) => g.monsters.map((m) => [m, g.id] as const)));
+/** Beute-Gruppe einer Monsterart (Mini-Bosse und Weltbosse über ihre Grundart). */
+export function lootGroupOf(kindId: string): LootGroup | undefined {
+  return GROUP_OF.get(kindId);
+}
+/** Kills je Gruppe für Titel und Händlerware */
+export const KILL_GOALS = [100, 500] as const;
+/** Meilenstein-Titel nach Stufe */
+export const LEVEL_TITLES: Record<number, string> = { 10: 'Erprobte Klinge', 20: 'Veteran des Tals', 30: 'Aschenbezwinger' };
+/** Stufenbänder der benannten Funde (je Band und Slot ein Fund) */
+export const NAMED_BANDS = [1, 6, 11, 16, 21, 26] as const;
+export type NamedBand = (typeof NAMED_BANDS)[number];
+/** Stufenband einer Monster- oder Spielerstufe (26–32 → 26). */
+export function bandOf(level: number): NamedBand {
+  return NAMED_BANDS[Math.max(0, Math.min(NAMED_BANDS.length - 1, Math.floor((level - 1) / 5)))]!;
+}
+
 /** Champion-Modifikatoren: Anführer mancher Rudel, stärker, mit besonderer Eigenschaft und besserer Beute. */
 export const CHAMPION_MODS: Record<string, { name: string; hp: number; dmg: number; speed: number; desc: string }> = {
   swift: { name: 'Flinker', hp: 1.8, dmg: 1.1, speed: 1.45, desc: 'sehr schnell' },
