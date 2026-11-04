@@ -118,7 +118,9 @@ export const HERO_STANCE = 0.4;
 const LIFT = 3;
 const ARM = 3.6;
 /** Schräge Draufsicht zur Kamera / weg (Bild-y je Pixel Tiefe) */
-const SHEAR = 0.32;
+export const SHEAR = 0.32;
+/** beim Hieb und mit dem Zweihänder weniger Scherung, sonst fährt die Klinge zur Kamera unter den Bildrand */
+export const SHEAR_REACH = SHEAR * 0.55;
 /** Strecke je Laufzyklus in Bildschirm-Pixeln bei Pixelmaßstab 2x: so gleiten die Füße nicht */
 export const HERO_CYCLE_PX = cycleLength(HERO_STRIDE, HERO_STANCE) * 2;
 
@@ -255,7 +257,7 @@ export function heroPose(anim: HeroAnim, view: HeroView, i: number, h: HeroLook,
     pose.bzz = -3.3;
     // schräge Draufsicht: was näher zur Kamera ist, steht tiefer im Bild (Füße, Knie, Hände), so sieht man Schritt und Armschwung
     // (beim Hieb und mit dem Zweihänder weniger, sonst fährt die Klinge zur Kamera unter den Bildrand; liegend keine)
-    pose.shear = anim === 'die' ? SHEAR * Math.max(0, 1 - i / 2) : anim === 'attack' || h.weapon === 'greatsword' ? SHEAR * 0.55 : SHEAR;
+    pose.shear = anim === 'die' ? SHEAR * Math.max(0, 1 - i / 2) : anim === 'attack' || h.weapon === 'greatsword' ? SHEAR_REACH : SHEAR;
     if (anim === 'walk') {
       const p = i / HERO_ANIMS.walk;
       // Hüfte kippt zum Spielbein, Schultern drehen gegen die Beine

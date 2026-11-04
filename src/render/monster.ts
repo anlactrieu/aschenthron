@@ -6,7 +6,7 @@
  * Reine Daten und Rechnung ohne DOM (Node-Kontaktbögen `scripts/bake-monsters.ts`, Tests, Browser `monsterSheet.ts`).
  */
 import { cycleLength, type FigAnim, type FigureSpec, type FigView, type Ramp } from './figure';
-import { ACCENT, CLOAKS, heroPose, MAT, type Gait, type HeroLook, type HeroWeapon } from './hero';
+import { ACCENT, CLOAKS, heroPose, MAT, SHEAR_REACH, type Gait, type HeroLook, type HeroWeapon } from './hero';
 import { PART, posed, type HeroGear, type RigBody, type RigPose } from './heroRig.js';
 import { BEAST_PART, beastPosed, SPIDER_STRIDE, type BeastBody } from './monsterRig.js';
 
@@ -288,12 +288,12 @@ function golemPose(p: RigPose, anim: FigAnim, view: FigView, i: number): void {
   const side = view === 'side';
   if (anim === 'attack') {
     Object.assign(p, SLAM[Math.min(SLAM.length - 1, i)]!);
-    if (!side) p.shear = 0.32 * 0.55;
+    if (!side) p.shear = SHEAR_REACH;
     return;
   }
   if (anim === 'die') return;
-  const sw = anim === 'walk' ? Math.cos((i / 8) * Math.PI * 2) : 0;
-  const b = anim === 'idle' ? Math.sin((i / 4) * Math.PI * 2) : 0;
+  const sw = anim === 'walk' ? Math.cos((i / HUM_ANIMS.walk) * Math.PI * 2) : 0;
+  const b = anim === 'idle' ? Math.sin((i / HUM_ANIMS.idle) * Math.PI * 2) : 0;
   const hit = anim === 'hit' ? (i === 0 ? 1 : 0.5) : 0;
   // von der Seite stark vorgebeugt, Fäuste vor dem Körper, Brust zur Kamera gedreht (breite Schultern); von vorn hängen die Arme senkrecht
   Object.assign(p, {

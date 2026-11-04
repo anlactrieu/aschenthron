@@ -271,6 +271,9 @@ function wisp(b, ph, M0) {
   return [1, -1].map((s) => P(add(c, [g * 0.85, g * 0.15, s * g * 0.35])));
 }
 
+/** Versatz je Körperbau und Ansicht (schräge Draufsicht), siehe `beastPosed` */
+const REST_LIFT = new WeakMap();
+
 /**
  * Pixel eines Tier-Bildes wie `posed()`: { n, xs, ys, color, shade, part, ... }.
  * Seitenansicht leicht zur Kamera gedreht, zur Kamera / weg = ganze Figur gedreht.
@@ -285,5 +288,21 @@ export function beastPosed(b, anim, view, i, n) {
   const yaw = view === "side" ? 0.42 : straight ? (view === "front" ? Math.PI / 2 : -Math.PI / 2) : view === "front" ? 1.05 : -1.05;
   const sheared = view !== "side" && (b.type === "worm" || b.type === "quad");
   const M = sheared ? mm([1, 0, 0, 0, 1, -BEAST_SHEAR, 0, 0, 1], rotY(-yaw)) : rotY(-yaw);
-  return shape(() => (b.type === "quad" ? quad(b, ph, M) : b.type === "spider" ? spider(b, ph, M) : b.type === "worm" ? worm(b, ph, M) : wisp(b, ph, M)));
+  const draw = (q) => () => (b.type === "quad" ? quad(b, q, M) : b.type === "spider" ? spider(b, q, M) : b.type === "worm" ? worm(b, q, M) : wisp(b, q, M));
+  if (!sheared || anim === "die") return shape(draw(ph));
+  // schräg von oben: alle Bilder einer Ansicht um denselben Betrag heben (aus dem Stehbild), damit der Standfuß im Gehen nicht
+  // springt; nur was trotzdem unter die Fußlinie reicht, wird zusätzlich angehoben
+  const key = `${view}`;
+  let lift = REST_LIFT.get(b)?.[key];
+  if (lift === undefined) {
+    const ref = shape(draw({ ...phaseOf("idle", 0, 4), coil: ph.coil }), false);
+    lift = Math.max(0, ref.y1 - 1);
+    REST_LIFT.set(b, { ...REST_LIFT.get(b), [key]: lift });
+  }
+  const out = shape(draw(ph), false);
+  const up = Math.max(lift, out.y1 - 1);
+  for (let j = 0; j < out.n; j++) out.ys[j] -= up;
+  out.y0 -= up;
+  out.y1 -= up;
+  return out;
 }

@@ -390,7 +390,7 @@ function drawBody(S) {
     // (Richtungen ohne die Scherung der Schrägsicht: eine Scheibe, die zur Kamera zeigt, bleibt so im Bild nur verschoben)
     const sh = S.q.shear ?? 0, flat = (v) => [v[0], v[1] + sh * v[2], v[2]];
     const hand = armF.end, nrm = unit(add(flat(fwd), mul(flat(across), S.q.yaw ? 0.8 : 1.7))), R = axes(nrm, flat(up));
-    const c = add(hand, add(mul(nrm, (S.q.yaw ? 1.4 : 3.4) * k), mul(up, -0.5 * k)));
+    const c = add(hand, add(mul([nrm[0], nrm[1] - sh * nrm[2], nrm[2]], (S.q.yaw ? 1.4 : 3.4) * k), mul(up, -0.5 * k)));
     const tall = gear.shield === 3 ? 1.35 : gear.shield === 2 ? 1.15 : 1, wide = gear.shield === 3 ? 0.95 : gear.shield === 2 ? 0.85 : 1;
     ellipsoid(add(c, mul(nrm, -0.3)), R, [0.8, 5.4 * k * tall, 4.8 * k * wide], PART.shieldRim, 0);
     ellipsoid(c, R, [0.9, 4.6 * k * tall, 4.0 * k * wide], PART.shield, 0);
@@ -841,10 +841,12 @@ export function skeleton(pose) {
  * die Pixel wie `posed()`.
  */
 export const KIT = { add, sub, mul, dot, cross, len, unit, rotY, rotZ, mm, mv, ik, axes, lerp3, sphere, sweep, ellipsoid };
-export function shape(draw) {
+export function shape(draw, pin = true) {
   setBody(null);
   clipBody = false;
   clipWeapon = false;
   const eyePts = draw();
-  return onGround(finish({ q: { eyes: false, mark: false }, eyePts }));
+  // pin = false: nicht auf die Fußlinie heben (schräge Draufsicht: der nähere Fuß liegt zu Recht etwas tiefer)
+  const out = finish({ q: { eyes: false, mark: false }, eyePts });
+  return pin ? onGround(out) : out;
 }
