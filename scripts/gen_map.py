@@ -636,7 +636,9 @@ for lx, ly in [(2, 3), (2, 5), (31, 3), (31, 5), (2, 15), (31, 15), (2, 26), (31
 for lx, ly in [(14, 3), (20, 3), (14, 14), (20, 14), (14, 18), (20, 18), (14, 26), (20, 26), (14, 34), (20, 34), (9, 9), (26, 9), (11, 36)]: setg(lx, ly, 22)
 for lx, ly in [(13, 21), (13, 26), (21, 26), (21, 21), (13, 29), (30, 40)]: setg(lx, ly, 19)
 for lx, ly in [(13, 25), (21, 25), (2, 36), (27, 42)]: setg(lx, ly, 20)
-for lx, ly in [(13, 37)]: setg(lx, ly, 24)
+for lx, ly in [(13, 37), (15, 7), (19, 7), (20, 36)]: setg(lx, ly, 24)       # Marktstände: Stadtmitte (nördlicher Rand) und Hafenplatz
+for lx, ly in [(15, 11), (19, 40)]: setg(lx, ly, 20)                             # Kisten am Stand
+for lx, ly in [(19, 11)]: setg(lx, ly, 19)                                       # Fass am Stand
 for lx, ly in [(7, 7), (11, 7), (24, 7), (28, 7), (7, 11), (11, 11), (24, 11), (28, 11)]: setg(lx, ly, 27)
 
 # alte Objekte der Stadt entfernen (NPCs, Zonen, Start), neue setzen
@@ -686,6 +688,12 @@ for y in range(fy0, fy0 + 6):
 g[fy0 + 3][fx0] = 28 + ICONS.index('chest')
 objs[:] = [o for o in objs if not (o["type"] == "npc" and o["name"] == "Truhe")]
 obj("Lagerverwalter Torvin", "npc", fx0 + 1, fy0 + 3, kind="stash")
+# Felsenwacht: Marktplatz belebt (P1 Lebende Städte). Nur Kacheln abseits von Mittelstraße (x 111-115), Querstraße (y 69-71), NPCs und Start;
+# Stände, Kisten, Fässer, Brunnen und Laternen (Nachtlicht). Kein Zufall, kein Eingriff in spätere Rudel (Stadtfläche ist ohnehin frei).
+for x, y, gid in [(110, 67, 24), (117, 67, 24), (106, 68, 20), (121, 72, 20), (105, 72, 19), (120, 73, 19), (118, 66, 21),
+                  (110, 65, 22), (116, 65, 22), (110, 73, 22), (116, 73, 22)]:
+    assert g[y][x] in (1, 2), ("Felsenwacht: Platz-Prop nicht frei", x, y, g[y][x])
+    g[y][x] = gid
 
 # ------------------------------------------------------------------ Handelsstraße (sicherer Weg)
 # Eine durchgehende Straße verbindet Aschenhafen mit der Felsenwacht (und weiter bis zum Hochland-Eingang). Entlang der Straße

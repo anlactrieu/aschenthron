@@ -103,7 +103,7 @@ export const TOWNS: TownDef[] = [
       { kind: 'cart', x: 16, y: 154 }, { kind: 'cart', x: 44, y: 148 },
       { kind: 'hay', x: 15, y: 152 }, { kind: 'hay', x: 45, y: 160 },
       { kind: 'sacks', x: 26, y: 168 }, { kind: 'sacks', x: 37, y: 174 }, { kind: 'sacks', x: 20, y: 174 },
-      { kind: 'baskets', x: 29, y: 143 }, { kind: 'baskets', x: 33, y: 139 }, { kind: 'baskets', x: 26, y: 171 },
+      { kind: 'baskets', x: 28, y: 139 }, { kind: 'baskets', x: 34, y: 143 }, { kind: 'baskets', x: 26, y: 171 },
     ],
   },
   {
@@ -373,6 +373,8 @@ interface Bubble {
   from: number;
   tw: number;
   th: number;
+  /** Glückwunsch (mehrere Aufstiege hintereinander ersetzen einander) */
+  cong: boolean;
 }
 
 const FONT = "NinjaUi, 'Courier New', monospace";
@@ -665,10 +667,11 @@ export class TownLife {
   }
 
   private drawResident(r: Resident, c: LifeCtx): void {
-    const got = figureTexture(this.scene, r.key, r.req);
     const { sx, sy } = toScreen(r.x, r.y);
     const onscreen = sx > c.view.x - 80 && sx < c.view.x + c.view.width + 80 && sy > c.view.y - 120 && sy < c.view.y + c.view.height + 120;
-    if (!got || got === 'wait' || !onscreen) {
+    // Nur Sichtbare dringlich backen/hochladen; der Rest kommt über `prefetchFigure` beim Betreten der Stadt
+    const got = onscreen ? figureTexture(this.scene, r.key, r.req) : null;
+    if (!got || got === 'wait') {
       r.img.setVisible(false);
       r.torch?.img.setVisible(false);
       r.torch?.glow.setVisible(false);
@@ -872,12 +875,13 @@ export class TownLife {
     return this.bubbles.filter((b) => b.until > 0).length < max;
   }
 
-  private say(anchor: Anchor, head: number, text: string, ms: number, now: number, delay = 0): void {
+  private say(anchor: Anchor, head: number, text: string, ms: number, now: number, delay = 0, cong = false): void {
     let b = this.bubbles.find((x) => x.until === 0);
+    if (!b && this.bubbles.length >= 8) return;
     if (!b) {
       const box = this.scene.add.graphics().setDepth(OVERLAY + 4).setVisible(false);
       const txt = this.scene.add.text(0, 0, '', { fontFamily: FONT, fontSize: '16px', color: '#2a1d12', align: 'center', wordWrap: { width: 170 }, lineSpacing: 1 }).setOrigin(0.5, 1).setDepth(OVERLAY + 5).setVisible(false);
-      b = { box, txt, anchor: null, head: 0, until: 0, from: 0, tw: 0, th: 0 };
+      b = { box, txt, anchor: null, head: 0, until: 0, from: 0, tw: 0, th: 0, cong: false };
       this.bubbles.push(b);
     }
     // die Pixelschrift hat sehr schmale Leerzeichen: doppelt setzen, sonst kleben die Wörter
@@ -885,6 +889,7 @@ export class TownLife {
     b.tw = Math.ceil(b.txt.width) + 14;
     b.th = Math.ceil(b.txt.height) + 10;
     b.anchor = anchor;
+    b.cong = cong;
     b.head = head;
     b.from = now + delay;
     b.until = now + delay + ms;
@@ -931,6 +936,14 @@ export class TownLife {
     if (level === this.lastLevel && c.time - this.lastCongrat < 1500) return;
     this.lastLevel = level;
     this.lastCongrat = c.time;
+    // mehrere Aufstiege auf einmal: nur der letzte Glückwunsch bleibt
+    for (const b of this.bubbles) {
+      if (!b.cong || !b.until) continue;
+      b.until = 0;
+      b.anchor = null;
+      b.box.setVisible(false).clear();
+      b.txt.setVisible(false);
+    }
     const cands: { d: number; role: Role | 'npc'; anchor: Anchor; head: number }[] = [];
     for (const r of this.res) {
       if (r.state === 'gone' || r.alpha < 0.5 || !r.img.visible) continue;
@@ -947,7 +960,7 @@ export class TownLife {
     const picked: typeof cands = [];
     for (const x of cands) if (picked.length < 3 && !picked.some((p) => p.role === x.role)) picked.push(x);
     for (const x of cands) if (picked.length < 3 && !picked.includes(x)) picked.push(x);
-    picked.forEach((p, i) => this.say(p.anchor, p.head, congratText(p.role, level, this.rng), 3800, c.time, 500 + i * 450));
+    picked.forEach((p, i) => this.say(p.anchor, p.head, congratText(p.role, level, this.rng), 3800, c.time, 500 + i * 450, true));
   }
   private lastCongrat = -1e9;
 }

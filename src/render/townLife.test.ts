@@ -61,7 +61,7 @@ describe('Stadtleben: Daten gegen die echte Karte', () => {
       for (const d of t.decor) {
         const ok = isWalkable(g, d.x, d.y);
         if (FLAT_DECOR.has(d.kind)) expect(ok, `${t.name} ${d.kind} ${d.x},${d.y} sollte begehbar sein`).toBe(true);
-        else if (d.kind === 'cart') expect(true).toBe(true);
+        else if (d.kind === 'cart') continue; // Karren und Heu: flach genug, man geht darüber
         else expect(ok, `${t.name} ${d.kind} ${d.x},${d.y} sollte blockiert sein`).toBe(false);
       }
     }
@@ -72,6 +72,31 @@ describe('Stadtleben: Daten gegen die echte Karte', () => {
     expect(lineClear(g, z[0], z[1], z[0], z[1])).toBe(true);
     // quer durch Haus und Mauer nach draußen
     expect(lineClear(g, 31, 140, 31, 120)).toBe(false);
+  });
+});
+
+describe('Stadtleben: Karte', () => {
+  it('Platz-Props sperren keinen Weg: alle NPCs, Tore und Haustüren sind vom Start aus erreichbar', () => {
+    const reach = (sx: number, sy: number): Set<number> => {
+      const seen = new Set<number>([sy * g.w + sx]);
+      const q = [[sx, sy]];
+      while (q.length) {
+        const [x, y] = q.pop()!;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = x! + dx!;
+          const ny = y! + dy!;
+          const k = ny * g.w + nx;
+          if (!seen.has(k) && isWalkable(g, nx, ny)) {
+            seen.add(k);
+            q.push([nx, ny]);
+          }
+        }
+      }
+      return seen;
+    };
+    const from = reach(Math.round(world.start.x), Math.round(world.start.y));
+    for (const n of world.npcs) expect(from.has(Math.round(n.y) * g.w + Math.round(n.x)), n.name).toBe(true);
+    for (const t of TOWNS) for (const r of t.residents) expect(from.has(r.home[1] * g.w + r.home[0]), `${t.name} Haustür ${r.home}`).toBe(true);
   });
 });
 
