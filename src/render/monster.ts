@@ -8,7 +8,7 @@
 import { cycleLength, type FigAnim, type FigureSpec, type FigView, type Ramp } from './figure';
 import { ACCENT, CLOAKS, heroPose, MAT, type Gait, type HeroLook, type HeroWeapon } from './hero';
 import { PART, posed, type HeroGear, type RigBody, type RigPose } from './heroRig.js';
-import { BEAST_PART, beastPosed, type BeastBody } from './monsterRig.js';
+import { BEAST_PART, beastPosed, SPIDER_STRIDE, type BeastBody } from './monsterRig.js';
 
 /* ------------------------------------------------ Farben */
 
@@ -379,7 +379,7 @@ export function humSpec(key: string, d: HumDef, outline = OUTLINE, anims: Record
 /** Strecke je Laufzyklus eines Tieres bei 1x und Größe 1 (passend zu `monsterRig.js`) */
 function beastCycle(b: BeastBody): number {
   if (b.type === 'worm' || b.type === 'wisp') return 40;
-  const stride = b.type === 'spider' ? 2.6 : (b.height ?? 8) * 0.42;
+  const stride = b.type === 'spider' ? SPIDER_STRIDE : (b.height ?? 8) * 0.42;
   return cycleLength(stride, 0.5);
 }
 

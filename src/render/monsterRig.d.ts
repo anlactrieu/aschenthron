@@ -24,4 +24,5 @@ export interface BeastBody {
   spikes?: boolean;
 }
 export const BEAST_PART: Record<string, number>;
+export const SPIDER_STRIDE: number;
 export function beastPosed(b: BeastBody, anim: string, view: string, i: number, n: number): Posed;

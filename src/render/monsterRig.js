@@ -142,16 +142,28 @@ function quad(b, ph, M0) {
 
 /* ------------------------------------------------ Spinne */
 
+/** Schrittweite der Spinnenbeine bei Größe 1 (Laufzyklus in monster.ts `beastCycle`) */
+export const SPIDER_STRIDE = 3.4;
+/** Sterbebilder: Kippen um die Längsachse, Absinken (Anteil), Einrollen der Beine, Spreizen, Fußhub */
+const SPIDER_DIE = [
+  { roll: 0, drop: 0.3, curl: 0, spread: -0.6, lift: 3 },
+  { roll: 0, drop: 1, curl: 0.05, spread: 1, lift: 0 },
+  { roll: 0.45, drop: 1, curl: 0.45, spread: 0, lift: 0 },
+  { roll: 2.8, drop: 1, curl: 0.55, spread: 0, lift: 0 },
+];
+
 function spider(b, ph, M0) {
   const k = b.size ?? 1, Hs = b.height * k, g = b.girth * k, hd = b.head * k, legR = (b.legR ?? 0.8) * k, legL = 11.5 * k * (b.legLen ?? 1);
-  const die = ph.die ?? 0, lunge = (ph.lunge ?? 0) * k;
-  const flip = Math.max(0, die - 0.3) / 0.7;
-  // Sterben: sackt ab, kippt auf den Rücken, Beine krümmen sich
-  const M = mm(M0, rotX(-flip * 2.6));
-  const { P, egg } = painter(M, [0, flip * g * 1.4, 0]);
+  const lunge = (ph.lunge ?? 0) * k;
+  // Sterben in Schlüsselbildern: zucken (Beine hoch), einknicken (Körper auf dem Boden, Beine flach gespreizt), auf die Seite
+  // kippen (Beine krümmen sich), auf dem Rücken liegen (Beine eng eingerollt)
+  const D = ph.die === undefined ? null : SPIDER_DIE[Math.min(SPIDER_DIE.length - 1, Math.round(ph.die * (SPIDER_DIE.length - 1)))];
+  const flip = D ? D.roll : 0, curl = D ? D.curl : 0, spread = D ? D.spread : 0;
+  const M = mm(M0, rotX(-flip));
+  const { P, egg } = painter(M, [0, 0, 0]);
   const bob = ph.walk !== undefined ? Math.abs(Math.sin(ph.walk * TAU * 2)) * 0.4 * k : (ph.breath ?? 0) * 0.2 * k;
   const rear = (ph.attack ? Math.max(0, -(ph.lunge ?? 0)) * 0.9 : 0) + (ph.rear ?? 0) * 1.5;
-  const drop = Math.min(1, die * 2) * (Hs - g * 0.5);
+  const drop = D ? D.drop * (Hs - g * 0.55) : 0;
   const C = [2.2 * k + lunge * 0.8, Hs + bob + rear * k * 0.5 - drop, 0];
   const A = [-g * 0.95 + lunge * 0.4, Hs + 1.4 * k + bob * 0.6 - drop, 0];
   egg(A, axes([1, 0.15, 0], [0, 1, 0]), [g * 1.05, g * 0.88, g * 0.95], P_.fur);
@@ -165,9 +177,11 @@ function spider(b, ph, M0) {
   const ANG = [0.62, 0.2, -0.28, -0.72];
   for (const s of [1, -1]) for (let j = 0; j < 4; j++) {
     const a = ANG[j], at = add(C, [hd * (0.35 - j * 0.28), -hd * 0.1, s * hd * 0.55]);
-    let fx = at[0] + Math.sin(a) * legL, fz = at[2] + s * Math.cos(a) * legL * 0.8, fy = legR;
+    const reach = legL * (1 + spread * 0.15);
+    let fx = at[0] + Math.sin(a) * reach, fz = at[2] + s * Math.cos(a) * reach * 0.8, fy = legR;
     if (ph.walk !== undefined) {
-      const f = foot(ph.walk + ((j + (s > 0 ? 0 : 1)) % 2) * 0.5, 2.6 * k, 2.2 * k);
+      // Wechselschritt: Beine 1 und 3 der einen Seite mit 2 und 4 der anderen; deutlicher Hub, Knie gehen beim Heben hoch
+      const f = foot(ph.walk + ((j + (s > 0 ? 0 : 1)) % 2) * 0.5, SPIDER_STRIDE * k, 3.2 * k);
       fx += f.x;
       fy += f.y;
     }
@@ -175,8 +189,15 @@ function spider(b, ph, M0) {
       fy += rear * 2.5 * k;
       fx += 1.5 * k;
     }
-    fy += drop * 0.5 + flip * legL * 0.5;
-    const knee = ik(P(at), P([fx, fy, fz]), legL * 0.5, legL * 0.68, mv(M, [Math.sin(a) * 0.3, 1, s * Math.cos(a) * 0.5]));
+    if (D) {
+      // die Füße ziehen sich zum Körper (eingerollt) und heben sich vom Boden; das Knie zeigt dann nach außen statt nach oben
+      fy += D.lift * k;
+      fx += (at[0] + Math.sin(a) * legL * 0.22 - fx) * curl;
+      fz += (at[2] + s * Math.cos(a) * legL * 0.22 - fz) * curl;
+      fy += (at[1] - hd * 0.9 - fy) * curl;
+    }
+    const pole = [Math.sin(a) * (0.3 + curl), 1 - curl * 0.6, s * Math.cos(a) * (0.5 + curl)];
+    const knee = ik(P(at), P([fx, fy, fz]), legL * 0.5, legL * 0.68, mv(M, pole));
     const part = s > 0 ? P_.legN : P_.legF;
     sweep(P(at), knee.joint, legR * 1.3, legR, part, 0);
     sweep(knee.joint, knee.end, legR, legR * 0.6, part, 0);
