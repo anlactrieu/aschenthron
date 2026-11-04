@@ -362,8 +362,6 @@ const diamondPath = (c: Ctx, w = TILE_W, h = TILE_H, y0 = 0): void => {
 
 /* ------------------------------------------------------- Props (Wand, Baum…) */
 
-/** Wandhöhe der alten Iso-Stadtwand (town.ts, nur noch Ersatz für Wände außerhalb erkannter Häuser) */
-const WALL_H = 44;
 
 /* ------------------------------------------------------------- Akteure */
 
@@ -1081,4 +1079,4 @@ export function ensureTexture(scene: Phaser.Scene, key: string, make: () => HTML
   return key;
 }
 
-export { WALL_H, mkCanvas, ctxOf, rng, rect, css, shade, mix, outline, upscale, grounded, diamondPath };
+export { mkCanvas, ctxOf, rng, rect, css, shade, mix, outline, upscale, grounded, diamondPath };

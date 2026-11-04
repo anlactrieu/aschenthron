@@ -120,7 +120,8 @@ export class GameScene extends Phaser.Scene {
   private houseSigns = new Map<number, Phaser.GameObjects.Image>();
   private roofs: { img: Phaser.GameObjects.Image; house: House }[] = [];
   /** Fenster- und Laternenlicht, Deckkraft = Nacht-Faktor der Atmosphäre */
-  private nightLights: { img: Phaser.GameObjects.Image; k: number }[] = [];
+  private nightLights: { img: Phaser.GameObjects.Image; k: number; follow?: Phaser.GameObjects.Image }[] = [];
+  private night = 0;
   /** Türbilder an Nord-/Ost-/Westseite liegen über dem Dach und blenden mit ihm aus */
   private playerId = 0;
   private gfx!: Phaser.GameObjects.Graphics;
@@ -1740,7 +1741,8 @@ export class GameScene extends Phaser.Scene {
       const gkey = ensureTexture(this, `nh_glow_${hs.x0}_${hs.y0}`, () => houseGlow(hs)!);
       const gimg = this.add.image(f.sx - TILE_W / 2, f.sy - TILE_H / 2, gkey).setOrigin(0, 0).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0)
         .setDepth((hs.y0 + hs.h - 1) * TILE_H + TILE_H / 2 + 1);
-      this.nightLights.push({ img: gimg, k: 1 });
+      // blendet mit der Fassade aus, wenn der Spieler im Haus steht
+      this.nightLights.push({ img: gimg, k: 1, follow: fac });
       // Kleine Außendeko (reine Optik: keine Kollision, kein Sim-Einfluss)
       const free = (x: number, y: number): boolean => {
         const g = this.tiles[y * w + x] ?? 0;
@@ -1761,7 +1763,7 @@ export class GameScene extends Phaser.Scene {
     for (let i = 0; i < this.tiles.length; i++) {
       if (this.tiles[i] !== TOWN_GID.lantern) continue;
       const p = toScreen(i % w, Math.floor(i / w));
-      this.nightLights.push({ img: this.add.image(p.sx, p.sy + TILE_H / 2 - 54, glowKey).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0).setDepth(p.sy + TILE_H / 2 + 1), k: 1 });
+      this.nightLights.push({ img: this.add.image(p.sx, p.sy + TILE_H / 2 - 64, glowKey).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0).setDepth(p.sy + TILE_H / 2 + 1), k: 1 });
     }
   }
 
@@ -1780,11 +1782,9 @@ export class GameScene extends Phaser.Scene {
 
   /** Dach blendet auf 20 % aus, solange der Spieler im Haus (oder unter dem Dachüberstand im Norden) steht, auf 50 % vor der Tür. */
   private updateRoofs(px: number, py: number): void {
-    // Fenster und Laternen leuchten nach Tageszeit (nur alle paar Bilder neu)
-    if (this.frame % 10 === 0) {
-      const n = this.atmo.night();
-      for (const l of this.nightLights) l.img.setAlpha(n * l.k);
-    }
+    // Fenster und Laternen leuchten nach Tageszeit (Nacht-Faktor nur alle paar Bilder neu), Fenster folgen dem Ausblenden der Fassade
+    if (this.frame % 10 === 0) this.night = this.atmo.night();
+    for (const l of this.nightLights) l.img.setAlpha(this.night * l.k * (l.follow?.alpha ?? 1));
     for (const { img, house: hs } of this.roofs) {
       const inside = px >= hs.x0 && px <= hs.x0 + hs.w - 1 && py >= hs.y0 - 1 && py <= hs.y0 + hs.h - 1;
       // Vor der Tür (bis 2 Kacheln) wird das Dach halb durchsichtig, damit man die Leute im Haus sieht

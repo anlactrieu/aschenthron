@@ -9,7 +9,7 @@
  */
 import { DOOR_ICONS, TOWN_GID, drawDoorIcon, type DoorIcon } from './town';
 import { ART, INK, Raster, h3, mix, toCanvas, type Rgb } from './world/raster';
-import { R, fence, type Ramp5 } from './world/props';
+import { R, fence, tone, type Ramp5 } from './world/props';
 
 /** Bis zu dieser Zeilenzahl reicht das Dach; Kerbe an der Türseite (Kachelspalte/-zeile im Dachbild) */
 export interface RoofNotch { col: number; row: number; rows: number }
@@ -94,7 +94,7 @@ const GLASS_HI = 0x34465a;
 /** Fensterlicht nachts (additiv) */
 export const WINDOW_LIGHT: Rgb = 0xff9a38;
 
-const t5 = (r: Ramp5, t: number): Rgb => r[Math.max(0, Math.min(4, Math.round(t)))]!;
+const t5 = tone;
 
 /* ---------------------------------------------------------------- Dach */
 

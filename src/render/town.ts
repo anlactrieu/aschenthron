@@ -1,12 +1,11 @@
 import type Phaser from 'phaser';
-import { TILE_H, TILE_W, WALL_H, ctxOf, css, diamondPath, mkCanvas, rect, rng, shade } from './art';
+import { rect } from './art';
 import { Raster, toCanvas } from './world/raster';
-import { barrel, boat, crates, flowerBox, lantern, post, ship, stall, well } from './world/props';
+import { barrel, boat, crates, flowerBox, lantern, post, ship, stall, wallTile, well } from './world/props';
 
 /**
  * Stadtgrafik (Stufe 6, Aschenhafen): Türschild-Symbole und die Registrierung der Stadt-Props (Fässer, Kisten, Brunnen,
- * Laternen, Marktstand, Blumenkästen, Boote, Pfähle, Segelschiff aus world/props.ts). Die alten Iso-Wand-/Türbilder
- * bleiben nur als Ersatz für Wandkacheln außerhalb erkannter Häuser.
+ * Laternen, Marktstand, Blumenkästen, Boote, Pfähle, Segelschiff aus world/props.ts).
  */
 
 type Ctx = CanvasRenderingContext2D;
@@ -19,85 +18,6 @@ export const DOOR_ICONS = ['anchor', 'book', 'coins', 'anvil', 'chest', 'shield'
 export type DoorIcon = (typeof DOOR_ICONS)[number];
 /** Stadt-Texturen aus der Code-Welt (stehen unten mittig, siehe GameScene.makeProp) */
 export const WORLD_TOWN_KEYS = new Set(['twn_barrel', 'twn_crates', 'twn_well', 'twn_lantern', 'twn_stall', 'twn_post', 'twn_flowers', 'twn_boat', 'twn_ship']);
-
-const PLASTER = [0xcdbf9f, 0xd8c8a8, 0xbfae90, 0xc9b69a];
-const ROOF = [0x9a4632, 0x8a3a2c, 0x7a3a30, 0xa4502e];
-const TIMBER = 0x5a3c26;
-
-function poly(x: Ctx, pts: [number, number][], col: number): void {
-  x.fillStyle = css(col);
-  x.beginPath();
-  x.moveTo(pts[0]![0], pts[0]![1]);
-  for (const [px, py] of pts.slice(1)) x.lineTo(px, py);
-  x.closePath();
-  x.fill();
-}
-
-function line(x: Ctx, ax: number, ay: number, bx: number, by: number, col: number, w = 1): void {
-  x.strokeStyle = css(col);
-  x.lineWidth = w;
-  x.beginPath();
-  x.moveTo(ax, ay);
-  x.lineTo(bx, by);
-  x.stroke();
-}
-
-/** Hauswand als Block (wie die Stadtmauer, aber Putz, Fachwerk, Fenster, Ziegeldach als Oberseite). */
-export function houseWallCanvas(variant: number): HTMLCanvasElement {
-  const c = mkCanvas(TILE_W, TILE_H + WALL_H);
-  const x = ctxOf(c);
-  const r = rng(variant * 71 + 5);
-  const plaster = PLASTER[variant % PLASTER.length]!;
-  const roof = ROOF[variant % ROOF.length]!;
-  const hw = TILE_W / 2;
-  const hh = TILE_H / 2;
-  const left: [number, number][] = [[0, hh], [hw, TILE_H], [hw, TILE_H + WALL_H], [0, hh + WALL_H]];
-  const right: [number, number][] = [[TILE_W, hh], [hw, TILE_H], [hw, TILE_H + WALL_H], [TILE_W, hh + WALL_H]];
-  poly(x, left, plaster);
-  poly(x, right, shade(plaster, 0.8));
-  // Steinsockel
-  poly(x, [[0, hh + WALL_H - 7], [hw, TILE_H + WALL_H - 7], [hw, TILE_H + WALL_H], [0, hh + WALL_H]], 0x6a6560);
-  poly(x, [[TILE_W, hh + WALL_H - 7], [hw, TILE_H + WALL_H - 7], [hw, TILE_H + WALL_H], [TILE_W, hh + WALL_H]], 0x57524e);
-  // Fachwerk: Randbalken, Querbalken, Strebe
-  for (const [side, col] of [[0, TIMBER], [1, shade(TIMBER, 0.8)]] as const) {
-    const sx = side === 0 ? 0 : TILE_W;
-    const sh = side === 0 ? 1 : -1;
-    line(x, sx, hh, sx, hh + WALL_H, col, 3);
-    line(x, hw, TILE_H, hw, TILE_H + WALL_H, col, 3);
-    line(x, sx, hh + 2, hw, TILE_H + 2, col, 3);
-    line(x, sx, hh + WALL_H - 9, hw, TILE_H + WALL_H - 9, col, 2);
-    line(x, sx + sh * 2, hh + WALL_H - 10, sx + sh * 14, hh + 12 + (side === 0 ? 7 : 7), col, 2);
-  }
-  // Fenster (nicht jede Wand): Rahmen, Glas, Kreuz, Blumenkasten
-  for (const side of [0, 1] as const) {
-    if (r() > (side === 0 ? 0.62 : 0.5)) continue;
-    const ox = side === 0 ? 11 : 37;
-    const oy = side === 0 ? 27 : 27;
-    const skew = side === 0 ? 1 : -1;
-    for (let i = 0; i < 12; i++) {
-      const px = ox + i;
-      const py = oy + Math.round((skew * (i - 6)) / 2);
-      rect(x, px, py, 1, 14, i === 0 || i === 11 ? TIMBER : 0x2a3a52);
-    }
-    for (let i = 1; i < 11; i++) rect(x, ox + i, oy + Math.round((skew * (i - 6)) / 2) + 6, 1, 1, TIMBER);
-    for (let i = 1; i < 6; i++) rect(x, ox + 5, oy + Math.round((skew * (5 - 6)) / 2) + i, 1, 1, TIMBER);
-    for (let i = 1; i < 11; i++) rect(x, ox + i, oy + Math.round((skew * (i - 6)) / 2) + 14, 1, 2, 0x4a3a2a);
-    rect(x, ox + 3, oy + Math.round((skew * -3) / 2) + 2, 2, 2, 0xf0e0a0);
-  }
-  // Dach: Oberseite als Ziegelfläche mit Reihen und Firstkante
-  x.save();
-  diamondPath(x);
-  x.clip();
-  rect(x, 0, 0, TILE_W, TILE_H, roof);
-  for (let i = -4; i <= 8; i++) line(x, i * 8, 0, i * 8 + hw, hh, shade(roof, 0.78), 1);
-  for (let i = 0; i < 12; i++) rect(x, 8 + Math.floor(r() * 46), 3 + Math.floor(r() * 24), 3, 1, shade(roof, 1.15 + r() * 0.15));
-  line(x, 4, hh, TILE_W - 4, hh, shade(roof, 1.25), 1);
-  x.restore();
-  // Dachkante (dunkle Linie an der Traufe)
-  line(x, 0, hh, hw, TILE_H, shade(roof, 0.55), 2);
-  line(x, TILE_W, hh, hw, TILE_H, shade(roof, 0.5), 2);
-  return c;
-}
 
 /** Schild-Symbol (14x14) für Türschilder. */
 export function drawDoorIcon(x: Ctx, icon: DoorIcon, ox: number, oy: number): void {
@@ -136,42 +56,15 @@ export function drawDoorIcon(x: Ctx, icon: DoorIcon, ox: number, oy: number): vo
   }
 }
 
-/** Tür: zwei Pfosten mit Sturz und hängendem Schild. `axis`: Richtung der Wandreihe (x: Wand links oben und rechts unten). */
-export function doorCanvas(icon: DoorIcon, axis: 'x' | 'y'): HTMLCanvasElement {
-  const c = mkCanvas(TILE_W, TILE_H + WALL_H);
-  const x = ctxOf(c);
-  const g = (px: number, py: number): [number, number] => [px, py + WALL_H];
-  const a = axis === 'x' ? g(16, 8) : g(48, 8);
-  const b = axis === 'x' ? g(48, 24) : g(16, 24);
-  const H = 40;
-  // Pfosten und Sturz
-  for (const [px, py] of [a, b]) {
-    rect(x, px - 2, py - H, 4, H, TIMBER);
-    rect(x, px - 2, py - H, 1, H, shade(TIMBER, 1.3));
-    rect(x, px - 3, py - 3, 6, 3, 0x6a6560);
-  }
-  line(x, a[0], a[1] - H, b[0], b[1] - H, TIMBER, 4);
-  line(x, a[0], a[1] - H - 3, b[0], b[1] - H - 3, shade(TIMBER, 1.25), 1);
-  // Schild an zwei Ketten
-  const mx = Math.round((a[0] + b[0]) / 2);
-  const my = Math.round((a[1] + b[1]) / 2) - H;
-  rect(x, mx - 8, my + 2, 1, 6, 0x303038);
-  rect(x, mx + 7, my + 2, 1, 6, 0x303038);
-  rect(x, mx - 11, my + 8, 23, 20, shade(TIMBER, 0.7));
-  rect(x, mx - 10, my + 9, 21, 18, 0xa07a4a);
-  rect(x, mx - 10, my + 9, 21, 1, 0xc09a62);
-  drawDoorIcon(x, icon, mx - 7, my + 11);
-  return c;
-}
-
 /** Registriert alle Stadt-Texturen in Phaser. */
 export function registerTownArt(scene: Phaser.Scene): void {
   const add = (key: string, c: HTMLCanvasElement) => {
     if (!scene.textures.exists(key)) scene.textures.addCanvas(key, c);
   };
-  for (let v = 0; v < PLASTER.length; v++) add(`twn_wall_${v}`, houseWallCanvas(v));
+  // Wand-/Türkacheln außerhalb erkannter Häuser (in der jetzigen Karte keine): schlichte Ziegelwand der Code-Welt
+  for (let v = 0; v < 4; v++) add(`twn_wall_${v}`, toCanvas(wallTile('brick', 15, v, 0)));
   DOOR_ICONS.forEach((icon) => {
-    for (const axis of ['x', 'y'] as const) add(`twn_door_${icon}_${axis}`, doorCanvas(icon, axis));
+    for (const axis of ['x', 'y'] as const) add(`twn_door_${icon}_${axis}`, toCanvas(wallTile('brick', 15, 0, 1)));
   });
   // Stadt-Props der Code-Welt (world/props.ts), Maßstab 2, Fußpunkt unten mittig
   const W = (key: string, make: () => Raster) => add(key, toCanvas(make()));

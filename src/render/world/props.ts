@@ -7,7 +7,8 @@
 import { ART, INK, Raster, h3, mix, rng, vnoise, type Rgb } from './raster';
 
 export type Ramp5 = readonly [Rgb, Rgb, Rgb, Rgb, Rgb];
-const tone = (r: Ramp5, t: number): Rgb => r[Math.max(0, Math.min(4, Math.round(t)))]!;
+/** Ton einer 5er-Rampe zu einer (gerundeten, begrenzten) Stufe */
+export const tone = (r: Ramp5, t: number): Rgb => r[Math.max(0, Math.min(4, Math.round(t)))]!;
 
 /* ---------------------------------------------------------------- Rampen (dunkel → hell) */
 
