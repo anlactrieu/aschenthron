@@ -1,9 +1,10 @@
 # HANDOFF – Aschenthron
 
-## LÄUFT GERADE (2026-11-04, spät): T4C-Charme Welle 1
+## ERLEDIGT (2026-11-04, spät): T4C-Charme Welle 1
 - **Stand:** Plan in `SPEC.md` „Plan: T4C-Charme“ (P1–P9) + Nutzerentscheidungen (91f1a2a). Drei Sessions parallel auf `neuer-look`, geteilter Checkout, kein Push, `HANDOFF.md` pflegt nur die Hauptsession: `p1-staedte` (Sonnet; `townLife.ts`, `npc.ts`, `audio.ts`, `town.ts`, Karte, Haken `GameScene.ts`), `p7-musik` (Sonnet; `music.ts`), `p3-fortschritt` (Opus; `src/sim/**`, `ui.ts`, `achievements.ts`, `server/**`; darf Teilaufgaben an Sonnet-Sessions geben).
 - **Letzte 3 Entscheidungen:** (1) Nutzer: erst Inhalte P1–P7, Iso (P9) später; Probe `probe/iso/vergleich.png`. (2) Nutzer: Tempo 20–30 h bis Cap 30, Beute fast nur benannt, Stichworte nur anklicken. (3) Modellwahl: Sonnet für P1/P7, Opus nur für P3 (Beute-Umbau mit Spielstand-Migration und Balance).
-- **Offen:** Berichte prüfen (Diff, tsc/Lint/Tests/Build, Browser), dann Welle 2 (P2 Gespräche, P4 Kampf, P5 Wildnis, P6 Tag/Nacht); noch zu entscheiden: Todesstrafe, Fertigkeiten, Wegweiser, zweite Insel. `main` (live, 0647cc6) erst nach Okay.
+- **Ergebnis Welle 1 (geprüft: tsc, Lint, 366 Tests, Build grün; im Spiel nur von den Sessions gesehen):** P7 11ad141 (Leitmotive je Stimmung, Überblendung, `music.ts`). P1 8a8e7ee, 38888dd (`townLife.ts`: Bewohner, Tiere, Tagesablauf, Zurufe, Stadtgeräusche, Glückwünsche bei `levelUp`; Platz-Props in Karte). P3 5c61e0c…48ce0a3 (benannte feste Beute `src/sim/named.ts` `NAMED`, `rollNamed`/`rollBase` in `items.ts`; Kurve `xpStretch` + Migration `migrateXpV1`, Bot L30 22,8–27,6 h; `LEVEL_TITLES`, `KILL_GOALS`, Bestiarium `renderBestiary`). Session-Übergaben im Notizordner `side-session-notes/local_eb990716…/` (`p1-staedte…`, `p7-musik-handoff.md`, `p3-fortschritt-handoff.md`).
+- **Offen:** Nutzer-Test; Push `main` nach Okay; P3-Rest (Kill-Ziel als Auftrag mit P2, Titel über dem Kopf in `GameScene.ts`, Charaktererschaffung über Fragen, mehr Funde, Balance einzelner Funde); Welle 2 (P2 Gespräche, P4 Kampf, P5 Wildnis, P6 Tag/Nacht) in frischer Session; zu entscheiden: Todesstrafe, Fertigkeiten, Wegweiser, zweite Insel.
 - **Learnings:** Nutzer will ausdrücklich: Sessions nur dann mit Opus, wenn nötig, sonst kleineres Modell.
 
 ## PLAN (2026-11-04, Session „t4c-charme“, Branch `neuer-look`): T4C-Charme – Recherche, Lückenanalyse, Iso-Probe
