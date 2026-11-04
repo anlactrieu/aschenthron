@@ -59,10 +59,14 @@ const activeSlot = (): number => sessionSlot;
 const slotKey = (n: number): string => (n === 1 ? SAVE_BASE : `${SAVE_BASE}.s${n}`);
 const saveKey = (): string => slotKey(sessionSlot);
 const VIEW = 30;
-/** Kamera-Zoom: Standard etwas weiter draußen als 1, per Mausrad zwischen ZOOM_MIN und ZOOM_MAX */
-const ZOOM_DEFAULT = 0.75;
-const ZOOM_MIN = isTouch ? 0.4 : 0.55;
-const ZOOM_MAX = isTouch ? 1.4 : 1.1;
+/**
+ * Kamera-Zoom nur in Stufen, bei denen 1 Kunstpixel (= 2 Weltpixel, `FIG_SCALE`) ganze Bildschirmpixel misst:
+ * 0.5 = 1 px, 1 = 2 px, 1.5 = 3 px, 2 = 4 px. Die Canvas rendert mit 1 Pixel je CSS-Pixel (DPR wird vom Browser hochskaliert),
+ * die Stufen gelten also in Canvas-Pixeln. Standard 1: zeigt 25 % weniger Fläche als der frühere Zoom 0.75, aber 0.5 wäre winzig.
+ */
+const ZOOM_STEPS = [0.5, 1, 1.5, 2];
+const ZOOM_DEFAULT = 1;
+const ZOOM_MAX_I = ZOOM_STEPS.length - 1;
 const ZOOM_KEY = 'aschenthron.zoom';
 const CHUNK = 16;
 /** Bodenstreifen je Chunk (Etappen beim Bauen, siehe stepChunk) */
@@ -278,7 +282,13 @@ export class GameScene extends Phaser.Scene {
     this.input.on('pointerdown', (ptr: Phaser.Input.Pointer) => this.onClick(ptr));
     // Kamera-Zoom per Mausrad (weiter heraus = mehr Welt sichtbar), Wert bleibt im Browser gespeichert
     this.setZoom(Number(safeStorage()?.getItem(ZOOM_KEY)) || ZOOM_DEFAULT);
-    this.input.on('wheel', (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => this.setZoom(this.cameras.main.zoom * (dy > 0 ? 0.92 : 1.08)));
+    // Eine Stufe je Rastschritt; Trackpads feuern viele Ereignisse, darum kurze Sperre
+    let wheelAt = 0;
+    this.input.on('wheel', (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
+      if (!dy || this.time.now - wheelAt < 120) return;
+      wheelAt = this.time.now;
+      this.stepZoom(dy > 0 ? -1 : 1);
+    });
     this.input.mouse?.disableContextMenu();
     if (isTouch) {
       // Aktive Finger selbst mitzählen: Phasers pointer2.isDown bleibt nach abgebrochenen Touches gern hängen und blockiert dann jedes Laufen
@@ -290,7 +300,7 @@ export class GameScene extends Phaser.Scene {
       document.addEventListener('visibilitychange', () => this.fingers.clear());
       // Handy: zwei Finger zoomen die Kamera, die Zoom-Knöpfe im Menü auch
       this.input.addPointer(1);
-      window.addEventListener('aschenthron:zoom', (e) => this.setZoom(this.cameras.main.zoom * ((e as CustomEvent<number>).detail || 1)));
+      window.addEventListener('aschenthron:zoom', (e) => this.stepZoom(((e as CustomEvent<number>).detail || 1) > 1 ? 1 : -1));
     }
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') this.setArmed(null);
@@ -538,8 +548,20 @@ export class GameScene extends Phaser.Scene {
     this.ui.say(`${s.name} gewählt – Ziel anklicken (Rechtsklick oder Esc: abbrechen).`);
   }
 
+  /** Nächste Zoomstufe zu z (auch für gespeicherte krumme Werte) */
+  private snapZoom(z: number): number {
+    return ZOOM_STEPS.reduce((best, s) => (Math.abs(s - z) < Math.abs(best - z) ? s : best), ZOOM_DEFAULT);
+  }
+
+  private stepZoom(dir: 1 | -1): void {
+    const i = ZOOM_STEPS.indexOf(this.cameras.main.zoom);
+    this.setZoom(ZOOM_STEPS[Math.min(ZOOM_MAX_I, Math.max(0, (i < 0 ? 1 : i) + dir))]!);
+  }
+
   private setZoom(z: number): void {
-    const zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
+    const zoom = this.snapZoom(z);
+    if (zoom === this.cameras.main.zoom && this.zoomSet) return;
+    this.zoomSet = true;
     this.cameras.main.setZoom(zoom);
     try {
       safeStorage()?.setItem(ZOOM_KEY, String(zoom));
@@ -547,6 +569,8 @@ export class GameScene extends Phaser.Scene {
       /* ohne Speicher: Zoom gilt nur für diese Sitzung */
     }
   }
+
+  private zoomSet = false;
 
   private setArmed(id: string | null): void {
     this.armedSkill = id;
@@ -1341,7 +1365,14 @@ export class GameScene extends Phaser.Scene {
     this.fx.update(time, g);
     const cp = this.camPos ?? p;
     const { sx, sy } = toScreen(cp.x, cp.y);
-    this.cameras.main.centerOn(Math.round(sx), Math.round(sy - 14));
+    const cam = this.cameras.main;
+    cam.centerOn(Math.round(sx), Math.round(sy - 14));
+    // Scroll auf ganze Bildschirmpixel (bei Zoom 1.5 sonst 1,5-px-Sprünge, Flimmern beim Laufen); Zoom dreht um die Bildmitte
+    const z = cam.zoom;
+    const cx = (cam.width * (z - 1)) / 2;
+    cam.scrollX = (Math.round(cam.scrollX * z + cx) - cx) / z;
+    const cy = (cam.height * (z - 1)) / 2;
+    cam.scrollY = (Math.round(cam.scrollY * z + cy) - cy) / z;
     if (this.frame % 30 === 0) {
       this.marks = questMarks(this.world, p);
       this.step = nextStep(this.world, p);
@@ -2373,8 +2404,8 @@ export class GameScene extends Phaser.Scene {
       this.labels.set(id, t);
     }
     if (t.text !== text) t.setText(text);
-    // Namen wachsen beim Herauszoomen mit, damit sie auf dem Bildschirm mindestens ~9 px groß bleiben (Handy: Zoom bis 0.4);
-    // beim Standard-Zoom 0.75 bleibt der Faktor 1 (kein unscharfes Hochskalieren)
+    // Namen wachsen beim Herauszoomen mit, damit sie auf dem Bildschirm mindestens ~9 px groß bleiben (Zoom bis 0.5);
+    // beim Standard-Zoom 1 bleibt der Faktor 1 (kein unscharfes Hochskalieren)
     const k = Math.max(1, 9 / (size * this.cameras.main.zoom));
     if (t.scaleX !== k) t.setScale(k);
     t.setPosition(Math.round(x), Math.round(y)).setVisible(settings().labels || id[0] === 'm' || size > 12);
