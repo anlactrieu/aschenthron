@@ -523,3 +523,25 @@ Noch offen: 5 Todesstrafe, 6 Fertigkeiten, 7 Wegweiser, 8 zweite Insel (siehe un
 6. **Fertigkeiten:** Rang 1–5 lassen oder als steigende Zahlenwerte beim Lehrer trainieren (großer Umbau)?
 7. **Wegweiser:** „Hinlaufen“ und Richtungspfeil behalten, abschaltbar machen („Entdecken-Modus“) oder entfernen?
 8. **Zweite Insel (P8):** ja und wann?
+
+### P3 Fortschritt mit Gewicht: Umbau-Entwurf (2026-11-04, Session „p3-fortschritt“)
+**Nutzerentscheidungen (AskUserQuestion 2026-11-04):** Kurve „früh flott, spät zäh“ (Bot-Ziel: Stufe 10 ≈ 2 h, 20 ≈ 9 h, 30 ≈ 25 h) · Schmied bleibt die Ausnahme für Zufallsaffixe (Aufwerten, Neu würfeln, Erweitern gegen Gold; benannte Funde, Unikate, Set-Teile unveränderbar) · Zufallsaffix-Beute fällt nur noch bei Weltbossen · Unikate mit festen Werten (aufgerundete Mitte des alten Bereichs; gefundene alte Stücke behalten ihre Werte).
+**Basismessung vor dem Umbau (Bot, Seed 2024):** Stufe 5 nach 19 Min., 10 nach 74 Min., 20 nach 234 Min., Stufe 30 in 12 h nicht erreicht (Endstufe 29, 95 Tode, davon 65 auf Stufe 23–26). Die SPEC-Angabe „8,4 h“ ist veraltet.
+
+**Beute (benannt und fest):**
+- **Grundgegenstände** (die 157 Vorlagen in `items.ts`, z. B. „Eisenhelm“) bleiben feste Gegenstände ohne Affixe und sind weiter der Großteil der Beute. Händler verkaufen wie bisher nur Grundgegenstände.
+- **Benannte Funde** (`NAMED` in `src/sim/named.ts`): fester Name, Grundvorlage, feste Zusatzwerte, feste Sockelzahl, Seltenheitsklasse `magic` (2 Werte) oder `rare` (3 Werte, halbe Fallchance). Am Gegenstand: `Item.named = id`, Werte in `affixes` (ohne `tier`), damit Tooltip und Bewertung ohne Umbau laufen. Kein neuer `Rarity`-Wert (Bodentexturen in `GameScene`/`art.ts` hängen daran).
+- **Menge:** je Stufenband (1, 6, 11, 16, 21, 26) und Slot genau ein Fund = **66 Funde** (11 Slots × 6 Bänder), jeder einer Beute-Gruppe zugeordnet, die in dem Band jagt.
+- **Beute-Gruppen** (`LOOT_GROUPS` in `data.ts`, eine Tabelle für Funde, Kill-Zähler und Bestiarium; `family` taugt nicht, `humanoid` mischt Goblins, Räuber und Hexen): Ratten, Hunde und Wölfe, Goblins, Räuber, Spinnen, Moor (Ghule, Hexen), Untote, Trolle und Golems, Würmer, Glut (Aschenwandler, Elementare), Dämonen.
+- **Wurf:** Fällt Ausrüstung, ist es mit 30 % ein benannter Fund der Gruppe im Stufenfenster (sonst aus allen Gruppen des Bands), sonst ein Grundgegenstand. Ausrüstungs-Fallchance sinkt etwas (`GEAR_DROP_FACTOR` 0,5 → 0,35), weil eine Stufe 2–3-mal so lange dauert.
+- **Alle Beutewege:** normale Monster wie oben · Champions: sicher ein benannter Fund ihrer Gruppe · Mini-Bosse: ein benannter Fund (bevorzugt `rare`) plus Unikat/Set-Wurf wie bisher · Weltbosse: weiter Zufallsaffixe mit hohen Stufen (die einzige Beute-Ausnahme) plus Unikat/Set · Truhen und verlorene Fracht: Grundgegenstände und benannte Funde · Kopfgeld: 30 % benannter Fund der Zielgruppe · Aufgaben-Belohnung: drei benannte Funde der Stufe zur Wahl.
+- **Unikate, Proc-Waffen, Meisterschaft:** Unikate bleiben (sie sind schon benannt), Werte jetzt fest; Boss-Quellen unverändert. Proc-Waffen sind Grundvorlagen mit festen Werten und bleiben. Meisterschaft (Stufe 20) ist kein Beutesystem und bleibt unverändert. Sets bleiben.
+- **Bestiarium:** je Beute-Gruppe die Monsterarten mit Kill-Zahl und die Funde der Gruppe (benannte Funde, Unikate ihrer Bosse). Ein Fund zeigt Name und Werte erst, wenn man ihn einmal gefunden hat, sonst „???“.
+
+**Stufen:** `xpToNext` bekommt einen Streckfaktor je Stufe (früh klein, spät groß), Bot-Ziel siehe oben. XP aus Aufgaben wird mit demselben Faktor der Aufgabenstufe skaliert, damit Aufgaben nicht entwertet werden; Kopfgelder hängen schon an `xpToNext`. Todesstrafe bleibt 5 % der Stufenspanne (wird damit absolut größer).
+
+**Titel und Kill-Ziele:** Meilenstein-Titel bei Stufe 10, 20 und 30. Je Beute-Gruppe: 100 Kills → Titel, 500 Kills → zweiter Titel und ein benannter Fund der Gruppe wird bei den Händlern kaufbar (Preis-Prüfung im Befehl `buy`, nicht nur in der Oberfläche). Aktiven Titel wählt man im Charakterfenster (Befehl `setTitle`). Anzeige über dem Kopf braucht `GameScene` (P1-Datei) und kommt später.
+
+**Spielstände:** `kills` (je Monsterart), `found` (gefundene Funde/Unikate), `titles`, `title`, `xpv` neu in `KEYS` (Server speichert über `exportPlayer`, Client bekommt alles über `Snapshot.you`). Alte Zufallsgegenstände bleiben unverändert erhalten. Unbekanntes `named` wird entfernt, der Gegenstand bleibt. Alte Stände (ohne `xpv`) behalten ihre Stufe; der Fortschritt innerhalb der Stufe wird anteilig auf die neue Kurve umgerechnet.
+
+**Nicht in dieser Runde:** Kill-Ziel als Auftrag (nach P2 Gespräche, dann als versteckter Auftrag), Titel über dem Kopf (nach P1), Charaktererschaffung über Fragen.
