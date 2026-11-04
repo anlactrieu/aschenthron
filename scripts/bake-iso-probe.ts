@@ -112,11 +112,15 @@ const PROPS: PropDef[] = [
 
 /* ------------------------------------------------ Boden wie im Spiel */
 
-const clampI = (x: number, y: number): number => Math.max(0, Math.min(H - 1, y)) * W + Math.max(0, Math.min(W - 1, x));
-const mat = (x: number, y: number): number => matOf(gid[clampI(x, y)]!, zone[clampI(x, y)]!);
-const ground = new Raster(W * ART, H * ART);
-paintGround(ground, 0, 0, W, H, { mat, waterDist: () => 3 });
-for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) stampDetail(ground, x, y, gid[y * W + x]!, zone[y * W + x]!, x * ART, y * ART);
+// Rand M Kacheln Wiese rundum (der Weg läuft nach rechts weiter), damit die Iso-Ansicht bildschirmfüllend ausgeschnitten werden kann
+const M = 13;
+const inMap = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < W && y < H;
+const tileAt = (x: number, y: number): [number, number] =>
+  inMap(x, y) ? [gid[y * W + x]!, zone[y * W + x]!] : x >= W && (y === 9 || y === 10) ? K.dirt : K.grass;
+const mat = (x: number, y: number): number => matOf(...tileAt(x, y));
+const ground = new Raster((W + 2 * M) * ART, (H + 2 * M) * ART);
+paintGround(ground, -M, -M, W + 2 * M, H + 2 * M, { mat, waterDist: () => 3 });
+for (let y = -M; y < H + M; y++) for (let x = -M; x < W + M; x++) stampDetail(ground, x, y, ...tileAt(x, y), (x + M) * ART, (y + M) * ART);
 void MATS;
 
 /** Figurbild aus dem Sheet in ein Raster stempeln (Fußpunkt bei px, py; gespiegelt bei flip); `put` entscheidet je Pixel */
@@ -145,7 +149,7 @@ function blob(put: (x: number, y: number) => void, cx: number, cy: number, rx: n
 
 function topDown(): Raster {
   const r = new Raster(W * ART, H * ART);
-  r.d.set(ground.d);
+  for (let y = 0; y < r.h; y++) for (let x = 0; x < r.w; x++) r.d[y * r.w + x] = ground.d[(y + M * ART) * ground.w + x + M * ART]!;
   type Draw = { y: number; run: () => void };
   const draws: Draw[] = [];
   for (const hs of HOUSES) {
@@ -184,10 +188,10 @@ const TW = 16; // halbe Rautenbreite
 const TH = 8; // halbe Rautenhöhe
 const UZ = 16; // Pixel je Höheneinheit
 const MARGIN_TOP = 64;
-const IW = (W + H) * TW;
-const IH = (W + H) * TH + MARGIN_TOP + 8;
-const OX = H * TW;
-const proj = (X: number, Y: number, Zh = 0): [number, number] => [OX + (X - Y) * TW, MARGIN_TOP + (X + Y) * TH - Zh * UZ];
+const IW = (W + H + 4 * M) * TW;
+const IH = (W + H + 4 * M) * TH + MARGIN_TOP + 8;
+const OX = (H + 2 * M) * TW;
+const proj = (X: number, Y: number, Zh = 0): [number, number] => [OX + (X - Y) * TW, MARGIN_TOP + (X + Y + 2 * M) * TH - Zh * UZ];
 
 function iso(): Raster {
   const r = new Raster(IW, IH);
@@ -206,11 +210,11 @@ function iso(): Raster {
   for (let v = 0; v < IH; v++) {
     for (let u = 0; u < IW; u++) {
       const a = (u - OX) / TW;
-      const b = (v - MARGIN_TOP) / TH;
+      const b = (v - MARGIN_TOP) / TH - 2 * M;
       const X = (a + b) / 2;
       const Y = (b - a) / 2;
-      if (X < 0 || Y < 0 || X >= W || Y >= H) continue;
-      const p = ground.get(Math.floor(X * ART), Math.floor(Y * ART));
+      if (X < -M || Y < -M || X >= W + M || Y >= H + M) continue;
+      const p = ground.get(Math.floor((X + M) * ART), Math.floor((Y + M) * ART));
       put(u, v, ((p & 255) << 16) | (p & 0xff00) | ((p >> 16) & 255), X + Y, -1);
     }
   }
@@ -355,9 +359,15 @@ function save(name: string, r: Raster, k = 2): void {
 }
 
 const td = topDown();
-const is = iso();
+const full = iso();
+// Bildschirmausschnitt gleicher Größe wie die Draufsicht, mittig auf dem Platz (so sähe das Spiel aus, nicht als Insel im Dunkeln)
+const [cx, cy] = proj(W / 2, H / 2 - 1);
+const is = new Raster(td.w, td.h);
+const x0 = Math.round(cx - td.w / 2), y0 = Math.round(cy - td.h / 2);
+for (let y = 0; y < is.h; y++) for (let x = 0; x < is.w; x++) is.d[y * is.w + x] = full.get(x0 + x, y0 + y) || 0xff0e0a0b;
 save('draufsicht.png', td);
 save('iso.png', is);
+
 // Nebeneinander auf gleicher Höhe (oben bündig)
 const GAP = 12;
 const side = new Raster(td.w + GAP + is.w, Math.max(td.h, is.h));

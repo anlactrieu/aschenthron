@@ -412,6 +412,8 @@ Auslöser: Nutzer „Der Charme fehlt mir komplett.“ Hauptbeschwerden: **Welt 
 - **Charaktererschaffung über Fragen**, klassenlos, Ausrüstung über Attribut-Anforderungen, Auto-Angriff, Mischbuilds.
 - **Gemeinschaft und Musik:** kleine Server, man kennt jeden; „Glückwunsch!“-Kultur bei Level-ups; Musik wird am meisten gelobt (eingängig), Grafik schon damals veraltet. Kritik: Grind eintönig, kein Questlog, man weiß am Anfang nicht, was tun.
 
+**Quellen:** https://www.t4c.com/cms/ar.html · https://www.t4cbible.com/ArakasQuest · https://winternun.blog/2021/12/02/the-4th-coming-t4c-quests-with-coordinates/ · http://brosmetty.blogspot.com/2013/08/blog-post.html · https://www.superjumpmagazine.com/ancient-worlds-part-4-the-4th-coming/ · https://en.wikipedia.org/wiki/The_4th_Coming · https://gamebrain.co/game/the-4th-coming · https://mein-mmo.de/8-alte-mmorpgs/9/ (Massively OP „Game Archaeologist“ war gesperrt; die Fan-Leitfäden schreiben teils voneinander ab).
+
 **Vermutet** (nicht belegt): Der Charme entsteht aus Entdecken ohne Wegweiser, langsamem bedeutsamem Aufstieg, festen bekannten Orten mit Namen, wiedererkennbarer Musik je Ort und dem Gefühl, dass Stadt und Welt bewohnt sind (online durch andere Spieler, im Solo muss NPC-Leben das ersetzen). Beute eher feste, benannte Gegenstände mit bekannter Seltenheit als Zufallsaffixe.
 
 ### Ist-Stand (gespielt 2026-11-04, Dev-Server, 1280x800, Aschenhafen + Roggenfelder; Zahlen aus `data.ts`/`world.ts`)
@@ -439,7 +441,8 @@ Auslöser: Nutzer „Der Charme fehlt mir komplett.“ Hauptbeschwerden: **Welt 
 
 ### Ansicht: Probe Draufsicht gegen Iso
 - **Probe:** `scripts/bake-iso-probe.ts` backt denselben Stadtausschnitt (2 Häuser, Brunnen, Marktstand, Held, 4 NPCs, 2 Goblins, Ratte) mit dem Spielcode einmal als Draufsicht und einmal als Iso 2:1 (Rauten 64×32 bei Maßstab 2, Häuser als 3D-Kästen mit Fachwerk, Satteldach, Giebel, Tiefenpuffer). Ausgabe `probe/iso/` (index.html, `vergleich.png`), im Dev-Server unter `/probe/iso/`. Das Spiel ist unverändert.
-- **Befund Figuren:** Das Rig kann per `yaw = ±45°` Schrägansichten (vorn-schräg, hinten-schräg) ohne neue Kunst backen (`probe/iso/held-richtungen.png`). Iso braucht also 2 zusätzliche Ansichten je Sheet (+~66 % Backzeit/Speicher), keine neue Kunst.
+- **Befund Figuren:** Beim Helden belegt: Das Rig backt per `yaw = ±45°` Schrägansichten (vorn-schräg, hinten-schräg) ohne neue Kunst (`probe/iso/held-richtungen.png`). Zweibeinige Monster und NPCs laufen über dasselbe Rig (`humSpec` → `posed`), dort vermutlich gleich; Tiere (`monsterRig.js`) ungeprüft. Iso braucht 2 zusätzliche Ansichten je Sheet (+~66 % Backzeit/Speicher).
+- **Rahmen der Probe:** beide Bilder sind gleich große Bildschirmausschnitte (864×672), um den Platz herum ist nur Füllwiese. Bei Iso sieht man auf gleicher Fläche etwas weniger Karte (Rauten, Häuserhöhe).
 - **Aufwand kompletter Umbau (Sim, Server, Spielstände unberührt):**
   | Teil | Dateien | Art | Aufwand |
   |---|---|---|---|
@@ -448,7 +451,7 @@ Auslöser: Nutzer „Der Charme fehlt mir komplett.“ Hauptbeschwerden: **Welt 
   | Wände, Klippen, Gruft-/Dungeonwände als Iso-Blöcke | `world/props.ts` (`wallTile`) | neu | L |
   | Häuser als Kästen (Wände, Dach, Giebel, Türen an allen Seiten, Dach ausblenden beim Betreten, Fensterlicht) | `houses.ts`, `GameScene.ts` (Häuser) | neu (Probe-Ansatz) | L |
   | Props als stehende Bilder, Zäune/Stände je Richtung | `world/props.ts`, `town.ts` | übernehmen/anpassen | S–M |
-  | Figuren: 2 Schrägansichten, Richtungswahl nach Laufrichtung | `figure.ts`, `hero.ts`, `monster.ts`, `monsterRig.js`, `npc.ts`, `figureWorker.ts` | anpassen | M |
+  | Figuren: 2 Schrägansichten, Richtungswahl nach Laufrichtung (Held belegt, Zweibeiner vermutlich gleich, Tiere ungeprüft) | `figure.ts`, `hero.ts`, `monster.ts`, `monsterRig.js`, `npc.ts`, `figureWorker.ts` | anpassen | M (Tiere evtl. M–L) |
   | pixelfx-Ankerpunkte, Namen, Lichtstrahlen, Minimap (bleibt Draufsicht), HUD | `fx.ts`, `pixelfx.ts`, `minimap.ts` | meist übernehmen | S |
   | Render-Tests | `groundLook.test.ts`, `atmosphere.test.ts` u. a. | anpassen | S |
   Gesamt grob **4–6 Sessions** (vergleichbar mit dem Welt-Umbau 2026-11-04). Risiko: Wandkanten und Dungeons sind der größte Brocken; Boden nur umzuprojizieren (wie in der Probe) geht schnell, wirkt aber weicher.
@@ -458,8 +461,8 @@ Allgemein: je Paket frische Session, Entscheidungen vorher per AskUserQuestion, 
 
 **P1 Lebende Städte** (ansichtsunabhängig, Beschwerde Welt leer, Aufwand M)
 - Ziel: Aschenhafen und Felsenwacht wirken bewohnt.
-- Änderungen: 8–15 Bewohner je Stadt ohne Funktion (Wache auf Runde, Kinder, Bauer mit Korb, Fischer am Kai, Betrunkener, Ausrufer), Tiere (Hühner, Katze, Hund, Krähen, Möwen am Hafen), Tagesablauf nach Uhrzeit (Markt am Tag, nachts Wache mit Fackel, Leute gehen in die Häuser), kurze Zurufe als Sprechblasen (eigene Texte, Gerüchte zu Orten), Stadtgeräusche (Hammer an der Schmiede, Stimmengewirr). Rein clientseitig, damit Sim, Golden-Tests und Mehrspieler unberührt bleiben.
-- Dateien: neu `src/render/townLife.ts`, `src/render/npc.ts` (Bewohner-Looks), `src/render/audio.ts` (Stadtgeräusche), ein Haken in `GameScene.ts`.
+- Änderungen: leeren Platz verdichten (Marktstände, Karren, Kisten, Aushangbrett, Banner; Props tragen in beide Ansichten), 8–15 Bewohner je Stadt ohne Funktion (Wache auf Runde, Kinder, Bauer mit Korb, Fischer am Kai, Betrunkener, Ausrufer), Tiere (Hühner, Katze, Hund, Krähen, Möwen am Hafen), Tagesablauf nach Uhrzeit (Markt am Tag, nachts Wache mit Fackel, Leute gehen in die Häuser), kurze Zurufe als Sprechblasen (eigene Texte, Gerüchte zu Orten), Stadtgeräusche (Hammer an der Schmiede, Stimmengewirr). Bewohner und NPCs in Hörweite gratulieren beim Level-up („Glückwunsch!“-Ersatz, hört auf das bestehende Ereignis `levelUp`). Rein clientseitig, damit Sim, Golden-Tests und Mehrspieler unberührt bleiben.
+- Dateien: neu `src/render/townLife.ts`, `src/render/npc.ts` (Bewohner-Looks), `src/render/audio.ts` (Stadtgeräusche), `src/render/town.ts` + `scripts/gen_map.py`/`src/data/aschenthron.json` (Platz-Props), ein Haken in `GameScene.ts`.
 
 **P2 Gespräche mit Themen** (ansichtsunabhängig, Beschwerde Welt leer, Aufwand M)
 - Ziel: Entdecken wie bei T4C, ohne Tipp-Frust.
@@ -468,7 +471,7 @@ Allgemein: je Paket frische Session, Entscheidungen vorher per AskUserQuestion, 
 
 **P3 Fortschritt mit Gewicht** (ansichtsunabhängig, Beschwerde Progression, Aufwand M–L)
 - Ziel: Stufen fühlen sich verdient an, Beute hat Namen.
-- Änderungen: (a) Level-Kurve strecken (Zielwert vom Nutzer, siehe Entscheidungen), Bot nachmessen; (b) Echo der Welt beim Level-up: NPCs in Hörweite gratulieren, Ausrufer verkündet Meilensteine (Solo-Ersatz für „Glückwunsch!“-Kultur); (c) **benannte Funde** je Monsterfamilie mit fester, kleiner Chance und eigenem Namen, Bestiarium zeigt Drops nach dem ersten Fund; (d) **Kill-Zähler-Ziele** (nach 100/500 Goblins Titel, Händlerware oder Auftrag); (e) optional Charaktererschaffung über Fragen statt freier Startpunkte.
+- Änderungen: (a) Level-Kurve strecken (Zielwert vom Nutzer, siehe Entscheidungen), Bot nachmessen; (b) Meilenstein-Titel bei Stufe 10/20/30 (das Gratulieren der Bewohner macht P1); (c) **benannte Funde** je Monsterfamilie mit fester, kleiner Chance und eigenem Namen, Bestiarium zeigt Drops nach dem ersten Fund; (d) **Kill-Zähler-Ziele** (nach 100/500 Goblins Titel, Händlerware oder Auftrag); (e) optional Charaktererschaffung über Fragen statt freier Startpunkte.
 - Dateien: `src/sim/data.ts` (Kurve, Funde), `src/sim/items.ts` (Funde im Drop-Wurf), `src/sim/world.ts` (Kill-Zähler), `src/render/ui.ts` + `src/render/achievements.ts` (Bestiarium, Titel), `src/sim/save.ts`.
 
 **P4 Kampf mit Gefahr** (ansichtsunabhängig, Beschwerde Kampf, Aufwand M)
@@ -496,11 +499,12 @@ Allgemein: je Paket frische Session, Entscheidungen vorher per AskUserQuestion, 
 - Änderungen: Aschental wird Startinsel; zweite Region per Schiff ab Aschenhafen, freigeschaltet über Stufe + Gold + Questkette (optional guter/böser Weg); neue Karte, Monster, Stadt.
 - Dateien: `scripts/gen_map.py`, `src/data/*.json`, `src/sim/data.ts`, `src/sim/world.ts`, `src/sim/save.ts` (Karten-/Regionwechsel).
 
-**P9 Ansicht** (nur wenn der Nutzer Iso wählt, Aufwand 4–6 Sessions, siehe Tabelle oben). Danach erst die Stadt verdichten (mehr Stände, Karren, Kisten, Banner auf dem leeren Platz in `gen_map.py`/`town.ts`), weil Props und Häuser von der Ansicht abhängen.
+**P9 Ansicht** (nur wenn der Nutzer Iso wählt, Aufwand 4–6 Sessions, siehe Tabelle oben). Ansichtsabhängig sind vor allem Häuser, Wände und Boden; Props und Figuren aus P1/P5 tragen hinüber.
 
 ### Reihenfolge und Aufteilung auf Sessions
-- **Welle 1 (parallel, getrennte Dateien):** P1 Lebende Städte (`townLife.ts`, `npc.ts`, `audio.ts`, Haken in `GameScene.ts`) · P2 Gespräche (`data.ts` nur `NPC_TOPICS`, `quests.ts`, `save.ts`, `ui.ts`) · P7 Musik (`music.ts`). Gemeinsam berührt nur `GameScene.ts` (P1) – P2/P7 lassen es aus.
-- **Welle 2 (nacheinander, alle in `world.ts`/`data.ts`):** P3 Fortschritt → P4 Kampf → P6 Tag/Nacht. P5 Wildnis kann parallel dazu laufen, solange es nur `wildlife.ts`/`props.ts`/Karte anfasst (Patrouille erst nach P4).
+**Top 5:** P1 Lebende Städte · P3 Fortschritt mit Gewicht · P2 Gespräche mit Themen · P4 Kampf mit Gefahr · P5 Wildnis mit Leben (je eine Hauptbeschwerde zuerst; P7 Musik ist klein und läuft nebenher).
+- **Welle 1 (parallel, getrennte Dateien):** P1 Lebende Städte (`townLife.ts`, `npc.ts`, `audio.ts`, `town.ts`, Karte, Haken in `GameScene.ts`) · P3 Fortschritt (`data.ts`, `items.ts`, `world.ts`, `save.ts`, `ui.ts`, `achievements.ts`) · P7 Musik (`music.ts`). Keine Datei doppelt; Karte (`gen_map.py`/JSON) nur P1.
+- **Welle 2:** P2 Gespräche (nach P3, beide in `data.ts`/`save.ts`/`ui.ts`) parallel zu P5 Wildnis, solange P5 nur `wildlife.ts`/`props.ts`/Karte anfasst. Danach P4 Kampf → P6 Tag/Nacht (beide `world.ts`/`data.ts`, nacheinander; die kämpfende Patrouille aus P5 erst nach P4).
 - **Welle 3:** P8 Insel; P9 Ansicht, falls gewählt (blockiert dann alle Render-Pakete, also nicht parallel zu P1/P5).
 
 ### Offene Entscheidungen für den Nutzer
