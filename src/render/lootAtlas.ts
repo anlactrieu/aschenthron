@@ -34,9 +34,6 @@ export function initLootAtlas(scene: Phaser.Scene): void {
   queue.push(...all);
 }
 
-/** Bildname des Icons in `LOOT_TEX` oder `null`, solange es noch nicht gezeichnet ist */
-export const lootFrame = (templateId: string): string | null => frames.get(templateId) ?? null;
-
 /** Beuteansicht `img` auf das Icon umstellen, sobald es da ist (sofort, wenn schon gezeichnet); das Icon rückt in der Warteschlange vor */
 export function useLootIcon(img: Phaser.GameObjects.Image, templateId: string): void {
   const f = frames.get(templateId);

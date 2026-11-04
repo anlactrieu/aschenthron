@@ -33,11 +33,12 @@ export function queueUpload(scene: Phaser.Scene, key: string, src: FigSource, ur
   if (!('gl' in r) || !(src instanceof Uint8Array) || !sheet) return false;
   const at = jobs.findIndex((j) => j.key === key);
   if (at >= 0) {
-    if (urgent && at > 0) jobs.unshift(...jobs.splice(at, 1));
+    if (urgent && at > 0) jobs.splice(jobs[0]!.row > 0 ? 1 : 0, 0, ...jobs.splice(at, 1));
     return true;
   }
   const job: Job = { key, src: src as FigSource & Uint8Array, wrapper: null, w: sheet.w, h: sheet.h, row: 0 };
-  if (urgent) jobs.unshift(job);
+  // ein schon halb gefülltes erstes Sheet bleibt vorn (sonst verhungert es hinter immer neuen)
+  if (urgent) jobs.splice(jobs[0] && jobs[0].row > 0 ? 1 : 0, 0, job);
   else jobs.push(job);
   return true;
 }
