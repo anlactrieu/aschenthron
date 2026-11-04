@@ -31,7 +31,7 @@ function build(): HTMLDivElement {
     ),
     mk(`Quelle: <span style="color:#e8c040">opengameart.org/content/dungeon-crawl-32x32-tiles</span><br>Original: <span style="color:#e8c040">github.com/crawl/crawl</span> (rltiles)`),
     mk(
-      `<b>Welt, Oberfläche und Schrift:</b> „Ninja Adventure Asset Pack“ von <i>Pixel-Boy</i> und <i>AAA</i> (Gelände, Häuser, Bäume, Props, Fenster- und Knopfrahmen „Theme Wood“, Porträt, Pixelschrift). Lizenz: <b>CC0</b> – keine Namensnennung nötig, hier als Dankeschön.`,
+      `<b>Oberfläche und Schrift:</b> „Ninja Adventure Asset Pack“ von <i>Pixel-Boy</i> und <i>AAA</i> (Fenster- und Knopfrahmen „Theme Wood“, Pixelschrift, Figuren im Vergleichsmodus). Lizenz: <b>CC0</b> – keine Namensnennung nötig, hier als Dankeschön. Die Spielwelt (Gelände, Häuser, Bäume, Props) ist im Code gezeichnet.`,
     ),
     mk(`Quelle: <span style="color:#ffd24a">pixel-boy.itch.io/ninja-adventure-asset-pack</span>`),
     mk(
