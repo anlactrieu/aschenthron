@@ -1,5 +1,16 @@
 # HANDOFF – Aschenthron
 
+## LÄUFT GERADE (2026-11-04, abends): offene Punkte abarbeiten
+- **Stand:** Nutzer will alle „Bekannten offenen Punkte“ (unten) abgearbeitet haben. Drei Sonnet-Sessions laufen parallel im selben Checkout auf `neuer-look`, kein Push, jede committet nur eigene Pfade und bearbeitet `HANDOFF.md` nicht (Bericht als letzte Nachricht an die Hauptsession):
+  - `figuren-maengel` (local_715673b9…): Schattenriss-Blickrichtung, Sterben nach hinten, Golem, Spinne/Wurm, Held im Worker backen – `monsterRig.js`, `monster.ts`, `hero*.ts`, `heroRig.js`, `*Sheet.ts`, `figure*.ts`, `npc.ts`.
+  - `welt-maengel` (local_645927b4…): Zonengrenzen, Dungeon-Wände, Nachtlichter eigene Ebene, violette Straße/Felsenwacht-Platz, Chunk-Startbau verteilen – `src/render/world/**`, `groundLook.ts`, `atmosphere.ts`, `houses.ts`, `town.ts`, `minimap.ts`.
+  - `effekte-2x` (local_bf5e252c…): Boss-Aura/Heilung auf Maßstab 2, kräftiger per Remix – `pixelfx.ts`, `fx.ts`.
+- **Letzte 3 Entscheidungen:** (1) Aufteilung nach Dateibereichen statt nach Punkten, damit parallele Sessions sich nicht überschreiben. (2) Ruckler (Textur-Pool) + wartende Gegner anklickbar erst NACH `figuren-maengel`, weil beide `GameScene.ts` und die Sheet-Dateien berühren. (3) Nur die Hauptsession pflegt `HANDOFF.md` (vermeidet Merge-Konflikte bei geteiltem Checkout).
+- **Ergebnis Runde 1 (geprüft: tsc, Lint, 328 Tests, Build grün):** 615ef0c Effekte (Aura/Heilung Maßstab 2, Remixe `shadow-flames-big.js`/`heal-big.js`, `fxScale()` rundet), 13fc9a6 Figuren (`tipFirst` in `heroRig.js`, `SHEAR_LIE` 0,8, `GOLEM_DIE`, Schattenriss je Ansicht `fig_sil` `${key}|${view}`), f28b124 Welt (Nacht-Tönung als Phaser-Rechteck MULTIPLY unter `LIGHT_DEPTH`, `LIGHT_GAIN` 0.55, `meander` in `groundLook.ts`, `wallTile` in `world/props.ts`, Pflaster neutral). Held im Worker und wartende Gegner anklickbar waren schon erledigt (0af0813, b125cf4). Alles nur per Kontaktbogen/versteckter Pane gesehen.
+- **Rest-Mängel:** Golem seitlich: naher Arm verdeckt Beine; Spinne vorletztes Sterbebild eckig; Zonengrenzen eher Inseln als Kurve; Wandmuster wiederholt alle 4 Kacheln; Aura evtl. zu hell auf hellem Boden.
+- **Offen:** Session `ruckler` (Textur-Pool für Beute-Icons/pixelfx/Sheets + Sichtprüfung im Spiel); danach Mehrspieler + Vorhang mit Spielstand; iPhone/Pinch/Safari testet der Nutzer; Löschen der Ninja-PNGs (`public/assets/ninja/Backgrounds/`) wartet auf Nutzer-Ja; `main` erst nach Okay mergen/pushen.
+- **Learnings:** Die Hauptsession wurde in `Spielschmiede/` gestartet → Skill `pixelfx` fehlt dort; Arbeit mit pixelfx darum immer in Sessions, die in diesem Ordner starten.
+
 ## START HIER (2026-11-04, Gesamtstand für eine neue Session)
 - **Live:** https://anlactrieu.github.io/aschenthron/ zeigt den kompletten Umbau (main = neuer-look = f2c3998, beide gepusht; alte Version im Branch `sicherung/2026-11-03`). Pages baut nur aus `main` (Umgebung `github-pages` erlaubt nur main), Workflow `.github/workflows/pages.yml` (npm test + build mit `BASE_PATH=/aschenthron/`).
 - **Neue Session immer im Ordner `Spielschmiede/Spiele/Aschenthron` starten**, sonst lädt der Projekt-Skill `pixelfx` nicht.
