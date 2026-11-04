@@ -1,9 +1,9 @@
 import { Rng } from './rng';
 import { findPath, isWalkable, type Grid, type Pt } from './path';
-import { itemReq, itemAffixes, gemTemplateId, handsOf, weaponSpeedOf, rollGem, rollUniqueSpecial, rollWorldDrop, rollWorldSpecial, rollDrop, rollPotion, rollSpecial, templateById, generateItem, generateNamed, rerollAffixes, extendAffixes, SETS, type GemInfo, type Item, type PowerId, type SetBonus, type EquipSlot, type Stat } from './items';
+import { itemReq, itemAffixes, gemTemplateId, handsOf, weaponSpeedOf, rollGem, rollUniqueSpecial, rollWorldDrop, rollWorldSpecial, rollPotion, rollSpecial, templateById, generateItem, generateNamed, rollNamed, rollBase, rollLoot, rerollAffixes, extendAffixes, SETS, type GemInfo, type Item, type PowerId, type SetBonus, type EquipSlot, type Stat } from './items';
 import {
   ATTR_KEYS, ATTR_NAME, xpToNext, questXp, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, skillReq, skillRankOf, ACTIVE_POWER, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
-  monsterKind, npcKeyOf, lootGroupOf, LOOT_GROUPS, KILL_GOALS, LEVEL_TITLES, type LootGroup, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
+  monsterKind, npcKeyOf, lootGroupOf, LOOT_GROUPS, KILL_GOALS, LEVEL_TITLES, type LootGroup, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, NAMED_SHARE, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
   FAMILY_RES, MELEE_SKILL_KRAFT_SCALE, MAX_RES, SLOW_FACTOR, STATUS_IDS, PASSIVE_CAP, DMG_NAME, type DmgType, type StatusId, type SkillDef, type PassiveKey,
   ATTR_THRESHOLD, ATTR_THRESHOLD_2, ATTR_THRESHOLD_BONUS, LEVEL_MILESTONES, milestonePoints, WILL_RES_PER_2, WILL_STATUS_PER_POINT, WILL_STATUS_CAP, GEM_MIN_LEVEL, GEM_DROP, GEM_SOCKET_COST, WORLD_BOSS_LOOT, type QuestDef,
 } from './data';
@@ -717,7 +717,8 @@ const SELL_RANK: Record<string, number> = { normal: 0, magic: 1, rare: 2 };
 
 /** Rucksack-Gegenstände, die der Sammelverkauf bis zu dieser Seltenheit mitnimmt (nie Tränke, Edelsteine, Set- und Unikat-Teile). */
 export function bulkSellable(a: Actor, upTo: 'normal' | 'magic' | 'rare'): Item[] {
-  return a.inventory.filter((i) => i.slot !== 'potion' && i.slot !== 'gem' && (SELL_RANK[i.rarity] ?? 99) <= SELL_RANK[upTo]!);
+  // benannte Funde sind die Kernbeute (P3): wie Set und Unikat nie im Sammelverkauf
+  return a.inventory.filter((i) => i.slot !== 'potion' && i.slot !== 'gem' && !i.named && (SELL_RANK[i.rarity] ?? 99) <= SELL_RANK[upTo]!);
 }
 
 export function sellPrice(i: Item): number {
@@ -760,9 +761,10 @@ export function questRewardChoices(def: QuestDef): Item[] {
       if (sp) out.push(sp);
     }
   }
+  // P3: drei benannte Funde der Stufe zur Wahl (fest je Aufgabe)
   for (let tries = 0; out.length < 3; tries++) {
-    const it = rollDrop(rng, ids, lv, 'rare');
-    if (tries >= 40 || !out.some((o) => o.templateId === it.templateId)) out.push(it);
+    const it = rollNamed(rng, ids, lv, undefined, true) ?? rollBase(rng, ids, lv);
+    if (tries >= 40 || !out.some((o) => o.name === it.name)) out.push(it);
   }
   rewardCache.set(def.id, out);
   return out;
@@ -945,11 +947,12 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       a.gold += b.gold;
       let item: Item | undefined;
       if (w.fx.next() < 0.3) {
-        item = rollDrop(w.rng, () => w.nextId++, a.level, 'rare');
+        item = rollNamed(w.rng, () => w.nextId++, a.level, lootGroupOf(b.target)) ?? rollBase(w.rng, () => w.nextId++, a.level);
         if (carriedWeight(a) + item.weight > carryCapacity(a)) {
           w.ground.push({ id: w.nextId++, x: Math.round(a.x), y: Math.round(a.y), item, expiresAt: null });
           w.events.push({ type: 'fail', reason: 'Rucksack zu schwer – Belohnung liegt am Boden.', to: a.id });
         } else a.inventory.push(item);
+        markFound(w, a, item);
       }
       w.events.push({ type: 'questTurned', questId: `bounty:${b.id}`, xp: b.xp, gold: b.gold, ...(item ? { item } : {}), to: a.id });
       gainXp(w, a, b.xp);
@@ -1755,12 +1758,15 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
     w.ground.push({ id: w.nextId++, x, y, item, expiresAt: w.tick + MONSTER_LOOT_TTL });
     w.events.push({ type: 'loot', item, x, y });
   };
+  // P3: Beute ist fest – Grundgegenstände und benannte Funde der Beute-Gruppe; Zufallsaffixe nur noch bei Weltbossen
+  const lid = () => w.nextId++;
+  const group = lootGroupOf(k.id);
   if (k.boss || w.rng.next() <= k.dropChance * GEAR_DROP_FACTOR) {
-    drop(rollDrop(w.rng, () => w.nextId++, k.level, k.boss ? 'rare' : undefined, k.boss ? 0.6 : WEAPON_SHARE_MONSTER));
+    drop(k.boss ? (rollNamed(w.rng, lid, k.level, group, true) ?? rollBase(w.rng, lid, k.level, 0.6)) : rollLoot(w.rng, lid, k.level, group, NAMED_SHARE, WEAPON_SHARE_MONSTER));
   }
   if (w.rng.next() <= POTION_DROP_CHANCE) drop(rollPotion(w.rng, () => w.nextId++, k.level));
   if (k.level >= GEM_MIN_LEVEL && w.rng.next() < (k.boss ? GEM_DROP.boss : m.unique ? GEM_DROP.unique : m.champ ? GEM_DROP.champion : GEM_DROP.normal)) drop(rollGem(w.rng, () => w.nextId++, k.level));
-  if (m.champ) drop(rollDrop(w.rng, () => w.nextId++, k.level, w.rng.next() < 0.25 ? 'rare' : 'magic', 0.4));
+  if (m.champ) drop(rollNamed(w.rng, lid, k.level, group, w.rng.next() < 0.25) ?? rollBase(w.rng, lid, k.level, 0.4));
   const wb = m.unique ? uniqueDef(m.unique) : undefined;
   if (wb?.world) {
     // Weltboss: garantierte seltene Stücke mit hohen Affix-Stufen, bessere Edelsteine, oft Unikat/Set-Teil
@@ -1773,8 +1779,8 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
     drop(rollPotion(w.rng, nid, k.level));
     w.events.push({ type: 'worldBoss', id: m.id, name: m.name, state: 'dead', where: wb.where ?? '' });
   } else if (m.unique) {
-    drop(rollDrop(w.rng, () => w.nextId++, k.level, 'rare'));
-    if (w.rng.next() < 0.5) drop(rollDrop(w.rng, () => w.nextId++, k.level, 'rare'));
+    drop(rollNamed(w.rng, lid, k.level, group, true) ?? rollBase(w.rng, lid, k.level));
+    if (w.rng.next() < 0.5) drop(rollBase(w.rng, lid, k.level));
     const sp = rollUniqueSpecial(w.rng, () => w.nextId++, k.level);
     if (sp) drop(sp);
     drop(rollPotion(w.rng, () => w.nextId++, k.level));
@@ -1846,7 +1852,7 @@ function wildEvents(w: World, pl: Actor): void {
     const nid = () => w.nextId++;
     const lv = Math.max(1, Math.min(base.level + 1, pl.level + 3));
     const drop = (item: Item) => w.ground.push({ id: w.nextId++, x: sp.x, y: sp.y, item, expiresAt: w.tick + TICK_RATE * 300 });
-    drop(rollDrop(w.fx, nid, lv, w.fx.next() < 0.3 ? 'rare' : 'magic', 0.3));
+    drop(rollNamed(w.fx, nid, lv, undefined, w.fx.next() < 0.3) ?? rollBase(w.fx, nid, lv, 0.3));
     drop(rollPotion(w.fx, nid, lv));
     say('Ein umgestürzter Händlerkarren: Verlorene Fracht liegt am Wegrand.', '#6fd0ff');
   }
@@ -2458,7 +2464,7 @@ function openChest(w: World, a: Actor, c: Chest): void {
   for (let i = 0; i < gear; i++) {
     const r = w.rng.next();
     const rarity = c.tier === 'gold' ? (r < 0.35 ? 'rare' : 'magic') : c.tier === 'iron' ? (r < 0.15 ? 'rare' : r < 0.7 ? 'magic' : 'normal') : r < 0.05 ? 'rare' : r < 0.35 ? 'magic' : 'normal';
-    drop(rollDrop(w.rng, () => w.nextId++, c.level, rarity, 0.35));
+    drop(rarity === 'normal' ? rollBase(w.rng, () => w.nextId++, c.level, 0.35) : (rollNamed(w.rng, () => w.nextId++, c.level, undefined, rarity === 'rare') ?? rollBase(w.rng, () => w.nextId++, c.level, 0.35)));
   }
   for (let i = 0; i < (c.tier === 'wood' ? 1 : 2); i++) drop(rollPotion(w.rng, () => w.nextId++, c.level));
   if (c.level >= GEM_MIN_LEVEL && w.rng.next() < GEM_DROP.chest[c.tier]) drop(rollGem(w.rng, () => w.nextId++, c.level));

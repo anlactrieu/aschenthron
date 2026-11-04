@@ -4,7 +4,7 @@ import { buildWorld, type TiledMap } from './tiled';
 import { MAX_LEVEL, SHOPS, totalXpFor } from './data';
 import { handsOf, templateById, type Item } from './items';
 import {
-  missingReq, applyCommand, regionAt, buyPrice, armorOf, carryCapacity, drainEvents, getActor, inSafeZone, maxHpOf, tick, TICK_RATE,
+  missingReq, damageRange, applyCommand, regionAt, buyPrice, armorOf, carryCapacity, drainEvents, getActor, inSafeZone, maxHpOf, tick, TICK_RATE,
   type Actor, type World,
 } from './world';
 
@@ -70,7 +70,7 @@ describe('Level-Tempo (Messung)', () => {
       tick(w);
       for (const e of drainEvents(w)) {
         if (e.type === 'hit' && e.targetId === p.id) lastHits.push(getActor(w, e.attackerId)?.name ?? '?');
-        if (e.type === 'levelUp') { reached[e.level] ??= w.tick; if (process.env.PACE_LEVELS) console.log(`LEVEL ${e.level} nach ${(w.tick / TICK_RATE / 60).toFixed(0)} min @${Math.round(p.x)},${Math.round(p.y)} ${regionAt(w, p.x, p.y)?.name ?? '-'}`); }
+        if (e.type === 'levelUp') { reached[e.level] ??= w.tick; if (process.env.PACE_LEVELS) console.log(`LEVEL ${e.level} nach ${(w.tick / TICK_RATE / 60).toFixed(0)} min @${Math.round(p.x)},${Math.round(p.y)} ${regionAt(w, p.x, p.y)?.name ?? '-'} hp ${maxHpOf(p)} ar ${armorOf(p)} dmg ${damageRange(p).join('-')}`); }
         if (e.type === 'deathPenalty') {
           deaths++;
           if (process.env.PACE_DEATHS) { const nm = w.actors.filter((a) => a.kind === 'monster' && a.alive).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0]; console.log(`DEATH L${p.level} @${Math.round(prev.x)},${Math.round(prev.y)} ${regionAt(w, prev.x, prev.y)?.name ?? '-'} ziel ${(() => { const tg = prevTid !== null ? getActor(w, prevTid) : undefined; return tg ? `${tg.name} L${tg.level}@${Math.round(tg.x)},${Math.round(tg.y)}` : '-'; })()} bei ${nm?.name} (${nm?.champ ?? '-'}) killer ${[...new Set(lastHits.slice(-12))].join('/')} hp max ${maxHpOf(p)} armor ${armorOf(p)}`); }

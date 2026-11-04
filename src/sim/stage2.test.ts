@@ -690,7 +690,7 @@ describe('Champions, Mini-Bosse und Boss-Fähigkeiten', () => {
     applyCommand(w, p.id, { type: 'attack', targetId: u.id });
     for (let i = 0; i < 400 && u.alive; i++) tick(w);
     expect(u.alive).toBe(false);
-    expect(w.ground.filter((g) => g.item.rarity === 'rare').length).toBeGreaterThanOrEqual(1);
+    expect(w.ground.filter((g) => !!g.item.named || !!g.item.unique).length).toBeGreaterThanOrEqual(1); // P3: benannter Fund
   });
 
   it('Bodenschlag warnt zuerst und trifft nur, wer im Ring stehen bleibt', () => {

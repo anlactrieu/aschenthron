@@ -590,7 +590,9 @@ export const SHOPS: Record<string, string[]> = {
 };
 
 /** Gegenstands-Drops: Ausrüstung seltener, Tränke häufiger. Faktor auf die Monster-dropChance. */
-export const GEAR_DROP_FACTOR = 0.5;
+export const GEAR_DROP_FACTOR = 0.35;
+/** Anteil benannter Funde an der Ausrüstungsbeute normaler Monster (P3; Rest: Grundgegenstände) */
+export const NAMED_SHARE = 0.3;
 export const POTION_DROP_CHANCE = 0.3;
 export const POTION_COOLDOWN_TICKS = 100;
 

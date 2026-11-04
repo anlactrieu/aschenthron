@@ -1629,7 +1629,7 @@ export class Ui {
     const f = el('div');
     f.style.cssText = `width:${Math.min(100, (st.progress / def.count) * 100)}%;background:${st.state === 'done' ? '#6fe08a' : '#d8a24a'}`;
     bar.append(f);
-    const rew = `Belohnung ${questXp(def.minLevel, def.xp)} XP, ${def.gold} Gold${def.choices ? ', je nach Entscheidung' : def.reward ? (def.reward === 'unique' ? ', Wahl: 3 Stücke (Unikat/Set möglich)' : ', Wahl: 1 von 3 seltenen Stücken') : ''}`;
+    const rew = `Belohnung ${questXp(def.minLevel, def.xp)} XP, ${def.gold} Gold${def.choices ? ', je nach Entscheidung' : def.reward ? (def.reward === 'unique' ? ', Wahl: 3 Stücke (Unikat/Set möglich)' : ', Wahl: 1 von 3 benannten Funden') : ''}`;
     c.append(bar, el('div', 'a-note', st.state === 'done' ? 'Fertig – beim Auftraggeber abgeben!' : rew));
     return c;
   }
@@ -1743,7 +1743,7 @@ export class Ui {
       let name = b.target;
       try { name = monsterKind(b.target).name; } catch { /* unbekannt */ }
       const done = b.progress >= b.count;
-      c.append(el('div', '', `${b.claimed ? '✔ ' : ''}Erlege ${b.count}× ${name} (${Math.min(b.progress, b.count)}/${b.count})`), el('div', 'a-note', `Belohnung ${b.xp} XP, ${b.gold} Gold, 30 % Chance auf einen seltenen Gegenstand`));
+      c.append(el('div', '', `${b.claimed ? '✔ ' : ''}Erlege ${b.count}× ${name} (${Math.min(b.progress, b.count)}/${b.count})`), el('div', 'a-note', `Belohnung ${b.xp} XP, ${b.gold} Gold, 30 % Chance auf einen benannten Fund`));
       const bar = el('div', 'a-bar');
       const f = el('div');
       f.style.cssText = `width:${Math.min(100, (b.progress / b.count) * 100)}%;background:${done ? '#6fe08a' : '#d8a24a'}`;
@@ -1899,7 +1899,7 @@ export class Ui {
         const items = bulkSellable(p, upTo);
         const gold = items.reduce((n, i) => n + sellPrice(i), 0);
         const b = el('button', 'a-btn' + (items.length ? '' : ' off'), `${label} (${items.length} · ${gold}g)`);
-        b.title = 'Verkauft alle passenden Gegenstände im Rucksack. Tränke, Edelsteine, Set- und Unikat-Teile bleiben.';
+        b.title = 'Verkauft alle passenden Gegenstände im Rucksack. Tränke, Edelsteine, benannte Funde, Set- und Unikat-Teile bleiben.';
         b.onclick = () => {
           if (!items.length) return;
           if (upTo === 'rare' && !confirm(`${items.length} Gegenstände (auch seltene) für ${gold} Gold verkaufen?`)) return;
@@ -2014,7 +2014,7 @@ export class Ui {
         t.style.fontWeight = 'bold';
         c.append(t);
         if (def.chain) c.append(el('div', 'a-note', `Kette: ${def.chain}`));
-        c.append(el('div', 'a-note', def.text), el('div', 'a-note', `Belohnung: ${questXp(def.minLevel, def.xp)} XP, ${def.gold} Gold${def.reward ? (def.reward === 'unique' ? ', Unikat/Set-Teil' : ', seltener Gegenstand') : ''}`));
+        c.append(el('div', 'a-note', def.text), el('div', 'a-note', `Belohnung: ${questXp(def.minLevel, def.xp)} XP, ${def.gold} Gold${def.reward ? (def.reward === 'unique' ? ', Unikat/Set-Teil' : ', benannter Fund') : ''}`));
         if (def.reward && st?.state !== 'turned') {
           const names = questRewardChoices(def).map((it) => it.name);
           const pv = el('div', 'a-note', `Zu holen: ${names.join(' · ')}`);

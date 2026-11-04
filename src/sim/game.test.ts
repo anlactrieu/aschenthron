@@ -194,7 +194,7 @@ describe('Hub: Händler und Stash (M5)', () => {
 });
 
 describe('Welt, Dungeon und Boss (M6)', () => {
-  it('Boss wird wütend, lässt garantiert Seltenes fallen', () => {
+  it('Boss wird wütend, lässt garantiert einen benannten Fund fallen', () => {
     const { w, p: pl } = fresh();
     pl.damage = [300, 300];
     pl.x = 10;
@@ -206,7 +206,7 @@ describe('Welt, Dungeon und Boss (M6)', () => {
     const ev = drainEvents(w);
     expect(ev.some((e) => e.type === 'enraged')).toBe(true);
     expect(boss.alive).toBe(false);
-    expect(w.ground.some((g) => g.item.rarity === 'rare')).toBe(true);
+    expect(w.ground.some((g) => !!g.item.named || !!g.item.unique)).toBe(true); // P3: benannte Beute statt Zufallsaffixe
   });
 });
 

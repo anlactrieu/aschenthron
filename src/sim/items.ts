@@ -594,6 +594,23 @@ export function rollDrop(rng: Rng, nextId: () => number, monsterLevel: number, f
   return generateItem(rng, nextId(), t.id, forceRarity ?? rollRarity(rng));
 }
 
+/** Grundgegenstand (normal, ohne Affixe) aus dem Stufenfenster; `weaponShare` wie bei `rollDrop`. */
+export function rollBase(rng: Rng, nextId: () => number, level: number, weaponShare = 1): Item {
+  const noWeapons = weaponShare < 1 && rng.next() >= weaponShare;
+  const pool = TEMPLATES.filter((t) => t.slot !== 'potion' && t.slot !== 'gem' && !(noWeapons && t.slot === 'weapon') && t.minLevel <= level && t.minLevel >= level - 8);
+  const t = pool[rng.int(0, pool.length - 1)]!;
+  return generateItem(rng, nextId(), t.id, 'normal');
+}
+
+/** Beute (P3): mit `namedChance` ein benannter Fund (Gruppe zuerst), sonst ein Grundgegenstand. Zufallsaffixe fallen hier nie. */
+export function rollLoot(rng: Rng, nextId: () => number, level: number, group: string | undefined, namedChance: number, weaponShare = 1, preferRare = false): Item {
+  if (rng.next() < namedChance) {
+    const n = rollNamed(rng, nextId, level, group, preferRare);
+    if (n) return n;
+  }
+  return rollBase(rng, nextId, level, weaponShare);
+}
+
 /** Stärkster Trank der Art, der zur Monsterstufe passt (Fenster wie bei Ausrüstung). */
 export function rollPotion(rng: Rng, nextId: () => number, monsterLevel: number): Item {
   const kind: 'heal' | 'mana' = rng.next() < 0.6 ? 'heal' : 'mana';
@@ -717,18 +734,17 @@ export function generateNamed(id: number, defId: string): Item {
 }
 
 /** Benannte Funde, die bei dieser Stufe fallen können: aktuelles und voriges Stufenband. */
-export function namedPool(level: number, group?: string): NamedDef[] {
-  const all = NAMED.filter((d) => d.band <= level && d.band >= level - 9);
-  if (!group) return all;
-  const own = all.filter((d) => d.group === group);
-  return own.length ? own : all;
+export function namedPool(level: number): NamedDef[] {
+  return NAMED.filter((d) => d.band <= level && d.band >= level - 9);
 }
+/** Funde der eigenen Beute-Gruppe fallen so viel öfter als die übrigen des Bands (Gruppe prägt die Beute, jeder Slot bleibt erreichbar). */
+export const NAMED_GROUP_WEIGHT = 4;
 
-/** Würfelt einen benannten Fund (magic doppelt so oft wie rare; `preferRare` dreht das um). */
+/** Würfelt einen benannten Fund (magic doppelt so oft wie rare; `preferRare` dreht das um; eigene Gruppe bevorzugt). */
 export function rollNamed(rng: Rng, nextId: () => number, level: number, group?: string, preferRare = false): Item | null {
-  const pool = namedPool(level, group);
+  const pool = namedPool(level);
   if (!pool.length) return null;
-  const weight = (d: NamedDef) => (d.rarity === 'rare' ? (preferRare ? 3 : 1) : preferRare ? 1 : 2);
+  const weight = (d: NamedDef) => (d.rarity === 'rare' ? (preferRare ? 3 : 1) : preferRare ? 1 : 2) * (group && d.group === group ? NAMED_GROUP_WEIGHT : 1);
   let r = rng.next() * pool.reduce((n, d) => n + weight(d), 0);
   for (const d of pool) {
     r -= weight(d);

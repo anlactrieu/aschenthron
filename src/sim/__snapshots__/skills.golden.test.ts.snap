@@ -1283,7 +1283,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 15`] = `
       "type": "loot",
     },
     {
-      "amount": 143,
+      "amount": 135,
       "attackerId": 1,
       "crit": false,
       "skill": "multishot",
@@ -1293,7 +1293,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 15`] = `
   ],
   "hp": 5000,
   "mana": 4986,
-  "next": 0.5399471158161759,
+  "next": 0.831733848201111,
   "target": 5,
   "victims": [
     {
@@ -1306,7 +1306,7 @@ exports[`Skills golden > Rang 4, Krit, mehrere Seeds 15`] = `
     {
       "burn": null,
       "dot": null,
-      "hp": 32,
+      "hp": 40,
       "status": {},
       "target": 1,
     },

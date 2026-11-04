@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import type { Grid } from './path';
 import { KILL_GOALS, LEVEL_TITLES, MAX_LEVEL, XP_VERSION, migrateXpV1, questXp, totalXpFor, xpStretch, xpToNext } from './data';
 import { NAMED } from './named';
-import { generateNamed } from './items';
-import { addNpc, applyCommand, createWorld, gainXp, groupKills, merchantNamed, namedPrice, spawnMonster, spawnPlayer, tick, type Actor, type World } from './world';
+import { generateNamed, rollLoot, templateById, type Item } from './items';
+import { Rng } from './rng';
+import { QUESTS, NAMED_SHARE } from './data';
+import { addNpc, applyCommand, createWorld, gainXp, questRewardChoices, groupKills, merchantNamed, namedPrice, spawnMonster, spawnPlayer, tick, type Actor, type World } from './world';
 import { exportPlayer, importPlayer } from './save';
 
 const big = (): Grid => ({ w: 40, h: 40, walkable: new Array(1600).fill(true) });
@@ -120,5 +122,56 @@ describe('P3 Titel und Kill-Ziele', () => {
     const ghost = q.inventory.find((i) => i.id === 999)!;
     expect(ghost).toBeDefined();
     expect(ghost.named).toBeUndefined();
+  });
+});
+
+/** Fest: Grundgegenstand ohne gewürfelte Affixe oder benannter Fund ohne Affix-Stufen. */
+const fixedLoot = (i: Item): boolean => {
+  const base = templateById(i.templateId).base?.length ?? 0;
+  if (i.named) return i.affixes.every((a) => a.tier === undefined);
+  return i.rarity === 'normal' && i.affixes.length === base;
+};
+
+describe('P3 Beute: benannt und fest', () => {
+  it('normale Monsterbeute hat nie Zufallsaffixe; etwa 30 % benannte Funde, die Gruppe bevorzugt', () => {
+    const rng = new Rng(11);
+    let id = 1;
+    let named = 0;
+    let own = 0;
+    const N = 3000;
+    for (let i = 0; i < N; i++) {
+      const it = rollLoot(rng, () => id++, 8, 'goblins', NAMED_SHARE, 0.12);
+      expect(fixedLoot(it), it.name).toBe(true);
+      if (it.named) {
+        named++;
+        if (NAMED.find((d) => d.id === it.named)!.group === 'goblins') own++;
+      }
+    }
+    expect(named / N).toBeGreaterThan(0.25);
+    expect(named / N).toBeLessThan(0.35);
+    expect(own / named).toBeGreaterThan(0.35);
+    expect(own).toBeLessThan(named);
+  });
+
+  it('Aufgaben-Belohnungen sind drei verschiedene feste Stücke', () => {
+    for (const q of QUESTS.filter((x) => x.reward === 'rare').slice(0, 10)) {
+      const c = questRewardChoices(q);
+      expect(c.length).toBe(3);
+      expect(new Set(c.map((i) => i.name)).size).toBe(3);
+      for (const it of c) expect(fixedLoot(it), `${q.id}: ${it.name}`).toBe(true);
+    }
+  });
+
+  it('Champions lassen sicher einen benannten Fund fallen', () => {
+    const w = createWorld(5, big());
+    const p = spawnPlayer(w, 10, 10);
+    p.attrs.kraft = 60;
+    const m = spawnMonster(w, 11, 10, 'goblin_warrior', { champ: 'swift' });
+    m.hp = 1;
+    applyCommand(w, p.id, { type: 'attack', targetId: m.id });
+    for (let t = 0; t < 400 && m.alive; t++) tick(w);
+    expect(m.alive).toBe(false);
+    expect(w.ground.some((g) => !!g.item.named)).toBe(true);
+    for (const g of w.ground) if (g.item.slot !== 'potion' && g.item.slot !== 'gem') expect(fixedLoot(g.item) || !!g.item.unique, g.item.name).toBe(true);
   });
 });
