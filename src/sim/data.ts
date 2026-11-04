@@ -68,13 +68,13 @@ const XP_LATE_FACTOR = 1.0;
 function xpToNextV1(level: number): number {
   return Math.round(XP_PER_LEVEL_BASE * Math.pow(level, 1.3) * (1 + level / 6) * (1 + Math.pow(level / MAX_LEVEL, XP_LATE_EXP) * XP_LATE_FACTOR));
 }
-/** P3 „früh flott, spät zäh“: Streckfaktor je Stufe auf die alte Kurve (Bot-Ziel Stufe 10 ≈ 2 h, 20 ≈ 9 h, 30 ≈ 25 h; gemessen 2 h / 7,6–11,5 h / 25–33 h). */
+/** P3 „früh flott, spät zäh“: Streckfaktor je Stufe auf die alte Kurve (Bot-Ziel Stufe 10 ≈ 2 h, 20 ≈ 9 h, 30 ≈ 25 h; gemessen mit fester Beute, Seeds 2024/7/99: 1,9–2,0 h / 8,3–9,7 h / 22,8–27,6 h). */
 export function xpStretch(level: number): number {
   return XP_STRETCH_START + (XP_STRETCH_END - XP_STRETCH_START) * Math.pow(Math.min(1, (level - 1) / (MAX_LEVEL - 1)), XP_STRETCH_EXP);
 }
 const XP_STRETCH_START = 1.45;
-const XP_STRETCH_END = 3.2;
-const XP_STRETCH_EXP = 1.4;
+const XP_STRETCH_END = 1.85;
+const XP_STRETCH_EXP = 1;
 export function xpToNext(level: number): number {
   return Math.round(xpToNextV1(level) * xpStretch(level));
 }
