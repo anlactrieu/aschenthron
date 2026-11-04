@@ -46,7 +46,9 @@ export function validateCommand(w: World, c: unknown): Command | null {
     case 'useSkill':
       return str(o.skillId) && (o.targetId === undefined || int(o.targetId)) ? { type: 'useSkill', skillId: o.skillId, targetId: o.targetId as number | undefined } : null;
     case 'buy':
-      return str(o.templateId) ? { type: 'buy', templateId: o.templateId } : null;
+      return str(o.templateId) ? { type: 'buy', templateId: o.templateId, ...(str(o.named) ? { named: o.named } : {}) } : null;
+    case 'setTitle':
+      return o.title === null || str(o.title) ? { type: 'setTitle', title: o.title as string | null } : null;
     case 'talk':
       return int(o.npcId) ? { type: 'talk', npcId: o.npcId } : null;
     case 'acceptQuest': case 'turnInQuest':

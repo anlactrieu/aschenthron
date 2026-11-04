@@ -1,13 +1,14 @@
 import { Rng } from './rng';
 import { findPath, isWalkable, type Grid, type Pt } from './path';
-import { itemReq, itemAffixes, gemTemplateId, handsOf, weaponSpeedOf, rollGem, rollUniqueSpecial, rollWorldDrop, rollWorldSpecial, rollDrop, rollPotion, rollSpecial, templateById, generateItem, rerollAffixes, extendAffixes, SETS, type GemInfo, type Item, type PowerId, type SetBonus, type EquipSlot, type Stat } from './items';
+import { itemReq, itemAffixes, gemTemplateId, handsOf, weaponSpeedOf, rollGem, rollUniqueSpecial, rollWorldDrop, rollWorldSpecial, rollDrop, rollPotion, rollSpecial, templateById, generateItem, generateNamed, rerollAffixes, extendAffixes, SETS, type GemInfo, type Item, type PowerId, type SetBonus, type EquipSlot, type Stat } from './items';
 import {
-  ATTR_KEYS, ATTR_NAME, xpToNext, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, skillReq, skillRankOf, ACTIVE_POWER, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
-  monsterKind, npcKeyOf, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
+  ATTR_KEYS, ATTR_NAME, xpToNext, questXp, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, skillReq, skillRankOf, ACTIVE_POWER, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
+  monsterKind, npcKeyOf, lootGroupOf, LOOT_GROUPS, KILL_GOALS, LEVEL_TITLES, type LootGroup, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
   FAMILY_RES, MELEE_SKILL_KRAFT_SCALE, MAX_RES, SLOW_FACTOR, STATUS_IDS, PASSIVE_CAP, DMG_NAME, type DmgType, type StatusId, type SkillDef, type PassiveKey,
   ATTR_THRESHOLD, ATTR_THRESHOLD_2, ATTR_THRESHOLD_BONUS, LEVEL_MILESTONES, milestonePoints, WILL_RES_PER_2, WILL_STATUS_PER_POINT, WILL_STATUS_CAP, GEM_MIN_LEVEL, GEM_DROP, GEM_SOCKET_COST, WORLD_BOSS_LOOT, type QuestDef,
 } from './data';
 import { EFFECTS, cleanse, controlDr, dispel, mergeStatus } from './effects';
+import { NAMED } from './named';
 
 export const TICK_RATE = 20;
 export const NPC_RANGE = 3;
@@ -74,7 +75,8 @@ export type Command =
   | { type: 'respec' }
   | { type: 'rest' }
   | { type: 'useSkill'; skillId: string; targetId?: number }
-  | { type: 'buy'; templateId: string }
+  | { type: 'buy'; templateId: string; named?: string }
+  | { type: 'setTitle'; title: string | null }
   | { type: 'sell'; itemId: number }
   | { type: 'sellBulk'; upTo: 'normal' | 'magic' | 'rare' }
   | { type: 'stashPut'; itemId: number }
@@ -155,6 +157,13 @@ export interface Actor {
   /** Spieler: heutige Kopfgelder (Aushang in der Stadt) und der Tag, für den sie gelten */
   bounties?: Bounty[];
   bountyDay?: number;
+  /** Spieler (P3): Kills je Monsterart (Kill-Ziele, Bestiarium) */
+  kills?: Record<string, number>;
+  /** Spieler (P3): schon einmal gefundene benannte Funde und Unikate (Bestiarium, Händlerware) */
+  found?: string[];
+  /** Spieler (P3): verdiente Titel und der gezeigte */
+  titles?: string[];
+  title?: string;
   /** Spieler: gerade gelesene Teleport-Schriftrolle (Wirkzeit, Abbruch bei Bewegung oder Treffer) */
   tele?: { at: number; from: number; x: number; y: number; town: string; itemId: number };
   /** Monster: frühester Tick für den nächsten Schutz-/Bannzauber */
@@ -768,7 +777,7 @@ function finishQuest(w: World, a: Actor, def: QuestDef, pick = 0): void {
   // Entscheidungsaufgabe: die gewählte Option bestimmt Gold, Erfahrung und ob es den Gegenstand gibt
   const opt = def.choices?.[Math.max(0, Math.min(def.choices.length - 1, Math.floor(pick)))];
   const goldGain = opt?.gold ?? def.gold;
-  const xpGain = opt?.xp ?? def.xp;
+  const xpGain = questXp(def.minLevel, opt?.xp ?? def.xp);
   a.gold += goldGain;
   let item: Item | undefined;
   if (def.reward && (!opt || opt.item)) {
@@ -779,6 +788,7 @@ function finishQuest(w: World, a: Actor, def: QuestDef, pick = 0): void {
       w.ground.push({ id: w.nextId++, x: Math.round(a.x), y: Math.round(a.y), item, expiresAt: null });
       w.events.push({ type: 'fail', reason: 'Rucksack zu schwer – Belohnung liegt am Boden.', to: a.id });
     } else a.inventory.push(item);
+    markFound(w, a, item);
   }
   w.events.push({ type: 'questTurned', questId: def.id, xp: xpGain, gold: goldGain, ...(item ? { item } : {}), to: a.id });
   gainXp(w, a, xpGain);
@@ -945,6 +955,11 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       gainXp(w, a, b.xp);
       break;
     }
+    case 'setTitle': {
+      if (cmd.title === null) delete a.title;
+      else if (a.titles?.includes(cmd.title)) a.title = cmd.title;
+      break;
+    }
     case 'chooseSpec': {
       if (a.level < SPEC_LEVEL) return fail(w, `Meisterschaft ab Stufe ${SPEC_LEVEL}.`);
       if (a.spec) return fail(w, 'Du hast bereits eine Meisterschaft (Neuverteilen beim Lehrer setzt sie zurück).');
@@ -1023,10 +1038,12 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
     case 'buy': {
       const merchants = w.npcs.filter((n) => n.kind === 'merchant' && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
       if (!merchants.length) return fail(w, 'Kein Händler in der Nähe.');
-      if (!merchants.some((m) => (SHOPS[m.shop ?? 'basic'] ?? []).includes(cmd.templateId))) return fail(w, 'Das führt der Händler nicht.');
-      const price = buyPrice(cmd.templateId);
+      // Händlerware aus Kill-Zielen: jeder Händler, nur freigeschaltete Funde
+      if (cmd.named !== undefined && !merchantNamed(a).includes(cmd.named)) return fail(w, 'Das führt der Händler nicht.');
+      if (cmd.named === undefined && !merchants.some((m) => (SHOPS[m.shop ?? 'basic'] ?? []).includes(cmd.templateId))) return fail(w, 'Das führt der Händler nicht.');
+      const price = cmd.named !== undefined ? namedPrice(cmd.named) : buyPrice(cmd.templateId);
       if (a.gold < price) return fail(w, 'Nicht genug Gold.');
-      const item = generateItem(w.rng, w.nextId++, cmd.templateId, 'normal');
+      const item = cmd.named !== undefined ? generateNamed(w.nextId++, cmd.named) : generateItem(w.rng, w.nextId++, cmd.templateId, 'normal');
       if (carriedWeight(a) + item.weight > carryCapacity(a)) {
         w.events.push({ type: 'tooHeavy', item, to: a.id });
         return;
@@ -1115,7 +1132,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       if (cmd.op !== 'upgrade' && cmd.op !== 'reroll' && cmd.op !== 'extend') return fail(w, 'Unbekannte Schmiedearbeit.');
       const it = a.inventory.find((i) => i.id === cmd.itemId);
       if (!it || it.slot === 'potion' || it.slot === 'gem') return;
-      if (it.rarity === 'legendary' || it.rarity === 'set') return fail(w, 'Das lässt sich nicht verändern.');
+      if (it.rarity === 'legendary' || it.rarity === 'set' || it.named) return fail(w, 'Das lässt sich nicht verändern.');
       const cost = craftCost(it, cmd.op);
       if (cmd.op === 'upgrade' && it.rarity === 'rare') return fail(w, 'Bereits selten.');
       if (cmd.op === 'reroll' && it.rarity === 'normal') return fail(w, 'Normale Gegenstände haben keine Affixe.');
@@ -1707,6 +1724,7 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
       }
     }
     if (m.kindId && !m.summoned) for (const b of pl.bounties ?? []) if (b.target === m.kindId && b.progress < b.count) b.progress++;
+    if (m.kindId && !m.summoned && pl.kind === 'player') countKill(w, pl, m.kindId);
     for (const q of QUESTS) {
       const st = pl.quests[q.id];
       if (st?.state !== 'active') continue;
@@ -1874,7 +1892,58 @@ export function gainXp(w: World, a: Actor, amount: number): void {
     a.hp = maxHpOf(a);
     a.mana = maxManaOf(a);
     w.events.push({ type: 'levelUp', level: a.level, to: a.id });
+    const lt = LEVEL_TITLES[a.level];
+    if (lt) awardTitle(w, a, lt, `Stufe ${a.level}`);
   }
+}
+
+/** Vergibt einen Titel einmalig; der erste wird gleich gezeigt. */
+export function awardTitle(w: World, a: Actor, title: string, why: string): void {
+  a.titles ??= [];
+  if (a.titles.includes(title)) return;
+  a.titles.push(title);
+  a.title ??= title;
+  note(w, a, `Neuer Titel: „${title}“ (${why}). Wählbar im Charakterfenster.`);
+}
+
+/** Kills einer Beute-Gruppe (Summe ihrer Monsterarten). */
+export function groupKills(a: Actor, group: LootGroup | string): number {
+  const g = LOOT_GROUPS.find((x) => x.id === group);
+  return g ? g.monsters.reduce((n, id) => n + (a.kills?.[id] ?? 0), 0) : 0;
+}
+
+/** Kill zählen; bei 100 und 500 Kills der Gruppe gibt es Titel, bei 500 dazu Händlerware. */
+function countKill(w: World, a: Actor, kindId: string): void {
+  a.kills ??= {};
+  a.kills[kindId] = (a.kills[kindId] ?? 0) + 1;
+  const g = LOOT_GROUPS.find((x) => x.id === lootGroupOf(kindId));
+  if (!g) return;
+  const n = groupKills(a, g.id);
+  if (n >= KILL_GOALS[0]) awardTitle(w, a, g.titles[0], `${KILL_GOALS[0]} ${g.name} erlegt`);
+  if (n >= KILL_GOALS[1] && !a.titles?.includes(g.titles[1])) {
+    awardTitle(w, a, g.titles[1], `${KILL_GOALS[1]} ${g.name} erlegt`);
+    note(w, a, `Die Händler führen jetzt die benannten Funde der ${g.name}, die du schon einmal gefunden hast.`);
+  }
+}
+
+/** Merkt sich einen benannten Fund oder ein Unikat fürs Bestiarium (erster Fund). */
+export function markFound(w: World, a: Actor, item: Item): void {
+  const id = item.named ?? item.unique;
+  if (!id || a.kind !== 'player') return;
+  a.found ??= [];
+  if (a.found.includes(id)) return;
+  a.found.push(id);
+  note(w, a, `Neu im Bestiarium: ${item.name}.`);
+}
+
+/** Händlerware aus Kill-Zielen: benannte Funde einer Gruppe mit 500 Kills, die man schon gefunden hat. */
+export function merchantNamed(a: Actor): string[] {
+  return NAMED.filter((d) => a.found?.includes(d.id) && groupKills(a, d.group) >= KILL_GOALS[1]).map((d) => d.id);
+}
+
+/** Preis eines benannten Funds beim Händler: dreifacher Wert. */
+export function namedPrice(id: string): number {
+  return generateNamed(0, id).value * 3;
 }
 
 function onPlayerDeath(w: World, p: Actor): void {
@@ -2418,4 +2487,5 @@ function tryPickup(w: World, a: Actor): void {
   w.ground = w.ground.filter((x) => x.id !== g.id);
   a.inventory.push(g.item);
   w.events.push({ type: 'pickedUp', item: g.item, to: a.id });
+  markFound(w, a, g.item);
 }

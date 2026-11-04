@@ -1,10 +1,12 @@
 import { assignHotbar, HOTBAR_SLOTS, hotbarFor } from './hotbar';
-import { skillReq, SPECS, SPEC_LEVEL, NPC_ROLE, npcKeyOf, ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_2, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, STATUS_IDS, SCHOOL_NAME, schoolOf, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, MAX_LEVEL, monsterKind, uniqueDef, NPC_LORE, type QuestDef, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
-import { LEGENDARIES, POWER_TEXT, TEMPLATES, SETS, TIER_COLOR, GEM_COLOR, affixRange, gemAffix, gemName, handsOf, itemAffixes, itemReq, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
+import { skillReq, SPECS, SPEC_LEVEL, NPC_ROLE, npcKeyOf, ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_2, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, STATUS_IDS, SCHOOL_NAME, schoolOf, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, questXp, MAX_LEVEL, monsterKind, uniqueDef, LOOT_GROUPS, KILL_GOALS, UNIQUES, MONSTERS, NPC_LORE, type QuestDef, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
+import { NAMED } from '../sim/named';
+import { Rng } from '../sim/rng';
+import { LEGENDARIES, POWER_TEXT, TEMPLATES, SETS, TIER_COLOR, GEM_COLOR, affixRange, generateLegendary, generateNamed, gemAffix, gemName, handsOf, itemAffixes, itemReq, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
 import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
   bulkSellable, sellPrice, critChance, attrBonus, equipSlotFor, socketCost, maxHpOf, maxManaOf, missingReq, nearNpc, trainerTeaches, powerOf, resistOf, type Actor, type Command, type Npc, type World,
-  gearStat, parryChance, passiveSum, questRewardChoices, missingSkillReq,
+  gearStat, parryChance, passiveSum, questRewardChoices, missingSkillReq, groupKills, merchantNamed, namedPrice,
 } from '../sim/world';
 import { buildProfile } from '../sim/build';
 import { itemIcon, potionIcon, skillIcon, statusIcon } from './icons';
@@ -236,7 +238,7 @@ const CSS = `
 ${BAR_CSS}
 `;
 
-type Tab = 'inv' | 'char' | 'skills' | 'quests' | 'ach' | 'set';
+type Tab = 'inv' | 'char' | 'skills' | 'quests' | 'best' | 'ach' | 'set';
 type BagFilter = 'all' | 'weapon' | 'armor' | 'potion' | 'other';
 type BagSort = 'none' | 'slot' | 'rarity' | 'value';
 
@@ -304,6 +306,7 @@ export class Ui {
   private dragging: Drag | null = null;
   private ghost: HTMLImageElement | null = null;
   private lastP: Actor | null = null;
+  private titleCount = 0;
   private lastW: World | null = null;
   private dollKey = '';
   private face?: HTMLImageElement;
@@ -405,6 +408,7 @@ export class Ui {
       else if (a === 'skills') this.toggleTab('skills');
       else if (a === 'quests') this.toggleTab('quests');
       else if (a === 'ach') this.toggleTab('ach');
+      else if (a === 'bestiary') this.toggleTab('best');
       else if (a === 'settings') this.toggleTab('set');
       else if (a === 'rest') this.send({ type: 'rest' });
       else if (a === 'heal') this.usePotionKind('heal');
@@ -571,13 +575,17 @@ export class Ui {
   }
 
   update(w: World, p: Actor, target?: Actor): void {
+    // Neuer Titel (Stufe oder Kill-Ziel): Banner; beim ersten Blick (Laden) nur merken
+    const nt = p.titles?.length ?? 0;
+    if (this.lastP === p && nt > this.titleCount) this.banner(`Neuer Titel: „${p.titles![nt - 1]}“`, '#ffd23a');
+    this.titleCount = nt;
     this.lastP = p;
     this.updatePortrait(p);
     this.lastW = w;
     this.updateHud(p, target);
     this.updateTracker(w, p);
     const near = w.npcs.filter((n) => Math.hypot(n.x - p.x, n.y - p.y) <= NPC_RANGE);
-    const key = JSON.stringify([settings().hotbar, this.open, this.tab, p.inventory, this.bagFilter, this.bagSort, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.freeRespec, p.gold, p.level, p.spec, near.map((n) => n.id), p.quests, p.bounties, p.xp > 0, this.board?.map((r) => r.name + r.xp).join(), this.ach?.unlocked.size, this.ach?.stats.kills, this.sel?.d.item.id, this.sel?.d.templateId, this.touchMain]);
+    const key = JSON.stringify([settings().hotbar, this.open, this.tab, p.inventory, this.bagFilter, this.bagSort, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.freeRespec, p.gold, p.level, p.spec, near.map((n) => n.id), p.quests, p.bounties, p.kills, p.found, p.titles, p.title, p.xp > 0, this.board?.map((r) => r.name + r.xp).join(), this.ach?.unlocked.size, this.ach?.stats.kills, this.sel?.d.item.id, this.sel?.d.templateId, this.touchMain]);
     if (key === this.key || this.dragging) return;
     this.key = key;
     if (isTouch && this.sel && !this.selValid(p)) this.sel = null;
@@ -823,7 +831,7 @@ export class Ui {
     const win = (t: Tab) => () => this.toggleTab(t);
     this.touchMenu.append(
       mk('Charakter', win('char')), mk('Fertigkeiten', win('skills')),
-      mk('Aufgaben', win('quests')), mk('Erfolge', win('ach')),
+      mk('Aufgaben', win('quests')), mk('Bestiarium', win('best')), mk('Erfolge', win('ach')),
       mk('Karte', () => window.dispatchEvent(new CustomEvent('aschenthron:map'))), mk('Einstellungen', win('set')),
       mk('Speichern', () => this.manualIo?.save()), mk('Laden', () => this.confirmLoad()),
       mk('Vollbild', () => {
@@ -853,9 +861,9 @@ export class Ui {
     const box = this.tip;
     box.replaceChildren();
     box.append(el('div', 'tp-name', it.name));
-    const rar = { normal: 'Normal', magic: 'Magisch', rare: 'Selten', set: 'Set', legendary: 'Legendär' }[it.rarity];
+    const rar = (it.named ? 'Benannter Fund · ' : '') + { normal: 'Normal', magic: 'Magisch', rare: 'Selten', set: 'Set', legendary: 'Legendär' }[it.rarity];
     const slotName = it.slot === 'potion' ? 'Trank' : it.slot === 'gem' ? 'Edelstein' : it.off === 'arrows' ? 'Pfeile' : it.off === 'shield' ? 'Schild' : SLOT_NAME[it.slot];
-    const baseName = it.slot !== 'potion' && it.slot !== 'gem' && it.rarity === 'rare' ? templateById(it.templateId).name : '';
+    const baseName = it.slot !== 'potion' && it.slot !== 'gem' && (it.rarity === 'rare' || it.named) ? templateById(it.templateId).name : '';
     const sub = el('div');
     const rarEl = el('span', '', rar);
     rarEl.style.color = RARITY_COLOR[it.rarity];
@@ -877,7 +885,11 @@ export class Ui {
       q.style.cssText = 'margin-top:4px;font-size:13px';
       it.affixes.slice(base).forEach((a) => {
         let line: HTMLElement;
-        if (a.tier) {
+        if (it.named || it.unique) {
+          // feste Werte (benannte Funde, Unikate): kein Wurf
+          line = el('div', '', affixText(a));
+          line.style.color = '#8fd890';
+        } else if (a.tier) {
           // Affix-Stufe T1–T5 mit Spannweite dieser Stufe (T5 golden)
           const [lo, hi] = affixRange(a.stat, t.minLevel, a.tier);
           line = el('div', '', `${affixText(a)} · T${a.tier} (${lo}–${hi})`);
@@ -892,6 +904,12 @@ export class Ui {
         q.append(line);
       });
       if (q.childNodes.length) box.append(q);
+    }
+    const lore = it.named ? NAMED.find((d) => d.id === it.named)?.lore : undefined;
+    if (lore) {
+      const l = el('div', 'tp-dim', `„${lore}“`);
+      l.style.cssText = 'margin-top:4px;font-style:italic';
+      box.append(l);
     }
     if (it.sockets?.length) {
       const sk = el('div');
@@ -1085,7 +1103,7 @@ export class Ui {
   private renderMain(p: Actor): void {
     this.tip.style.display = 'none'; // Inhalt wird neu aufgebaut: ein hängender Tooltip würde auf nichts mehr zeigen
     const tabs = el('div', 'a-tabs');
-    for (const [id, label] of ([['inv', 'Inventar', 'inv'], ['char', 'Charakter', 'char'], ['skills', 'Fertigkeiten', 'skills'], ['quests', 'Aufgaben', 'quests'], ['ach', 'Erfolge', 'ach'], ['set', 'Einstellungen', 'settings']] as [Tab, string, Parameters<typeof keyOf>[0]][]).map(([id, name, act]): [Tab, string] => [id, isTouch ? name : `${name} (${keyLabel(keyOf(act))})`])) {
+    for (const [id, label] of ([['inv', 'Inventar', 'inv'], ['char', 'Charakter', 'char'], ['skills', 'Fertigkeiten', 'skills'], ['quests', 'Aufgaben', 'quests'], ['best', 'Bestiarium', 'bestiary'], ['ach', 'Erfolge', 'ach'], ['set', 'Einstellungen', 'settings']] as [Tab, string, Parameters<typeof keyOf>[0]][]).map(([id, name, act]): [Tab, string] => [id, isTouch ? name : `${name} (${keyLabel(keyOf(act))})`])) {
       const t = el('div', `a-tab${this.tab === id ? ' on' : ''}`, label);
       t.onclick = () => {
         this.tab = id;
@@ -1098,6 +1116,7 @@ export class Ui {
     else if (this.tab === 'char') this.renderChar(body, p);
     else if (this.tab === 'skills') this.renderSkills(body, p);
     else if (this.tab === 'ach') this.renderAch(body);
+    else if (this.tab === 'best') this.renderBestiary(body, p);
     else if (this.tab === 'set') this.renderSettings(body);
     else {
       this.renderQuests(body, p);
@@ -1105,7 +1124,7 @@ export class Ui {
     }
     const toNpc = isTouch && this.sideShown ? [Object.assign(el('span', 'a-x', 'Händler'), { onclick: () => { this.touchMain = false; this.sel = null; this.key = ''; this.layout(); } })] : [];
     for (const b of toNpc) b.style.cssText = 'font-size:15px;padding:0 10px;display:flex;align-items:center;border-left:1px solid #4b3f3a';
-    const title = titleBar(`${p.name} · Stufe ${p.level}`, this.main, () => this.toggle(false), toNpc);
+    const title = titleBar(`${p.name}${p.title ? ` „${p.title}“` : ''} · Stufe ${p.level}`, this.main, () => this.toggle(false), toNpc);
     this.main.replaceChildren(...[title, tabs, body, this.selPanel(p)].filter((x): x is HTMLElement => !!x));
   }
 
@@ -1260,6 +1279,19 @@ export class Ui {
       b.onclick = () => p.statPoints > 0 && this.send({ type: 'spendStat', attr: k });
       row.append(b);
       body.append(row);
+    }
+    // Titel (Stufen-Meilensteine, Kill-Ziele): einer wird im Namen gezeigt
+    body.append(el('div', 'a-sec', 'Titel'));
+    if (!p.titles?.length) body.append(el('div', 'a-note', `Noch keiner. Titel gibt es ab Stufe 10 und für ${KILL_GOALS[0]} Kills einer Gegnergruppe (Bestiarium).`));
+    else {
+      const row = el('div');
+      row.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap';
+      for (const t of p.titles) {
+        const b = el('button', `a-btn${p.title === t ? '' : ' off'}`, t);
+        b.onclick = () => this.send({ type: 'setTitle', title: p.title === t ? null : t });
+        row.append(b);
+      }
+      body.append(row, el('div', 'a-note', 'Klick wählt den gezeigten Titel, nochmal Klick legt ihn ab.'));
     }
     // Meisterschaft (ab Stufe 20): eine dauerhafte Weichenstellung
     if (p.level >= SPEC_LEVEL) {
@@ -1597,7 +1629,7 @@ export class Ui {
     const f = el('div');
     f.style.cssText = `width:${Math.min(100, (st.progress / def.count) * 100)}%;background:${st.state === 'done' ? '#6fe08a' : '#d8a24a'}`;
     bar.append(f);
-    const rew = `Belohnung ${def.xp} XP, ${def.gold} Gold${def.choices ? ', je nach Entscheidung' : def.reward ? (def.reward === 'unique' ? ', Wahl: 3 Stücke (Unikat/Set möglich)' : ', Wahl: 1 von 3 seltenen Stücken') : ''}`;
+    const rew = `Belohnung ${questXp(def.minLevel, def.xp)} XP, ${def.gold} Gold${def.choices ? ', je nach Entscheidung' : def.reward ? (def.reward === 'unique' ? ', Wahl: 3 Stücke (Unikat/Set möglich)' : ', Wahl: 1 von 3 seltenen Stücken') : ''}`;
     c.append(bar, el('div', 'a-note', st.state === 'done' ? 'Fertig – beim Auftraggeber abgeben!' : rew));
     return c;
   }
@@ -1623,6 +1655,49 @@ export class Ui {
       c.style.opacity = got ? '1' : '.6';
       const pr = a.prog?.(t.stats);
       c.append(el('div', '', `${got ? '✔ ' : ''}${a.name}`), el('div', 'a-note', a.text + (!got && pr ? ` (${pr[0]}/${pr[1]})` : '')));
+      body.append(c);
+    }
+  }
+
+  /** Bestiarium: je Beute-Gruppe Kills, Kill-Ziele, Monsterarten und Funde (Name und Werte erst nach dem ersten Fund). */
+  private renderBestiary(body: HTMLElement, p: Actor): void {
+    const found = new Set(p.found ?? []);
+    const seenAll = LOOT_GROUPS.reduce((n, g) => n + NAMED.filter((d) => d.group === g.id && found.has(d.id)).length, 0);
+    body.append(el('div', 'a-sec', `Bestiarium · ${seenAll}/${NAMED.length} Funde`));
+    body.append(el('div', 'a-note', `Name und Werte eines Funds zeigen sich erst, wenn du ihn einmal aufgehoben hast. ${KILL_GOALS[0]} Kills einer Gruppe: Titel. ${KILL_GOALS[1]}: zweiter Titel, und die Händler führen deine gefundenen Stücke dieser Gruppe.`));
+    for (const g of LOOT_GROUPS) {
+      const kills = groupKills(p, g.id);
+      const c = el('div', 'a-card');
+      c.style.display = 'block';
+      if (!kills) c.style.opacity = '.55';
+      const head = el('div', '', `${g.name} · ${kills} erlegt`);
+      head.style.fontWeight = 'bold';
+      const goals = KILL_GOALS.map((n, i) => `${kills >= n ? '✔' : `${Math.min(kills, n)}/${n}`} „${g.titles[i]}“`).join(' · ');
+      c.append(head, el('div', 'a-note', goals));
+      const kinds = g.monsters.map((id) => MONSTERS.find((m) => m.id === id)!).filter((m) => !!m).sort((a, b) => a.level - b.level);
+      c.append(el('div', 'a-note', kinds.map((m) => ((p.kills?.[m.id] ?? 0) > 0 ? `${m.name} (St. ${m.level}): ${p.kills![m.id]}` : `??? (St. ${m.level})`)).join(' · ')));
+      // Funde der Gruppe: benannte Funde nach Band, dazu Unikate ihrer Bosse und Mini-Bosse
+      const bosses = new Set([...g.monsters, ...UNIQUES.filter((u) => g.monsters.includes(u.base)).map((u) => u.id)]);
+      const drops: { id: string; level: number; item: () => Item; slot: string }[] = [
+        ...NAMED.filter((d) => d.group === g.id).map((d) => ({ id: d.id, level: d.band, item: () => generateNamed(-1, d.id), slot: SLOT_NAME[templateById(d.base).slot as EquipSlot] ?? '' })),
+        ...LEGENDARIES.filter((l) => l.source && bosses.has(l.source)).map((l) => ({ id: l.id, level: l.minLevel, item: () => generateLegendary(new Rng(1), -1, l.id), slot: SLOT_NAME[templateById(l.base).slot as EquipSlot] ?? '' })),
+      ].sort((a, b) => a.level - b.level);
+      const list = el('div');
+      list.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:4px;font-size:13px';
+      for (const d of drops) {
+        if (!found.has(d.id)) {
+          list.append(el('span', 'a-note', `??? · ${d.slot} · St. ${d.level}`));
+          continue;
+        }
+        const it = d.item();
+        const sp = el('span', '', `${it.name} · St. ${d.level}`);
+        sp.style.color = RARITY_COLOR[it.rarity];
+        sp.style.cursor = 'help';
+        sp.onmouseenter = (ev) => this.showTip(it, equippedFor(p, it), ev);
+        sp.onmouseleave = () => (this.tip.style.display = 'none');
+        list.append(sp);
+      }
+      if (drops.length) c.append(list);
       body.append(c);
     }
   }
@@ -1794,6 +1869,23 @@ export class Ui {
       body.append(grid);
       body.append(el('div', 'a-note', 'Ziehen in den Rucksack oder Doppelklick: kaufen.'));
     }
+    const ordered = merchants.length ? merchantNamed(p) : [];
+    if (ordered.length) {
+      body.append(el('div', 'a-sec', 'Auf Bestellung (Kill-Ziele)'));
+      for (const id of ordered) {
+        const it = generateNamed(-1, id);
+        const c = el('div', 'a-card');
+        const nm = el('span', '', it.name);
+        nm.style.color = RARITY_COLOR[it.rarity];
+        const price = namedPrice(id);
+        const b = el('button', `a-btn${p.gold >= price ? '' : ' off'}`, `${price}g`);
+        b.onclick = () => p.gold >= price && this.send({ type: 'buy', templateId: it.templateId, named: id });
+        c.append(nm, b);
+        c.onmouseenter = (ev) => this.showTip(it, equippedFor(p, it), ev);
+        c.onmouseleave = () => (this.tip.style.display = 'none');
+        body.append(c);
+      }
+    }
     if (merchants.length) {
       const sell = el('div', 'a-card a-drop');
       sell.dataset.drop = 'sell';
@@ -1873,7 +1965,7 @@ export class Ui {
           b.onclick = () => this.send({ type: 'craft', itemId: it.id, op });
           row.append(b);
         };
-        const craftable = it.rarity !== 'legendary' && it.rarity !== 'set';
+        const craftable = it.rarity !== 'legendary' && it.rarity !== 'set' && !it.named;
         if (craftable && it.rarity !== 'rare') add(`Aufwerten ${craftCost(it, 'upgrade')}g`, 'upgrade');
         if (craftable && it.rarity !== 'normal') add(`Neu würfeln ${craftCost(it, 'reroll')}g`, 'reroll');
         if (craftable && it.rarity === 'rare' && it.affixes.length < 5) add(`Affix + ${craftCost(it, 'extend')}g`, 'extend');
@@ -1922,7 +2014,7 @@ export class Ui {
         t.style.fontWeight = 'bold';
         c.append(t);
         if (def.chain) c.append(el('div', 'a-note', `Kette: ${def.chain}`));
-        c.append(el('div', 'a-note', def.text), el('div', 'a-note', `Belohnung: ${def.xp} XP, ${def.gold} Gold${def.reward ? (def.reward === 'unique' ? ', Unikat/Set-Teil' : ', seltener Gegenstand') : ''}`));
+        c.append(el('div', 'a-note', def.text), el('div', 'a-note', `Belohnung: ${questXp(def.minLevel, def.xp)} XP, ${def.gold} Gold${def.reward ? (def.reward === 'unique' ? ', Unikat/Set-Teil' : ', seltener Gegenstand') : ''}`));
         if (def.reward && st?.state !== 'turned') {
           const names = questRewardChoices(def).map((it) => it.name);
           const pv = el('div', 'a-note', `Zu holen: ${names.join(' · ')}`);
@@ -1939,7 +2031,7 @@ export class Ui {
           if (def.choices) {
             c.append(el('div', 'a-note', 'Entscheide dich:'));
             def.choices.forEach((o, pick) => {
-              const b = el('button', 'a-btn', `${o.label} – ${o.item ? `${o.xp} XP + ${choices[0]!.name}` : `${o.gold} Gold, ${o.xp} XP`}`);
+              const b = el('button', 'a-btn', `${o.label} – ${o.item ? `${questXp(def.minLevel, o.xp)} XP + ${choices[0]!.name}` : `${o.gold} Gold, ${questXp(def.minLevel, o.xp)} XP`}`);
               b.style.cssText = 'display:block;margin:2px 0;text-align:left';
               if (o.item) {
                 b.onmouseenter = (ev) => this.showTip(choices[0]!, equippedFor(p, choices[0]!), ev);

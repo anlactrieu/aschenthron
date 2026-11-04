@@ -61,19 +61,50 @@ export const MELEE_SKILL_KRAFT_SCALE = 1.5;
 
 /** XP, die von Level `l` auf `l+1` nötig sind. Kill-XP wächst mit L^1.3; der Faktor (1 + l/6) streckt die Kurve nach oben (mehr Kills pro Level im Endgame). */
 export const XP_PER_LEVEL_BASE = 190;
-/** Zusatzfaktor `1 + (l/Max)^Exp * Faktor`: frühe Level bleiben flüssig (L10 ≈ 1 h), das Endgame streckt sich (Bot-Messung: L30 nach ≈ 8 h, ein Mensch braucht deutlich länger). */
+/** Zusatzfaktor `1 + (l/Max)^Exp * Faktor` der alten Kurve (vor P3: Bot L30 nach ≈ 14 h); die P3-Kurve streckt sie mit `xpStretch`. */
 const XP_LATE_EXP = 1.5;
 const XP_LATE_FACTOR = 1.0;
-export function xpToNext(level: number): number {
+/** Kurve vor P3 (Version 1): nur noch für die Umrechnung alter Spielstände. */
+function xpToNextV1(level: number): number {
   return Math.round(XP_PER_LEVEL_BASE * Math.pow(level, 1.3) * (1 + level / 6) * (1 + Math.pow(level / MAX_LEVEL, XP_LATE_EXP) * XP_LATE_FACTOR));
 }
+/** P3 „früh flott, spät zäh“: Streckfaktor je Stufe auf die alte Kurve (Bot-Ziel Stufe 10 ≈ 2 h, 20 ≈ 9 h, 30 ≈ 25 h; gemessen 2 h / 7,6–11,5 h / 25–33 h). */
+export function xpStretch(level: number): number {
+  return XP_STRETCH_START + (XP_STRETCH_END - XP_STRETCH_START) * Math.pow(Math.min(1, (level - 1) / (MAX_LEVEL - 1)), XP_STRETCH_EXP);
+}
+const XP_STRETCH_START = 1.45;
+const XP_STRETCH_END = 3.2;
+const XP_STRETCH_EXP = 1.4;
+export function xpToNext(level: number): number {
+  return Math.round(xpToNextV1(level) * xpStretch(level));
+}
+/** Version der Stufenkurve im Spielstand (`xpv`): ältere Stände werden beim Laden umgerechnet. */
+export const XP_VERSION = 2;
 
 const XP_TABLE: number[] = [0, 0];
-for (let l = 1; l <= MAX_LEVEL; l++) XP_TABLE[l + 1] = XP_TABLE[l]! + xpToNext(l);
+const XP_TABLE_V1: number[] = [0, 0];
+for (let l = 1; l <= MAX_LEVEL; l++) {
+  XP_TABLE[l + 1] = XP_TABLE[l]! + xpToNext(l);
+  XP_TABLE_V1[l + 1] = XP_TABLE_V1[l]! + xpToNextV1(l);
+}
 
 /** Gesamt-XP, die für das Erreichen von `level` nötig sind. */
 export function totalXpFor(level: number): number {
   return XP_TABLE[Math.min(level, MAX_LEVEL + 1)] ?? 0;
+}
+
+/** XP eines alten Spielstands (Kurve 1) auf die aktuelle Kurve: Stufe bleibt, der Anteil innerhalb der Stufe auch. */
+export function migrateXpV1(level: number, xp: number): number {
+  const lo = XP_TABLE_V1[level] ?? 0;
+  const span = (XP_TABLE_V1[level + 1] ?? lo) - lo;
+  if (level >= MAX_LEVEL || span <= 0) return totalXpFor(level) + Math.max(0, xp - lo);
+  const frac = Math.max(0, Math.min(0.999, (xp - lo) / span));
+  return totalXpFor(level) + Math.floor(frac * xpToNext(level));
+}
+
+/** XP einer Aufgabe: feste Werte der Aufgabe, mit dem Streckfaktor ihrer Stufe (sonst wären Aufgaben durch die längere Kurve entwertet). */
+export function questXp(minLevel: number, xp: number): number {
+  return Math.round(xp * xpStretch(minLevel));
 }
 
 export type MonsterFamily = 'beast' | 'humanoid' | 'undead' | 'spider' | 'ghoul' | 'golem' | 'demon' | 'worm' | 'elemental';

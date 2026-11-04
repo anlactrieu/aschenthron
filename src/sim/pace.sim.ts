@@ -61,7 +61,7 @@ describe('Level-Tempo (Messung)', () => {
     let trips = 0;
     const lastHits: string[] = [];
     let mode: 'hunt' | 'town' = 'town'; // wie ein echter Spieler: erst mit dem Startgold einkaufen
-    const maxTicks = TICK_RATE * 3600 * 12;
+    const maxTicks = TICK_RATE * 3600 * Number(process.env.PACE_HOURS ?? 40); // Ziel Stufe 30 nach 20–30 h (P3)
     let prev: { x: number; y: number };
     let prevTid: number | null;
     for (let t = 0; t < maxTicks; t++) {
@@ -123,5 +123,5 @@ describe('Level-Tempo (Messung)', () => {
     }
     const mins = (tk?: number) => (tk ? `${(tk / TICK_RATE / 60).toFixed(0)} min` : 'nicht erreicht');
     console.log(`PACE Level5 ${mins(reached[5])} | Level10 ${mins(reached[10])} | Level20 ${mins(reached[20])} | Level30 ${mins(reached[30])} | Tode ${deaths} | Stadtfahrten ${trips} | Endlevel ${p.level} | XP-Bedarf Cap ${totalXpFor(MAX_LEVEL)} | Spielzeit ${(w.tick / TICK_RATE / 3600).toFixed(1)} h | Tode je Level ${JSON.stringify(deathLevels)}`);
-  }, 900000);
+  }, 1800000);
 });

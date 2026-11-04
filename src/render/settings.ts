@@ -1,7 +1,7 @@
 /** Einstellungen (Lautstärke, Anzeigen, Schnell aufheben) und Tastenbelegung; liegt nur im Browser (localStorage). */
 
 export type Action =
-  | 'inv' | 'char' | 'skills' | 'quests' | 'ach' | 'settings' | 'rest' | 'heal' | 'mana' | 'quicksave' | 'quickload'
+  | 'inv' | 'char' | 'skills' | 'quests' | 'bestiary' | 'ach' | 'settings' | 'rest' | 'heal' | 'mana' | 'quicksave' | 'quickload'
   | 'skill1' | 'skill2' | 'skill3' | 'skill4' | 'skill5' | 'skill6' | 'skill7' | 'skill8' | 'skill9';
 
 export const ACTIONS: { id: Action; label: string; def: string }[] = [
@@ -9,6 +9,7 @@ export const ACTIONS: { id: Action; label: string; def: string }[] = [
   { id: 'char', label: 'Charakter', def: 'c' },
   { id: 'skills', label: 'Fertigkeiten', def: 'k' },
   { id: 'quests', label: 'Aufgaben', def: 'j' },
+  { id: 'bestiary', label: 'Bestiarium', def: 'l' },
   { id: 'ach', label: 'Erfolge', def: 'o' },
   { id: 'settings', label: 'Einstellungen', def: 'p' },
   { id: 'rest', label: 'Rasten', def: 'r' },

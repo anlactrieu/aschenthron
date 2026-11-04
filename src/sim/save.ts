@@ -1,10 +1,12 @@
-import { monsterKind, milestonePoints, ATTR_KEYS, MAP_VERSION, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, questById, skillById, totalXpFor } from './data';
+import { monsterKind, migrateXpV1, XP_VERSION, milestonePoints, ATTR_KEYS, MAP_VERSION, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, questById, skillById, totalXpFor, LOOT_GROUPS, LEVEL_TITLES } from './data';
+import { NAMED } from './named';
 import { isWalkable } from './path';
 import { EQUIP_SLOT_LIST, GEM_KINDS, LEGENDARIES, SETS, TEMPLATES, handsOf, type Item } from './items';
 import { maxHpOf, maxManaOf, type Actor, type World } from './world';
 
 const KEYS = [
   'x', 'y', 'hp', 'mana', 'level', 'xp', 'statPoints', 'attrs', 'gold', 'skills', 'inventory', 'equipment', 'stash', 'maxHp', 'quests', 'skillRanks', 'skillPoints', 'freeRespec', 'spec', 'bounties', 'bountyDay',
+  'kills', 'found', 'titles', 'title',
 ] as const;
 
 
@@ -12,7 +14,7 @@ const KEYS = [
 export function exportPlayer(p: Actor): string {
   const o: Record<string, unknown> = {};
   for (const k of KEYS) o[k] = p[k];
-  return JSON.stringify({ v: 1, mapV: MAP_VERSION, player: o });
+  return JSON.stringify({ v: 1, mapV: MAP_VERSION, xpv: XP_VERSION, player: o });
 }
 
 /** Altformat: Köcher werden verworfen, Pfeilbündel (slot 'ammo') werden zu Pfeil-Gegenständen der Nebenhand. */
@@ -20,6 +22,8 @@ function migrateItem(i: unknown): unknown {
   if (!i || typeof i !== 'object') return i;
   const it = { ...(i as Record<string, unknown>) };
   if (it.slot === 'quiver') return null;
+  // Unbekannter benannter Fund (z. B. umbenannt): Gegenstand bleibt, nur die Kennung fällt weg
+  if (it.named !== undefined && !NAMED.some((d) => d.id === it.named)) delete it.named;
   if (it.slot === 'ammo') {
     const t = TEMPLATES.find((x) => x.id === it.templateId);
     if (!t || t.off !== 'arrows') return null;
@@ -54,12 +58,14 @@ const isItem = (i: unknown): i is Item => {
  */
 export function importPlayer(w: World, p: Actor, json: string): boolean {
   try {
-    const d = JSON.parse(json) as { v: number; mapV?: number; player: Partial<Actor> };
+    const d = JSON.parse(json) as { v: number; mapV?: number; xpv?: number; player: Partial<Actor> };
     if (d.v !== 1 || !d.player || typeof d.player !== 'object') return false;
     const s = d.player;
     const num = (v: unknown, def: number) => (typeof v === 'number' && Number.isFinite(v) ? v : def);
     p.level = Math.min(MAX_LEVEL, Math.max(1, Math.floor(num(s.level, 1))));
-    p.xp = Math.max(totalXpFor(p.level), num(s.xp, 0));
+    // Stände vor der P3-Kurve: Stufe bleibt, der Fortschritt innerhalb der Stufe wird anteilig umgerechnet
+    const rawXp = num(s.xp, 0);
+    p.xp = Math.max(totalXpFor(p.level), d.xpv === XP_VERSION ? rawXp : migrateXpV1(p.level, rawXp));
     p.statPoints = Math.max(0, Math.floor(num(s.statPoints, 0)));
     p.gold = Math.max(0, Math.floor(num(s.gold, 0)));
     p.maxHp = Math.max(10, num(s.maxHp, p.maxHp));
@@ -119,6 +125,18 @@ export function importPlayer(w: World, p: Actor, json: string): boolean {
           gold: Math.max(0, Math.floor(num(b.gold, 0))), xp: Math.max(0, Math.floor(num(b.xp, 0))), ...(b.claimed ? { claimed: true } : {}),
         }))
       : undefined;
+    // P3: Kills, Funde, Titel (Altstände: leer; Funde aus dem Besitz, Stufentitel nach Stufe)
+    p.kills = {};
+    if (s.kills && typeof s.kills === 'object') {
+      for (const [id, n] of Object.entries(s.kills as Record<string, unknown>)) if (monsterKindExists(id) && typeof n === 'number' && n > 0) p.kills[id] = Math.floor(Math.min(n, 1e7));
+    }
+    const knownFind = (id: unknown): id is string => typeof id === 'string' && (NAMED.some((d) => d.id === id) || LEGENDARIES.some((d) => d.id === id));
+    const owned = [...p.inventory, ...p.stash, ...Object.values(p.equipment)].map((i) => i!.named ?? i!.unique);
+    p.found = [...new Set([...(Array.isArray(s.found) ? s.found : []), ...owned].filter(knownFind))];
+    const allTitles = new Set([...Object.values(LEVEL_TITLES), ...LOOT_GROUPS.flatMap((g) => g.titles)]);
+    p.titles = [...new Set(Array.isArray(s.titles) ? s.titles.filter((t): t is string => typeof t === 'string' && allTitles.has(t)) : [])];
+    for (const [lv, t] of Object.entries(LEVEL_TITLES)) if (p.level >= Number(lv) && !p.titles.includes(t)) p.titles.push(t);
+    p.title = typeof s.title === 'string' && p.titles.includes(s.title) ? s.title : undefined;
     p.skillCd = {};
     p.path = [];
     p.targetId = null;
