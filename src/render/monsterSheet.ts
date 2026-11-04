@@ -6,11 +6,12 @@
 import type Phaser from 'phaser';
 import { FigureBaker, type FigureSheet, type FigureSpec } from './figure';
 import { addSheetTexture, sheetCanvas, type FigCanvas } from './heroSheet';
+import { heroSpec, type HeroLook } from './hero';
 import { monsterSpec } from './monster';
 import { npcSpec } from './npc';
 
 /** Was gebacken werden soll (für den Worker: nur Daten) */
-export type FigReq = { t: 'm'; id: string } | { t: 'n'; kind: string; name?: string };
+export type FigReq = { t: 'm'; id: string } | { t: 'n'; kind: string; name?: string } | { t: 'h'; look: HeroLook };
 
 /** So viele fertige Sheets bleiben im Cache (je ca. 0,5-2,5 MB) */
 const KEEP = 40;
@@ -24,11 +25,13 @@ const pending = new Set<string>();
 /** wartet im Spielthread */
 const local = new Map<string, FigureBaker>();
 const reqs = new Map<string, FigReq>();
+/** Abnehmer eines Sheets statt des Caches (Held: eigener Cache in heroSheet.ts) */
+const waiters = new Map<string, (s: FigureSheet) => void>();
 
 let pool: Worker[] | null | undefined;
 let next = 0;
 
-const specOf = (r: FigReq): FigureSpec | null => (r.t === 'm' ? monsterSpec(r.id) : npcSpec(r.kind, r.name));
+const specOf = (r: FigReq): FigureSpec | null => (r.t === 'm' ? monsterSpec(r.id) : r.t === 'h' ? heroSpec(r.look) : npcSpec(r.kind, r.name));
 
 function workers(): Worker[] | null {
   if (pool !== undefined) return pool;
@@ -38,16 +41,21 @@ function workers(): Worker[] | null {
       w.onmessage = (e: MessageEvent<{ key: string; sheet: FigureSheet | null }>) => {
         const { key, sheet } = e.data;
         pending.delete(key);
-        if (sheet) ready.set(key, sheetCanvas(sheet));
+        const wait = waiters.get(key);
+        waiters.delete(key);
+        if (sheet && wait) wait(sheet);
+        else if (sheet) ready.set(key, sheetCanvas(sheet));
       };
       w.onerror = () => {
         // Worker kaputt: alles Offene im Spielthread backen
         pool = null;
         for (const key of pending) {
+          if (waiters.has(key)) continue;
           const s = specOf(reqs.get(key)!);
           if (s) local.set(key, new FigureBaker(s));
         }
         pending.clear();
+        waiters.clear();
       };
       return w;
     });
@@ -101,4 +109,16 @@ export function pumpFigures(scene: Phaser.Scene, inUse: () => Set<string>, budge
       if (scene.textures.exists(old)) scene.textures.remove(old);
     }
   }
+}
+
+/** Sheet im Worker backen und an `done` geben (Held); `false`, wenn es keine Worker gibt */
+export function bakeInWorker(key: string, req: FigReq, done: (s: FigureSheet) => void): boolean {
+  const w = workers();
+  if (!w) return false;
+  if (pending.has(key)) return true;
+  reqs.set(key, req);
+  pending.add(key);
+  waiters.set(key, done);
+  w[next++ % w.length]!.postMessage({ key, req });
+  return true;
 }

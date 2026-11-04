@@ -1881,9 +1881,9 @@ export class GameScene extends Phaser.Scene {
     return fig ? new Phaser.Geom.Rectangle(img.x - fig.w / 2, img.y - fig.top, fig.w, fig.top) : null;
   }
 
-  private figSize(img: Phaser.GameObjects.Image): { top: number; w: number; dir: boolean } | null {
-    const src = img.texture.getSourceImage() as { figTop?: number; figW?: number; figDir?: boolean } | undefined;
-    return src && src.figTop !== undefined ? { top: src.figTop, w: src.figW ?? 0, dir: !!src.figDir } : null;
+  private figSize(img: Phaser.GameObjects.Image): { top: number; w: number; dir: boolean; all: boolean } | null {
+    const src = img.texture.getSourceImage() as { figTop?: number; figW?: number; figDir?: boolean; figSheet?: { mirrorAll?: boolean } } | undefined;
+    return src && src.figTop !== undefined ? { top: src.figTop, w: src.figW ?? 0, dir: !!src.figDir, all: !!src.figSheet?.mirrorAll } : null;
   }
 
   /** Legt eine Ninja-Textur an (false, wenn das Bild nicht geladen ist → Aufrufer nimmt die DCSS-Figur). */
@@ -2109,7 +2109,8 @@ export class GameScene extends Phaser.Scene {
   private skelFigure(a: Actor): { key: string; sheet: FigureSheet } | null {
     if (a.kind === 'player') {
       if (heroMode() !== 'skelett') return null;
-      return heroTexture(this, lookOf(a), () => this.figuresInUse());
+      const cur = this.actorViews.get(a.id)?.img.texture.key;
+      return heroTexture(this, lookOf(a), () => this.figuresInUse(), cur?.startsWith('hero_') ? cur : undefined);
     }
     if (figureMode() !== 'skelett') return null;
     const id = a.kindId!;
@@ -2217,7 +2218,7 @@ export class GameScene extends Phaser.Scene {
       }
       img.setVisible(true).setPosition(sx + ox, sy + 8 + oy + bob).setDepth(sy + 8).setFlipX(
         // DCSS-Monster blicken von Haus aus nach links; nur die vorab gespiegelte Seitenansicht (Zweibeiner) blickt nach rechts
-        fig ? (fig.dir ? !!view.side && view.flip : view.flip) : a.kind === 'monster' && !(view.side && BIPED.has(monsterKind(a.kindId!).family)) ? !view.flip : view.flip,
+        fig ? (fig.dir ? (fig.all || !!view.side) && view.flip : view.flip) : a.kind === 'monster' && !(view.side && BIPED.has(monsterKind(a.kindId!).family)) ? !view.flip : view.flip,
       );
       if (!a.alive && skel) {
         // Skelett-Figur: eigenes Sterbebild (liegt am Ende), Monster verblassen erst danach

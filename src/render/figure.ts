@@ -35,6 +35,8 @@ export interface FigureSpec {
   /** Strecke je Laufzyklus in Bildschirm-Pixeln (Pixelmaßstab 2x), Ausholbilder des Angriffs */
   cyclePx: number;
   wind: number;
+  /** auch Vorder-/Rückansicht nach Laufrichtung spiegeln (Tiere: schräg gedreht, nicht symmetrisch) */
+  mirrorAll?: boolean;
 }
 
 export interface FigureSheet {
@@ -54,6 +56,7 @@ export interface FigureSheet {
   clipped: number;
   cyclePx: number;
   wind: number;
+  mirrorAll: boolean;
 }
 
 const cols = (anims: Record<FigAnim, number>): number => FIG_ANIMS.reduce((n, a) => n + anims[a], 0);
@@ -76,7 +79,7 @@ export class FigureBaker {
     const { w: FW, h: FH } = spec.frame;
     const W = FW * cols(spec.anims);
     const H = FH * FIG_VIEWS.length;
-    this.sheet = { key: spec.key, w: W, h: H, data: new Uint8ClampedArray(W * H * 4), frames: {}, frame: spec.frame, anims: spec.anims, top: 0, bodyW: 0, clipped: 0, cyclePx: spec.cyclePx, wind: spec.wind };
+    this.sheet = { key: spec.key, w: W, h: H, data: new Uint8ClampedArray(W * H * 4), frames: {}, frame: spec.frame, anims: spec.anims, top: 0, bodyW: 0, clipped: 0, cyclePx: spec.cyclePx, wind: spec.wind, mirrorAll: !!spec.mirrorAll };
     FIG_VIEWS.forEach((view, row) => {
       let col = 0;
       for (const anim of FIG_ANIMS) {

@@ -6,8 +6,9 @@
  */
 import type Phaser from 'phaser';
 import type { Look } from './art';
-import type { FigureSheet } from './figure';
-import { bakeHero, heroKey, heroLookOf } from './hero';
+import { bakeFigure, type FigureSheet } from './figure';
+import { bakeHero, heroKey, heroLookOf, heroSpec } from './hero';
+import { bakeInWorker } from './monsterSheet';
 
 /** Pixelmaßstab aller Skelett-Figuren in der Welt */
 export const FIG_SCALE = 2;
@@ -71,9 +72,19 @@ function sheetOf(look: Look): { key: string; canvas: FigCanvas } {
 /** So viele Looks bleiben gebacken (je ca. 1,2 MB als 1x-Canvas); ältere werden samt Textur verworfen */
 const KEEP = 8;
 
-/** Texturschlüssel des Helden-Sheets für diesen Look; legt die Textur samt Bildern beim ersten Mal an. */
-export function heroTexture(scene: Phaser.Scene, look: Look, inUse?: () => Set<string>): { key: string; sheet: FigureSheet } {
-  const { key, canvas } = sheetOf(look);
+/**
+ * Texturschlüssel des Helden-Sheets für diesen Look; legt die Textur samt Bildern beim ersten Mal an. Ist schon ein Sheet zu
+ * sehen (`prev`, z. B. beim Ausrüstungswechsel), backt der Worker den neuen Look und bis dahin bleibt das alte Sheet stehen;
+ * nur ohne Vorgänger (erstes Erscheinen) wird sofort im Spielthread gebacken.
+ */
+export function heroTexture(scene: Phaser.Scene, look: Look, inUse?: () => Set<string>, prev?: string): { key: string; sheet: FigureSheet } {
+  const h = heroLookOf(look);
+  let key = heroKey(h);
+  if (!sheets.has(key) && prev && sheets.has(prev)) {
+    const k = key;
+    if (bakeInWorker(k, { t: 'h', look: h }, (sheet) => sheets.set(k, sheetCanvas(sheet)))) key = prev;
+  }
+  const canvas = sheets.get(key) ?? sheetOf(look).canvas;
   // zuletzt benutzt ans Ende (Map hält die Einfügereihenfolge), Älteste verwerfen, außer sie sind gerade zu sehen
   sheets.delete(key);
   sheets.set(key, canvas);
@@ -117,6 +128,10 @@ export function sheetPortrait(canvas: FigCanvas, scale: number): HTMLCanvasEleme
   return out;
 }
 
+/** Porträt/Inventarfigur: aus dem fertigen Sheet, sonst nur das eine Stehbild backen (wenige ms statt des ganzen Sheets) */
 export function heroPortraitCanvas(look: Look, scale: number): HTMLCanvasElement {
-  return sheetPortrait(sheetOf(look).canvas, scale);
+  const h = heroLookOf(look);
+  const ready = sheets.get(heroKey(h));
+  if (ready) return sheetPortrait(ready, scale);
+  return sheetPortrait(sheetCanvas(bakeFigure({ ...heroSpec(h), anims: { idle: 1, walk: 0, attack: 0, hit: 0, die: 0 } })), scale);
 }

@@ -2,7 +2,7 @@
  * Zuordnung Spiel-IDs → Figuren aus „Ninja Adventure“ (Pixel-Boy und AAA, CC0, siehe ASSETS.md) und der Schalter „Figuren“.
  * Reine Daten und Funktionen ohne Canvas/Image: import-sicher in Node (Tests). Gezeichnet wird in `ninjaFigures.ts`.
  *
- * Schalter (URL `?figuren=` hat Vorrang und wird gemerkt, sonst localStorage `aschenthron.figuren2`):
+ * Schalter (URL `?figuren=` gilt nur für diesen Seitenaufruf, gemerkt wird nur die Wahl im Menü, localStorage `aschenthron.figuren3`):
  *  - `skelett` (Standard seit 2026-11-04): eigene Skelett-Figuren für Monster und NPCs (`monster.ts`, `npc.ts`); die alten
  *    Figuren (DCSS) nur, solange ein Sheet noch gebacken wird
  *  - `dcss`: DCSS-NPCs, DCSS-Monster, ein Pixelmaßstab (Rückfall)
@@ -15,8 +15,8 @@
 export type FigMode = 'skelett' | 'mix' | 'ninja' | 'dcss';
 export const FIG_MODES: FigMode[] = ['skelett', 'dcss', 'mix', 'ninja'];
 export const FIG_LABEL: Record<FigMode, string> = { skelett: 'Skelett', mix: 'Mix', ninja: 'Ninja', dcss: 'DCSS' };
-// neuer Schlüssel: ein früher gemerktes `dcss` (alter Standard) soll die neuen Figuren nicht verdecken
-const FIG_KEY = 'aschenthron.figuren2';
+// neuer Schlüssel: ein früher gemerktes `dcss` (alter Standard, auch von Test-URLs gesetzt) soll die neuen Figuren nicht verdecken
+const FIG_KEY = 'aschenthron.figuren3';
 
 let mode: FigMode | undefined;
 
@@ -24,14 +24,13 @@ const isMode = (v: unknown): v is FigMode => v === 'skelett' || v === 'mix' || v
 /** Modi mit Ninja-Figuren (Held/NPCs/Monster aus Ninja Adventure) */
 export const usesNinja = (m: FigMode): boolean => m === 'mix' || m === 'ninja';
 
-/** Aktueller Modus: URL > localStorage > skelett. Außerhalb des Browsers immer `skelett`. */
+/** Aktueller Modus: URL (nicht gemerkt) > Wahl im Menü > skelett. Außerhalb des Browsers immer `skelett`. */
 export function figureMode(): FigMode {
   if (mode) return mode;
   let m: unknown;
   try {
     if (typeof location !== 'undefined') {
       m = new URLSearchParams(location.search).get('figuren');
-      if (isMode(m)) window.localStorage.setItem(FIG_KEY, m);
     }
   } catch {
     /* kein Zugriff: weiter */

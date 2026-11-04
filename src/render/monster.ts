@@ -322,7 +322,7 @@ export function monsterSpec(id: string): FigureSpec | null {
     key: monsterKey(id), frame: d.frame, anims: BEAST_ANIMS,
     render: (anim, view, i) => beastPosed(d.body, anim, view, i, BEAST_ANIMS[anim]),
     mats: beastMats(d), fallback: d.pal.fur!, outline, eye: d.eye, mark: 0xc8a048,
-    cyclePx: beastCycle(d.body) * 2 * size, wind: 2,
+    cyclePx: beastCycle(d.body) * 2 * size, wind: 2, mirrorAll: true,
   };
 }
 
