@@ -26,7 +26,7 @@ import { itemIcon, skillCursor } from './icons';
 import { Sfx } from './audio';
 import { Minimap } from './minimap';
 import { isTouch } from './touch';
-import { Atmosphere, isDungeon } from './atmosphere';
+import { Atmosphere, isDungeon, LIGHT_DEPTH } from './atmosphere';
 import { Fx } from './fx';
 import { playPixelfx, registerPixelfx, type FxName } from './pixelfx';
 import { attackFrame, onceFrame, walkFrame, type FigView, type FigureSheet } from './figure';
@@ -67,6 +67,8 @@ const VIEW = 30;
 const ZOOM_STEPS = [0.5, 1, 1.5, 2];
 const ZOOM_DEFAULT = 1;
 const ZOOM_MAX_I = ZOOM_STEPS.length - 1;
+/** Stärke der Lichter über der Nachttönung (undimmed wären sie sonst zu grell) */
+const LIGHT_GAIN = 0.55;
 const ZOOM_KEY = 'aschenthron.zoom';
 const CHUNK = 16;
 /** Bodenstreifen je Chunk (Etappen beim Bauen, siehe stepChunk) */
@@ -1842,7 +1844,7 @@ export class GameScene extends Phaser.Scene {
       this.roofs.push({ img: fac, house: hs });
       // Fensterlicht (nachts, additiv über Ober- und Erdgeschoss der Vorderwand)
       const gimg = this.add.image(f.sx - TILE_W / 2, f.sy - TILE_H / 2, ...this.houseTex(sh.glow.key, sh.glow.make)).setOrigin(0, 0).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0)
-        .setDepth((hs.y0 + hs.h - 1) * TILE_H + TILE_H / 2 + 1);
+        .setDepth(LIGHT_DEPTH);
       // blendet mit der Fassade aus, wenn der Spieler im Haus steht
       this.nightLights.push({ img: gimg, k: 1, follow: fac });
       // Kleine Außendeko (reine Optik: keine Kollision, kein Sim-Einfluss)
@@ -1864,7 +1866,7 @@ export class GameScene extends Phaser.Scene {
     for (let i = 0; i < this.tiles.length; i++) {
       if (this.tiles[i] !== TOWN_GID.lantern) continue;
       const p = toScreen(i % w, Math.floor(i / w));
-      this.nightLights.push({ img: this.add.image(p.sx, p.sy + TILE_H / 2 - 64, glowKey).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0).setDepth(p.sy + TILE_H / 2 + 1), k: 1 });
+      this.nightLights.push({ img: this.add.image(p.sx, p.sy + TILE_H / 2 - 64, glowKey).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0).setDepth(LIGHT_DEPTH), k: 1 });
     }
   }
 
@@ -1885,7 +1887,7 @@ export class GameScene extends Phaser.Scene {
   private updateRoofs(px: number, py: number): void {
     // Fenster und Laternen leuchten nach Tageszeit (Nacht-Faktor nur alle paar Bilder neu), Fenster folgen dem Ausblenden der Fassade
     if (this.frame % 10 === 0) this.night = this.atmo.night();
-    for (const l of this.nightLights) l.img.setAlpha(this.night * l.k * (l.follow?.alpha ?? 1));
+    for (const l of this.nightLights) l.img.setAlpha(this.night * l.k * LIGHT_GAIN * (l.follow?.alpha ?? 1));
     for (const { img, house: hs } of this.roofs) {
       const inside = px >= hs.x0 && px <= hs.x0 + hs.w - 1 && py >= hs.y0 - 1 && py <= hs.y0 + hs.h - 1;
       // Vor der Tür (bis 2 Kacheln) wird das Dach halb durchsichtig, damit man die Leute im Haus sieht

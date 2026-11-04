@@ -3,13 +3,20 @@ import type { Sfx } from './audio';
 
 /**
  * Tag/Nacht und Wetter als reiner Render-Layer (nichts davon steht in der Sim oder im Spielstand).
- * - Tageszeit: Echtzeit, ein voller Zyklus dauert 24 Minuten (1 Spielstunde = 1 Minute). Ein DOM-Overlay mit
- *   `mix-blend-mode: multiply` färbt das Bild (Dämmerung warm, Nacht bläulich dunkel, Morgen warm).
+ * - Tageszeit: Echtzeit, ein voller Zyklus dauert 24 Minuten (1 Spielstunde = 1 Minute). Eine bildschirmfüllende
+ *   Fläche mit Multiply-Mischung in der Szene färbt die Welt (Dämmerung warm, Nacht bläulich dunkel, Morgen warm).
+ *   Sie liegt bei `LIGHT_DEPTH - 1`: Fenster- und Laternenlicht (additiv, Tiefe `LIGHT_DEPTH`) liegt darüber und
+ *   wird nicht mitgedimmt.
  * - Dungeons ignorieren den Zyklus (konstante Dunkelheit über den Vignetten-Verlauf der Szene), Städte bleiben heller.
  * - Wetter je Außenzone, wechselt per Zufall alle ca. 3,5 Minuten (aus der Uhr abgeleitet, daher ohne Speicherstand):
  *   Regen (Moorlande, selten Aschenhafen-Umland), Nebel (Moorlande, Totenacker), Ascheflocken (Aschenöde, Aschengrund).
  * Testparameter: `?stunde=22` (feste Uhrzeit), `?wetter=regen|nebel|asche|klar`.
  */
+
+/** Tiefe der Lichter (Fenster, Laternen): über der Tönung, unter Regen und Ascheflocken */
+/** `Phaser.BlendModes.MULTIPLY` (Wert, damit Tests ohne Phaser-Import laufen) */
+const MULTIPLY = 2;
+export const LIGHT_DEPTH = 1e7 + 2;
 
 export type Weather = 'clear' | 'rain' | 'fog' | 'ash';
 export type ZoneClass = 'indoor' | 'town' | 'outdoor';
@@ -82,7 +89,7 @@ interface Particle {
 }
 
 export class Atmosphere {
-  private overlay: HTMLDivElement;
+  private tint: Phaser.GameObjects.Rectangle;
   private veil: HTMLDivElement;
   private gfx: Phaser.GameObjects.Graphics;
   private drops: Particle[] = [];
@@ -107,11 +114,11 @@ export class Atmosphere {
     this.fixedHour = h !== null && Number.isFinite(Number(h)) ? Number(h) : null;
     const w = q.get('wetter');
     this.fixedWeather = w ? ({ regen: 'rain', nebel: 'fog', asche: 'ash', klar: 'clear' } as Record<string, Weather>)[w] ?? null : null;
-    this.overlay = document.createElement('div');
-    this.overlay.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2;mix-blend-mode:multiply;background:rgb(255,255,255)';
+    // Riesig und mittig: bei Zoom 0.5 muss die Fläche trotz Kamerazoom das ganze Bild decken
+    this.tint = scene.add.rectangle(0, 0, 40000, 40000, 0xffffff).setScrollFactor(0).setBlendMode(MULTIPLY).setDepth(LIGHT_DEPTH - 1);
     this.veil = document.createElement('div');
     this.veil.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2;opacity:0;background:radial-gradient(ellipse at center,rgba(160,176,170,.16) 20%,rgba(150,166,160,.42) 100%)';
-    document.body.append(this.overlay, this.veil);
+    document.body.append(this.veil);
     this.gfx = scene.add.graphics().setScrollFactor(0).setDepth(1e7 + 6);
   }
 
@@ -172,10 +179,11 @@ export class Atmosphere {
     const lift = Math.min(1, this.mix.indoor + this.mix.town * TOWN_LIFT);
     const rain = 1 - 0.14 * rainK;
     const out = [r, g, b].map((c) => Math.round((c + (255 - c) * lift) * rain));
-    const ck = out.map((c) => Math.min(255, Math.round(c / 2) * 2)).join(',');
+    const q = out.map((c) => Math.min(255, Math.round(c / 2) * 2));
+    const ck = q.join(',');
     if (ck !== this.colorKey) {
       this.colorKey = ck;
-      this.overlay.style.background = `rgb(${ck})`;
+      this.tint.setFillStyle((q[0]! << 16) | (q[1]! << 8) | q[2]!);
     }
     const fogK = this.cur === 'fog' ? this.k : 0;
     const vk = (Math.round(fogK * 25) / 25).toFixed(2);
@@ -183,6 +191,7 @@ export class Atmosphere {
       this.veilKey = vk;
       this.veil.style.opacity = vk;
     }
+    this.tint.setPosition(this.scene.scale.width / 2, this.scene.scale.height / 2);
     this.state = { hour, weather: this.cur, k: this.k, color: ck };
 
     // Regenrauschen: nur bei spürbarer Änderung an den Ton melden

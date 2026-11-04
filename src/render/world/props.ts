@@ -527,11 +527,17 @@ export function wallTile(style: WallStyle, open: number, wxAbs: number, wyAbs: n
         const n = vnoise(gx, gy, 6, 77, WP * ART);
         t = n < 0.35 ? 1 : n > 0.66 ? 3 : 2;
       } else {
-        const row = Math.floor(gy / 8);
-        const off = (row % 2) * 6;
-        const fx = (gx + off) % 12;
-        const fy = gy % 8;
-        t = fx === 11 || fy === 7 ? 0 : h3(Math.floor(((gx + off) % (WP * ART)) / 12), row, 3) < 0.3 ? 2.4 : 1.8;
+        // Grobes Mauerwerk statt Ziegelraster: breite Tonflächen, unregelmäßige Fugen, einzelne Bruchstücke und Risse
+        const PW = WP * ART;
+        const broad = vnoise(gx, gy, 14, 61, PW);
+        const seam = Math.abs(vnoise(gx, gy, 9, 62, PW) - 0.5);
+        const seam2 = Math.abs(vnoise((gx + 40) % PW, gy, 7, 63, PW) - 0.5);
+        t = broad < 0.35 ? 1.6 : broad > 0.66 ? 2.9 : 2.2;
+        if (seam < 0.022 || seam2 < 0.016) t = 0.8;
+        else if (seam < 0.05 && vnoise(gx, gy, 5, 64, PW) > 0.45) t += 0.7; // Lichtkante neben der Fuge
+        const sp = h3(gx, gy, 65);
+        if (sp < 0.02) t = 0.9;
+        else if (sp > 0.985) t = 3;
       }
       // Kanten zu offenen Seiten: hell (oben/links), dunkel (rechts)
       if ((open & 1 && y === 0) || (open & 8 && x === 0)) t = 4;
