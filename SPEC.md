@@ -396,3 +396,119 @@ User: „Wie in D4O kein Rang für Zauber, lieber mehr Zauber; neue Zauber desse
 - **Regeln:** ein ganzzahliger Pixelmaßstab (2x) für alles; keine fremden Spielfiguren nachbauen (pixelfx-Regel); Simulation/Golden-Snapshots unberührt; Prüfung je Schritt: tsc, Lint, Tests, Build, Browser; Commits pro verifiziertem Schritt auf `neuer-look`, nicht pushen; pixelfx-Skill in der Session laden (Session im Ordner `Spiele/Aschenthron` starten).
 - **Status (2026-11-03, Commits 3d80322, 3d3af84, 2d3e55a):** Erster Schnitt umgesetzt. Rig-Remix `src/render/heroRig.js` (MIT-Kopf, gedrungen: Beine 12,4 statt 16,9 px, Schultern breiter, Kopf größer, Teilnummer je Pixel), Posen/Material/Bäcker `src/render/hero.ts` (Stehen 4, Gehen 8, Angriff 6 Bilder; Seite/vorn/hinten, links gespiegelt; Tuch/Leder/Eisen mit Helm, Schulterplatten, Wappenrock; Kurzschwert, Bogen und Stab als Platzhalter), Laufzeit-Backen je Look `src/render/heroSheet.ts`, Schalter `?held=skelett|dcss`, Porträt/Inventarfigur. Offen: Schild, Umhang, Robe als Form, Seltenheitsakzente, Getroffen/Sterben, echte Bogen-/Stab-Angriffe, dann Monster-Skelette.
 - **Erster Schnitt (frische Session):** Held-Rig gedrungen umbauen, Gehen + Stehen + ein Angriff in 4 Richtungen, eine Rüstungsstufe und eine Waffe als Ebenen, im Spiel statt `playerCanvas` (Schalter `?held=skelett|dcss`, Standard skelett), Porträt aus dem neuen Helden.
+
+## Plan: T4C-Charme (2026-11-04, nur Plan + Ansichts-Probe, noch NICHT umgesetzt)
+Auslöser: Nutzer „Der Charme fehlt mir komplett.“ Hauptbeschwerden: **Welt leer/leblos** und **Kampf/Progression fühlen sich nicht wie T4C an**. Nur Prinzipien übernehmen, nichts kopieren (siehe „Rechtliches“). Recherche-Notizen mit Quellen: Notizordner `t4c-charme-recherche.md`.
+
+### Was den T4C-Charme ausmacht (Recherche)
+**Belegt** (Fan-Leitfäden t4c.com, t4cbible.com, winternun.blog, brosmetty.blogspot.com; superjumpmagazine.com „Ancient Worlds 4“; Wikipedia; gamebrain.co; mein-mmo.de):
+- **Gespräche über Stichworte:** Man tippt Begriffe zum NPC (Auftrag, Arbeit, Heilen, Name …), Ja/Nein-Antworten; falsches oder zu frühes Wort setzt zurück oder der NPC greift an. Aufträge sind versteckt, man findet sie über Gespräche, Gerüchte, Wiki.
+- **Kleiner, klarer Einstieg:** erster Auftrag per Stichwort, 15 Ratten im Keller unter dem Tempel der Startstadt; Heiler im Keller für Stufe 1; Startstadt mit Drachen-NPC.
+- **Feste, bekannte Orte:** Tempelkeller in 4 Ebenen, Goblinlager, Orklager (Anführer ab ~15), Grab mit Mini-Boss (Respawn ~30 Min.). Jeder Spieler kennt „das Goblinlager“.
+- **Weg von der Startinsel als großer Meilenstein:** zweite Insel ab Stufe 25 + 10.000 Gold + Questkette (100 Goblins, Vertrauen gewinnen), guter oder böser Weg (Karma); dritte Insel über Schlüsselkette, Karma-Schwellen, Stufe 40+.
+- **Tag und Nacht haben Folgen:** Schwarzmarkt nur nachts, manche NPCs sprechen nur nachts oder nicht nachts.
+- **Aufträge mit Reibung:** Zeitaufträge, lange Ketten mit Rätseln, Kill-Zähler (Waffe erst nach 500 Goblins kaufbar), Belohnung skaliert mit Stufe; 100 Goblins ≈ 15 % einer Stufe.
+- **Todesstrafe spürbar:** je Server Prozent von Rucksack (5–30 %), Gold (10–35 %), XP (5–15 %).
+- **Charaktererschaffung über Fragen**, klassenlos, Ausrüstung über Attribut-Anforderungen, Auto-Angriff, Mischbuilds.
+- **Gemeinschaft und Musik:** kleine Server, man kennt jeden; „Glückwunsch!“-Kultur bei Level-ups; Musik wird am meisten gelobt (eingängig), Grafik schon damals veraltet. Kritik: Grind eintönig, kein Questlog, man weiß am Anfang nicht, was tun.
+
+**Vermutet** (nicht belegt): Der Charme entsteht aus Entdecken ohne Wegweiser, langsamem bedeutsamem Aufstieg, festen bekannten Orten mit Namen, wiedererkennbarer Musik je Ort und dem Gefühl, dass Stadt und Welt bewohnt sind (online durch andere Spieler, im Solo muss NPC-Leben das ersetzen). Beute eher feste, benannte Gegenstände mit bekannter Seltenheit als Zufallsaffixe.
+
+### Ist-Stand (gespielt 2026-11-04, Dev-Server, 1280x800, Aschenhafen + Roggenfelder; Zahlen aus `data.ts`/`world.ts`)
+- **Stadt leer:** Aschenhafen hat einen großen Pflasterplatz mit einem Marktstand, sonst nichts. In der ganzen Welt gibt es 22 NPCs, alle mit Funktion (Händler, Lehrer, Aufträge, Lager), davon 10 in Aschenhafen, meist in ihren Häusern. Keine Bewohner, Wachen, Kinder, Tiere, keine Stimmen.
+- **Wildnis leblos:** Roggenfelder sind gleichmäßige Wiese mit einzelnen Bäumen, Ratten und Hunden. Keine Wege mit Reisenden, keine Landmarken (Ruinen, Schreine, Lagerfeuer), keine harmlosen Tiere, die Welt reagiert nicht.
+- **Gespräche:** `NPC_LORE` sind 2–4 Absätze Monolog zum Durchblättern. Keine Themen, keine versteckten Aufträge, keine Reaktion auf den Spieler.
+- **Tag/Nacht:** nur Darstellung (`atmosphere.ts`, 24-Minuten-Zyklus im Client); die Sim kennt keine Uhrzeit, nichts ändert sich nachts.
+- **Musik:** generativ (`music.ts`, Tonleiter + Zufallsmelodie je Stimmung). Stimmig, aber nichts zum Wiedererkennen oder Mitsummen.
+- **Kampf/Progression (Zahlen):** Feldratte Stufe 1 = 32 LP, 10 XP; Stufe 2 braucht 223 XP (≈ 22 Ratten); Startwaffe 7–13 Schaden (≈ 3–4 Treffer je Ratte). Bot: Stufe 5 nach 13 Min., 10 nach 50 Min., 30 nach 8,4 h (Levelcap). Todesstrafe mild (≈ 5 % XP, 1–3 Gegenstände, Leichenlauf). Beute nach Diablo-Art (Seltenheitsfarben, Zufallsaffixe, Lichtstrahl), dazu „Hinlaufen“-Autopilot und Richtungspfeil.
+- **Startinsel:** eine zusammenhängende Insel bis Stufe 30, kein „Weg hinaus“ als Meilenstein.
+
+### Lückenanalyse (gewichtet nach den beiden Beschwerden)
+| # | Lücke | Beschwerde | Gewicht |
+|---|---|---|---|
+| 1 | Städte ohne Bewohner, Tagesablauf, Geräusche | Welt leer | hoch |
+| 2 | Wildnis ohne harmloses Leben, Reisende, Landmarken | Welt leer | hoch |
+| 3 | Gespräche ohne Themen, nichts zu entdecken | Welt leer | hoch |
+| 4 | Tag/Nacht ohne Folgen | Welt leer | mittel |
+| 5 | Aufstieg zu schnell und zu klein (Stufe 10 in < 1 h, Cap 30), Level-up ohne Echo der Welt | Progression | hoch |
+| 6 | Beute als Zufallsaffix-Schwall statt benannter, bekannter Funde; keine Kill-Zähler-Ziele | Progression | hoch |
+| 7 | Kampf ohne Gefahr: Gegnerstärke nicht lesbar, milde Strafe, Monster fliehen/rufen nicht | Kampf | mittel |
+| 8 | Kein Inselwechsel als großes Ziel | Progression | mittel |
+| 9 | Musik ohne Leitmotive | Atmosphäre | mittel |
+| 10 | Draufsicht statt Iso (Raumgefühl) | Look | offen (Entscheidung) |
+
+### Ansicht: Probe Draufsicht gegen Iso
+- **Probe:** `scripts/bake-iso-probe.ts` backt denselben Stadtausschnitt (2 Häuser, Brunnen, Marktstand, Held, 4 NPCs, 2 Goblins, Ratte) mit dem Spielcode einmal als Draufsicht und einmal als Iso 2:1 (Rauten 64×32 bei Maßstab 2, Häuser als 3D-Kästen mit Fachwerk, Satteldach, Giebel, Tiefenpuffer). Ausgabe `probe/iso/` (index.html, `vergleich.png`), im Dev-Server unter `/probe/iso/`. Das Spiel ist unverändert.
+- **Befund Figuren:** Das Rig kann per `yaw = ±45°` Schrägansichten (vorn-schräg, hinten-schräg) ohne neue Kunst backen (`probe/iso/held-richtungen.png`). Iso braucht also 2 zusätzliche Ansichten je Sheet (+~66 % Backzeit/Speicher), keine neue Kunst.
+- **Aufwand kompletter Umbau (Sim, Server, Spielstände unberührt):**
+  | Teil | Dateien | Art | Aufwand |
+  |---|---|---|---|
+  | Projektion, Kamera, Klick-Picking, Tiefensortierung x+y, Pfeiltasten diagonal | `iso.ts`, `GameScene.ts` (44 Stellen), `art.ts` (3) | anpassen | S–M |
+  | Boden-Chunks als Rauten, Übergänge/Ufer neu, Chunk-Pool | `world/ground.ts`, `world/details.ts`, `GameScene.ts` (Chunks) | umbauen | M–L |
+  | Wände, Klippen, Gruft-/Dungeonwände als Iso-Blöcke | `world/props.ts` (`wallTile`) | neu | L |
+  | Häuser als Kästen (Wände, Dach, Giebel, Türen an allen Seiten, Dach ausblenden beim Betreten, Fensterlicht) | `houses.ts`, `GameScene.ts` (Häuser) | neu (Probe-Ansatz) | L |
+  | Props als stehende Bilder, Zäune/Stände je Richtung | `world/props.ts`, `town.ts` | übernehmen/anpassen | S–M |
+  | Figuren: 2 Schrägansichten, Richtungswahl nach Laufrichtung | `figure.ts`, `hero.ts`, `monster.ts`, `monsterRig.js`, `npc.ts`, `figureWorker.ts` | anpassen | M |
+  | pixelfx-Ankerpunkte, Namen, Lichtstrahlen, Minimap (bleibt Draufsicht), HUD | `fx.ts`, `pixelfx.ts`, `minimap.ts` | meist übernehmen | S |
+  | Render-Tests | `groundLook.test.ts`, `atmosphere.test.ts` u. a. | anpassen | S |
+  Gesamt grob **4–6 Sessions** (vergleichbar mit dem Welt-Umbau 2026-11-04). Risiko: Wandkanten und Dungeons sind der größte Brocken; Boden nur umzuprojizieren (wie in der Probe) geht schnell, wirkt aber weicher.
+
+### Pakete (priorisiert; „ansichtsunabhängig“ = sofort möglich, egal wie die Ansicht entschieden wird)
+Allgemein: je Paket frische Session, Entscheidungen vorher per AskUserQuestion, Commits je verifiziertem Schritt auf `neuer-look`, Prüfung tsc, Lint, Tests, Build, Browser; bei Sim-Änderungen Golden-Snapshots bewusst aktualisieren und `npm run pace` nachmessen.
+
+**P1 Lebende Städte** (ansichtsunabhängig, Beschwerde Welt leer, Aufwand M)
+- Ziel: Aschenhafen und Felsenwacht wirken bewohnt.
+- Änderungen: 8–15 Bewohner je Stadt ohne Funktion (Wache auf Runde, Kinder, Bauer mit Korb, Fischer am Kai, Betrunkener, Ausrufer), Tiere (Hühner, Katze, Hund, Krähen, Möwen am Hafen), Tagesablauf nach Uhrzeit (Markt am Tag, nachts Wache mit Fackel, Leute gehen in die Häuser), kurze Zurufe als Sprechblasen (eigene Texte, Gerüchte zu Orten), Stadtgeräusche (Hammer an der Schmiede, Stimmengewirr). Rein clientseitig, damit Sim, Golden-Tests und Mehrspieler unberührt bleiben.
+- Dateien: neu `src/render/townLife.ts`, `src/render/npc.ts` (Bewohner-Looks), `src/render/audio.ts` (Stadtgeräusche), ein Haken in `GameScene.ts`.
+
+**P2 Gespräche mit Themen** (ansichtsunabhängig, Beschwerde Welt leer, Aufwand M)
+- Ziel: Entdecken wie bei T4C, ohne Tipp-Frust.
+- Änderungen: Gesprächsfenster mit hervorgehobenen Stichworten im Text; Klick (optional Eintippen) öffnet ein Thema; Themen geben Gerüchte, Wegbeschreibungen, Hintergrund und schalten **versteckte Aufträge** frei, die es nur über Stichworte aus anderen Gesprächen gibt; Notizbuch „Bekannte Stichworte“; Gruß nach Ruf/Stufe/Tageszeit. Bestehende Aufträge bleiben erreichbar.
+- Dateien: `src/sim/data.ts` (neu `NPC_TOPICS` neben `NPC_LORE`), `src/sim/quests.ts` (Freischalten über Thema, Befehl `askTopic`), `src/sim/save.ts` (bekannte Stichworte), `src/render/ui.ts` (Gesprächsfenster).
+
+**P3 Fortschritt mit Gewicht** (ansichtsunabhängig, Beschwerde Progression, Aufwand M–L)
+- Ziel: Stufen fühlen sich verdient an, Beute hat Namen.
+- Änderungen: (a) Level-Kurve strecken (Zielwert vom Nutzer, siehe Entscheidungen), Bot nachmessen; (b) Echo der Welt beim Level-up: NPCs in Hörweite gratulieren, Ausrufer verkündet Meilensteine (Solo-Ersatz für „Glückwunsch!“-Kultur); (c) **benannte Funde** je Monsterfamilie mit fester, kleiner Chance und eigenem Namen, Bestiarium zeigt Drops nach dem ersten Fund; (d) **Kill-Zähler-Ziele** (nach 100/500 Goblins Titel, Händlerware oder Auftrag); (e) optional Charaktererschaffung über Fragen statt freier Startpunkte.
+- Dateien: `src/sim/data.ts` (Kurve, Funde), `src/sim/items.ts` (Funde im Drop-Wurf), `src/sim/world.ts` (Kill-Zähler), `src/render/ui.ts` + `src/render/achievements.ts` (Bestiarium, Titel), `src/sim/save.ts`.
+
+**P4 Kampf mit Gefahr** (ansichtsunabhängig, Beschwerde Kampf, Aufwand M)
+- Ziel: Man sieht, was gefährlich ist, und spürt einen Tod.
+- Änderungen: Gegnername + Stufenfarbe bei Hover (grau/weiß/gelb/orange/rot nach Stufenabstand); Gegner rufen Rudelgenossen und fliehen bei wenig Leben (Goblins, Banditen), Untote nie; ein paar „zu früh betreten“-Gefahrenorte nahe der Startgebiete; Todesstrafe wählbar schärfer (Gold-Anteil, mehr Rucksack-Gegenstände, siehe Entscheidungen).
+- Dateien: `src/sim/world.ts` (KI), `src/sim/data.ts` (Werte), `src/render/GameScene.ts` (Hover-Anzeige).
+
+**P5 Wildnis mit Leben** (überwiegend ansichtsunabhängig, Beschwerde Welt leer, Aufwand M–L)
+- Ziel: Zwischen den Orten passiert etwas.
+- Änderungen: harmlose Tiere (Rehe fliehen, Krähen fliegen auf, Frösche im Moor, Fledermäuse nachts), Landmarken je Zone (Ruinen, Wegschrein, Galgen, verlassenes Lagerfeuer, tote Abenteurer mit Notiz/Hinweis auf P2-Stichworte), Reisende auf der Handelsstraße (Händlerkarren, Pilger, Wachpatrouille, die gegen Monster kämpft).
+- Dateien: neu `src/render/wildlife.ts` (Tiere, nur Client), `src/render/world/props.ts` (Landmarken-Bilder), `scripts/gen_map.py` + `src/data/aschenthron.json` (Landmarken als Daten, `MAP_VERSION` prüfen), `src/sim/world.ts` (kämpfende Patrouille, später).
+
+**P6 Tag und Nacht mit Folgen** (ansichtsunabhängig, Aufwand M)
+- Ziel: Nachts ist die Welt anders.
+- Änderungen: Uhrzeit in die Sim (aus Tick, im Mehrspieler vom Server), Nachtmarkt/Hehler nur nachts, Läden schließen, einzelne NPCs nur nachts, nachts mehr oder stärkere Untote und Nachtjäger.
+- Dateien: `src/sim/world.ts`, `src/sim/data.ts`, `src/render/atmosphere.ts` (Uhr aus der Sim lesen), `src/render/ui.ts`.
+
+**P7 Musik mit Leitmotiven** (ansichtsunabhängig, Aufwand S–M)
+- Ziel: Orte erkennt man am Klang.
+- Änderungen: je Stimmung eine selbst komponierte, feste Melodie (im Code notiert) als Thema, die generative Begleitung bleibt darunter; Stadtthema, Feld, Moor, Dungeon, Boss.
+- Dateien: `src/render/music.ts`.
+
+**P8 Weg von der Startinsel** (Aufwand XL, nach P2/P3)
+- Ziel: großes Etappenziel wie bei T4C.
+- Änderungen: Aschental wird Startinsel; zweite Region per Schiff ab Aschenhafen, freigeschaltet über Stufe + Gold + Questkette (optional guter/böser Weg); neue Karte, Monster, Stadt.
+- Dateien: `scripts/gen_map.py`, `src/data/*.json`, `src/sim/data.ts`, `src/sim/world.ts`, `src/sim/save.ts` (Karten-/Regionwechsel).
+
+**P9 Ansicht** (nur wenn der Nutzer Iso wählt, Aufwand 4–6 Sessions, siehe Tabelle oben). Danach erst die Stadt verdichten (mehr Stände, Karren, Kisten, Banner auf dem leeren Platz in `gen_map.py`/`town.ts`), weil Props und Häuser von der Ansicht abhängen.
+
+### Reihenfolge und Aufteilung auf Sessions
+- **Welle 1 (parallel, getrennte Dateien):** P1 Lebende Städte (`townLife.ts`, `npc.ts`, `audio.ts`, Haken in `GameScene.ts`) · P2 Gespräche (`data.ts` nur `NPC_TOPICS`, `quests.ts`, `save.ts`, `ui.ts`) · P7 Musik (`music.ts`). Gemeinsam berührt nur `GameScene.ts` (P1) – P2/P7 lassen es aus.
+- **Welle 2 (nacheinander, alle in `world.ts`/`data.ts`):** P3 Fortschritt → P4 Kampf → P6 Tag/Nacht. P5 Wildnis kann parallel dazu laufen, solange es nur `wildlife.ts`/`props.ts`/Karte anfasst (Patrouille erst nach P4).
+- **Welle 3:** P8 Insel; P9 Ansicht, falls gewählt (blockiert dann alle Render-Pakete, also nicht parallel zu P1/P5).
+
+### Offene Entscheidungen für den Nutzer
+1. **Ansicht:** Draufsicht behalten · auf Iso umbauen (4–6 Sessions, Probe `probe/iso/`) · erst Inhalte (P1–P7), Ansicht später.
+2. **Level-Tempo:** Stufe 30 heute nach ≈ 8 h (Bot). Strecken (z. B. 20–30 h), Levelcap anheben oder lassen?
+3. **Beute:** Zufallsaffixe behalten und benannte Funde ergänzen, oder überwiegend feste, benannte Gegenstände wie bei T4C?
+4. **Gespräche:** Stichworte anklicken, eintippen oder beides?
+5. **Todesstrafe:** so lassen oder schärfer (Gold-Anteil, mehr Gegenstände)?
+6. **Fertigkeiten:** Rang 1–5 lassen oder als steigende Zahlenwerte beim Lehrer trainieren (großer Umbau)?
+7. **Wegweiser:** „Hinlaufen“ und Richtungspfeil behalten, abschaltbar machen („Entdecken-Modus“) oder entfernen?
+8. **Zweite Insel (P8):** ja und wann?

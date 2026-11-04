@@ -1,5 +1,11 @@
 # HANDOFF – Aschenthron
 
+## PLAN (2026-11-04, Session „t4c-charme“, Branch `neuer-look`): T4C-Charme – Recherche, Lückenanalyse, Iso-Probe
+- **Stand:** Nur Plan + Probe, nichts im Spiel geändert. Plan in SPEC.md „Plan: T4C-Charme“ (Recherche belegt/vermutet, Ist-Stand, Lückenanalyse, Pakete P1–P9 mit Dateien/Aufwand/Wellen, 8 offene Entscheidungen). Quellen-Notizen: Notizordner `t4c-charme-recherche.md`.
+- **Iso-Probe:** `npx tsx scripts/bake-iso-probe.ts` → `probe/iso/` (index.html, `vergleich.png`, `held-richtungen.png`), im Dev-Server `/probe/iso/`. Gleicher Ausschnitt, gleicher Spielcode für Boden/Props/Figuren, Iso-Häuser per 3D-Flächen + Tiefenpuffer. Figuren-Schrägansicht per Rig-`yaw ±45°` geht ohne neue Kunst. Umbau grob 4–6 Sessions.
+- **Nächster Schritt:** Nutzer entscheidet Ansicht + Entscheidungen 2–8, dann Welle 1 (P1 Lebende Städte, P2 Gespräche, P7 Musik) parallel in frischen Sessions.
+- **Mängel (ehrlich):** Recherche dünn (Fan-Leitfäden schreiben voneinander ab, Massively OP gesperrt, keine Foren-Erinnerungen gefunden); Iso-Boden nur umprojiziert (weicher als nativ); NPCs/Monster in der Probe ohne Schrägansicht; Probe ist ein Standbild ohne Lauf.
+
 ## ERLEDIGT (2026-11-04, abends): alle bekannten offenen Punkte abgearbeitet (Sessions figuren-maengel, welt-maengel, effekte-2x, ruckler)
 - **Stand:** Nutzer will alle „Bekannten offenen Punkte“ (unten) abgearbeitet haben. Drei Sonnet-Sessions laufen parallel im selben Checkout auf `neuer-look`, kein Push, jede committet nur eigene Pfade und bearbeitet `HANDOFF.md` nicht (Bericht als letzte Nachricht an die Hauptsession):
   - `figuren-maengel` (local_715673b9…): Schattenriss-Blickrichtung, Sterben nach hinten, Golem, Spinne/Wurm, Held im Worker backen – `monsterRig.js`, `monster.ts`, `hero*.ts`, `heroRig.js`, `*Sheet.ts`, `figure*.ts`, `npc.ts`.

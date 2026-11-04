@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ansicht im Vergleich</title>
+<style>
+  :root{--bg:#0b0a0e;--fg:#c8c0b0;--dim:#8a8478;--acc:#e0b060;--line:#2a2630}
+  body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif;padding:16px}
+  h1{font-size:20px;margin:0 0 6px}h2{font-size:16px;margin:28px 0 6px;color:var(--acc)}
+  p,li{color:var(--dim);max-width:78ch}
+  img{display:block;max-width:100%;image-rendering:pixelated;border:1px solid var(--line)}
+  .row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+  .row figure{margin:0;flex:1 1 420px}
+  figcaption{color:var(--fg);margin:4px 0 8px;font-weight:600}
+</style></head><body>
+<h1>Aschenthron: Draufsicht gegen Iso-Ansicht (Probe)</h1>
+<p>Derselbe Ausschnitt einer Stadt mit Held, vier NPCs, zwei Goblins und einer Ratte am Rand, gleicher Pixelmaßstab 2, gleiche Figuren und Böden aus dem Spielcode. Links die jetzige Draufsicht, rechts die schräge Iso-Ansicht 2:1 (Rautenkacheln 64×32, zwei Hauswände und Satteldach sichtbar). Das Spiel selbst ist unverändert. Neu backen: <code>npx tsx scripts/bake-iso-probe.ts</code>.</p>
+<div class="row">
+  <figure><figcaption>Jetzt: Draufsicht</figcaption><img src="draufsicht.png" alt="Stadtplatz in Draufsicht"></figure>
+  <figure><figcaption>Probe: Iso 2:1</figcaption><img src="iso.png" alt="Derselbe Stadtplatz in Iso-Ansicht"></figure>
+</div>
+<h2>Was man sieht</h2>
+<ul>
+  <li><b>Iso:</b> Häuser wirken wie Gebäude mit Tiefe (Vorder- und Seitenwand, Dach, Giebel). Der Platz liegt als Raute, Wege laufen schräg. Mehr Raumgefühl, näher am Look alter Online-RPGs.</li>
+  <li><b>Draufsicht:</b> mehr Fläche sichtbar, alles achsenparallel und gut lesbar, die Häuser zeigen nur Dach und Vorderwand.</li>
+  <li>Der Boden in der Iso-Probe ist nur umprojiziert (Pflaster wirkt kleiner und weicher). Bei einem echten Umbau würde er für Rauten neu gezeichnet.</li>
+  <li>Der Held steht in der Iso-Probe in einer 45°-Schrägansicht, die das Figuren-Skelett ohne neue Kunst hergibt (siehe unten). NPCs und Monster zeigen hier noch die alten Ansichten (vorn/seitlich).</li>
+</ul>
+<h2>Held: Seite, vorn, hinten, dann schräg vorn und schräg hinten (45°)</h2>
+<img src="held-richtungen.png" alt="Held in fünf Blickrichtungen">
+</body></html>
