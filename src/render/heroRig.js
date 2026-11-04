@@ -226,7 +226,7 @@ function ellipsoid(c, R, r, part, mat, minY = -Infinity) {
 // parts: each has its own number, so edges between them can be seen
 export const PART = { pelvis: 1, waist: 2, chest: 3, neck: 4, head: 5, face: 6, upperN: 7, elbowN: 8, foreN: 9, handN: 10, upperF: 11, elbowF: 12, foreF: 13, handF: 14, thighN: 15, kneeN: 16, shinN: 17, footN: 18, thighF: 19, kneeF: 20, shinF: 21, footF: 22, weapon: 23, offWeapon: 24, helm: 25, pauldronN: 26, pauldronF: 27,
   // Aschenthron: Ausrüstung und Körpermerkmale als eigene Teile (eigene Farbe je Teil, Kanten dazwischen)
-  shield: 28, shieldRim: 29, shieldBoss: 30, cloak: 31, cloakHem: 32, robe: 33, robeHem: 34, quiver: 35, fletch: 36, crest: 37, ear: 38, horn: 39, tail: 40, wing: 41, hood: 42, belly: 43, beard: 44 };
+  shield: 28, shieldRim: 29, shieldBoss: 30, cloak: 31, cloakHem: 32, robe: 33, robeHem: 34, quiver: 35, fletch: 36, crest: 37, ear: 38, horn: 39, tail: 40, wing: 41, hood: 42, belly: 43, beard: 44, crack: 45, rivet: 46 };
 
 // a frame from three directions (made orthonormal, first one kept): columns = local x, y, z
 function axes(x, y) {
@@ -244,6 +244,7 @@ function drawBody(S) {
   const gear = S.q.gear ?? {};
   const C = F_("chest"), fwd = mv(C.R, [1, 0, 0]), up = mv(C.R, [0, 1, 0]), across = mv(C.R, [0, 0, 1]);
   const ghost = !!gear.ghost; // ohne Beine (Geister): Robe bis zum Boden, schwebt
+  if (gear.golem) return drawGolem(S, gear.golem);
   if (gear.ribs) {
     // Skelett: Becken, dünne Wirbelsäule, Brustkorb aus Rippenbögen um einen dunklen Hohlraum
     ellipsoid(at("pelvis", [0, -0.2 * k, 0]), F_("pelvis").R, [2.4 * k, 1.9 * k, 3.9 * wk], PART.pelvis, 0);
@@ -397,6 +398,68 @@ function drawBody(S) {
     sphere(add(c, mul(nrm, 0.9)), 1.3 * k, PART.shieldBoss, 0);
   }
   void turn;
+}
+
+// Aschenthron: Golem (1 Stein, 2 Eisen): massiger Rumpf aus zwei Blöcken, kleiner Kopf tief zwischen Schulterbrocken mit
+// Brauenwulst, Arme, die nach unten dicker werden, bis fast zum Boden, kurze Säulenbeine. Stein hat Risse (eigenes Teil
+// `crack`, im Spiel dunkel oder glühend), Eisen Plattenkanten und Nieten (`rivet`). Maße in `size`, nicht in `limb`.
+function drawGolem(S, kind) {
+  const { B, armN, armF, legN, legF, sN, sF, hipN, hipF } = S, F_ = (name) => B[name];
+  const k = BODY.size, hk = k * BODY.head;
+  const at = (f, v) => add(F_(f).t, mv(F_(f).R, v));
+  const C = F_("chest"), iron = kind === 2;
+  ellipsoid(at("pelvis", [0, -0.3 * k, 0]), F_("pelvis").R, [3.8 * k, 3.0 * k, 5.4 * k], PART.pelvis, 0);
+  sweep(F_("pelvis").t, C.t, 3.9 * k, 4.6 * k, PART.waist, 1);
+  // Brustblock und vorgewölbter Bauchblock: die Fuge dazwischen trennt sie
+  const chest = [0.8 * k, 1.2 * k, 0], R0 = [6.0 * k, 5.6 * k, 7.4 * k];
+  ellipsoid(at("chest", chest), C.R, R0, PART.chest, 0);
+  ellipsoid(at("chest", [2.4 * k, -3.2 * k, 0]), C.R, [4.4 * k, 3.6 * k, 5.8 * k], PART.belly, 0);
+  // Punkte auf der Brustoberfläche: a = um die Hochachse (0 vorn, + zur nahen Seite), b = hoch/runter
+  const onChest = (a, b, out = 1.02) => at("chest", add(chest, [R0[0] * Math.cos(b) * Math.cos(a) * out, R0[1] * Math.sin(b) * out, R0[2] * Math.cos(b) * Math.sin(a) * out]));
+  if (iron) {
+    // Plattenkante quer über die Brust, Nieten darauf und am Bauchblock
+    for (let a = -0.9; a <= 1.5; a += 0.12) sphere(onChest(a, -0.05, 1.0), 0.75 * k, PART.crack, 0);
+    for (let a = -0.7; a <= 1.4; a += 0.42) sphere(onChest(a, 0.32, 1.03), 0.62 * k, PART.rivet, 0);
+    for (let a = -0.5; a <= 1.2; a += 0.55) sphere(at("chest", [1.9 * k + 3.8 * k * Math.cos(a), -2.6 * k, 5.4 * k * Math.sin(a)]), 0.6 * k, PART.rivet, 0);
+  } else {
+    // Risse: Zickzack-Linien über die vordere, zur Kamera gewandte Brust
+    const cracks = [[[0.15, 0.75], [0.35, 0.45], [0.25, 0.2], [0.5, -0.05]], [[0.9, 0.6], [1.1, 0.3], [0.95, 0.05]], [[-0.35, 0.4], [-0.15, 0.15]]];
+    for (const line of cracks) for (let j = 0; j + 1 < line.length; j++) {
+      const [a0, b0] = line[j], [a1, b1] = line[j + 1];
+      for (let u = 0; u <= 1.001; u += 0.2) sphere(onChest(a0 + (a1 - a0) * u, b0 + (b1 - b0) * u), 0.5 * k, PART.crack, 0);
+    }
+  }
+  // Kopf: klein, tief eingesunken, Gesichtsstein mit glühenden Augen unter einem Brauenwulst
+  // (vorn oben auf dem Brustblock statt auf dem Hals, sonst steckt er von vorn hinter der Brust; die Augen folgen B.head)
+  const H = F_("head");
+  H.t = at("chest", [3.6 * k, 6.2 * k, 0]);
+  const atH = (v) => add(H.t, mv(H.R, v));
+  ellipsoid(H.t, H.R, [3.4 * hk, 3.2 * hk, 3.4 * hk], PART.head, 0);
+  ellipsoid(atH([1.05 * hk, -0.55 * hk, 0]), H.R, [3.0 * hk, 3.0 * hk, 2.95 * hk], PART.face, 0);
+  ellipsoid(atH([1.7 * hk, 1.5 * hk, 0]), H.R, [2.6 * hk, 1.15 * hk, 3.6 * hk], iron ? PART.helm : PART.head, 0);
+  if (iron) for (const s2 of [1, -1]) sphere(atH([0.4 * hk, 2.2 * hk, s2 * 2.8 * hk]), 0.6 * k, PART.rivet, 0);
+  // Arme: Schulterbrocken, Oberarm, Ellbogen, Unterarm nach unten dicker, Faustblock
+  const arm = (far, A, sh) => {
+    const P2 = far ? PART.pauldronF : PART.pauldronN, U = far ? PART.upperF : PART.upperN, E = far ? PART.elbowF : PART.elbowN, Fo = far ? PART.foreF : PART.foreN, Ha = far ? PART.handF : PART.handN;
+    sweep(sh, A.joint, 2.5 * k, 2.2 * k, U, 0);
+    sphere(A.joint, 2.3 * k, E, 1);
+    sweep(A.joint, A.end, 2.4 * k, 3.0 * k, Fo, 0);
+    const dir = unit(sub(A.end, A.joint));
+    ellipsoid(add(A.end, mul(dir, 1.2 * k)), axes(dir, mv(C.R, [1, 0, 0])), [3.3 * k, 3.0 * k, 3.1 * k], Ha, 0);
+    ellipsoid(add(sh, mv(C.R, [-0.3 * k, 1.2 * k, 0])), C.R, [3.6 * k, 3.0 * k, 3.6 * k], P2, 0);
+    if (iron) for (let j = -1; j <= 1; j++) sphere(add(sh, mv(C.R, [j * 1.6 * k, 4.1 * k, 0])), 0.6 * k, PART.rivet, 0);
+  };
+  arm(false, armN, sN);
+  arm(true, armF, sF);
+  // Beine: kurze Säulen, breite Füße
+  const leg = (L, hip, th, kn, shn, fo, nameFt) => {
+    sweep(hip, L.joint, 3.5 * k, 3.1 * k, th, 0);
+    sphere(L.joint, 2.7 * k, kn, 1);
+    sweep(L.joint, L.end, 3.0 * k, 3.3 * k, shn, 0);
+    ellipsoid(add(F_(nameFt).t, mv(F_(nameFt).R, [1.3 * k, -0.7 * k, 0])), F_(nameFt).R, [4.0 * k, 1.9 * k, 3.1 * k], fo, 0);
+  };
+  leg(legN, hipN, PART.thighN, PART.kneeN, PART.shinN, PART.footN, "footN");
+  leg(legF, hipF, PART.thighF, PART.kneeF, PART.shinF, PART.footF, "footF");
 }
 
 // ---- what they hold: drawn along the handle from the fist, through the same depth buffer

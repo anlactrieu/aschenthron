@@ -109,11 +109,12 @@ const troll = (c: number, o: Partial<HumDef> = {}, b: RigBody = {}): HumDef => (
   gear: { ears: 0.5, snout: 1.3, fists: 1.2, feet: 1.2, ...o.gear },
   pal: { skin: sk(c), top: sk(c), sleeve: sk(c), waist: sk(c), legs: rampOf(0x5a4632), boots: sk(c), hair: rampOf(0x4a4030), pelvis: MAT.leatherD, ...o.pal },
 });
+/** Golem: eigener Körperbau im Rig (`gear.golem`: 1 Stein mit Rissen, 2 Eisen mit Platten und Nieten), Arme bis fast zum Boden */
 const golem = (r: Ramp, eye: number, b: RigBody = {}, o: Partial<HumDef> = {}): HumDef => ({
-  rig: 'hum', style: 'none', eye, hunch: 1, gait: { stance: 0.5, stride: 4 }, ...o,
-  body: { size: 1.35, head: 0.85, neck: 0.8, arms: 1.3, limb: 1.4, legs: 0.85, width: 1.3, belly: 1.1, ...b },
-  gear: { fists: 1.45, feet: 1.15, ...o.gear },
-  pal: { skin: r, top: r, sleeve: r, legs: r, boots: r, hair: r, ...o.pal },
+  rig: 'hum', style: 'none', eye, hunch: 1, gait: { stance: 0.5, stride: 4, lift: 2 }, ...o,
+  body: { size: 1.35, head: 0.8, neck: 1, arms: 1.5, torso: 1.3, legs: 0.8, width: 1.3, ...b },
+  gear: { golem: 1, ...o.gear },
+  pal: { skin: r, top: r, sleeve: r, legs: r, boots: r, hair: r, metal: r, pelvis: r, waist: r, crack: [r[3], r[4], r[4], r[4], r[4]], ...o.pal },
 });
 const demon = (c: number, o: Partial<HumDef> = {}, b: RigBody = {}): HumDef => ({
   rig: 'hum', style: 'none', weapon: 'claw', eye: 0xffe040, ...o,
@@ -195,7 +196,7 @@ export const MONSTER_DEFS: Record<string, MonsterDef> = {
   hill_troll: troll(0x7a8a6a),
   stone_golem: golem(STONE, 0x7ae0ff),
   rock_troll: troll(0x6a7a62, { pal: { skin: rampOf(0x7a8070), top: STONE } }, { size: 1.38 }),
-  iron_golem: golem(MAT.iron, 0xffa040, { size: 1.4 }),
+  iron_golem: golem(rampOf(0x8a909a), 0xffa040, { size: 1.4 }, { gear: { golem: 2 }, pal: { helm: rampOf(0x6a707a), crack: rampOf(0x5a5e66), rivet: rampOf(0xc8b080, 1.25) } }),
   stone_colossus: { ...golem(rampOf(0xa09a8a), 0xffd060, { size: 1.75 }), boss: true },
   // Würmer
   pit_worm: worm(0x9a7a5a),
@@ -203,7 +204,7 @@ export const MONSTER_DEFS: Record<string, MonsterDef> = {
   // Asche und Feuer
   ash_walker: ghoul(0x6a5a52, { style: 'sword', weapon: 'shortsword', blade: RUST, hunch: 1.2, eye: 0xff8a3a, gear: { helm: 5 }, pal: { hood: rampOf(0x3a3230), top: rampOf(0x4a3e3a) } }, { arms: 1.1, limb: 0.95 }),
   cinder_wisp: { rig: 'beast', eye: 0xffffe0, frame: { w: 60, h: 68, fx: 30, fy: 62 }, body: { type: 'wisp', size: 1.55, girth: 5.5, height: 11 }, pal: { fur: LAVA, belly: rampOf(0xffe080, 1.2), mark: CHAR } },
-  ember_elemental: golem(CHAR, 0xfff0a0, { size: 1.35 }, { pal: { chest: LAVA, belly: LAVA, head: LAVA, handN: LAVA, handF: LAVA } }),
+  ember_elemental: golem(CHAR, 0xfff0a0, { size: 1.35 }, { pal: { belly: LAVA, crack: LAVA, handN: LAVA, handF: LAVA } }),
   imp: demon(0xd05a3a, { gear: { horns: 0.6, tail: 0.8, wings: 0.75, ears: 0.7 } }, { size: 0.8, head: 1.3, legs: 0.85 }),
   hell_spawn: demon(0xc0402a, { hunch: 1.5 }, { size: 1.1, limb: 1.2, arms: 1.15 }),
   // Aschengrund
@@ -258,6 +259,7 @@ function humPose(d: HumDef, anim: FigAnim, view: FigView, i: number): RigPose {
     const b = Math.sin((i / 4) * Math.PI);
     Object.assign(p, { fx: 9, fy: -16 + b * 0.6, bx: 8, by: -15.5 - b * 0.6, armsFront: true, bz: 3 });
   }
+  if (d.gear?.golem) golemPose(p, anim, view, i);
   if (d.float && living) p.y = -3 - Math.sin((i / (anim === 'walk' ? 8 : 4)) * Math.PI * 2) * 1;
   const gear: HeroGear = { ...p.gear, ...d.gear, helm: d.gear?.helm ?? 0, shield: d.shield ?? 0 };
   if (d.gear?.pauldron === undefined) gear.pauldron = false;
@@ -269,6 +271,40 @@ function humPose(d: HumDef, anim: FigAnim, view: FigView, i: number): RigPose {
   if (d.wscale) pose.wscale = d.wscale;
   delete pose.accent;
   return pose;
+}
+
+/** Golem: Doppelfaust von oben auf den Boden, Werte in Bildpixeln bei Größe 1 (das Rig skaliert mit `size`) */
+const SLAM: RigPose[] = [
+  { fx: 3, fy: -25, bx: 2, by: -25, armsFront: true, crouch: 1.2, lean: -1.5, ffx: 4, fbx: -4 },
+  { fx: 0, fy: -28, bx: -1, by: -28, armsFront: true, crouch: 2, lean: -3, ffx: 4, fbx: -4, hy: -0.6 },
+  { fx: 11, fy: -15, bx: 10, by: -15, armsFront: true, crouch: 3.5, lean: 3, ffx: 5, fbx: -4 },
+  { fx: 12, fy: -4.5, bx: 11, by: -4.5, armsFront: true, crouch: 5.5, lean: 5, ffx: 5.5, fbx: -4.5 },
+  { fx: 10.5, fy: -5, bx: 9.5, by: -5, armsFront: true, crouch: 4.5, lean: 4, ffx: 5, fbx: -4.5 },
+  { fx: 6, fy: -7, bx: 4, by: -7, crouch: 2.2, lean: 2, ffx: 4.5, fbx: -4 },
+];
+
+/** Golem: Arme hängen bis fast zum Boden neben dem Körper und pendeln schwer; Angriff = Doppelfaust */
+function golemPose(p: RigPose, anim: FigAnim, view: FigView, i: number): void {
+  const side = view === 'side';
+  if (anim === 'attack') {
+    Object.assign(p, SLAM[Math.min(SLAM.length - 1, i)]!);
+    if (!side) p.shear = 0.32 * 0.55;
+    return;
+  }
+  if (anim === 'die') return;
+  const sw = anim === 'walk' ? Math.cos((i / 8) * Math.PI * 2) : 0;
+  const b = anim === 'idle' ? Math.sin((i / 4) * Math.PI * 2) : 0;
+  const hit = anim === 'hit' ? (i === 0 ? 1 : 0.5) : 0;
+  // von der Seite stark vorgebeugt, Fäuste vor dem Körper, Brust zur Kamera gedreht (breite Schultern); von vorn hängen die Arme senkrecht
+  Object.assign(p, {
+    fx: (side ? 4.5 : 3) - sw * 4 - hit * 2, fy: -4 + Math.abs(sw) * 1.2 + b * 0.4 - hit * 2, fz: side ? 7 : 9.5,
+    bx: (side ? 2.5 : 1.5) + sw * 4 - hit * 3, by: -4 + Math.abs(sw) * 1.2 + b * 0.4 - hit * 1.5, bz: side ? -7 : -9.5,
+    armsFront: false, armOut: 0,
+  });
+  if (side) {
+    p.turn = 0.62 + sw * 0.08;
+    p.lean = (p.lean ?? 0) + 1.5;
+  }
 }
 
 /** Teilfarben aus der Palette einer Art: Gruppen (skin, top, …) auf Teile verteilt, einzelne Teile überschreiben */
@@ -283,6 +319,7 @@ function humMats(d: HumDef): Record<number, Ramp> {
     foreN: skin, foreF: skin, handN: skin, handF: skin, thighN: P.legs ?? RAG, kneeN: P.legs ?? RAG, thighF: P.legs ?? RAG, kneeF: P.legs ?? RAG,
     shinN: P.boots ?? MAT.boot, shinF: P.boots ?? MAT.boot, footN: P.boots ?? MAT.boot, footF: P.boots ?? MAT.boot,
     pauldronN: metal, pauldronF: metal, robe: P.robe ?? top, robeHem: P.robeHem ?? MAT.belt, cloak: P.cloak ?? CLOAKS.rag!, cloakHem: P.cloakHem ?? P.cloak ?? CLOAKS.rag!,
+    crack: P.crack ?? skin, rivet: P.rivet ?? MAT.iron,
     quiver: MAT.leatherD, fletch: MAT.fletch, crest: P.crest ?? MAT.tabard, ear: skin, horn: P.horn ?? BONE, tail: P.tail ?? skin, wing: P.wing ?? skin, beard: P.beard ?? MAT.hair,
     shield: P.shield ?? (d.shield === 1 ? MAT.wood : metal), shieldRim: d.shield === 1 ? MAT.iron : MAT.chain, shieldBoss: MAT.iron,
   };

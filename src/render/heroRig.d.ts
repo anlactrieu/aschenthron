@@ -26,6 +26,8 @@ export interface HeroGear {
   feet?: number;
   /** ohne Beine, Robe bis zum Boden */
   ghost?: boolean;
+  /** Golem: 1 Stein (Risse), 2 Eisen (Platten, Nieten) */
+  golem?: number;
   /** Skelett: Rippen statt Brust */
   ribs?: boolean;
 }
