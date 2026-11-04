@@ -1,13 +1,15 @@
 /**
- * Häuser der Stadt als Gebäude (prozedural gezeichnet, Palette angelehnt an Ninja Adventure TilesetHouse, CC0): In der
- * Karte sind Häuser Wandringe (gid 18) mit Dielenboden (gid 15) innen und einer Türkachel (gid 28..37). Zur Laufzeit
- * werden diese Rechtecke erkannt; die Karte und die Sim bleiben unverändert. Gezeichnet wird ein Satteldach (Schindelreihen,
- * Dachfirst, Traufe, Schornsteine, Kerbe mit Vordach an der Türseite), eine zweigeschossige Vorderwand mit Fachwerk, Fenstern
- * mit Läden und Blumenkästen, Steinsockel und eine Holztür mit Berufsschild. Ohne Dokument (Node) liefern die Bauer null.
+ * Häuser der Stadt als Gebäude, im Kunstraster der Code-Welt (24 px je Kachel, Maßstab 2, Stil wie world/props.ts):
+ * In der Karte sind Häuser Wandringe (gid 18) mit Dielenboden (gid 15) innen und einer Türkachel (gid 28..37). Zur
+ * Laufzeit werden diese Rechtecke erkannt; Karte und Sim bleiben unverändert. Gezeichnet wird ein Satteldach (Schindeln
+ * bzw. Stroh, Dachfirst, Traufe, Giebelbretter, Schornsteine, Kerbe mit Vordach an der Türseite), ein Obergeschoss mit
+ * Fachwerk, Fenstern mit Läden und Blumenkästen, ein Erdgeschoss mit Steinsockel, eine Holztür mit Berufsschild und ein
+ * eigenes Lichtbild für die Fenster (nachts). Ohne Dokument (Node) liefern die Canvas-Bauer null; die Raster-Bauer
+ * (`*Raster`) laufen überall (Kontaktbögen).
  */
 import { DOOR_ICONS, TOWN_GID, drawDoorIcon, type DoorIcon } from './town';
-import { PIXEL } from './ninjaProps';
-import { gradeRgb } from './ninja';
+import { ART, INK, Raster, h3, mix, toCanvas, type Rgb } from './world/raster';
+import { R, fence, type Ramp5 } from './world/props';
 
 /** Bis zu dieser Zeilenzahl reicht das Dach; Kerbe an der Türseite (Kachelspalte/-zeile im Dachbild) */
 export interface RoofNotch { col: number; row: number; rows: number }
@@ -62,265 +64,271 @@ export function detectHouses(tiles: ArrayLike<number>, gw: number, gh: number): 
   return out;
 }
 
+/* ---------------------------------------------------------------- Paletten je Variante (gedämpft, dunkel) */
 
-type Cv = HTMLCanvasElement;
-type G = CanvasRenderingContext2D;
-type Rgb = [number, number, number];
+const ROOF: Ramp5[] = [
+  [0x14161c, 0x212532, 0x303648, 0x434a5c, 0x5a6274], // Schiefer
+  [0x1e0e0c, 0x341814, 0x4c241c, 0x663226, 0x804234], // Ziegel
+  [0x1e180e, 0x342a16, 0x4a3c1e, 0x625028, 0x7c6634], // Stroh
+  [0x121a12, 0x1e2a1c, 0x2a3a26, 0x384c30, 0x4a6040], // Moos
+  [0x1a120c, 0x2c1e14, 0x40301e, 0x564028, 0x6e5434], // Holzschindel
+];
+const PLASTER: Ramp5[] = [
+  [0x2e2a24, 0x4c463c, 0x6a6252, 0x857b68, 0x9c917c],
+  [0x2c2c30, 0x48484e, 0x64626a, 0x7e7c82, 0x949198],
+  [0x34281a, 0x544430, 0x725e44, 0x8b7656, 0xa08a68],
+  [0x2e2a24, 0x4c463c, 0x6a6252, 0x857b68, 0x9c917c],
+  [0x302a26, 0x4e4640, 0x6c6258, 0x877c70, 0x9e9284],
+];
+const SHUTTER: Ramp5[] = [
+  [0x0e1614, 0x1a2824, 0x283c36, 0x365048, 0x48665c],
+  [0x0e1218, 0x1a2230, 0x283448, 0x36465e, 0x485a74],
+  [0x1a0c0a, 0x2e1612, 0x44221c, 0x5a2e26, 0x723c32],
+  [0x1a120c, 0x2e2016, 0x443020, 0x5a402a, 0x725236],
+  [0x101610, 0x1c281c, 0x2a3a28, 0x384c34, 0x4a6044],
+];
+const TIMBER: Ramp5 = [0x120a06, 0x20140c, 0x321f12, 0x462c1a, 0x5a3a24];
+const STONE: Ramp5 = R.stone;
+const GLASS = 0x121a24;
+const GLASS_HI = 0x34465a;
+/** Fensterlicht nachts (additiv) */
+export const WINDOW_LIGHT: Rgb = 0xff9a38;
 
-const mk = (w: number, h: number): Cv => {
-  const c = document.createElement('canvas');
-  c.width = w;
-  c.height = h;
-  return c;
-};
-const ctx = (c: Cv): G => {
-  const g = c.getContext('2d', { willReadFrequently: true })!;
-  g.imageSmoothingEnabled = false;
-  return g;
-};
-const cl = (v: number): number => Math.max(0, Math.min(255, Math.round(v)));
-const col = (c: Rgb, k = 1): string => {
-  const [r, g, b] = gradeRgb(c);
-  return `rgb(${cl(r * k)},${cl(g * k)},${cl(b * k)})`;
-};
-const mix = (a: Rgb, b: Rgb, t: number): Rgb => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
-/** Kleiner Hash 0..n-1 aus drei Zahlen */
-const hh = (a: number, b: number, c: number, n: number): number => {
-  let h = (Math.imul(a + 17, 73856093) ^ Math.imul(b + 31, 19349663) ^ Math.imul(c + 7, 83492791)) >>> 0;
-  h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
-  return ((h ^ (h >>> 16)) >>> 0) % n;
-};
-const rect = (g: G, c: string, x: number, y: number, w: number, h: number): void => {
-  g.fillStyle = c;
-  g.fillRect(x, y, w, h);
-};
+const t5 = (r: Ramp5, t: number): Rgb => r[Math.max(0, Math.min(4, Math.round(t)))]!;
 
-function up(src: Cv, k = PIXEL): Cv {
-  const out = mk(src.width * k, src.height * k);
-  const g = ctx(out);
-  g.drawImage(src, 0, 0, out.width, out.height);
-  return out;
-}
+/* ---------------------------------------------------------------- Dach */
 
-/** Dachfarbe, Läden, Putz je Variante: gedämpft, natürlich (Schiefer, Ziegel, Stroh, Moos, Holzschindel). */
-const ROOF: Rgb[] = [[98, 114, 134], [152, 94, 72], [178, 150, 92], [104, 124, 100], [134, 102, 74]];
-const SHUTTER: Rgb[] = [[84, 118, 106], [78, 104, 128], [128, 70, 58], [136, 88, 62], [92, 116, 90]];
-const PLASTER: Rgb[] = [[222, 214, 194], [230, 210, 178], [216, 206, 178], [222, 214, 190], [228, 212, 186]];
-const TIMBER: Rgb = [96, 66, 44];
-const OUTLINE: Rgb = [38, 28, 28];
-const STONE: Rgb = [132, 126, 116];
-
-/** Eine Schindelfläche mit Reihenversatz zwischen y0 und y1, seitlich von xa bis xb. */
-function shingles(g: G, base: Rgb, xa: number, xb: number, y0: number, y1: number, rowH: number, shW: number, seed: number, shade: number): void {
-  for (let y = y0, r = 0; y < y1; y += rowH, r++) {
+/** Schindelfläche zwischen y0 und y1 (Reihen mit Versatz, Lichtkante oben, Schatten unten, Fugen) */
+function shingles(r: Raster, ramp: Ramp5, xa: number, xb: number, y0: number, y1: number, rowH: number, shW: number, seed: number, lift: number): void {
+  for (let y = y0, row = 0; y < y1; y += rowH, row++) {
     const rh = Math.min(rowH, y1 - y);
-    const off = (r % 2) * (shW >> 1);
+    const off = (row % 2) * (shW >> 1);
     for (let x = xa - off, i = 0; x < xb; x += shW, i++) {
-      const x0 = Math.max(x, xa);
-      const x1 = Math.min(x + shW, xb);
-      if (x1 <= x0) continue;
-      const j = 0.9 + hh(seed, r, i, 21) * 0.01;
-      rect(g, col(base, shade * j), x0, y, x1 - x0, rh);
-      if (rh > 2) rect(g, col(base, shade * j * 1.14), x0, y, x1 - x0, 1); // Lichtkante oben
-      rect(g, col(base, shade * 0.66), x0, y + rh - 1, x1 - x0, 1); // Schatten unter der Reihe
-      if (x >= xa) rect(g, col(base, shade * 0.72), x, y, 1, rh - 1); // Fuge links
+      const tone = 2 + lift + (h3(seed, row, i) < 0.25 ? 0.6 : h3(seed, row, i + 50) < 0.15 ? -0.6 : 0);
+      for (let yy = y; yy < y + rh; yy++) {
+        for (let xx = Math.max(x, xa); xx < Math.min(x + shW, xb); xx++) {
+          let t = tone;
+          if (yy === y && rh > 2) t += 0.9; // Lichtkante
+          if (yy === y + rh - 1) t = 0.6 + lift * 0.5; // Schatten unter der Reihe
+          else if (xx === x) t -= 0.8; // Fuge
+          r.set(xx, yy, t5(ramp, t));
+        }
+      }
     }
   }
 }
 
-/** Steinschornstein auf dem Dach: Fuß bei (x, yBase), Schatten nach rechts unten. */
-function chimney(g: G, x: number, yBase: number, seed: number): void {
-  const w = 9;
-  const h = 13;
-  const y = yBase - h;
-  rect(g, 'rgba(20,14,14,0.38)', x + 2, yBase - 3, w, 5); // Schatten auf dem Dach
-  rect(g, col(OUTLINE), x - 1, y - 1, w + 2, h + 2);
-  rect(g, col(STONE, 0.92), x, y + 2, w, h - 2);
-  rect(g, col(STONE, 1.18), x, y + 2, 2, h - 2); // Lichtseite
-  rect(g, col(STONE, 0.7), x + w - 2, y + 2, 2, h - 2); // Schattenseite
-  for (let r = 0; r < 4; r++) {
-    const yy = y + 5 + r * 3;
-    rect(g, col(STONE, 0.62), x, yy, w, 1);
-    for (let i = r % 2 ? 2 : 4; i < w; i += 5) rect(g, col(STONE, 0.62), x + i, yy - 2, 1, 2);
+/** Strohdach: senkrechte Halmstriche, Bündelkanten waagrecht */
+function thatch(r: Raster, ramp: Ramp5, xa: number, xb: number, y0: number, y1: number, seed: number, lift: number): void {
+  for (let y = y0; y < y1; y++) {
+    for (let x = xa; x < xb; x++) {
+      let t = 2 + lift + (h3(x, Math.floor(y / 3), seed) < 0.3 ? 0.7 : h3(x, Math.floor(y / 2), seed + 1) < 0.2 ? -0.7 : 0);
+      if ((y - y0) % 6 === 5) t = 0.8 + lift * 0.5;
+      r.set(x, y, t5(ramp, t));
+    }
   }
-  rect(g, col(STONE, 1.3), x - 1, y, w + 2, 2); // Deckplatte
-  rect(g, col(OUTLINE), x - 1, y + 2, w + 2, 1);
-  rect(g, col([34, 26, 28]), x + 2, y + 0, w - 4, 1); // Rauchöffnung
-  if (hh(seed, x, 3, 2) === 0) rect(g, col(STONE, 1.05), x + 3, y - 2, 3, 1);
 }
 
-/** Vordach im Kerbenkopf: zwei Schindelreihen, dunkle Unterseite, Schatten darunter. */
-function awning(g: G, base: Rgb, x: number, y: number, seed: number): void {
-  rect(g, col(OUTLINE), x - 1, y, 18, 1);
-  shingles(g, base, x, x + 16, y + 1, y + 4, 3, 6, seed, 1.04);
-  rect(g, col(TIMBER, 0.8), x, y + 4, 16, 1);
-  rect(g, 'rgba(10,6,6,0.4)', x, y + 5, 16, 2);
+/** Steinschornstein, Fuß bei (x, yBase), Schatten rechts unten aufs Dach */
+function chimney(r: Raster, x: number, yBase: number): void {
+  const w = 8;
+  const h = 14;
+  const y = yBase - h;
+  for (let k = 0; k < 3; k++) for (let i = 0; i < w; i++) r.blend(x + 2 + i, yBase + k, 0x050406, 0.4);
+  r.rect(x - 1, y - 1, w + 2, h + 2, INK);
+  for (let yy = y + 2; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) r.set(xx, yy, t5(STONE, xx === x ? 4 : xx >= x + w - 1 ? 1 : ((yy - y) % 3 === 0 ? 1.6 : 2.6)));
+  r.rect(x - 1, y, w + 2, 2, STONE[4]);
+  r.rect(x + 1, y, w - 2, 1, 0x0a0808);
+}
+
+/** Vordach im Kerbenkopf (eine Kachel breit) */
+function awning(r: Raster, ramp: Ramp5, x: number, y: number, seed: number): void {
+  r.rect(x - 1, y, ART + 2, 1, INK);
+  shingles(r, ramp, x, x + ART, y + 1, y + 6, 3, 6, seed, 0.6);
+  r.rect(x, y + 6, ART, 1, TIMBER[3]);
+  r.rect(x - 1, y + 7, ART + 2, 1, INK);
+  for (let k = 0; k < 2; k++) for (let i = 0; i < ART; i++) r.blend(x + i, y + 8 + k, 0x050406, 0.4 - k * 0.15);
 }
 
 /**
- * Dach als Satteldach in Draufsicht: Rückseite oben (dunkler), Dachfirst mit hellem Grat, Vorderseite mit Schindelreihen,
- * Traufe mit Schatten unten, Giebelbretter links/rechts, Schornsteine. `notch` schneidet eine Kerbe für die Tür.
+ * Dach als Raster: Rückseite oben (dunkler), First mit hellem Grat, Vorderseite, Traufe mit Brett, Giebelbretter links
+ * (hell) und rechts (dunkel), Schornsteine. `notch` schneidet eine Kerbe für die Tür (mit Vordach).
  */
-export function houseRoof(wTiles: number, hTiles: number, variant: number, seed = 0, notch: RoofNotch | null = null): Cv | null {
-  if (typeof document === 'undefined') return null;
-  const W = wTiles * 16;
-  const H = hTiles * 16;
-  const c = mk(W, H);
-  const g = ctx(c);
-  const base = ROOF[variant % ROOF.length]!;
+export function houseRoofRaster(wTiles: number, hTiles: number, variant: number, seed = 0, notch: RoofNotch | null = null): Raster {
+  const W = wTiles * ART;
+  const H = hTiles * ART;
+  const r = new Raster(W, H);
+  const ramp = ROOF[variant % ROOF.length]!;
+  const straw = variant % ROOF.length === 2;
   const ridge = Math.round(H * 0.42);
-  rect(g, col(OUTLINE), 0, 0, W, H);
-  shingles(g, base, 2, W - 2, 1, ridge - 2, 4, 6, seed, 0.78); // Rückseite
-  shingles(g, base, 2, W - 2, ridge + 2, H - 4, 5, 8, seed + 5, 1); // Vorderseite
-  // Dachfirst: Grat mit Kappen
-  rect(g, col(OUTLINE), 1, ridge - 2, W - 2, 1);
-  rect(g, col(mix(base, [255, 244, 220], 0.5)), 2, ridge - 1, W - 4, 1);
-  rect(g, col(mix(base, [255, 244, 220], 0.3)), 2, ridge, W - 4, 1);
-  rect(g, col(base, 0.55), 2, ridge + 1, W - 4, 1);
-  for (let x = 6; x < W - 4; x += 7) rect(g, col(base, 0.6), x, ridge - 1, 1, 2);
-  // Traufe: Traufbrett und Schatten
-  rect(g, col(TIMBER, 1.15), 1, H - 4, W - 2, 1);
-  rect(g, col(TIMBER, 0.95), 1, H - 3, W - 2, 2);
-  rect(g, col(OUTLINE), 0, H - 1, W, 1);
-  // Giebelbretter links (hell) und rechts (dunkel)
-  rect(g, col(TIMBER, 1.25), 1, 1, 1, H - 2);
-  rect(g, col(TIMBER, 0.8), W - 2, 1, 1, H - 2);
+  r.rect(0, 0, W, H, INK);
+  if (straw) {
+    thatch(r, ramp, 2, W - 2, 1, ridge - 2, seed, -0.4);
+    thatch(r, ramp, 2, W - 2, ridge + 2, H - 4, seed + 5, 0.4);
+  } else {
+    shingles(r, ramp, 2, W - 2, 1, ridge - 2, 5, 7, seed, -0.5);
+    shingles(r, ramp, 2, W - 2, ridge + 2, H - 4, 6, 9, seed + 5, 0.3);
+  }
+  // First: Grat mit Kappen
+  r.rect(1, ridge - 2, W - 2, 1, INK);
+  r.rect(2, ridge - 1, W - 4, 1, mix(ramp[4], 0xd8c8a8, 0.35));
+  r.rect(2, ridge, W - 4, 1, ramp[4]);
+  r.rect(2, ridge + 1, W - 4, 1, ramp[1]);
+  for (let x = 7; x < W - 4; x += 8) r.rect(x, ridge - 1, 1, 2, ramp[1]);
+  // Traufe: Brett und Kante
+  r.rect(1, H - 4, W - 2, 1, TIMBER[4]);
+  r.rect(1, H - 3, W - 2, 2, TIMBER[2]);
+  r.rect(0, H - 1, W, 1, INK);
+  // Giebelbretter
+  r.rect(1, 1, 1, H - 2, TIMBER[4]);
+  r.rect(W - 2, 1, 1, H - 2, TIMBER[1]);
   // Schornsteine auf der Rückseite, nicht über der Kerbe
   const cols: number[] = [];
   for (let k = 1; k < wTiles - 1; k++) if (!notch || Math.abs(k - notch.col) > 1) cols.push(k);
-  const nChim = wTiles >= 7 && hh(seed, 1, 1, 3) > 0 ? 2 : 1;
-  const first = cols[hh(seed, 2, 2, Math.max(1, cols.length))] ?? 2;
+  const two = wTiles >= 7 && Math.floor(h3(seed, 1, 1) * 3) > 0;
+  const first = cols[Math.floor(h3(seed, 2, 2) * Math.max(1, cols.length))] ?? 2;
   const picks = new Set<number>([first]);
-  if (nChim === 2) picks.add(cols[(cols.indexOf(first) + 3) % cols.length] ?? first);
-  for (const k of picks) chimney(g, k * 16 + 3 + hh(seed, k, 4, 3), ridge - 1, seed + k);
+  if (two) picks.add(cols[(cols.indexOf(first) + 3) % cols.length] ?? first);
+  for (const k of picks) chimney(r, k * ART + 6 + Math.floor(h3(seed, k, 4) * 6), ridge - 1);
   if (notch) {
-    const nx = notch.col * 16;
-    const ny = notch.row * 16;
-    const nh = notch.rows * 16;
-    g.clearRect(nx, ny, 16, nh);
-    // Ränder der Kerbe: Außenlinie und Lichtkante auf der Dachseite
-    if (nx > 0) {
-      rect(g, col(OUTLINE), nx - 1, ny, 1, nh);
-      rect(g, col(TIMBER, 1.2), nx - 2, ny, 1, nh);
-    }
-    if (nx + 16 < W) {
-      rect(g, col(OUTLINE), nx + 16, ny, 1, nh);
-      rect(g, col(TIMBER, 0.85), nx + 17, ny, 1, nh);
-    }
-    if (ny + nh < H) {
-      rect(g, col(OUTLINE), nx, ny + nh, 16, 1);
-      rect(g, col(TIMBER, 1.15), nx, ny + nh + 1, 16, 1);
-    }
-    awning(g, base, nx, ny, seed);
+    const nx = notch.col * ART;
+    const ny = notch.row * ART;
+    const nh = notch.rows * ART;
+    for (let y = ny; y < Math.min(H, ny + nh); y++) for (let x = nx; x < nx + ART; x++) r.d[y * W + x] = 0;
+    if (nx > 0) { r.rect(nx - 1, ny, 1, nh, INK); r.rect(nx - 2, ny, 1, nh, TIMBER[4]); }
+    if (nx + ART < W) { r.rect(nx + ART, ny, 1, nh, INK); r.rect(nx + ART + 1, ny, 1, nh, TIMBER[1]); }
+    if (ny + nh < H) { r.rect(nx, ny + nh, ART, 1, INK); r.rect(nx, ny + nh + 1, ART, 1, TIMBER[3]); }
+    awning(r, ramp, nx, ny, seed);
   }
-  return up(c);
+  return r;
 }
 
-/** Zeichnet das Fenster-Teil einer Kachel: Rahmen, Glas mit Kreuz und Glanz, Läden, Sims. */
-function windowPane(g: G, v: number, y: number, h: number): void {
-  const sh = SHUTTER[v % SHUTTER.length]!;
-  rect(g, col(OUTLINE), 3, y - 1, 10, h + 2);
-  rect(g, col(TIMBER, 1.1), 4, y, 8, h);
-  rect(g, col([120, 150, 168]), 5, y + 1, 6, h - 2);
-  rect(g, col([176, 204, 214]), 5, y + 1, 2, 2); // Glanz
-  rect(g, col(TIMBER, 0.9), 7, y + 1, 1, h - 2);
-  rect(g, col(TIMBER, 0.9), 5, y + Math.floor(h / 2), 6, 1);
-  // Läden beidseitig
-  for (const sx of [1, 12]) {
-    rect(g, col(OUTLINE), sx, y - 1, 3, h + 2);
-    rect(g, col(sh), sx + (sx === 1 ? 0 : 1), y, 2, h);
-    rect(g, col(sh, 0.7), sx + (sx === 1 ? 1 : 0), y + 1, 1, h - 2);
-  }
-  rect(g, col([200, 192, 176]), 3, y + h, 10, 1); // Sims
-  rect(g, col(OUTLINE), 3, y + h + 1, 10, 1);
+export function houseRoof(wTiles: number, hTiles: number, variant: number, seed = 0, notch: RoofNotch | null = null): HTMLCanvasElement | null {
+  if (typeof document === 'undefined') return null;
+  return toCanvas(houseRoofRaster(wTiles, hTiles, variant, seed, notch));
 }
 
-/** Putzfläche mit leichtem Rauschen */
-function plaster(g: G, v: number, seed: number): void {
+/* ---------------------------------------------------------------- Wände, Fenster, Tür */
+
+/** Putzfläche mit leisem Rauschen */
+function plaster(r: Raster, v: number, seed: number, y0 = 0, y1 = ART): void {
   const p = PLASTER[v % PLASTER.length]!;
-  rect(g, col(p), 0, 0, 16, 16);
-  for (let i = 0; i < 9; i++) rect(g, col(p, 0.94 + hh(seed, i, 9, 4) * 0.02), hh(seed, i, 1, 16), hh(seed, i, 2, 16), 1, 1);
+  for (let y = y0; y < y1; y++) for (let x = 0; x < ART; x++) r.set(x, y, t5(p, h3(x + seed * 3, y, 9) < 0.08 ? 1.6 : h3(x, y + seed, 10) < 0.05 ? 3 : 2.4));
 }
 
-/** Holzpfosten an den Kachelrändern (Fachwerk) */
-function posts(g: G, y0: number, y1: number): void {
-  for (const x of [0, 14]) {
-    rect(g, col(OUTLINE), x === 0 ? 0 : 15, y0, 1, y1 - y0);
-    rect(g, col(TIMBER), x === 0 ? 1 : 14, y0, x === 0 ? 1 : 1, y1 - y0);
+/** Fachwerk: Pfosten an den Kachelrändern */
+function posts(r: Raster, y0: number, y1: number): void {
+  for (let y = y0; y < y1; y++) {
+    r.set(0, y, INK);
+    r.set(1, y, TIMBER[4]);
+    r.set(2, y, TIMBER[2]);
+    r.set(ART - 3, y, TIMBER[3]);
+    r.set(ART - 2, y, TIMBER[1]);
+    r.set(ART - 1, y, INK);
   }
-  rect(g, col(TIMBER, 1.2), 1, y0, 1, y1 - y0);
-  rect(g, col(TIMBER), 13, y0, 2, y1 - y0);
 }
 
-/** Steinsockel unten in der Kachel (5 Reihen hoch) */
-function plinth(g: G, y: number, seed: number): void {
-  rect(g, col(STONE), 0, y, 16, 16 - y);
-  rect(g, col(OUTLINE, 1.4), 0, y, 16, 1);
-  rect(g, col(STONE, 1.15), 0, y + 1, 16, 1);
-  for (let r = 0, yy = y + 2; yy < 16; r++, yy += 3) {
-    rect(g, col(STONE, 0.62), 0, yy + 2 > 15 ? 15 : yy + 2, 16, 1);
-    for (let x = (r % 2) * 4; x < 16; x += 8) rect(g, col(STONE, 0.66), x, yy, 1, 3);
+/** Strebe (schräger Balken) im Fachwerk */
+function brace(r: Raster, y0: number, y1: number): void {
+  for (let i = 0; i <= y1 - y0; i++) {
+    const x = 3 + Math.round((i * (ART - 7)) / (y1 - y0));
+    r.set(x, y0 + i, TIMBER[3]);
+    r.set(x + 1, y0 + i, TIMBER[1]);
   }
-  rect(g, col(STONE, 0.9 + hh(seed, 1, 1, 3) * 0.05), 3, y + 2, 2, 1);
 }
+
+/** Fenster: Rahmen, dunkles Glas mit Kreuz und Glanz, Läden, Sims */
+function windowPane(r: Raster, v: number, y: number, h: number): void {
+  const sh = SHUTTER[v % SHUTTER.length]!;
+  r.rect(6, y - 1, 12, h + 2, INK);
+  r.rect(7, y, 10, h, TIMBER[3]);
+  r.rect(8, y + 1, 8, h - 2, GLASS);
+  r.rect(8, y + 1, 2, 2, GLASS_HI);
+  r.rect(11, y + 1, 1, h - 2, TIMBER[2]);
+  r.rect(8, y + Math.floor(h / 2), 8, 1, TIMBER[2]);
+  for (const sx of [2, 18]) {
+    r.rect(sx, y - 1, 4, h + 2, INK);
+    r.rect(sx + 1, y, 2, h, sh[3]);
+    r.rect(sx + (sx === 2 ? 2 : 1), y + 1, 1, h - 2, sh[1]);
+  }
+  r.rect(6, y + h + 1, 12, 1, STONE[3]);
+  r.rect(6, y + h + 2, 12, 1, INK);
+}
+
+/** Steinsockel unten in der Kachel ab y */
+function plinth(r: Raster, y: number): void {
+  for (let yy = y; yy < ART; yy++) {
+    for (let x = 0; x < ART; x++) {
+      const row = Math.floor((yy - y - 1) / 3);
+      const off = (row % 2) * 4;
+      let t = yy === y ? 0.4 : yy === y + 1 ? 3.6 : (yy - y - 1) % 3 === 2 ? 1 : (x + off) % 8 === 0 ? 1.2 : 2.4;
+      if (yy === ART - 1) t = 0.6;
+      r.set(x, yy, t5(STONE, t));
+    }
+  }
+}
+
+/** Glasflächen (für das Nachtlicht): [x, y, w, h] im Kunstraster der Kachel */
+const WIN_UPPER: [number, number, number, number] = [8, 6, 8, 8];
+const WIN_LOWER: [number, number, number, number] = [8, 3, 8, 8];
 
 /**
- * 16x16-Kachel der Vorderwand. `row`: 'upper' (Obergeschoss unter der Traufe, gehört zur Dachebene) oder 'lower'
- * (Erdgeschoss mit Steinsockel). `kind`: 'win' Fenster, 'brace' Putz mit Fachwerkstrebe, 'post' Eckpfosten.
+ * Kachel der Vorderwand als Raster. `row`: 'upper' (Obergeschoss unter der Traufe, gehört zur Dachebene) oder 'lower'
+ * (Erdgeschoss mit Steinsockel). `kind`: 'win' Fenster, 'brace' Putz mit Strebe, 'post' Eckpfosten.
  */
-export function houseWallTile(row: 'upper' | 'lower', kind: 'win' | 'brace' | 'post', variant: number, seed = 0): Cv | null {
-  if (typeof document === 'undefined') return null;
-  const c = mk(16, 16);
-  const g = ctx(c);
-  plaster(g, variant, seed);
+export function houseWallRaster(row: 'upper' | 'lower', kind: 'win' | 'brace' | 'post', variant: number, seed = 0): Raster {
+  const r = new Raster(ART, ART);
+  plaster(r, variant, seed);
   if (row === 'upper') {
-    rect(g, col(TIMBER, 0.9), 0, 14, 16, 2); // Deckenbalken
-    rect(g, col(OUTLINE), 0, 15, 16, 1);
-    rect(g, col(TIMBER, 1.2), 0, 14, 16, 1);
+    r.rect(0, ART - 3, ART, 2, TIMBER[2]); // Deckenbalken
+    r.rect(0, ART - 3, ART, 1, TIMBER[4]);
+    r.rect(0, ART - 1, ART, 1, INK);
     if (kind === 'win') {
-      windowPane(g, variant, 3, 8);
+      windowPane(r, variant, WIN_UPPER[1] - 1, WIN_UPPER[3] + 2);
       // Blumenkasten
-      rect(g, col(OUTLINE), 2, 12, 12, 3);
-      rect(g, col([124, 84, 52]), 3, 12, 10, 2);
-      const fl: Rgb[] = [[224, 96, 108], [236, 196, 84], [190, 120, 196], [240, 240, 232]];
-      for (let i = 0; i < 5; i++) {
-        rect(g, col([70, 130, 62]), 3 + i * 2, 11, 2, 1);
-        rect(g, col(fl[(hh(seed, i, 5, 4) + i) % 4]!), 3 + i * 2 + (i % 2), 10 + (i % 2), 1, 1);
+      r.rect(5, 17, 14, 3, INK);
+      r.rect(6, 17, 12, 2, R.wood[2]);
+      const fl = [0xa86a80, 0xc8b35a, 0x8a6aa8, 0xc8c4b4];
+      for (let i = 0; i < 6; i++) {
+        r.rect(6 + i * 2, 16, 2, 1, R.leaf[3]);
+        r.set(6 + i * 2 + (i % 2), 15 + (i % 2), fl[(Math.floor(h3(seed, i, 5) * 4) + i) % 4]!);
       }
-    } else if (kind === 'brace') {
-      for (let i = 0; i < 11; i++) rect(g, col(TIMBER), 3 + i, 3 + i, 1, 1);
-      posts(g, 3, 14);
-    }
-    rect(g, 'rgba(10,6,6,0.42)', 0, 0, 16, 1); // Schatten der Traufe
-    rect(g, 'rgba(10,6,6,0.3)', 0, 1, 16, 1);
-    rect(g, 'rgba(10,6,6,0.16)', 0, 2, 16, 1);
-    if (kind === 'post') posts(g, 3, 14);
-  } else {
-    plinth(g, 11, seed);
-    if (kind === 'win') {
-      windowPane(g, variant, 1, 8);
-    } else if (kind === 'brace') {
-      for (let i = 0; i < 10; i++) rect(g, col(TIMBER), 3 + i, 1 + i, 1, 1);
-      posts(g, 0, 11);
     } else {
-      posts(g, 0, 11);
+      posts(r, 3, ART - 3);
+      if (kind === 'brace') brace(r, 4, ART - 5);
+    }
+    // Schatten der Traufe
+    for (let k = 0; k < 3; k++) for (let x = 0; x < ART; x++) r.blend(x, k, 0x050406, 0.55 - k * 0.17);
+  } else {
+    plinth(r, 16);
+    if (kind === 'win') windowPane(r, variant, WIN_LOWER[1] - 1, WIN_LOWER[3] + 2);
+    else {
+      posts(r, 0, 16);
+      if (kind === 'brace') brace(r, 1, 15);
     }
   }
-  return up(c);
+  return r;
+}
+
+export function houseWallTile(row: 'upper' | 'lower', kind: 'win' | 'brace' | 'post', variant: number, seed = 0): HTMLCanvasElement | null {
+  if (typeof document === 'undefined') return null;
+  return toCanvas(houseWallRaster(row, kind, variant, seed));
+}
+
+export function houseFacadeRaster(wTiles: number, variant: number, seed = 0): Raster {
+  const r = new Raster(wTiles * ART, ART);
+  for (let rel = 0; rel < wTiles; rel++) r.blit(houseWallRaster('upper', upperKind(rel, wTiles), variant, seed + rel), rel * ART, 0);
+  return r;
 }
 
 /** Obere Fassadenreihe (gehört optisch zum Dach, blendet mit ihm aus): Fenster an ungeraden Plätzen. */
-export function houseFacade(wTiles: number, variant: number, seed = 0): Cv | null {
+export function houseFacade(wTiles: number, variant: number, seed = 0): HTMLCanvasElement | null {
   if (typeof document === 'undefined') return null;
-  const c = mk(wTiles * 48, 48);
-  const g = ctx(c);
-  for (let rel = 0; rel < wTiles; rel++) {
-    const edge = rel === 0 || rel === wTiles - 1;
-    const t = houseWallTile('upper', edge ? 'post' : rel % 2 === 1 ? 'win' : 'brace', variant, seed + rel);
-    if (!t) return null;
-    g.drawImage(t, rel * 48, 0);
-  }
-  return c;
+  return toCanvas(houseFacadeRaster(wTiles, variant, seed));
+}
+
+function upperKind(rel: number, w: number): 'win' | 'brace' | 'post' {
+  return rel === 0 || rel === w - 1 ? 'post' : rel % 2 === 1 ? 'win' : 'brace';
 }
 
 /** Zeile der Vorderwand im Erdgeschoss: Art der Kachel an Spalte `rel`. */
@@ -328,76 +336,113 @@ export function lowerKind(rel: number, w: number): 'win' | 'brace' | 'post' {
   return rel === 0 || rel === w - 1 ? 'post' : rel % 2 === 0 ? 'win' : 'brace';
 }
 
-/** Holztür in Rahmen mit Steinschwelle, 16x16 (Unterteil). */
-function doorLeaf(g: G, oy: number, variant: number): void {
-  const wood: Rgb = [130, 90, 54];
-  rect(g, col(OUTLINE), 2, oy + 2, 12, 14);
-  rect(g, col(TIMBER, 1.1), 3, oy + 2, 10, 2); // Sturzbalken
-  rect(g, col(wood, 0.55), 3, oy + 4, 10, 11); // dunkle Öffnung als Rand
-  rect(g, col(wood), 4, oy + 5, 8, 11);
-  rect(g, col(OUTLINE), 3, oy + 4, 1, 1);
-  rect(g, col(OUTLINE), 12, oy + 4, 1, 1); // gerundete Ecken
-  for (let x = 6; x < 12; x += 2) rect(g, col(wood, 0.72), x, oy + 5, 1, 11);
-  rect(g, col(wood, 1.2), 4, oy + 5, 1, 11);
-  rect(g, col([58, 52, 52]), 4, oy + 7, 8, 1); // Eisenbänder
-  rect(g, col([58, 52, 52]), 4, oy + 12, 8, 1);
-  rect(g, col([232, 196, 92]), 10, oy + 10, 1, 2); // Griff
-  rect(g, col(STONE, 1.1), 2, oy + 15, 12, 1); // Schwelle
-  void variant;
+/**
+ * Nachtlicht der Fenster eines Hauses als Raster über Obergeschoss und Erdgeschoss (2 Kachelreihen, Breite des Hauses):
+ * warme Glasfläche plus kleiner gestufter Schein. Wird additiv über die Fassade gelegt, Deckkraft nach Tageszeit.
+ * Die Tür-Kachel bleibt dunkel.
+ */
+export function houseGlowRaster(hs: House): Raster {
+  const r = new Raster(hs.w * ART, ART * 2);
+  const doorRel = hs.door && hs.door.side === 'S' ? hs.door.x - hs.x0 : -1;
+  const lit = (rel: number, row: number): boolean => h3(hs.x0 + rel, hs.y0 + row, 77) < 0.7;
+  const pane = (ox: number, oy: number, [x, y, w, h]: [number, number, number, number]): void => {
+    for (let yy = -3; yy < h + 3; yy++) {
+      for (let xx = -3; xx < w + 3; xx++) {
+        const inside = xx >= 0 && yy >= 0 && xx < w && yy < h;
+        const d = Math.max(xx < 0 ? -xx : xx >= w ? xx - w + 1 : 0, yy < 0 ? -yy : yy >= h ? yy - h + 1 : 0);
+        const a = inside ? 200 : d === 1 ? 70 : d === 2 ? 36 : 16;
+        r.set(ox + x + xx, oy + y + yy, inside && (xx === 0 || yy === 0) ? 0xffd890 : WINDOW_LIGHT, a);
+      }
+    }
+  };
+  for (let rel = 0; rel < hs.w; rel++) {
+    if (upperKind(rel, hs.w) === 'win' && lit(rel, 0)) pane(rel * ART, 0, WIN_UPPER);
+    if (lowerKind(rel, hs.w) === 'win' && rel !== doorRel && lit(rel, 1)) pane(rel * ART, ART, WIN_LOWER);
+  }
+  return r;
+}
+
+export function houseGlow(hs: House): HTMLCanvasElement | null {
+  if (typeof document === 'undefined') return null;
+  return toCanvas(houseGlowRaster(hs));
+}
+
+/** Holztür in Rahmen mit Steinschwelle (untere Kachel ab oy) */
+function doorLeaf(r: Raster, oy: number): void {
+  const wood = R.wood;
+  r.rect(4, oy + 2, 16, 22, INK);
+  r.rect(5, oy + 2, 14, 2, TIMBER[3]); // Sturz
+  r.rect(5, oy + 4, 14, 19, wood[1]);
+  r.rect(6, oy + 5, 12, 18, wood[2]);
+  for (let x = 9; x < 18; x += 3) r.rect(x, oy + 5, 1, 18, wood[1]);
+  r.rect(6, oy + 5, 1, 18, wood[3]);
+  r.rect(6, oy + 8, 12, 1, R.iron[1]); // Eisenbänder
+  r.rect(6, oy + 17, 12, 1, R.iron[1]);
+  r.rect(15, oy + 13, 1, 2, 0xc8a040); // Griff
+  r.rect(4, oy + 23, 16, 1, STONE[3]); // Schwelle
+}
+
+/** Hängendes Berufsschild (Holzbrett, dunkler Rand, Symbol), 16x16 */
+function signRaster(icon: DoorIcon): Raster {
+  const r = new Raster(16, 16);
+  r.rect(0, 0, 16, 16, INK);
+  r.rect(1, 1, 14, 14, 0x6a4a2c);
+  r.rect(1, 1, 14, 1, 0x8a6a40);
+  r.rect(1, 14, 14, 1, 0x4a321e);
+  drawDoorIcon(rasterCtx(r) as unknown as CanvasRenderingContext2D, icon, 1, 1);
+  return r;
+}
+
+/** Minimaler 2D-Kontext auf einem Raster (nur fillStyle als #rrggbb und fillRect), damit drawDoorIcon auch hier malt */
+function rasterCtx(r: Raster): { fillStyle: string; fillRect(x: number, y: number, w: number, h: number): void } {
+  let col = 0;
+  return {
+    set fillStyle(v: string) { col = parseInt(v.replace('#', ''), 16) || 0; },
+    get fillStyle() { return `#${col.toString(16).padStart(6, '0')}`; },
+    fillRect(x, y, w, h) { r.rect(Math.round(x), Math.round(y), Math.round(w), Math.round(h), mix(col, 0x30282a, 0.25)); },
+  };
 }
 
 /**
- * Tür mit Berufsschild. `tall`: 16x32 mit hängendem Schild über der Tür (Süd-, Ost-, Westtür), sonst nur Tür 16x16
+ * Tür mit Berufsschild. `tall`: 24x48 mit hängendem Schild über der Tür (Süd-, Ost-, Westtür), sonst nur die Tür 24x24
  * (Nordtür, das Schild kommt als eigenes Bild, siehe `houseSign`).
  */
-export function houseDoor(icon: DoorIcon, variant: number, tall = true, seed = 0): Cv | null {
-  if (typeof document === 'undefined') return null;
-  const hgt = tall ? 32 : 16;
-  const c = mk(16, hgt);
-  const g = ctx(c);
-  const lo = hgt - 16;
+export function houseDoorRaster(icon: DoorIcon, variant: number, tall = true, seed = 0): Raster {
+  const hgt = tall ? ART * 2 : ART;
+  const r = new Raster(ART, hgt);
+  const lo = hgt - ART;
   if (tall) {
-    // Obere Wand hinter dem Schild
-    const top = mk(16, 16);
-    const tg = ctx(top);
-    plaster(tg, variant, seed);
-    posts(tg, 0, 16);
-    g.drawImage(top, 0, 0);
+    plaster(r, variant, seed, 0, ART);
+    posts(r, 0, ART);
   }
-  plaster(g, variant, seed + 1);
-  // Unterteil: Putz, Pfosten, Sockel, Tür
-  const bot = mk(16, 16);
-  const bg = ctx(bot);
-  plaster(bg, variant, seed + 2);
-  posts(bg, 0, 16);
-  plinth(bg, 12, seed);
-  doorLeaf(bg, 0, variant);
-  g.drawImage(bot, 0, lo);
+  plaster(r, variant, seed + 1, lo, hgt);
+  const bot = new Raster(ART, ART);
+  plaster(bot, variant, seed + 2);
+  posts(bot, 0, ART);
+  plinth(bot, 19);
+  doorLeaf(bot, 0);
+  r.blit(bot, 0, lo);
   if (tall) {
-    g.drawImage(drawSign(icon, true), 0, 2);
+    r.rect(4, 2, 1, 3, R.iron[2]);
+    r.rect(19, 2, 1, 3, R.iron[2]);
+    r.blit(signRaster(icon), 4, 5);
   }
-  return up(c);
+  return r;
 }
 
-/** Hängendes Berufsschild (Holzbrett, dunkler Rand, Symbol), 16x16. Mit `chain` hängt es an zwei Ketten unter einem Balken. */
-function drawSign(icon: DoorIcon, chain: boolean): Cv {
-  const s = mk(16, 16);
-  const sg = ctx(s);
-  rect(sg, col(OUTLINE), 0, 0, 16, 16);
-  rect(sg, col([160, 122, 74]), 1, 1, 14, 14);
-  rect(sg, col([196, 158, 100]), 1, 1, 14, 1);
-  rect(sg, col([112, 80, 50]), 1, 14, 14, 1);
-  drawDoorIcon(sg, icon, 1, 1);
-  if (chain) {
-    rect(sg, col(TIMBER, 0.8), 0, 0, 16, 1);
-  }
-  return s;
+export function houseDoor(icon: DoorIcon, variant: number, tall = true, seed = 0): HTMLCanvasElement | null {
+  if (typeof document === 'undefined') return null;
+  return toCanvas(houseDoorRaster(icon, variant, tall, seed));
 }
 
-/** Berufsschild als eigenes Bild (für Nordtüren). */
-export function houseSign(icon: DoorIcon): Cv | null {
+/** Berufsschild als eigenes Bild (für Nordtüren), unten mittig auf einer Kachel */
+export function houseSign(icon: DoorIcon): HTMLCanvasElement | null {
   if (typeof document === 'undefined') return null;
-  return up(drawSign(icon, false));
+  const r = new Raster(ART, ART);
+  r.rect(4, 0, 1, 6, R.iron[2]);
+  r.rect(19, 0, 1, 6, R.iron[2]);
+  r.blit(signRaster(icon), 4, 6);
+  return toCanvas(r);
 }
 
 export interface HouseDecor { x: number; y: number; kind: 'barrel' | 'crates' | 'fence' }
@@ -413,13 +458,13 @@ export function houseDecor(hs: House, free: (x: number, y: number) => boolean): 
   const d = hs.door;
   const blocked = (x: number, y: number): boolean => !!d && Math.abs(x - d.x) + Math.abs(y - d.y) <= 2;
   const seed = hs.x0 * 31 + hs.y0 * 17;
-  const pattern = hh(seed, 5, 5, 3);
+  const pattern = Math.floor(h3(seed, 5, 5) * 3);
   const spots: [number, number, HouseDecor['kind'][]][] = [];
   const L = hs.x0 + 1;
-  const R = hs.x0 + hs.w - 2;
-  if (pattern === 0) spots.push([L, row, ['barrel']], [R, row, ['crates']]);
-  else if (pattern === 1) spots.push([L, row, ['fence']], [L + 1, row, ['fence']], [R, row, ['barrel']]);
-  else spots.push([L, row, ['crates']], [R - 1, row, ['fence']], [R, row, ['fence']]);
+  const Rr = hs.x0 + hs.w - 2;
+  if (pattern === 0) spots.push([L, row, ['barrel']], [Rr, row, ['crates']]);
+  else if (pattern === 1) spots.push([L, row, ['fence']], [L + 1, row, ['fence']], [Rr, row, ['barrel']]);
+  else spots.push([L, row, ['crates']], [Rr - 1, row, ['fence']], [Rr, row, ['fence']]);
   for (const [x, y, kinds] of spots) {
     if (blocked(x, y) || !free(x, y)) continue;
     out.push({ x, y, kind: kinds[0]! });
@@ -427,25 +472,8 @@ export function houseDecor(hs: House, free: (x: number, y: number) => boolean): 
   return out;
 }
 
-/** Niedriger Holzzaun (Querstück 16 Breite, mit Pfosten links), unten bündig. */
-export function houseFence(variant: number): Cv | null {
+/** Niedriger Holzzaun (eine Kachel breit), unten bündig */
+export function houseFence(variant: number): HTMLCanvasElement | null {
   if (typeof document === 'undefined') return null;
-  const c = mk(16, 11);
-  const g = ctx(c);
-  const wood: Rgb = variant % 2 ? [150, 108, 66] : [136, 98, 62];
-  // Querlatten
-  for (const y of [3, 7]) {
-    rect(g, col(OUTLINE), 0, y - 1, 16, 4);
-    rect(g, col(wood), 0, y, 16, 2);
-    rect(g, col(wood, 1.2), 0, y, 16, 1);
-  }
-  // Pfosten mit Spitze
-  for (const x of [0, 13]) {
-    rect(g, col(OUTLINE), x, 1, 4, 10);
-    rect(g, col(OUTLINE), x + 1, 0, 2, 1);
-    rect(g, col(wood, 1.05), x + 1, 1, 2, 9);
-    rect(g, col(wood, 1.3), x + 1, 1, 1, 9);
-    rect(g, col(wood, 0.7), x + 2, 2, 1, 8);
-  }
-  return up(c);
+  return toCanvas(fence(variant));
 }

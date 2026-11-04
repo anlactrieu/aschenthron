@@ -11,12 +11,12 @@ import {
 import { isWalkable } from '../sim/path';
 import { toScreen, toTile } from './iso';
 import { figureMode, ninjaNpcDef } from './figureMap';
-import { detectHouses, houseDoor, houseDecor, houseFacade, houseFence, houseRoof, houseSign, houseWallTile, lowerKind, type House, type RoofNotch } from './houses';
+import { detectHouses, houseDoor, houseDecor, houseFacade, houseFence, houseGlow, houseRoof, houseSign, houseWallTile, lowerKind, WINDOW_LIGHT, type House, type RoofNotch } from './houses';
 import { buildZoneMap, Z } from './groundLook';
 import { ART, ART_SCALE, Raster, toCanvas } from './world/raster';
 import { matOf, paintGround } from './world/ground';
 import { stampDetail, stampWaterDetail } from './world/details';
-import { wallTile } from './world/props';
+import { glow, wallTile } from './world/props';
 import { DOOR_ICONS, TOWN_GID, WATER_PROP_GIDS, WORLD_TOWN_KEYS, registerTownArt } from './town';
 import { Ui, describeItem, isUpgrade } from './ui';
 import { generateItem, type Item } from '../sim/items';
@@ -117,6 +117,8 @@ export class GameScene extends Phaser.Scene {
   private houseAt = new Map<number, House>();
   private houseSigns = new Map<number, Phaser.GameObjects.Image>();
   private roofs: { img: Phaser.GameObjects.Image; house: House }[] = [];
+  /** Fenster- und Laternenlicht, Deckkraft = Nacht-Faktor der Atmosphäre */
+  private nightLights: { img: Phaser.GameObjects.Image; k: number }[] = [];
   /** Türbilder an Nord-/Ost-/Westseite liegen über dem Dach und blenden mit ihm aus */
   private playerId = 0;
   private gfx!: Phaser.GameObjects.Graphics;
@@ -1692,11 +1694,12 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** Erkennt die Häuser und legt Dach-Bilder an; ohne Ninja-Bilder bleibt die alte Hausgrafik. */
+  /** Erkennt die Häuser und legt Dach-, Fassaden- und Lichtbilder an (ohne Dokument, z. B. in Tests, nichts). */
   private initHouses(): void {
     this.houses = [];
     this.houseAt.clear();
     this.roofs = [];
+    this.nightLights = [];
     if (!houseRoof(8, 6, 0)) return;
     const { w, h } = this.world.grid;
     this.houses = detectHouses(this.tiles, w, h);
@@ -1716,6 +1719,11 @@ export class GameScene extends Phaser.Scene {
       const f = toScreen(hs.x0, hs.y0 + hs.h - 2);
       const fac = this.add.image(f.sx - TILE_W / 2, f.sy - TILE_H / 2, fkey).setOrigin(0, 0).setDepth(this.roofDepth(hs) + 1);
       this.roofs.push({ img: fac, house: hs });
+      // Fensterlicht (nachts, additiv über Ober- und Erdgeschoss der Vorderwand)
+      const gkey = ensureTexture(this, `nh_glow_${hs.x0}_${hs.y0}`, () => houseGlow(hs)!);
+      const gimg = this.add.image(f.sx - TILE_W / 2, f.sy - TILE_H / 2, gkey).setOrigin(0, 0).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0)
+        .setDepth((hs.y0 + hs.h - 1) * TILE_H + TILE_H / 2 + 1);
+      this.nightLights.push({ img: gimg, k: 1 });
       // Kleine Außendeko (reine Optik: keine Kollision, kein Sim-Einfluss)
       const free = (x: number, y: number): boolean => {
         const g = this.tiles[y * w + x] ?? 0;
@@ -1727,9 +1735,16 @@ export class GameScene extends Phaser.Scene {
           const fk = ensureTexture(this, `nh_fence_${hs.variant % 2}`, () => houseFence(hs.variant)!);
           this.add.image(p.sx, p.sy + 6, fk).setOrigin(0.5, 1).setDepth(p.sy + 6);
         } else if (this.textures.exists(dc.kind === 'barrel' ? 'twn_barrel' : 'twn_crates')) {
-          this.add.image(p.sx, p.sy + TILE_H / 2 - 5, dc.kind === 'barrel' ? 'twn_barrel' : 'twn_crates').setOrigin(0.5, 1).setDepth(p.sy + TILE_H / 2);
+          this.add.image(p.sx, p.sy + TILE_H / 2 - 2, dc.kind === 'barrel' ? 'twn_barrel' : 'twn_crates').setOrigin(0.5, 1).setDepth(p.sy + TILE_H / 2);
         }
       }
+    }
+    // Laternenschein (nachts): ein Lichtbild je Laterne, unabhängig vom Prop-Nachladen
+    const glowKey = ensureTexture(this, 'twn_lantern_glow', () => toCanvas(glow(22, WINDOW_LIGHT, 150)));
+    for (let i = 0; i < this.tiles.length; i++) {
+      if (this.tiles[i] !== TOWN_GID.lantern) continue;
+      const p = toScreen(i % w, Math.floor(i / w));
+      this.nightLights.push({ img: this.add.image(p.sx, p.sy + TILE_H / 2 - 54, glowKey).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0).setDepth(p.sy + TILE_H / 2 + 1), k: 1 });
     }
   }
 
@@ -1748,6 +1763,11 @@ export class GameScene extends Phaser.Scene {
 
   /** Dach blendet auf 20 % aus, solange der Spieler im Haus (oder unter dem Dachüberstand im Norden) steht, auf 50 % vor der Tür. */
   private updateRoofs(px: number, py: number): void {
+    // Fenster und Laternen leuchten nach Tageszeit (nur alle paar Bilder neu)
+    if (this.frame % 10 === 0) {
+      const n = this.atmo.night();
+      for (const l of this.nightLights) l.img.setAlpha(n * l.k);
+    }
     for (const { img, house: hs } of this.roofs) {
       const inside = px >= hs.x0 && px <= hs.x0 + hs.w - 1 && py >= hs.y0 - 1 && py <= hs.y0 + hs.h - 1;
       // Vor der Tür (bis 2 Kacheln) wird das Dach halb durchsichtig, damit man die Leute im Haus sieht

@@ -120,6 +120,13 @@ export class Atmosphere {
     return this.fixedHour ?? ((Date.now() % DAY_MS) / DAY_MS) * 24;
   }
 
+  /** Wie dunkel es draußen ist: 0 am Mittag, 1 tief in der Nacht (für Fenster- und Laternenlicht) */
+  night(): number {
+    const [r, g, b] = dayColor(this.hour());
+    const lum = (r * 0.3 + g * 0.59 + b * 0.11) / 255;
+    return Math.max(0, Math.min(1, (1 - lum) * 1.8 - 0.05));
+  }
+
   setRegion(name: string): void {
     this.region = name;
     this.zone = zoneClass(name);

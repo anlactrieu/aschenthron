@@ -172,3 +172,39 @@ if (!only || only === 'props') {
   save('props-stadt.png', crop(0, 5, 30, 5), 2);
   save('props-waende.png', crop(0, 10, 25, 5), 3);
 }
+
+/* ------------------------------------------------ Häuser: alle Varianten mit Tür, Fassade, Nachtlicht */
+
+if (!only || only === 'haus') {
+  const { houseRoofRaster, houseFacadeRaster, houseWallRaster, houseDoorRaster, houseGlowRaster, lowerKind } = await import('../src/render/houses');
+  const TW = 36;
+  const TH = 9;
+  const r = new Raster(TW * ART, TH * ART);
+  paintGround(r, 0, 0, TW, TH, { mat: (x, y) => matOf(y >= 7 ? 16 : 16, Z.none), waterDist: () => 3 });
+  const night = new Raster(r.w, r.h);
+  for (let v = 0; v < 5; v++) {
+    const w = 6 + (v % 2);
+    const h = 5;
+    const x0 = 1 + v * 7;
+    const y0 = 2;
+    const hs = { x0, y0, w, h, variant: v, door: { x: x0 + 2, y: y0 + h - 1, icon: (['anchor', 'book', 'coins', 'anvil', 'sword'] as const)[v], side: 'S' as const } };
+    r.blit(houseRoofRaster(w, h - 1, v, v * 7), x0 * ART, (y0 - 1) * ART);
+    r.blit(houseFacadeRaster(w, v, v * 7), x0 * ART, (y0 + h - 2) * ART);
+    for (let rel = 0; rel < w; rel++) {
+      const t = rel === 2 ? houseDoorRaster(hs.door.icon, v, true, v) : houseWallRaster('lower', lowerKind(rel, w), v, v + rel);
+      r.blit(t, (x0 + rel) * ART, (y0 + h) * ART - t.h);
+    }
+    night.blit(houseGlowRaster(hs), x0 * ART, (y0 + h - 2) * ART);
+  }
+  save('haus.png', r, 2);
+  // Nacht: dunkel multipliziert, Licht additiv
+  const n = new Raster(r.w, r.h);
+  for (let i = 0; i < r.d.length; i++) {
+    const p = r.d[i]!;
+    const q = night.d[i]!;
+    const a = (q >>> 24) / 255;
+    const ch = (s: number, k: number): number => Math.min(255, Math.round(((p >> s) & 255) * k + ((q >> s) & 255) * a * 0.8));
+    n.d[i] = ((255 << 24) | (ch(16, 0.5) << 16) | (ch(8, 0.42) << 8) | ch(0, 0.36)) >>> 0;
+  }
+  save('haus-nacht.png', n, 2);
+}
