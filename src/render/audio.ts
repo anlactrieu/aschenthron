@@ -15,6 +15,8 @@ export class Sfx {
   private bedKind: 'wind' | 'embers' | 'cave' | null = null;
   private rainGain: GainNode | null = null;
   private rainLevel = 0;
+  private townGain: GainNode | null = null;
+  private townLevel = 0;
   private music: Music | null = null;
   private mood: Mood | null = null;
   private musicOn = true;
@@ -126,8 +128,35 @@ export class Sfx {
     this.rainGain.gain.value = 0;
     rs.connect(bp).connect(this.rainGain).connect(this.master!);
     rs.start();
+    // Stadtgemurmel: Bandpass-Rauschen, dessen Pegel langsam schwankt (wie Stimmen), nur in Städten hörbar
+    const ts = c.createBufferSource();
+    ts.buffer = this.noiseBuf;
+    ts.loop = true;
+    const tb = c.createBiquadFilter();
+    tb.type = 'bandpass';
+    tb.frequency.value = 520;
+    tb.Q.value = 1.1;
+    const wob = c.createGain();
+    wob.gain.value = 0.6;
+    const lfo = c.createOscillator();
+    lfo.frequency.value = 0.37;
+    const lfoAmt = c.createGain();
+    lfoAmt.gain.value = 0.4;
+    lfo.connect(lfoAmt).connect(wob.gain);
+    lfo.start();
+    this.townGain = c.createGain();
+    this.townGain.gain.value = 0;
+    ts.connect(tb).connect(wob).connect(this.townGain).connect(this.master!);
+    ts.start();
     this.ambient(this.bedKind);
     this.rain(this.rainLevel);
+    this.town(this.townLevel);
+  }
+
+  /** Stadtgemurmel 0–1 (Bewohner in der Nähe, Tageszeit); außerhalb von Städten 0. */
+  town(level: number): void {
+    this.townLevel = level;
+    if (this.townGain && this.ctx) this.townGain.gain.setTargetAtTime(level * 0.07, this.ctx.currentTime, 0.9);
   }
 
   /** Umgebungston der Zone: Wind (Moor), Glut (Aschenöde), Höhle (Dungeons) oder Stille. */
@@ -290,5 +319,40 @@ export class Sfx {
     [262, 330, 392, 523, 659, 784].forEach((f, i) => this.tone(f, 0.55, 'triangle', 0.22, undefined, i * 0.11));
     [131, 196].forEach((f, i) => this.tone(f, 1.2, 'sawtooth', 0.12, undefined, 0.3 + i * 0.2));
     this.noise(0.5, 0.1, 5000, 0.5);
+  }
+
+  /* Stadtgeräusche: `v` (0–1) ist die Nähe zur Quelle, leise aus der Ferne */
+  /** Hammerschlag auf dem Amboss */
+  hammer(v = 1): void {
+    if (!this.gate('hammer', 220)) return;
+    this.noise(0.05, 0.3 * v, 5000);
+    this.tone(2300, 0.1, 'triangle', 0.1 * v, 1900);
+    this.tone(3400, 0.06, 'sine', 0.05 * v);
+    this.tone(180, 0.07, 'square', 0.06 * v, 90);
+  }
+  cluck(v = 1): void {
+    if (!this.gate('cluck', 700)) return;
+    [420, 520, 460].forEach((f, i) => this.tone(f, 0.05, 'triangle', 0.07 * v, f * 1.3, i * 0.08));
+  }
+  gull(v = 1): void {
+    if (!this.gate('gull', 1800)) return;
+    this.tone(1500, 0.28, 'sawtooth', 0.045 * v, 1000);
+    this.tone(1650, 0.22, 'sawtooth', 0.04 * v, 1050, 0.3);
+  }
+  caw(v = 1): void {
+    if (!this.gate('caw', 2000)) return;
+    [0, 0.26].forEach((d) => this.tone(420, 0.18, 'sawtooth', 0.06 * v, 260, d));
+  }
+  bark(v = 1): void {
+    if (!this.gate('bark', 1500)) return;
+    [0, 0.2].forEach((d) => {
+      this.noise(0.06, 0.2 * v, 1400, d);
+      this.tone(330, 0.1, 'square', 0.07 * v, 170, d);
+    });
+  }
+  meow(v = 1): void {
+    if (!this.gate('meow', 3000)) return;
+    this.tone(700, 0.4, 'sine', 0.06 * v, 950);
+    this.tone(950, 0.25, 'sine', 0.05 * v, 560, 0.3);
   }
 }

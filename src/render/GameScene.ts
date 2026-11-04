@@ -35,6 +35,7 @@ import { FIG_SCALE, heroMode, heroTexture, originOf, prefetchHero } from './hero
 import { monsterKey } from './monster';
 import { figureTexture, initSilhouettes, prefetchFigure, pumpFigures, resetFigureBudgets, silhouette, silhouetteOf, SIL_TEX, uploadAhead, type FigReq, type Silhouette } from './monsterSheet';
 import { npcDef, npcFigKey } from './npc';
+import { TownLife } from './townLife';
 import { initLootAtlas, pumpLootIcons, useLootIcon } from './lootAtlas';
 import { onSettings, settings } from './settings';
 import type { RemoteSession } from '../net/client';
@@ -196,6 +197,7 @@ export class GameScene extends Phaser.Scene {
   private fpsText: Phaser.GameObjects.Text | null = null;
   private fx!: Fx;
   private atmo!: Atmosphere;
+  private townLife!: TownLife;
   private marks: QuestMark[] = [];
   private gfxGround!: Phaser.GameObjects.Graphics;
   private gfxShimmer!: Phaser.GameObjects.Graphics;
@@ -292,6 +294,11 @@ export class GameScene extends Phaser.Scene {
     initSilhouettes(this);
     initLootAtlas(this);
     this.atmo = new Atmosphere(this, this.sfx);
+    this.townLife = new TownLife(this, this.sfx);
+    this.townLife.setNpcAnchor((id) => {
+      const img = this.npcViews.get(id);
+      return img?.visible ? { sx: img.x, sy: img.y, head: this.figSize(img)?.top ?? 56 } : null;
+    });
     this.minimap = new Minimap(this.world, this.tiles);
     if (this.remote) this.ui.say(`Verbunden als ${p.name}${this.remote.pvp ? ' – PvP außerhalb der Städte aktiv, Angreifer werden zu Mördern' : ''}. Klick auf Spieler greift an.`);
     else if (saved && importPlayer(this.world, p, saved)) this.ui.say('Spielstand geladen.');
@@ -1234,6 +1241,7 @@ export class GameScene extends Phaser.Scene {
           this.achBump('level', e.level);
           say(`LEVEL ${e.level}! +5 Attributpunkte (C), +1 Skillpunkt`);
           this.sfx.levelUp();
+          this.townLife.congratulate(e.level, { time: this.lastTime, player: this.player(), npcs: this.world.npcs });
           const pos = this.bodyPos(this.player());
           if (pos) {
             if (!playPixelfx(this, 'levelup', pos.x, pos.y + 20, { depth: OVERLAY_DEPTH - 1 })) this.fx.column(pos.x, pos.y + 20, 0xfff0a0, 1400);
@@ -1401,6 +1409,7 @@ export class GameScene extends Phaser.Scene {
     this.updateProps(px, py);
     this.updateRoofs(px, py);
     this.updateNpcs(time);
+    this.updateTownLife(time, p);
     this.updateChests(time, px, py);
     this.updateLoot(time, g);
     this.updateActors(time, p, g);
@@ -2347,7 +2356,17 @@ export class GameScene extends Phaser.Scene {
     // nur sichtbare: Ansichten ferner Akteure bleiben versteckt bestehen und würden sonst jedes Sheet festhalten
     for (const v of this.actorViews.values()) if (v.img.visible) keys.add(v.img.texture.key);
     for (const img of this.npcViews.values()) if (img.visible) keys.add(img.texture.key);
+    for (const k of this.townLife.keysInUse()) keys.add(k);
     return keys;
+  }
+
+  /** Stadtleben (townLife.ts): Bewohner, Tiere, Zurufe, Stadtgeräusche; reiner Client, die Sim kennt sie nicht */
+  private updateTownLife(time: number, p: Actor): void {
+    const cam = this.cameras.main;
+    this.townLife.update({
+      time, dtMs: time - this.lastTime, hour: this.atmo.hour(), night: this.night, zoom: cam.zoom, region: this.regionName, grid: this.world.grid, player: p,
+      view: cam.worldView, smiths: this.world.npcs.filter((n) => n.kind === 'smith'),
+    });
   }
 
   private updateActors(time: number, p: Actor, g: Phaser.GameObjects.Graphics): void {

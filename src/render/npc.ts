@@ -47,12 +47,29 @@ const BY_KIND: Record<string, HumDef> = {
   quest: human({ style: 'none', gear: { cloak: true }, pal: { top: ramp(0x6a5a8a), sleeve: ramp(0x5a4a7a), legs: MAT.trousers, boots: MAT.boot, cloak: CLOAKS.rag } }),
 };
 
+/**
+ * Bewohner ohne Funktion (`townLife.ts`): nur eine Aufmachung je Rolle, damit die Stadt nicht ein Dutzend Sheets backen muss.
+ * Schlüssel `res_<rolle>`; laufen über denselben Weg wie die Karten-NPCs (`kind` allein genügt).
+ */
+const RESIDENTS: Record<string, HumDef> = {
+  res_guard: guard({ gear: { helm: 1, cloak: true }, pal: { cloak: CLOAKS.wool, waist: ramp(0x5a3a2a), hair: HAIR.brown } }),
+  res_child: human({ style: 'none', pal: { top: ramp(0x9a6a3a), sleeve: ramp(0x9a6a3a), legs: MAT.trousers, boots: MAT.boot, hair: HAIR.blond } }, { size: 0.7, head: 1.2 }),
+  res_child2: human({ style: 'none', pal: { top: ramp(0x4a7a8a), sleeve: ramp(0x4a7a8a), legs: ramp(0x5a4a3a), boots: MAT.boot, hair: HAIR.red } }, { size: 0.76, head: 1.18 }),
+  res_farmer: human({ style: 'none', gear: { helm: 1 }, pal: { top: ramp(0x8a7a4a), sleeve: ramp(0x8a7a4a), helm: ramp(0xb89a58), legs: MAT.trousers, boots: MAT.boot, hair: HAIR.brown } }),
+  res_woman: robe(0x9a5a4a, { gear: { helm: 5 }, pal: { hood: ramp(0xc8b08a), robeHem: ramp(0x6a3a2a), hair: HAIR.black } }),
+  res_fisher: human({ style: 'none', gear: { helm: 1, cloak: true, beard: 0.9 }, pal: { top: ramp(0x3a5a6a), sleeve: ramp(0x3a5a6a), helm: ramp(0x2a3a4a), cloak: CLOAKS.rag, legs: MAT.trousers, boots: MAT.boot, hair: HAIR.grey, beard: HAIR.grey } }),
+  res_crier: robe(0xb03a2a, { gear: { helm: 1, beard: 0.8 }, pal: { helm: ramp(0x2a2a50), robeHem: ACCENT[2], top: ramp(0xb03a2a), hair: HAIR.red, beard: HAIR.red } }),
+  res_drunk: human({ style: 'none', gear: { beard: 1.1 }, pal: { top: ramp(0x6a5a4a), sleeve: ramp(0x5a4a3a), legs: ramp(0x4a4038), boots: MAT.boot, hair: HAIR.black, beard: HAIR.black } }, { belly: 1.3 }),
+  res_elder: robe(0x6a6a7a, { style: 'staff', weapon: 'staff', gear: { beard: 1.5 }, pal: { robeHem: MAT.belt, hair: HAIR.white, beard: HAIR.white } }),
+};
+export const RESIDENT_KINDS = Object.keys(RESIDENTS);
+
 /** Figur des NPCs oder `null` (Truhe ohne Verwalter) */
 export function npcDef(kind: string, name?: string): HumDef | null {
   const d = name ? BY_NAME[name] : undefined;
   if (d) return d;
   if (kind === 'stash') return name && /Lagerverwalter/.test(name) ? BY_NAME['Lagerverwalter Ottmar']! : null;
-  return BY_KIND[kind] ?? BY_KIND.quest!;
+  return RESIDENTS[kind] ?? BY_KIND[kind] ?? BY_KIND.quest!;
 }
 
 export const npcFigKey = (kind: string, name?: string): string => (name && BY_NAME[name] ? `nfig_n_${name}` : `nfig_${kind}`);
