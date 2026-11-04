@@ -21,7 +21,7 @@ export const HERO_FRAME = { w: 64, h: 64, fx: 30, fy: 58 };
 export const HERO_WIND_FRAMES = 2;
 
 /** Materialien der Rüstung/Robe */
-export type HeroMat = 'cloth' | 'leather' | 'iron' | 'dread' | 'bone' | 'ash' | 'acolyte';
+export type HeroMat = 'cloth' | 'leather' | 'iron' | 'dread' | 'bone' | 'ash' | 'acolyte' | 'leatherDread' | 'leatherBone' | 'leatherAsh';
 
 export interface HeroLook {
   /** Rumpf: Material, Robe statt Rüstung */
@@ -83,7 +83,8 @@ export function heroLookOf(look: Look): HeroLook {
   else if (chest) {
     const g = grade(chest, look.chest, /plate|mail|cuirass/, /leather|vest/);
     armor = matOf(chest, g === 2 ? 'iron' : 'leather');
-    if (armor !== 'iron' && armor !== 'leather' && /leather/.test(chest)) armor = 'leather';
+    // Leder späterer Stufen: eigener Farbton statt Metall (sonst Schulterplatten und Kettenärmel)
+    if (/leather/.test(chest)) armor = armor === 'dread' ? 'leatherDread' : armor === 'bone' ? 'leatherBone' : armor === 'ash' ? 'leatherAsh' : 'leather';
   }
   const head = i.head;
   const helm = !head ? 0 : /hood/.test(head) ? 5 : /cap/.test(head) ? 1 : /crown/.test(head) ? 4 : /visor|dread/.test(head) ? 3 : /helm/.test(head) ? 2 : look.head >= 3 ? 3 : 2;
@@ -267,6 +268,9 @@ export const MAT = {
   trousers: [0x7a7088, 0x5e566c, 0x463f52, 0x322c3c, 0x221e2a],
   leather: [0xc8945a, 0xa07040, 0x7a5030, 0x553620, 0x382414],
   leatherD: [0x98704a, 0x765434, 0x583c24, 0x3e2a18, 0x281a10],
+  leatherDread: [0x8a6a8a, 0x684e6a, 0x4c384e, 0x342636, 0x221822],
+  leatherBone: [0xd8c4a0, 0xb09a78, 0x88745a, 0x60503e, 0x3e3428],
+  leatherAsh: [0xa8705a, 0x845442, 0x623c30, 0x442820, 0x2c1a14],
   iron: [0xdce4ee, 0xaab4c4, 0x7c8698, 0x575f72, 0x3a3f4e],
   chain: [0xa4aab6, 0x80868f, 0x60656e, 0x45484f, 0x2e3036],
   dread: [0x8a84a8, 0x625c80, 0x45405e, 0x302c44, 0x1e1a2c],
@@ -302,13 +306,14 @@ const OUTLINE = 0x0c0a0e;
 const MARK_COL = 0xc8a048; // Gürtelschnalle/Brustmarke: Bronze
 
 function materials(h: HeroLook): Record<number, Ramp> {
-  const metal = (m: HeroMat): Ramp => (m === 'iron' ? MAT.iron : m === 'dread' ? MAT.dread : m === 'bone' ? MAT.bone : m === 'ash' ? MAT.ash : m === 'leather' ? MAT.leather : m === 'acolyte' ? MAT.acolyte : MAT.cloth);
+  const metal = (m: HeroMat): Ramp => (m === 'leatherDread' ? MAT.leatherDread : m === 'leatherBone' ? MAT.leatherBone : m === 'leatherAsh' ? MAT.leatherAsh : m === 'iron' ? MAT.iron : m === 'dread' ? MAT.dread : m === 'bone' ? MAT.bone : m === 'ash' ? MAT.ash : m === 'leather' ? MAT.leather : m === 'acolyte' ? MAT.acolyte : MAT.cloth);
   const heavy = h.armor === 'iron' || h.armor === 'dread' || h.armor === 'ash' || h.armor === 'bone';
   const body = metal(h.armor);
-  const sleeve = h.robe ? body : heavy ? MAT.chain : h.armor === 'leather' ? MAT.leatherD : MAT.cloth;
+  const leathery = h.armor === 'leather' || h.armor.startsWith('leather');
+  const sleeve = h.robe ? body : heavy ? MAT.chain : leathery ? MAT.leatherD : MAT.cloth;
   const acc = ACCENT[h.rar[1]];
   // schwere Rüstung trägt einen Wappenrock um die Hüfte (rot, ab magisch in Seltenheitsfarbe), Leder einen dunklen Wams-Saum
-  const waist = h.robe ? body : heavy ? acc ?? MAT.tabard : h.armor === 'leather' ? MAT.leatherD : MAT.cloth;
+  const waist = h.robe ? body : heavy ? acc ?? MAT.tabard : leathery ? MAT.leatherD : MAT.cloth;
   const fore = h.gloves === 2 ? MAT.iron : h.gloves === 1 ? MAT.leather : heavy ? MAT.chain : MAT.skin;
   const hand = h.gloves === 2 ? MAT.iron : h.gloves === 1 ? MAT.leatherD : MAT.skin;
   const shin = h.legs === 2 ? MAT.iron : MAT.boot;

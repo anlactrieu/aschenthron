@@ -5,7 +5,6 @@
  * (`monsterRig.js`). Bosse sind größer per Proportion (`size`), nicht per Skalierung, und behalten die goldene Kontur.
  * Reine Daten und Rechnung ohne DOM (Node-Kontaktbögen `scripts/bake-monsters.ts`, Tests, Browser `monsterSheet.ts`).
  */
-import { MONSTERS, type MonsterKind } from '../sim/data';
 import { cycleLength, type FigAnim, type FigureSpec, type FigView, type Ramp } from './figure';
 import { ACCENT, CLOAKS, heroPose, MAT, type Gait, type HeroLook, type HeroWeapon } from './hero';
 import { PART, posed, type HeroGear, type RigBody, type RigPose } from './heroRig.js';
@@ -347,5 +346,3 @@ function beastCycle(b: BeastBody): number {
   return cycleLength(stride, 0.5);
 }
 
-/** Alle Arten aus den Spieldaten mit Figur (Tests) */
-export const monsterKinds = (): MonsterKind[] => MONSTERS;

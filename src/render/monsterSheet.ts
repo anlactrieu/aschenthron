@@ -5,7 +5,7 @@
  */
 import type Phaser from 'phaser';
 import { FigureBaker, type FigureSheet, type FigureSpec } from './figure';
-import { addSheetTexture, sheetCanvas, sheetPortrait, type FigCanvas } from './heroSheet';
+import { addSheetTexture, sheetCanvas, type FigCanvas } from './heroSheet';
 import { monsterSpec } from './monster';
 import { npcSpec } from './npc';
 
@@ -102,20 +102,3 @@ export function pumpFigures(scene: Phaser.Scene, inUse: () => Set<string>, budge
     }
   }
 }
-
-/** Sofort backen (Porträts) */
-export function figurePortrait(key: string, req: FigReq, scale: number): HTMLCanvasElement | null {
-  let canvas = ready.get(key);
-  if (!canvas) {
-    const s = specOf(req);
-    if (!s) return null;
-    const b = new FigureBaker(s);
-    while (b.step()) { /* weiter */ }
-    canvas = sheetCanvas(b.sheet);
-    ready.set(key, canvas);
-  }
-  return sheetPortrait(canvas, scale);
-}
-
-/** Anzahl wartender Sheets (Debug) */
-export const figureQueue = (): number => pending.size + local.size;

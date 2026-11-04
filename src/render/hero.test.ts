@@ -78,5 +78,8 @@ describe('Skelett-Held', () => {
     expect(heroLookOf({ ...look, shield: 1, ids: { ...ids, offhand: 'tower_shield' } }).shield).toBe(3);
     expect(heroLookOf({ ...look, robe: true, chest: 2, ids: { ...ids, chest: 'bone_robe', cloak: 'wolf_cloak' } })).toMatchObject({ armor: 'bone', robe: true, cloak: 'wolf' });
     expect(heroLookOf({ ...look, rar: { head: 4, chest: 2, weapon: 1 } }).rar).toEqual([4, 2, 1]);
+    // Leder späterer Stufen sieht anders aus als das erste Wams
+    expect(heroLookOf({ ...look, chest: 4, ids: { ...ids, chest: 'dread_leather' } }).armor).toBe('leatherDread');
+    expect(heroLookOf({ ...look, chest: 0, ids: { ...ids, chest: 'leather_vest' } }).armor).toBe('leather');
   });
 });

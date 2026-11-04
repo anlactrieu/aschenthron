@@ -127,7 +127,7 @@ export class GameScene extends Phaser.Scene {
   private lootViews = new Map<number, Phaser.GameObjects.Image>();
   private npcViews = new Map<number, Phaser.GameObjects.Image>();
   /** Laufrichtung der NPCs: Spiegeln, Seitenansicht und Laufzyklus */
-  private npcDir = new Map<number, { x: number; y: number; flip: boolean; side: boolean; up: boolean; movingUntil: number }>();  private chestViews = new Map<number, Phaser.GameObjects.Image>();
+  private npcDir = new Map<number, { x: number; y: number; flip: boolean; side: boolean; up: boolean; movingUntil: number; dist?: number }>();  private chestViews = new Map<number, Phaser.GameObjects.Image>();
   private flash = new Map<number, number>();
   private acc = 0;
   private step: NextStep | null = null;
@@ -571,9 +571,8 @@ export class GameScene extends Phaser.Scene {
       if (a.id === this.playerId || !a.alive || (a.kind === 'player' && !this.remote)) continue;
       const v = this.actorViews.get(a.id);
       if (!v || !v.img.visible) continue;
-      // Skelett-Held: Rahmen hat viel Platz für die Waffe, getroffen wird nur der Körper
-      const fig = a.kind === 'player' && heroMode() === 'skelett' ? this.figSize(v.img) : null;
-      const box = fig ? new Phaser.Geom.Rectangle(v.img.x - fig.w / 2, v.img.y - fig.top, fig.w, fig.top) : v.img.getBounds();
+      // Skelett-Figuren: Rahmen hat viel Platz für Waffe und Liegen, getroffen wird nur der Körper
+      const box = this.bodyBox(v.img) ?? v.img.getBounds();
       if (box.contains(wx, wy) && (!best || v.img.depth > best.depth)) best = { depth: v.img.depth, actor: a };
     }
     // NPCs: zuerst die Figur selbst, erst danach die erweiterte Fläche (Namensschild/Marker); bei Überlappung gewinnt der nächste
@@ -581,7 +580,7 @@ export class GameScene extends Phaser.Scene {
     for (const n of this.world.npcs) {
       const img = this.npcViews.get(n.id);
       if (!img) continue;
-      const b = img.getBounds();
+      const b = this.bodyBox(img) ?? img.getBounds();
       const body = b.contains(wx, wy);
       const box = new Phaser.Geom.Rectangle(b.centerX - 55, b.top - 64, 110, b.height + 64);
       if (!body && !box.contains(wx, wy)) continue;
@@ -1838,6 +1837,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Sichtbare Höhe/Breite einer Ninja-Figurentextur (über den Füßen, in Bildpunkten); `null` bei DCSS-/prozeduralen Figuren. */
+  /** Körperkasten einer Skelett-Figur (Bildschirm-Pixel) oder `null` für alte Figuren */
+  private bodyBox(img: Phaser.GameObjects.Image): Phaser.Geom.Rectangle | null {
+    const src = img.texture.getSourceImage() as { figSheet?: unknown } | undefined;
+    const fig = src?.figSheet ? this.figSize(img) : null;
+    return fig ? new Phaser.Geom.Rectangle(img.x - fig.w / 2, img.y - fig.top, fig.w, fig.top) : null;
+  }
+
   private figSize(img: Phaser.GameObjects.Image): { top: number; w: number; dir: boolean } | null {
     const src = img.texture.getSourceImage() as { figTop?: number; figW?: number; figDir?: boolean } | undefined;
     return src && src.figTop !== undefined ? { top: src.figTop, w: src.figW ?? 0, dir: !!src.figDir } : null;
@@ -1877,6 +1883,7 @@ export class GameScene extends Phaser.Scene {
       const ndy = np.y - dir.y;
       if (Math.abs(ndx) + Math.abs(ndy) > 0.001) {
         dir.movingUntil = time + 160;
+        dir.dist = (dir.dist ?? 0) + Math.hypot(ndx * TILE_W, ndy * TILE_H);
         if (Math.abs(ndx) > 0.0005) dir.flip = ndx < 0;
         dir.side = Math.abs(ndx) > Math.abs(ndy) * 0.8;
         if (Math.abs(ndy) > 0.0005) dir.up = ndy < 0;
@@ -1887,7 +1894,7 @@ export class GameScene extends Phaser.Scene {
         const v3 = dir.side ? 'side' : dir.up ? 'back' : 'front';
         const A = nSkel.sheet.anims;
         const o = originOf(nSkel.sheet);
-        img.setTexture(nSkel.key, time < dir.movingUntil ? `walk_${v3}_${Math.floor(time / 85) % A.walk}` : `idle_${v3}_${idleFrame(time + n.id * 1231, A.idle)}`);
+        img.setTexture(nSkel.key, time < dir.movingUntil ? `walk_${v3}_${walkFrame(dir.dist ?? 0, A.walk, nSkel.sheet.cyclePx)}` : `idle_${v3}_${idleFrame(time + n.id * 1231, A.idle)}`);
         img.setOrigin(o.x, o.y).setScale(FIG_SCALE).setFlipX(dir.side && dir.flip);
       } else if (!chestLike) {
         img.setOrigin(0.5, FEET_ORIGIN_Y).setScale(1);
@@ -2075,8 +2082,9 @@ export class GameScene extends Phaser.Scene {
   /** Texturen der gerade gezeigten Figuren (dürfen nicht aus dem Cache fliegen) */
   private figuresInUse(): Set<string> {
     const keys = new Set<string>();
-    for (const v of this.actorViews.values()) keys.add(v.img.texture.key);
-    for (const img of this.npcViews.values()) keys.add(img.texture.key);
+    // nur sichtbare: Ansichten ferner Akteure bleiben versteckt bestehen und würden sonst jedes Sheet festhalten
+    for (const v of this.actorViews.values()) if (v.img.visible) keys.add(v.img.texture.key);
+    for (const img of this.npcViews.values()) if (img.visible) keys.add(img.texture.key);
     return keys;
   }
 
