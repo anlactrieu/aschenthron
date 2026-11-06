@@ -49,6 +49,13 @@ export function setNightBuff(m: Actor, on: boolean): void {
   }
 }
 
+/** Nach einem Zurücksetzen der Werte (z. B. Wut-Ende beim Wiederbeleben) gelten die Nachtwerte weiter */
+export function rebaseNight(m: Actor): void {
+  if (!m.nightBase) return;
+  m.nightBase.damage = [m.damage[0], m.damage[1]];
+  m.damage = [Math.max(1, Math.round(m.damage[0] * NIGHT.dmg)), Math.max(2, Math.round(m.damage[1] * NIGHT.dmg))];
+}
+
 /** Anwesenheit der Nacht-NPCs und Öffnung der Läden, rein aus der Uhr (auch auf dem Client nach jedem Schnappschuss) */
 export function syncNpcPresence(w: World): void {
   const night = isNightHour(hourOf(w));

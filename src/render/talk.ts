@@ -1,6 +1,6 @@
 import type { Actor } from '../sim/world';
 import { DAY_MS } from './atmosphere';
-import { hourOf, type Clocked } from '../sim/clock';
+import { hourOf, NIGHT_FROM, NIGHT_TO, type Clocked } from '../sim/clock';
 
 /** Aktuelle Spielstunde 0–24: mit Welt die Uhr der Sim (P6), sonst Echtzeit (`?stunde=22` fixiert sie). */
 export function gameHour(w?: Clocked): number {
@@ -10,7 +10,7 @@ export function gameHour(w?: Clocked): number {
 }
 
 export type Phase = 'day' | 'dusk' | 'night';
-export const phaseOf = (hour: number): Phase => (hour >= 6 && hour < 19 ? 'day' : hour >= 19 && hour < 21.5 ? 'dusk' : 'night');
+export const phaseOf = (hour: number): Phase => (hour >= NIGHT_TO && hour < 19 ? 'day' : hour >= 19 && hour < NIGHT_FROM ? 'dusk' : 'night');
 
 /** Bekanntheit: abgegebene Aufgaben plus Titel; der Gruß wird mit ihr wärmer. */
 export const fameOf = (p: Pick<Actor, 'quests' | 'titles'>): number =>

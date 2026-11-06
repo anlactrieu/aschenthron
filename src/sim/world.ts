@@ -11,7 +11,7 @@ import { EFFECTS, cleanse, controlDr, dispel, mergeStatus } from './effects';
 import { NAMED } from './named';
 import { CORPSE_OWNER_TICKS, deathRules, dropCount, droppable } from './death';
 import { LANDMARK_TOPICS } from './topicsData';
-import { closedMessage, isShop, syncClock } from './night';
+import { closedMessage, isShop, rebaseNight, syncClock } from './night';
 import { answerOf, canAsk, keywordLabel, learnedFrom } from './topics';
 
 export const TICK_RATE = 20;
@@ -2304,6 +2304,7 @@ function reviveMonster(w: World, m: Actor): void {
   if (m.enraged) {
     m.enraged = false;
     m.damage = monsterKind(m.kindId!).damage;
+    if (m.nightBase) rebaseNight(m);
   }
   const wb = m.unique ? uniqueDef(m.unique) : undefined;
   if (wb?.world) w.events.push({ type: 'worldBoss', id: m.id, name: m.name, state: 'spawn', where: wb.where ?? '' });

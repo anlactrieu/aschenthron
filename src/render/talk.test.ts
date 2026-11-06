@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { greeting, phaseOf, tierOf } from './talk';
+import { isNightHour } from '../sim/clock';
 
 describe('P2 Gruß', () => {
   const p = (level: number, turned = 0, titles: string[] = []) => ({
@@ -15,5 +16,8 @@ describe('P2 Gruß', () => {
     expect(tierOf(p(25))).toBe('beruehmt');
     const all = new Set([greeting(p(1), 12), greeting(p(1), 20), greeting(p(1), 2), greeting(p(8), 12), greeting(p(25), 12), greeting(p(25), 2)]);
     expect(all.size).toBe(6);
+  });
+  it('Phase Nacht deckt sich mit der Nacht der Sim (Läden zu, Nachtgänger)', () => {
+    for (let h = 0; h < 24; h += 0.25) expect(phaseOf(h) === 'night', `${h}`).toBe(isNightHour(h));
   });
 });

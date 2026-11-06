@@ -14,6 +14,7 @@ import { FIG_SCALE, originOf } from './heroSheet';
 import { figureTexture, prefetchFigure } from './monsterSheet';
 import { npcFigKey } from './npc';
 import { LIGHT_DEPTH } from './atmosphere';
+import { NIGHT_FROM, NIGHT_TO } from '../sim/clock';
 import type { Sfx } from './audio';
 
 /* ------------------------------------------------------------------------------------------------ Daten */
@@ -154,7 +155,8 @@ export function inShift(hour: number, [from, to]: Shift): boolean {
 
 export type DayPhase = 'day' | 'dusk' | 'night';
 export function dayPhase(hour: number): DayPhase {
-  return hour >= 6 && hour < 19 ? 'day' : hour >= 19 && hour < 21.5 ? 'dusk' : 'night';
+  // Grenzen der Sim: Nacht = Läden zu, Nachtgänger unterwegs (`sim/clock.ts`)
+  return hour >= NIGHT_TO && hour < 19 ? 'day' : hour >= 19 && hour < NIGHT_FROM ? 'dusk' : 'night';
 }
 
 /* ------------------------------------------------------------------------------------------------ Wege */

@@ -1843,7 +1843,7 @@ export class Ui {
     const stash = near.find((n) => n.kind === 'stash');
     const smith = near.find((n) => n.kind === 'smith');
     const hidden = (n: Npc) => QUESTS.filter((q) => q.hidden && isGiverOf(n, q) && p.quests[q.id]).map((q) => q.id);
-    const givers = near.filter((n) => n.kind === 'quest' || !!n.quests?.length || hidden(n).length > 0);
+    const givers = near.filter((n) => (n.kind === 'quest' && !n.nightOnly) || !!n.quests?.length || hidden(n).length > 0);
     const talkers = near.filter((n) => NPC_LORE[n.name] || hasTopics(n.name));
     // Rolle jedes NPCs in Reichweite: was kann ich hier tun?
     for (const n of near) if (NPC_ROLE[n.name]) body.append(el('div', 'a-note', `${n.name}: ${NPC_ROLE[n.name]}`));

@@ -3,7 +3,7 @@ import mapJson from '../data/aschenthron.json';
 import { buildWorld, type TiledMap } from './tiled';
 import { NIGHT, NIGHT_NPCS, NIGHT_SPAWNS, SHOPS, monsterKind } from './data';
 import { clockText, hourOf, isNightHour, nightNumber, openText, START_HOUR, TICKS_PER_HOUR } from './clock';
-import { closedMessage, nightBuffable, NIGHT_NPC_ID, setNightBuff, syncNpcPresence } from './night';
+import { closedMessage, nightBuffable, NIGHT_NPC_ID, rebaseNight, setNightBuff, syncNpcPresence } from './night';
 import { isWalkable } from './path';
 import { makeSnapshot } from './net';
 import { applyCommand, buyPrice, drainEvents, getActor, inSafeZone, regionAt, tick, TICK_RATE, type Actor, type World } from './world';
@@ -192,6 +192,17 @@ describe('P6: Nachtgegner', () => {
     setNightBuff(m, false);
     expect({ maxHp: m.maxHp, damage: [...m.damage], aggro: m.aggroRange, reward: m.rewardMult }).toEqual(base);
     expect(m.hp).toBeLessThanOrEqual(m.maxHp);
+  });
+  it('Wiederbeleben setzt den Schaden zurück: die Nachtwerte gelten danach weiter und fallen am Morgen sauber weg', () => {
+    const { w } = build();
+    const m = w.actors.find((a) => a.kindId === 'zombie' && regionAt(w, a.home!.x, a.home!.y)?.name === 'Totenacker')!;
+    const plain: [number, number] = [m.damage[0], m.damage[1]];
+    setNightBuff(m, true);
+    m.damage = [plain[0], plain[1]]; // wie nach dem Wut-Ende in reviveMonster
+    rebaseNight(m);
+    expect(m.damage[1]).toBe(Math.max(2, Math.round(plain[1] * NIGHT.dmg)));
+    setNightBuff(m, false);
+    expect(m.damage).toEqual(plain);
   });
   it('Nachts erscheinen Zusatzgegner an passenden Orten; am Morgen sind sie fort', () => {
     const { w, p } = build();
