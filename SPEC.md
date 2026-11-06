@@ -718,7 +718,7 @@ Nacht an: L30 / Tode
 - **Golden-Snapshots:** keine geändert, alle 462 Tests grün (Zähler- und Zufallspfade unberührt).
 - **Offen/ehrlich:** Wolf-Hänger im Bot-Lauf nicht nachgestellt (s. o.); die Sperre betrifft Heil-/Manatränke aller Händler (Stufe 5 für „Heiltrank“, Stufe-1-Spieler können ihn also nicht kaufen, falls sie ihn vorher kauften); Browser-Prüfung im Vite-Dev-Server (Port 5199), da der Produktions-Build keinen `__game`-Haken hat.
 
-## Einstieg für Neulinge (2026-11-06, vom Nutzer entschieden, noch NICHT umgesetzt)
+## Einstieg für Neulinge (2026-11-06, vom Nutzer entschieden, umgesetzt 2026-11-07 in 1f73d48, siehe HANDOFF)
 **Rückmeldung des Nutzers (erster Online-Test Welle 2):** Als neuer Spieler überfordert. Bei Lehrer Varn kann man sofort sehr viel lernen, ohne zu wissen, was sinnvoll ist. Start zufällig bei Nacht, vor der Stadt warten Wölfe, die viel zu stark sind, man kommt nicht raus. Selbst bei den Ratten stirbt man schnell, weil Wölfe, Goblins und nachspawnende andere Monster dazwischen sind. Er hat mit ein paar NPCs gesprochen, aber nicht verstanden, was zu tun ist, und ist ohne Tränke und ohne Fertigkeit rausgelaufen. Der Einstieg in D4O war leichter; der Start ist zu überladen.
 
 **Entscheidungen:**
