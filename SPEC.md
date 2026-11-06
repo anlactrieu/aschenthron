@@ -512,7 +512,8 @@ Allgemein: je Paket frische Session, Entscheidungen vorher per AskUserQuestion, 
 2. **Level-Tempo:** auf **20–30 h** bis Stufe 30 strecken, Cap bleibt 30.
 3. **Beute:** **fast nur benannte, feste Gegenstände** wie bei T4C (Zufallsaffixe nur noch Ausnahme).
 4. **Gespräche:** Stichworte **nur anklicken**, kein Eintippen.
-Noch offen: 5 Todesstrafe, 6 Fertigkeiten, 7 Wegweiser, 8 zweite Insel (siehe unten).
+5. **Todesstrafe (2026-11-06):** so nah wie möglich an D4O, aber mit unserem System harmonisiert (bestehender Leichenlauf, 5 % der Stufenspanne, gestreckte Kurve aus P3, benannte Beute, Safe-Zonen). Umsetzung in P4: D4O-Regeln recherchieren (Quellen belegt/vermutet trennen), Abweichungen begründen.
+Noch offen: 6 Fertigkeiten, 7 Wegweiser, 8 zweite Insel (siehe unten).
 
 ### Offene Entscheidungen für den Nutzer
 1. **Ansicht:** Draufsicht behalten · auf Iso umbauen (4–6 Sessions, Probe `probe/iso/`) · erst Inhalte (P1–P7), Ansicht später.

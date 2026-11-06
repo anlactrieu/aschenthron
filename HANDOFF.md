@@ -1,5 +1,13 @@
 # HANDOFF – Aschenthron
 
+## LÄUFT (2026-11-06): T4C-Charme Welle 2, Teil 1
+- **Stand:** Zwei Sonnet-Sessions parallel im geteilten Checkout auf `neuer-look`, kein Push, `HANDOFF.md` pflegt nur die Hauptsession:
+  - `p2-gespraeche` (local_328db655…): P2 Gespräche – `src/sim/data.ts` (`NPC_TOPICS`), `src/sim/quests.ts` (`askTopic`, versteckte Aufträge), `src/sim/save.ts` (bekannte Stichworte + Migration), `src/render/ui.ts` (Gesprächsfenster, Notizbuch).
+  - `p5-wildnis` (local_9ca5f104…): P5 Wildnis, nur Client – neu `src/render/wildlife.ts`, `src/render/world/props.ts` (Landmarken), `scripts/gen_map.py` + `src/data/aschenthron.json`, Haken in `GameScene.ts`. Die kämpfende Patrouille kommt erst nach P4.
+- **Letzte 3 Entscheidungen:** (1) Nutzer: kleinere Modelle, wo möglich, ohne Qualitätsverlust → beide Sessions auf Sonnet, mit Pflicht zu Prüfung, Browser-Test und `/code-review`. (2) P2 ∥ P5 laut SPEC-Wellenplan, weil sie getrennte Dateien haben; P5 ohne Sim-Teil, damit `world.ts` frei bleibt für P4. (3) Beide schreiben nur ihren eigenen Umsetzungsstand-Abschnitt in `SPEC.md`, P5 erst ganz am Ende.
+- **Offen:** Ergebnisse beider Sessions prüfen (Diff, tsc/Lint/Tests/Build), dann P4 Kampf → P6 Tag/Nacht nacheinander (beide in `world.ts`/`data.ts`). Für P4 fehlt die Nutzerentscheidung 5 (Todesstrafe schärfer?). Danach die P5-Patrouille. Außerdem weiter offen: der Online-Test des Nutzers für Welle 1.
+- **Learnings:** keine neuen.
+
 ## ERLEDIGT (2026-11-04, spät): T4C-Charme Welle 1
 - **Stand:** Plan in `SPEC.md` „Plan: T4C-Charme“ (P1–P9) + Nutzerentscheidungen (91f1a2a). Drei Sessions parallel auf `neuer-look`, geteilter Checkout, kein Push, `HANDOFF.md` pflegt nur die Hauptsession: `p1-staedte` (Sonnet; `townLife.ts`, `npc.ts`, `audio.ts`, `town.ts`, Karte, Haken `GameScene.ts`), `p7-musik` (Sonnet; `music.ts`), `p3-fortschritt` (Opus; `src/sim/**`, `ui.ts`, `achievements.ts`, `server/**`; darf Teilaufgaben an Sonnet-Sessions geben).
 - **Letzte 3 Entscheidungen:** (1) Nutzer: erst Inhalte P1–P7, Iso (P9) später; Probe `probe/iso/vergleich.png`. (2) Nutzer: Tempo 20–30 h bis Cap 30, Beute fast nur benannt, Stichworte nur anklicken. (3) Modellwahl: Sonnet für P1/P7, Opus nur für P3 (Beute-Umbau mit Spielstand-Migration und Balance).
