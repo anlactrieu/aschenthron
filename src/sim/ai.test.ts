@@ -60,6 +60,19 @@ describe('Gegner-KI (P4)', () => {
     expect(g.fled).toBe(true);
   });
 
+  it('Flucht endet, wenn das Ziel verschwindet: Goblin kämpft beim nächsten Ziel wieder', () => {
+    const { w, p } = setup();
+    const g = spawnMonster(w, 24, 20, 'goblin');
+    g.targetId = p.id;
+    g.hp = 1;
+    run(w, 3);
+    expect(g.autoAttack).toBe(false);
+    g.targetId = null;
+    run(w, 3);
+    expect(g.autoAttack).toBe(true);
+    expect(g.fleeUntil).toBeUndefined();
+  });
+
   it('Untoter flieht nie, auch nicht mit 1 Leben', () => {
     const { w, p } = setup();
     const s = spawnMonster(w, 22, 20, 'skeleton');

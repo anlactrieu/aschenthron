@@ -2286,11 +2286,13 @@ function reviveMonster(w: World, m: Actor): void {
 
 /** Rudelmitglieder in der Nähe greifen dasselbe Ziel an. */
 function alertPack(w: World, m: Actor, targetId: number): void {
-  for (const o of m.packId ? w.actors : []) {
-    if (o.kind === 'monster' && o.alive && o.packId === m.packId && o.targetId === null && o.id !== m.id && Math.hypot(o.x - m.x, o.y - m.y) <= PACK_ALERT_RANGE) {
-      o.targetId = targetId;
-      o.patrolling = false;
-      o.autoAttack = true;
+  if (m.packId) {
+    for (const o of w.actors) {
+      if (o.kind === 'monster' && o.alive && o.packId === m.packId && o.targetId === null && o.id !== m.id && Math.hypot(o.x - m.x, o.y - m.y) <= PACK_ALERT_RANGE) {
+        o.targetId = targetId;
+        o.patrolling = false;
+        o.autoAttack = true;
+      }
     }
   }
   callForHelp(w, m, targetId);
@@ -2309,7 +2311,10 @@ function callForHelp(w: World, m: Actor, targetId: number): void {
     o.autoAttack = true;
     heard++;
   }
-  if (!heard) return;
+  if (!heard) {
+    m.callAt = w.tick + TICK_RATE; // niemand in Reichweite: höchstens einmal je Sekunde neu suchen
+    return;
+  }
   m.callAt = w.tick + CALL_COOLDOWN;
   w.events.push({ type: 'call', id: m.id });
 }
@@ -2426,6 +2431,10 @@ function npcWanderStep(w: World, players: Actor[]): void {
 function monsterAi(w: World, m: Actor, players: Actor[]): void {
   const home = m.home!;
   if (m.targetId === null) {
+    if (m.fleeUntil !== undefined) {
+      m.fleeUntil = undefined;
+      m.autoAttack = true;
+    }
     let best: Actor | undefined;
     let bd = m.aggroRange;
     for (const x of players) {
