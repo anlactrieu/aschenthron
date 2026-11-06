@@ -7,6 +7,8 @@
 export const TICKS_PER_HOUR = 20 * 60;
 /** Uhrzeit bei Tick 0: früher Morgen, die erste Nacht beginnt nach 13 Minuten */
 export const START_HOUR = 8;
+/** Neue Charaktere (Einzelspieler, ohne Spielstand) starten um 7 Uhr: ein langer Tag vor der ersten Nacht (SPEC „Einstieg für Neulinge“) */
+export const NEW_CHAR_HOUR = 7;
 /** Nacht: von `NIGHT_FROM` bis `NIGHT_TO` (über Mitternacht). Läden machen genau dann zu. */
 export const NIGHT_FROM = 21;
 export const NIGHT_TO = 5.5;
@@ -14,12 +16,13 @@ export const NIGHT_TO = 5.5;
 /** Innenzonen: Tageszeit gilt dort nicht (Dunkelheit ist Dauerzustand) */
 export const DUNGEON_REGIONS = ['Gruft der Moorhexe', 'Katakomben', 'Tiefenmine', 'Thron der Asche', 'Goblinbau', 'Spinnennest'];
 
-export interface Clocked { tick: number; fixedHour?: number | null }
+/** `startHour`: Uhrzeit bei Tick 0 dieser Welt (fehlt = `START_HOUR`) */
+export interface Clocked { tick: number; fixedHour?: number | null; startHour?: number }
 
 /** Spielstunde 0–24 (mit Nachkomma) */
 export function hourOf(w: Clocked): number {
   if (w.fixedHour !== undefined && w.fixedHour !== null) return w.fixedHour;
-  return (START_HOUR + w.tick / TICKS_PER_HOUR) % 24;
+  return ((w.startHour ?? START_HOUR) + w.tick / TICKS_PER_HOUR) % 24;
 }
 
 export const isNightHour = (h: number): boolean => {
@@ -29,7 +32,7 @@ export const isNightHour = (h: number): boolean => {
 
 /** Laufende Nummer der Nacht (springt um 21 Uhr); bestimmt die Wahl der Spawn-Orte */
 export function nightNumber(w: Clocked): number {
-  return Math.floor((START_HOUR + w.tick / TICKS_PER_HOUR + (24 - NIGHT_FROM)) / 24);
+  return Math.floor(((w.startHour ?? START_HOUR) + w.tick / TICKS_PER_HOUR + (24 - NIGHT_FROM)) / 24);
 }
 
 /** "21:05" */

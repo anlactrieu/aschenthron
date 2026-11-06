@@ -191,9 +191,26 @@ export const CALL_RANGE = 12;
  */
 export interface DangerSpot { id: string; name: string; zone: string; x: number; y: number; kinds: string[]; hint: string }
 export const DANGER_SPOTS: DangerSpot[] = [
-  { id: 'wolfsbau', name: 'Wolfsbau', zone: 'Roggenfelder', x: 57, y: 138, kinds: ['dire_wolf', 'dire_wolf', 'dire_wolf', 'wolf'], hint: 'Ein Rudel Schreckenswölfe haust weit westlich der Straße. Zu früh kommt man dort nicht lebend raus.' },
-  { id: 'raeubernest', name: 'Räubernest im Röhricht', zone: 'Roggenfelder', x: 76, y: 145, kinds: ['bandit_captain', 'bandit', 'bandit', 'bandit'], hint: 'Im Röhricht südlich der Straße lauert ein Hauptmann mit seiner Bande.' },
+  // Einstieg für Neulinge: beide Orte liegen im Osten der Felder, gut zwölf Felder hinter der Anfängerzone (früher direkt vor dem Osttor)
+  { id: 'wolfsbau', name: 'Wolfsbau', zone: 'Roggenfelder', x: 92, y: 124, kinds: ['dire_wolf', 'dire_wolf', 'dire_wolf', 'wolf'], hint: 'Ein Rudel Schreckenswölfe haust im Nordosten der Felder, wo sie an den Wald stoßen. Zu früh kommt man dort nicht lebend raus.' },
+  { id: 'raeubernest', name: 'Räubernest im Röhricht', zone: 'Roggenfelder', x: 89, y: 147, kinds: ['bandit_captain', 'bandit', 'bandit', 'bandit'], hint: 'Im Röhricht im Südosten der Felder lauert ein Hauptmann mit seiner Bande.' },
 ];
+
+/**
+ * Anfängerzone (SPEC „Einstieg für Neulinge“): Felder vor beiden Toren von Aschenhafen. Dort leben nur Ratten und Wildhunde
+ * der Stufe 1–3, auch nachts. Beim Kartenaufbau werden fremde Arten der Karte durch `swap` ersetzt (Champion-Aura entfällt,
+ * Unikate ziehen nach `moves`), Nacht-Spawns und Zufallsereignisse bleiben draußen, fremde Gegner greifen dort niemanden an.
+ */
+export const BEGINNER_ZONE = {
+  name: 'Anfängerfelder vor Aschenhafen',
+  x: 28, y: 119, w: 49, h: 52,
+  kinds: ['field_rat', 'burrow_rat', 'wild_hound'],
+  maxLevel: 3,
+  swap: { feral_hound: 'wild_hound', giant_rat: 'burrow_rat', goblin: 'field_rat', goblin_scout: 'wild_hound' } as Record<string, string>,
+  moves: { rat_king: { x: 88, y: 126 } } as Record<string, { x: number; y: number }>,
+  /** Jagdhinweis für Stufe 1–3 (`nextStep`): mitten zwischen den Ratten vor dem Osttor */
+  hunt: { x: 60, y: 158 },
+};
 export const DANGER_OFFSETS: [number, number][] = [[0, 0], [2, 0], [-2, 0], [0, 2]];
 export const CALL_COOLDOWN = 20 * 20;
 export const FLEE_HP = 0.25;
@@ -650,8 +667,8 @@ export const POTION_COOLDOWN_TICKS = 100;
 /** Rüstungs-Formel: Schaden * K / (K + Rüstung) */
 export const ARMOR_K = 30;
 
-/** kill: Monsterart; chest: Truhen; champion/unique: Champions bzw. Mini-Bosse (unique mit `target`: ein bestimmter); visit: Region betreten; bring: Gegenstand von Monstern/Truhen sammeln; talk: mit einem NPC sprechen */
-export type QuestKind = 'kill' | 'chest' | 'champion' | 'unique' | 'visit' | 'bring' | 'talk' | 'camp' | 'find';
+/** buy: `count` Stück der Vorlage `target` beim Händler kaufen (oder geschenkt bekommen); kill: Monsterart; chest: Truhen; champion/unique: Champions bzw. Mini-Bosse (unique mit `target`: ein bestimmter); visit: Region betreten; bring: Gegenstand von Monstern/Truhen sammeln; talk: mit einem NPC sprechen */
+export type QuestKind = 'kill' | 'chest' | 'champion' | 'unique' | 'visit' | 'bring' | 'talk' | 'camp' | 'find' | 'buy';
 
 export interface QuestDef {
   id: string;
@@ -690,6 +707,10 @@ export interface QuestDef {
   teaches?: string[];
   /** P2: Name der versteckten Kette (nur für die Anzeige) */
   thread?: string;
+  /** Nach der Abgabe beginnt sofort diese Aufgabe (erster Auftrag: Schritt für Schritt ohne Rückweg zum Auftraggeber) */
+  next?: string;
+  /** Töte-Aufgabe gilt beim letzten Kill sofort als abgegeben (Kaufaufgaben immer) */
+  auto?: boolean;
 }
 
 /** Gibt dieser NPC die Aufgabe aus bzw. nimmt sie an? Normale Aufgaben stehen in `quests` des NPC, versteckte nennen ihn als `giver`. */
@@ -786,6 +807,9 @@ export const CHAIN_MOOR = 'Das Schweigen im Moor';
 export const CHAIN_OATH = 'Der letzte Eid';
 export const CHAIN_MINE = 'Pells Fund';
 export const CHAIN_WEB = 'Netze der Königin';
+export const CHAIN_FIRST = 'Erste Schritte';
+/** Wer den ersten Auftrag gibt und annimmt (wird beim Kartenaufbau an ihn gehängt, die Karte bleibt unverändert) */
+export const FIRST_GIVER = 'Hafenmeister Joren';
 export const CHAIN_ARRIVAL = 'Ankunft in Aschenhafen';
 export const CHAIN_THRONE = 'Die Chronik der Asche';
 
@@ -857,7 +881,11 @@ QUESTS.push(
 
 // Ankunftskette für neue Spieler: ein Rundgang, bei dem jede Rolle der Stadt einmal erklärt wird (reine Gesprächsaufgaben, kleine Belohnung)
 QUESTS.push(
-  chainQ(CHAIN_ARRIVAL, 3, { id: 'c_arr1', kind: 'talk', name: 'Im Lehrhaus', text: 'Hafenmeister Joren schickt dich zum Lehrhaus nördlich der Straße: Lehrer Varn zeigt dir, wie du Fertigkeiten lernst.', minLevel: 1, target: 'varn', outro: 'Varn: „Fertigkeiten lernst du hier gegen Skillpunkte und Gold. Jede Stufe bringt einen Punkt. Wähle dir einen Stil, nicht alles.“' }),
+  // Erster Auftrag (SPEC „Einstieg für Neulinge“): Tränke holen → Ratten jagen → zurück zu Joren → weiter zu Varn
+  { id: 'c_first1', kind: 'buy', chain: CHAIN_FIRST, name: 'Vorrat für draußen', text: 'Hafenmeister Joren: „Ohne Heiltränke geht keiner vor das Tor.“ Kauf bei Händlerin Mirel im Kaufhaus nördlich vom Platz 2 kleine Heiltränke. Hast du kein Gold, sprich sie an: Sie hilft aus.', minLevel: 1, target: 'heal_small', count: 2, xp: 30, gold: 0, next: 'c_first2', outro: 'Mirel: „Trink einen, sobald dein Leben unter die Hälfte fällt. Die Tasten stehen unten in der Leiste.“' },
+  { id: 'c_first2', kind: 'kill', chain: CHAIN_FIRST, name: 'Ratten vor dem Tor', text: 'Vor dem Osttor fressen Feldratten die Saat. Erlege 5 Feldratten auf den Feldern gleich hinter dem Tor. Dort draußen gibt es nur Ratten und Wildhunde, auch nachts.', minLevel: 1, requires: 'c_first1', target: 'field_rat', count: 5, xp: 40, gold: 10, auto: true, next: 'c_first3', outro: 'Das waren genug. Joren wartet am Hafen auf deinen Bericht.' },
+  { id: 'c_first3', kind: 'talk', chain: CHAIN_FIRST, name: 'Bericht am Hafen', text: 'Kehr zu Hafenmeister Joren am Hafen zurück und erzähl ihm von den Ratten.', minLevel: 1, requires: 'c_first2', target: 'joren', count: 1, xp: 140, gold: 20, next: 'c_arr1', outro: 'Joren: „Gut gemacht. Jetzt lohnt sich das Lernen: Lehrer Varn im Lehrhaus zeigt dir deine erste Fertigkeit. Nimm eine, nicht alle.“' },
+  chainQ(CHAIN_ARRIVAL, 3, { id: 'c_arr1', kind: 'talk', name: 'Im Lehrhaus', text: 'Hafenmeister Joren schickt dich zum Lehrhaus nördlich der Straße: Lehrer Varn zeigt dir, wie du Fertigkeiten lernst.', minLevel: 1, requires: 'c_first3', target: 'varn', outro: 'Varn: „Fertigkeiten lernst du hier gegen Skillpunkte und Gold. Jede Stufe bringt einen Punkt. Wähle dir einen Stil, nicht alles.“' }),
   chainQ(CHAIN_ARRIVAL, 3, { id: 'c_arr2', kind: 'talk', name: 'Im Kaufhaus', text: 'Varn rät dir, bei Händlerin Mirel Tränke und eine erste Ausrüstung zu kaufen.', minLevel: 1, requires: 'c_arr1', target: 'mirel', outro: 'Mirel: „Waffen, Rüstung, Tränke. Du kannst hier auch alles verkaufen, was du nicht brauchst. Zieh Gegenstände in den Rucksack, um zu kaufen.“' }),
   chainQ(CHAIN_ARRIVAL, 3, { id: 'c_arr3', kind: 'talk', name: 'In der Schmiede', text: 'Mirel verweist dich an Schmiedin Ilse: Sie verbessert Gegenstände.', minLevel: 1, requires: 'c_arr2', target: 'ilse', outro: 'Ilse: „Ich werte Gegenstände auf, würfle Zusatzwerte neu und setze Edelsteine ein. Komm wieder, wenn du Gold und gute Beute hast.“' }),
   chainQ(CHAIN_ARRIVAL, 3, { id: 'c_arr4', kind: 'talk', name: 'Im Lagerhaus', text: 'Ilse schickt dich ins Lagerhaus zu Lagerverwalter Ottmar. Dort liegt dein Besitz sicher.', minLevel: 1, requires: 'c_arr3', target: 'ottmar', outro: 'Ottmar: „Alles in meinem Lager bleibt dir auch beim Tod. Lass wertvolle Dinge hier, wenn du in gefährliche Gegenden gehst.“' }),
@@ -885,7 +913,7 @@ export const NPC_ROLE: Record<string, string> = {
   'Hehler Grau': 'Nachthändler: führt nachts Amulette, Ringe und große Tränke, die sonst nur als Beute fallen. Tagsüber nicht da.',
   'Nachthändlerin Vess': 'Nachthändlerin der Felsenwacht: dieselbe Ware wie der Hehler im Hafen, nur nachts da.',
   'Totengräber Hobb': 'Totengräber: erzählt, was nachts auf den Gräbern geschieht. Nur nachts da.',
-  'Hafenmeister Joren': 'Willkommen! Frag mich, wenn du nicht weißt, wohin.',
+  'Hafenmeister Joren': 'Willkommen! Bei mir beginnt dein erster Auftrag. Frag mich, wenn du nicht weißt, wohin.',
   'Lehrer Varn': 'Kampflehrer: Nahkampf, Fernkampf und Überleben lernen; hier verteilst du auch deine Skillpunkte neu.',
   'Magierin Selka': 'Magielehrerin: Zauber lernen (Feuer, Frost, Heilung, Schutz). Kampffertigkeiten lehrt Varn.',
   'Händlerin Mirel': 'Kaufen und verkaufen: Waffen, Rüstung, Tränke.',
@@ -907,7 +935,7 @@ export const NPC_LORE: Record<string, string[]> = {
   'Hafenmeister Joren': [
     'Willkommen in Aschenhafen. Das Schiff hinter dir bringt jeden, der hier neu anfängt.',
     'Nördlich der Straße: das Lehrhaus (Buchzeichen) für Fertigkeiten, das Kaufhaus (Münzen) für Waren, die Schmiede (Amboss) und das Lager (Truhe). Die Wache (Schild) vergibt Aufträge, die Kräuterfrau (Blatt) auch.',
-    'Geh deinen Weg erst einmal in Ruhe ab. Vor der Stadt warten auf den Feldern Ratten und Hunde – zum Üben genau richtig. Wenn du magst, mache einen Rundgang: Ich schicke dich zum Lehrer.',
+    'Bevor du losziehst, hab ich einen ersten Auftrag für dich: Tränke holen, vor dem Tor ein paar Ratten jagen, zurückkommen. Auf den Feldern gleich vor der Stadt gibt es nur Ratten und Wildhunde, auch nachts. Wölfe, Goblins und Räuber leben weiter draußen.',
   ],
   'Chronistin Maren': [
     'Ich schreibe auf, was andere vergessen wollen. Aschental war einmal ein Garten, bevor der Thron der Asche den Himmel verbrannte.',

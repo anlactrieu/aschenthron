@@ -55,7 +55,7 @@ export const NPC_TOPICS: Record<string, NpcTopics> = {
     topics: {
       hafen: { text: ['Aschenhafen lebt von dem, was die Schiffe nicht mehr bringen. Früher kamen Gewürze und Wolle, heute Flüchtlinge und Schmuggelware. Beides lade ich ab, ohne Fragen: Ein Hafenmeister, der Fragen stellt, lebt nicht lange.'] },
       wege: { text: ['Nach Osten führt die Handelsstraße zur [[felsenwacht|Felsenwacht]], ein langer Marsch durch Wald und Moor. Im Norden liegen die Roggenfelder, im Westen der Düsterwald. Bleib auf den Wegen, bis du Stufe zehn erreicht hast.'] },
-      wolfsrudel: { text: ['Im Wolfsbau, weit westlich der Straße, hat sich ein Rudel Schreckenswölfe eingegraben. Zwei Fischer sind dort einmal abgekommen, einer kam zurück. Wer vor Stufe zehn dort hineingeht, taugt nicht mehr zum Erzählen.'] },
+      wolfsrudel: { text: ['Im Wolfsbau im Nordosten der Felder, wo sie an den Wald stoßen, hat sich ein Rudel Schreckenswölfe eingegraben. Zwei Fischer sind dort einmal abgekommen, einer kam zurück. Wer vor Stufe zehn dort hineingeht, taugt nicht mehr zum Erzählen.'] },
       nebel: { text: ['Der Nebel kriecht seit dem Fall des Throns vom Wasser her. Die Fischer behaupten, er rieche nach Asche. Ich behaupte, er riecht nach Fisch, und bin trotzdem froh, wenn die Laternen brennen.'] },
       felsenwacht: { text: ['Die Felsenwacht ist unsere Schwesterstadt im Osten, eine Festung am Bergpass. Dort sitzt, wer mit Waffen mehr zu tun hat als mit Netzen. Wenn du Neuigkeiten willst, frag [[haldor|Haldor]] am Tor.'] },
       haldor: { text: ['Haldor steht seit Jahrzehnten am Tor der Felsenwacht und hört alles. Wer ihm zuhört, erfährt mehr als von jedem Ausrufer.'] },
@@ -128,7 +128,7 @@ export const NPC_TOPICS: Record<string, NpcTopics> = {
     },
   },
   'Hauptmann Brandt': {
-    open: 'Die Wache sucht Hilfe gegen [[raeuber|Räuber]], [[goblins|Goblins]] und alles, was nachts schreit. Im [[roehricht|Röhricht]] südlich der Straße soll sich eine Bande eingenistet haben.',
+    open: 'Die Wache sucht Hilfe gegen [[raeuber|Räuber]], [[goblins|Goblins]] und alles, was nachts schreit. Im [[roehricht|Röhricht]] im Südosten der Felder soll sich eine Bande eingenistet haben.',
     topics: {
       raeuber: { text: ['Im Nordwesten liegt das Räuberlager, geführt von Harkon. Davor streifen Lehrlinge und Wegelagerer durch den Wald. Ohne Rüstung ist das kein Ausflug.'] },
       roehricht: { text: ['Zwischen dem Schilf liegt das Räubernest mit einem Hauptmann und drei Schlägern. Die Händler nehmen lieber den langen Weg um das Röhricht herum. Ich schicke keine Rekruten hin, bevor sie nicht ihren ersten Schlag eingesteckt haben.'] },

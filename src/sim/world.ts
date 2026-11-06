@@ -4,7 +4,7 @@ import { itemReq, reqOfTemplate, itemAffixes, gemTemplateId, handsOf, weaponSpee
 import {
   ATTR_KEYS, ATTR_NAME, xpToNext, questXp, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, skillReq, skillRankOf, ACTIVE_POWER, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
   monsterKind, CALL_RANGE, CALL_COOLDOWN, FLEE_HP, FLEE_TICKS, npcKeyOf, isGiverOf, lootGroupOf, LOOT_GROUPS, KILL_GOALS, LEVEL_TITLES, type LootGroup, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, NAMED_SHARE, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
-  FAMILY_RES, MELEE_SKILL_KRAFT_SCALE, MAX_RES, SLOW_FACTOR, STATUS_IDS, PASSIVE_CAP, DMG_NAME, type DmgType, type StatusId, type SkillDef, type PassiveKey,
+  BEGINNER_ZONE, CHAIN_FIRST, FAMILY_RES, MELEE_SKILL_KRAFT_SCALE, MAX_RES, SLOW_FACTOR, STATUS_IDS, PASSIVE_CAP, DMG_NAME, type DmgType, type StatusId, type SkillDef, type PassiveKey,
   ATTR_THRESHOLD, ATTR_THRESHOLD_2, ATTR_THRESHOLD_BONUS, LEVEL_MILESTONES, milestonePoints, WILL_RES_PER_2, WILL_STATUS_PER_POINT, WILL_STATUS_CAP, GEM_MIN_LEVEL, GEM_DROP, GEM_SOCKET_COST, WORLD_BOSS_LOOT, type QuestDef,
 } from './data';
 import { EFFECTS, cleanse, controlDr, dispel, mergeStatus } from './effects';
@@ -378,6 +378,10 @@ export interface World {
   night: boolean;
   /** Testhilfe: Uhrzeit festhalten (`?stunde=`, nur Einzelspieler); sonst folgt die Uhr dem Tick (`clock.ts`) */
   fixedHour: number | null;
+  /** Uhrzeit bei Tick 0 (`clock.ts`); fehlt = `START_HOUR`. Neue Charaktere setzen `NEW_CHAR_HOUR`. */
+  startHour?: number;
+  /** Anfängerzone vor der ersten Stadt (`BEGINNER_ZONE`): nur schwache Tiere, fremde Gegner greifen dort niemanden an */
+  beginner: Rect[];
 }
 
 export interface PackPatrol {
@@ -390,7 +394,7 @@ export interface PackPatrol {
 }
 
 export function createWorld(seed: number, grid: Grid, safe: Rect[] = []): World {
-  return { tick: 0, grid, rng: new Rng(seed), actors: [], nextId: 1, events: [], ground: [], safe, npcs: [], start: { x: 1, y: 1 }, towns: [], regions: [], pvp: false, chests: [], camps: [], finds: [], landmarks: [], telegraphs: [], cmdActor: null, packs: new Map(), npcWander: false, fx: new Rng((seed ^ 0x9e3779b9) >>> 0), night: false, fixedHour: null };
+  return { tick: 0, grid, rng: new Rng(seed), actors: [], nextId: 1, events: [], ground: [], safe, npcs: [], start: { x: 1, y: 1 }, towns: [], regions: [], pvp: false, chests: [], camps: [], finds: [], landmarks: [], telegraphs: [], cmdActor: null, packs: new Map(), npcWander: false, fx: new Rng((seed ^ 0x9e3779b9) >>> 0), night: false, fixedHour: null, beginner: [] };
 }
 
 export function addNpc(w: World, kind: NpcKind, name: string, x: number, y: number, extra: Partial<Npc> = {}): Npc {
@@ -723,6 +727,19 @@ export function inSafeZone(w: World, x: number, y: number): boolean {
   return w.safe.some((r) => x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h);
 }
 
+/** Liegt der Punkt in der Anfängerzone (`BEGINNER_ZONE`, beim Kartenaufbau gesetzt)? */
+export function inBeginnerZone(w: World, x: number, y: number): boolean {
+  return w.beginner.some((r) => x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h);
+}
+
+/** Gehört der Gegner in die Anfängerzone? Nur die schwachen Tierarten dort, keine Champions, Unikate oder Bosse. */
+export function beginnerKind(m: Actor): boolean {
+  return !!m.kindId && BEGINNER_ZONE.kinds.includes(m.kindId) && !m.champ && !m.unique && !m.boss;
+}
+
+/** Fremde Gegner meiden die Anfängerzone: Sie greifen dort niemanden an und lassen Verfolgte dort ziehen. */
+const shunsBeginner = (w: World, m: Actor, x: number, y: number): boolean => w.beginner.length > 0 && !beginnerKind(m) && inBeginnerZone(w, x, y);
+
 /** Kleinste benannte Region (Zone/Dungeon), die den Punkt enthält. */
 export function regionAt(w: World, x: number, y: number): (Rect & { name: string; levels: string }) | undefined {
   let best: (Rect & { name: string; levels: string }) | undefined;
@@ -845,6 +862,11 @@ function finishQuest(w: World, a: Actor, def: QuestDef, pick = 0): void {
   w.events.push({ type: 'questTurned', questId: def.id, xp: xpGain, gold: goldGain, ...(item ? { item } : {}), to: a.id });
   if (def.teaches) learnTopics(w, a, def.teaches);
   gainXp(w, a, xpGain);
+  const next = def.next ? questById(def.next) : undefined;
+  if (next && !a.quests[next.id]) {
+    beginQuest(w, a, next);
+    note(w, a, `Neuer Auftrag: „${next.name}“`);
+  }
 }
 
 /** Nimmt eine Aufgabe an (Lager, die schon geräumt sind, zählen sofort als erfüllt). */
@@ -853,6 +875,44 @@ function beginQuest(w: World, a: Actor, def: QuestDef): void {
   if (def.kind === 'camp' && w.camps.find((c) => c.id === def.target)?.cleared) {
     a.quests[def.id] = { state: 'done', progress: def.count };
     w.events.push({ type: 'questDone', questId: def.id, to: a.id });
+  }
+}
+
+/** Erster Auftrag nur für neue Charaktere: Wer die Ankunftskette schon begonnen hat (alter Spielstand), bekommt ihn nicht mehr. */
+export function firstQuestOpen(a: Pick<Actor, 'quests'>, def: QuestDef): boolean {
+  return def.chain !== CHAIN_FIRST || !Object.keys(a.quests).some((id) => id.startsWith('c_arr'));
+}
+
+/** Kaufaufgaben zählen gekaufte Stücke; ist die Zahl erreicht, ist die Aufgabe sofort erfüllt und abgegeben. */
+function countBuy(w: World, a: Actor, templateId: string, n: number): void {
+  for (const def of QUESTS) {
+    const st = a.quests[def.id];
+    if (def.kind !== 'buy' || def.target !== templateId || st?.state !== 'active') continue;
+    st.progress = Math.min(def.count, st.progress + n);
+    w.events.push({ type: 'questProgress', questId: def.id, progress: st.progress, count: def.count, to: a.id });
+    if (st.progress < def.count) continue;
+    st.state = 'done';
+    finishQuest(w, a, def);
+  }
+}
+
+/** Ohne Gold für den Rest (oder bei geschlossenem Laden) schenkt der Händler die fehlenden Stücke einer Kaufaufgabe. */
+function giftBuyQuest(w: World, a: Actor, n: Npc): void {
+  for (const def of QUESTS) {
+    const st = a.quests[def.id];
+    if (def.kind !== 'buy' || st?.state !== 'active' || !(SHOPS[n.shop ?? 'basic'] ?? []).includes(def.target)) continue;
+    const left = def.count - st.progress;
+    if (!n.closed && a.gold >= buyPrice(def.target) * left) {
+      note(w, a, `${n.name}: „Die ${templateById(def.target).name} liegen in meinen Waren. Je ${buyPrice(def.target)} Gold.“`);
+      continue;
+    }
+    for (let i = 0; i < left; i++) {
+      const item = generateItem(w.rng, w.nextId++, def.target, 'normal');
+      a.inventory.push(item);
+      w.events.push({ type: 'pickedUp', item, to: a.id });
+    }
+    note(w, a, `${n.name}: „Nimm die hier, du zahlst, wenn du Gold hast.“`);
+    countBuy(w, a, def.target, left);
   }
 }
 
@@ -1128,6 +1188,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       a.gold -= price;
       a.inventory.push(item);
       w.events.push({ type: 'pickedUp', item, to: a.id });
+      if (cmd.named === undefined) countBuy(w, a, cmd.templateId, 1);
       break;
     }
     case 'sell': {
@@ -1175,6 +1236,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       if (a.quests[def.id]) return fail(w, 'Aufgabe bereits angenommen.');
       if (a.level < def.minLevel) return fail(w, `Benötigt Level ${def.minLevel}.`);
       if (def.requires && a.quests[def.requires]?.state !== 'turned') return fail(w, `Erst „${questById(def.requires)?.name ?? '?'}“ abschließen.`);
+      if (!firstQuestOpen(a, def)) return fail(w, 'Du kennst dich hier schon aus.');
       beginQuest(w, a, def);
       break;
     }
@@ -1200,6 +1262,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
           finishQuest(w, a, def);
         }
       }
+      if (isShop(n)) giftBuyQuest(w, a, n);
       break;
     }
     case 'readNote': {
@@ -1827,6 +1890,8 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
       for (const q of QUESTS) {
         if (q.kind !== 'kill' || q.chain || q.hidden || q.target !== m.kindId || pl.quests[q.id] || pl.level < q.minLevel) continue;
         if (q.requires && pl.quests[q.requires]?.state !== 'turned') continue;
+        // Läuft schon eine Kettenaufgabe auf diese Art (erster Auftrag: Ratten), zählt erst sie; die freie Aufgabe kommt danach
+        if (QUESTS.some((c) => c.chain && c.kind === 'kill' && c.target === q.target && pl.quests[c.id]?.state === 'active')) continue;
         pl.quests[q.id] = { state: 'active', progress: 0 };
         note(w, pl, `Aufgabe „${q.name}“ läuft jetzt mit – deine Kills zählen.`);
       }
@@ -1843,6 +1908,7 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
         if (st.progress >= q.count) {
           st.state = 'done';
           w.events.push({ type: 'questDone', questId: q.id, to: pl.id });
+          if (q.auto) finishQuest(w, pl, q);
         }
       } else if (q.kind === 'bring' && q.monsters?.includes(m.kindId!) && !m.summoned && w.rng.next() < (q.chance ?? 0.4)) {
         questItemFound(w, pl, q, st);
@@ -1910,7 +1976,7 @@ function wildEvents(w: World, pl: Actor): void {
   const d = Math.hypot(pl.x - s.x, pl.y - s.y);
   s.x = pl.x;
   s.y = pl.y;
-  if (d > 6 || inSafeZone(w, pl.x, pl.y)) return; // Teleport oder Stadt zählt nicht
+  if (d > 6 || inSafeZone(w, pl.x, pl.y) || inBeginnerZone(w, pl.x, pl.y)) return; // Teleport, Stadt und Anfängerzone zählen nicht
   s.walked += d;
   const region = regionAt(w, pl.x, pl.y)?.name;
   if (s.walked < WILD_STEPS || w.tick - s.at < WILD_COOLDOWN || pl.targetId !== null || (region && WILD_NOT_IN.includes(region))) return;
@@ -1924,7 +1990,7 @@ function wildEvents(w: World, pl: Actor): void {
       const ang = w.fx.next() * Math.PI * 2;
       const x = Math.round(pl.x + Math.cos(ang) * r);
       const y = Math.round(pl.y + Math.sin(ang) * r);
-      if (isWalkable(w.grid, x, y) && !inSafeZone(w, x, y)) return { x, y };
+      if (isWalkable(w.grid, x, y) && !inSafeZone(w, x, y) && !inBeginnerZone(w, x, y)) return { x, y };
     }
     return undefined;
   };
@@ -2397,7 +2463,7 @@ export function setupPatrols(w: World): void {
     const pts: Pt[] = [anchor];
     for (let tries = 0; tries < 24 && pts.length < 3; tries++) {
       const p = { x: anchor.x + w.fx.int(-PATROL_RADIUS, PATROL_RADIUS), y: anchor.y + w.fx.int(-PATROL_RADIUS, PATROL_RADIUS) };
-      if (!isWalkable(w.grid, p.x, p.y) || inSafeZone(w, p.x, p.y)) continue;
+      if (!isWalkable(w.grid, p.x, p.y) || inSafeZone(w, p.x, p.y) || mem.some((m) => shunsBeginner(w, m, p.x, p.y))) continue;
       if (pts.some((q) => Math.abs(q.x - p.x) + Math.abs(q.y - p.y) < 4)) continue;
       const path = findPath(w.grid, anchor, p);
       if (!path.length || path.length > PATROL_RADIUS * 2 + 2) continue;
@@ -2483,7 +2549,7 @@ function monsterAi(w: World, m: Actor, players: Actor[]): void {
     let best: Actor | undefined;
     let bd = m.aggroRange;
     for (const x of players) {
-      if ((inSafeZone(w, x.x, x.y) && x.pkUntil <= w.tick)) continue;
+      if ((inSafeZone(w, x.x, x.y) && x.pkUntil <= w.tick) || shunsBeginner(w, m, x.x, x.y)) continue;
       const d = dist(m, x);
       const stealth = x.kind === 'player' ? passiveSum(x, 'stealth') : 0;
       if (d <= bd && (stealth <= 0 || d <= m.aggroRange * (1 - stealth / 100))) {
@@ -2502,7 +2568,7 @@ function monsterAi(w: World, m: Actor, players: Actor[]): void {
   }
   if (fleeStep(w, m)) return;
   const t = getActor(w, m.targetId);
-  const lost = !t || !t.alive || (inSafeZone(w, t.x, t.y) && t.pkUntil <= w.tick) || Math.hypot(m.x - home.x, m.y - home.y) > LEASH;
+  const lost = !t || !t.alive || (inSafeZone(w, t.x, t.y) && t.pkUntil <= w.tick) || (t.kind === 'player' && shunsBeginner(w, m, t.x, t.y)) || Math.hypot(m.x - home.x, m.y - home.y) > LEASH;
   if (lost) {
     m.targetId = null;
     m.patrolling = false;

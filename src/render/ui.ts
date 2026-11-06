@@ -1636,6 +1636,7 @@ export class Ui {
       case 'bring': return `Sammle ${def.item} (${prog})`;
       case 'visit': return `Betritt: ${def.place}`;
       case 'talk': return `Sprich mit ${targetName(def)}`;
+      case 'buy': return `Kaufe ${def.count}× ${targetName(def)} (${prog})`;
       case 'camp': return `Säubere: ${targetName(def)}`;
       case 'find': return `Suche ${def.item} (${prog}) – achte auf Funkeln am Boden`;
       case 'chest': return `Öffne Truhen (${prog})`;
@@ -1858,6 +1859,14 @@ export class Ui {
       const pend = QUESTS.find((q) => q.kind === 'talk' && q.target === npcKeyOf(n.name) && p.quests[q.id]?.state === 'active');
       if (!pend) continue;
       const b = el('button', 'a-btn', `Anliegen vortragen: ${pend.name}`);
+      b.onclick = () => this.send({ type: 'talk', npcId: n.id });
+      body.append(b);
+    }
+    // Kaufaufgabe (erster Auftrag): beim Händler, der die Ware führt, das Anliegen vortragen; ohne Gold schenkt er sie
+    for (const n of shops) {
+      const buy = QUESTS.find((q) => q.kind === 'buy' && p.quests[q.id]?.state === 'active' && (SHOPS[n.shop ?? 'basic'] ?? []).includes(q.target));
+      if (!buy) continue;
+      const b = el('button', 'a-btn', `Anliegen vortragen: ${buy.name}`);
       b.onclick = () => this.send({ type: 'talk', npcId: n.id });
       body.append(b);
     }

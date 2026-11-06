@@ -1,16 +1,17 @@
-import { xpToNext } from './data';
+import { BEGINNER_ZONE, xpToNext } from './data';
 import { isShop } from './night';
-import { inSafeZone, type Actor, type GameEvent, type World } from './world';
+import { beginnerKind, inBeginnerZone, inSafeZone, type Actor, type GameEvent, type World } from './world';
 
 /**
  * Entscheidungen des Pace-Bots (`pace.sim.ts`), getrennt vom Messlauf, damit sie testbar sind.
  * `old` = Bot vor fa18c17, `fa18` = Stand fa18c17, `new` = mit Review-Resten und Nachtvorsicht (nachts in der Stadt warten,
- * vorsichtig jagen), `vess` = wie `new`, kauft nachts zusätzlich beim Nachthändler (geht ohne Sim-Änderung). Nur der Messlauf nutzt die Varianten.
+ * vorsichtig jagen), `vess` = wie `new`, kauft nachts zusätzlich beim Nachthändler (geht ohne Sim-Änderung), `neu` = wie `vess`, jagt aber
+ * auf Stufe 1–3 nur in der Anfängerzone (wie ein Neuling, der dem ersten Auftrag folgt). Nur der Messlauf nutzt die Varianten.
  */
-export type BotVariant = 'old' | 'fa18' | 'new' | 'vess';
+export type BotVariant = 'old' | 'fa18' | 'new' | 'vess' | 'neu';
 
 /** `new` und `vess` tragen die Reparaturen aus fa18c17 und der Nachtvorsicht */
-export const repaired = (bot: BotVariant): boolean => bot === 'new' || bot === 'vess';
+export const repaired = (bot: BotVariant): boolean => bot === 'new' || bot === 'vess' || bot === 'neu';
 
 export const WINDOW_MIN = 20;
 export const STALL_MIN = 240;
@@ -26,7 +27,7 @@ const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.
 /** Händler, bei denen gekauft werden kann: `new` zählt auch den Nachthändler (Typ quest mit Ware), `old`/`fa18` nur `merchant` */
 export function openShops(w: World, bot: BotVariant): World['npcs'] {
   if (bot === 'old') return w.npcs.filter((n) => n.kind === 'merchant');
-  return w.npcs.filter((n) => (bot === 'vess' ? isShop(n) : n.kind === 'merchant') && !n.closed && !n.away);
+  return w.npcs.filter((n) => (bot === 'vess' || bot === 'neu' ? isShop(n) : n.kind === 'merchant') && !n.closed && !n.away);
 }
 
 /** Händler für die Stadtfahrt: der nächste offene, sonst (nur `old`/`fa18`) der nächste überhaupt */
@@ -50,6 +51,10 @@ export function nightCare(w: World, p: Actor, bot: BotVariant): { caution: boole
  */
 export function pickTarget(w: World, p: Actor, opts: { bot: BotVariant; free: (a: Actor) => boolean; caution?: boolean }): Actor | undefined {
   const cap = opts.caution ? 0 : 1;
+  // `neu`: Neulinge bleiben bis Stufe 3 in der Anfängerzone (dort gibt es nichts zu meiden)
+  if (opts.bot === 'neu' && p.level <= BEGINNER_ZONE.maxLevel && w.beginner.length) {
+    return w.actors.filter((a) => a.kind === 'monster' && a.alive && beginnerKind(a) && inBeginnerZone(w, a.x, a.y)).sort((a, b) => dist(a, p) - dist(b, p))[0];
+  }
   const base = (a: Actor) => a.kind === 'monster' && a.alive && !a.boss && !a.unique;
   const near = w.actors
     .filter((a) => base(a) && a.level <= p.level + cap && a.level >= p.level - 4 && (opts.bot === 'old' || opts.free(a)))

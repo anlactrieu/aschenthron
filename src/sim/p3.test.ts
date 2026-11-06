@@ -36,7 +36,8 @@ describe('P3: Aufgabenketten', () => {
       expect(c.quests.length, c.name).toBeGreaterThanOrEqual(3);
       expect(c.quests.length, c.name).toBeLessThanOrEqual(6);
       c.quests.forEach((q, i) => {
-        if (i === 0) expect(q.requires, q.id).toBeUndefined();
+        // erstes Glied: frei oder Anschluss an das letzte Glied einer anderen Kette (Ankunft folgt auf „Erste Schritte“)
+        if (i === 0) expect(q.requires === undefined || chains.some((o) => o !== c && o.quests[o.quests.length - 1]!.id === q.requires), q.id).toBe(true);
         else expect(q.requires, q.id).toBe(c.quests[i - 1]!.id);
       });
     }

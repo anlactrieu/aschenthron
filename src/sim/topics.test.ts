@@ -170,6 +170,7 @@ describe('P2 Themen: Befehl askTopic', () => {
     const { w, p } = build();
     talkTo(w, p, 'Hauptmann Brandt', () => ({ type: 'acceptQuest', questId: 'q_rats' }));
     expect(p.quests.q_rats?.state).toBe('active');
+    p.quests.c_first3 = { state: 'turned', progress: 1 }; // Ankunft folgt auf den ersten Auftrag
     talkTo(w, p, 'Hafenmeister Joren', () => ({ type: 'acceptQuest', questId: 'c_arr1' }));
     expect(p.quests.c_arr1?.state).toBe('active');
     talkTo(w, p, 'Lehrer Varn', (npcId) => ({ type: 'talk', npcId }));

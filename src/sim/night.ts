@@ -6,7 +6,7 @@
 import { DANGER_OFFSETS, monsterKind, NIGHT, NIGHT_HUNTERS, NIGHT_NPCS, NIGHT_SPAWNS } from './data';
 import { DUNGEON_REGIONS, hourOf, isNightHour, nightNumber, NIGHT_TO, openText } from './clock';
 import { isWalkable } from './path';
-import { inSafeZone, regionAt, spawnMonster, TICK_RATE, type Actor, type Npc, type World } from './world';
+import { inBeginnerZone, inSafeZone, regionAt, spawnMonster, TICK_RATE, type Actor, type Npc, type World } from './world';
 
 /** Kennungen der Nacht-NPCs */
 export const NIGHT_NPC_ID = 900000;
@@ -94,7 +94,8 @@ function startNight(w: World): void {
       const [dx, dy] = DANGER_OFFSETS[Math.floor(hash(night, si, i + 100) * DANGER_OFFSETS.length)]!;
       const x = h.x + dx;
       const y = h.y + dy;
-      if (!isWalkable(w.grid, Math.round(x), Math.round(y)) || inSafeZone(w, x, y)) continue;
+      // nie in der Stadt und nie in der Anfängerzone (dort bleibt es auch nachts bei Ratten und Wildhunden)
+      if (!isWalkable(w.grid, Math.round(x), Math.round(y)) || inSafeZone(w, x, y) || inBeginnerZone(w, x, y)) continue;
       // nicht vor den Füßen eines Spielers erscheinen
       if (players.some((p) => Math.hypot(p.x - x, p.y - y) < 9)) continue;
       const kind = sp.kinds[Math.floor(hash(night, si, i + 200) * sp.kinds.length)]!;

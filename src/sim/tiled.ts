@@ -1,7 +1,7 @@
 import type { Grid } from './path';
-import { DANGER_OFFSETS, DANGER_SPOTS } from './data';
+import { BEGINNER_ZONE, CHAIN_FIRST, DANGER_OFFSETS, DANGER_SPOTS, FIRST_GIVER, QUESTS } from './data';
 import { addNightNpcs, syncNpcPresence } from './night';
-import { CAMP_RESPAWN_TICKS, addNpc, createWorld, giveStarterKit, inSafeZone, setupPatrols, spawnMonster, spawnPlayer, type NpcKind, type Rect, type TrainerField, type World } from './world';
+import { CAMP_RESPAWN_TICKS, addNpc, createWorld, giveStarterKit, inBeginnerZone, inSafeZone, setupPatrols, spawnMonster, spawnPlayer, type NpcKind, type Rect, type TrainerField, type World } from './world';
 
 interface TiledProp {
   name: string;
@@ -56,6 +56,7 @@ export function buildWorld(seed: number, map: TiledMap, opts: { player?: boolean
     .filter((o) => o.type === 'safezone')
     .map((o) => ({ x: o.x / ts, y: o.y / ts, w: o.width / ts, h: o.height / ts }));
   const world = createWorld(seed, grid, safe);
+  world.beginner = [{ x: BEGINNER_ZONE.x, y: BEGINNER_ZONE.y, w: BEGINNER_ZONE.w, h: BEGINNER_ZONE.h }];
   world.regions = objs
     .filter((o) => o.type === 'region')
     .map((o) => ({ name: o.name, levels: prop(o, 'levels') ?? '', x: o.x / ts, y: o.y / ts, w: o.width / ts, h: o.height / ts }));
@@ -81,7 +82,18 @@ export function buildWorld(seed: number, map: TiledMap, opts: { player?: boolean
     if (o.type === 'camp') world.camps.push({ id: prop(o, 'id')!, name: o.name, x: o.x / ts, y: o.y / ts, w: o.width / ts, h: o.height / ts, cleared: false });
     if (o.type === 'townstart') world.towns.push({ x: o.x / ts, y: o.y / ts, name: o.name });
     if (o.type === 'monster') {
-      const m = spawnMonster(world, o.x / ts, o.y / ts, prop(o, 'kind'), { champ: prop(o, 'champ'), unique: prop(o, 'unique') });
+      // Anfängerzone: fremde Arten werden zu schwachen Tieren, ohne Champion-Aura; Unikate ziehen weiter hinaus (gleiche Reihenfolge der Akteure)
+      let [mx, my, kind, champ] = [o.x / ts, o.y / ts, prop(o, 'kind'), prop(o, 'champ')];
+      const unique = prop(o, 'unique');
+      if (inBeginnerZone(world, mx, my)) {
+        const to = unique ? BEGINNER_ZONE.moves[unique] : undefined;
+        if (to) [mx, my] = [to.x, to.y];
+        else {
+          if (kind && !BEGINNER_ZONE.kinds.includes(kind)) kind = BEGINNER_ZONE.swap[kind] ?? BEGINNER_ZONE.kinds[0]!;
+          champ = undefined;
+        }
+      }
+      const m = spawnMonster(world, mx, my, kind, { champ, unique });
       m.packId = Number(prop(o, 'pack') ?? 0);
       const campId = prop(o, 'camp');
       if (campId) {
@@ -98,6 +110,9 @@ export function buildWorld(seed: number, map: TiledMap, opts: { player?: boolean
     const [dx, dy] = DANGER_OFFSETS[j % DANGER_OFFSETS.length]!;
     spawnMonster(world, d.x + dx, d.y + dy, k).packId = 200001 + i;
   }));
+  // Erster Auftrag (Kette „Erste Schritte“) beim Hafenmeister am Startpunkt, vor seinen Kartenaufgaben
+  const giver = world.npcs.find((n) => n.name === FIRST_GIVER);
+  if (giver) giver.quests = [...QUESTS.filter((q) => q.chain === CHAIN_FIRST).map((q) => q.id), ...(giver.quests ?? [])];
   world.start = { x: start.x / ts, y: start.y / ts };
   addNightNpcs(world);
   syncNpcPresence(world);

@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import mapJson from '../data/aschenthron.json';
 import { assignHotbar, hotbarFor } from './hotbar';
 import { buildWorld, type TiledMap } from '../sim/tiled';
-import { DMG_COLOR, STATUS_COLOR, isGiverOf, monsterKind, npcKeyOf, questById, QUESTS, SKILLS, STATUS_IDS } from '../sim/data';
+import { DMG_COLOR, STATUS_COLOR, isGiverOf, monsterKind, npcKeyOf, questById, QUESTS, SHOPS, SKILLS, STATUS_IDS } from '../sim/data';
 import { LANDMARK_TOPICS } from '../sim/topicsData';
 import { THREAT_COLOR, THREAT_TEXT, threatOf } from '../sim/threat';
 import { giverLocation, nextStep, type NextStep, questAvailable, questMarks, type QuestMark } from '../sim/quests';
@@ -29,7 +29,7 @@ import { Sfx } from './audio';
 import { Minimap } from './minimap';
 import { isTouch } from './touch';
 import { Atmosphere, isDungeon, LIGHT_DEPTH } from './atmosphere';
-import { hourOf } from '../sim/clock';
+import { hourOf, NEW_CHAR_HOUR } from '../sim/clock';
 import { syncNpcPresence } from '../sim/night';
 import { Fx } from './fx';
 import { playPixelfx, registerPixelfx, type FxName } from './pixelfx';
@@ -319,6 +319,8 @@ export class GameScene extends Phaser.Scene {
     if (this.remote) this.ui.say(`Verbunden als ${p.name}${this.remote.pvp ? ' – PvP außerhalb der Städte aktiv, Angreifer werden zu Mördern' : ''}. Klick auf Spieler greift an.`);
     else if (saved && importPlayer(this.world, p, saved)) this.ui.say('Spielstand geladen.');
     else {
+      // Neuer Charakter: der Tag beginnt um 7 Uhr (online gilt die Uhr des Servers, geladene Spielstände behalten 8 Uhr)
+      this.world.startHour = NEW_CHAR_HOUR;
       this.showTitle(p);
       // Erstausstattung: ein Rostschwert, damit die ersten Kämpfe nicht mit bloßen Fäusten beginnen
       const sword = generateItem(this.world.rng, this.world.nextId++, 'rusty_sword', 'normal');
@@ -327,7 +329,7 @@ export class GameScene extends Phaser.Scene {
       this.ui.banner('Aschental brennt. Der Thron der Asche ruft.', '#d8a24a');
       this.ui.welcome('Willkommen in Aschenhafen', [
         'Einst war Aschental ein Garten – dann verbrannte der Aschenkönig den Himmel. Du bist einer der Letzten, die noch gegen ihn ziehen. Dein Ziel: Stufe 30, der Thron der Asche.',
-        'Sprich mit Hafenmeister Joren (Haus mit Anker, links vom Platz) – er zeigt dir die Stadt. Klick auf den Boden: laufen. Klick auf einen Gegner: angreifen. Dein nächster Schritt steht oben rechts.',
+        'Sprich mit Hafenmeister Joren (Haus mit Anker, gleich links von dir): Er gibt dir deinen ersten Auftrag. Klick auf den Boden: laufen. Klick auf einen Gegner: angreifen. Dein nächster Schritt steht oben rechts und ist auf Karte und Minimap markiert.',
         'Punkte zu verteilen: C öffnet deinen Charakter, K die Fertigkeiten. Alle Tasten und Tipps findest du unter P.',
       ]);
     }
@@ -2245,6 +2247,13 @@ export class GameScene extends Phaser.Scene {
     for (const [id, st] of Object.entries(p.quests)) {
       const def = questById(id);
       if (st.state === 'done' && def?.hidden && isGiverOf(n, def)) return '?';
+    }
+    // Ziel des laufenden ersten Auftrags oder einer Gesprächsaufgabe (Händler, Lehrer): Sprechblase, auch bei NPCs ohne Aufträge
+    for (const [id, st] of Object.entries(p.quests)) {
+      const def = questById(id);
+      if (st.state !== 'active' || !def) continue;
+      if (def.kind === 'buy' && n.kind === 'merchant' && (SHOPS[n.shop ?? 'basic'] ?? []).includes(def.target)) return '…';
+      if (def.kind === 'talk' && n.kind !== 'quest' && def.target === npcKeyOf(n.name)) return '…';
     }
     if (n.kind !== 'quest') return '';
     let avail = false;

@@ -132,6 +132,7 @@ describe('Aschenhafen (Hafenstadt)', () => {
     expect(chain.map((q) => q.target)).toEqual(['varn', 'mirel', 'ilse', 'ottmar', 'brandt']);
     const giverOf = (id: string) => world.npcs.find((n) => n.quests?.includes(id))!;
     expect(giverOf('c_arr1').name).toBe('Hafenmeister Joren');
+    p.quests.c_first3 = { state: 'turned', progress: 1 }; // Ankunft folgt auf den ersten Auftrag (eigener Test in `newbie.test.ts`)
     const gold = p.gold;
     for (const q of chain) {
       const giver = giverOf(q.id);

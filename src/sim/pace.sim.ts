@@ -1,5 +1,5 @@
 import { describe, it } from 'vitest';
-import { hourOf } from './clock';
+import { hourOf, NEW_CHAR_HOUR } from './clock';
 import mapJson from '../data/aschenthron.json';
 import { buildWorld, type TiledMap } from './tiled';
 import { MAX_LEVEL, SHOPS, totalXpFor } from './data';
@@ -55,9 +55,9 @@ function townTrip(w: World, p: Actor, bot: BotVariant): boolean {
 }
 
 /**
- * Varianten: PACE_BOT=old|fa18|new|vess (Standard vess, siehe pacebot.ts); PACE_NIGHT=0 friert die Uhr auf 12 Uhr ein (Kontrolllauf ohne Nacht).
+ * Varianten: PACE_BOT=old|fa18|new|vess|neu (Standard neu, siehe pacebot.ts); PACE_NIGHT=0 friert die Uhr auf 12 Uhr ein (Kontrolllauf ohne Nacht).
  */
-const BOT = (process.env.PACE_BOT ?? 'vess') as BotVariant;
+const BOT = (process.env.PACE_BOT ?? 'neu') as BotVariant;
 
 describe('Level-Tempo (Messung)', () => {
   it('Bot-Lauf: Zeit bis Level 5/10/20/30', () => {
@@ -71,6 +71,7 @@ describe('Level-Tempo (Messung)', () => {
     const lastHits: string[] = [];
     let mode: 'hunt' | 'town' | 'wait' = 'town'; // wie ein echter Spieler: erst mit dem Startgold einkaufen
     const maxTicks = TICK_RATE * 3600 * Number(process.env.PACE_HOURS ?? 40); // Ziel Stufe 30 nach 20–30 h (P3)
+    w.startHour = NEW_CHAR_HOUR; // der Bot ist ein neuer Charakter
     if (process.env.PACE_NIGHT === '0') w.fixedHour = 12; // Kontrolllauf ohne Nacht
     const spots = new SpotWatch(BOT);
     const stuck = new StuckWatch(BOT);

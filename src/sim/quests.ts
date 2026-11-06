@@ -1,9 +1,10 @@
-import { QUESTS, NPC_KEYS, npcKeyOf, monsterKind, isGiverOf, type QuestDef } from './data';
-import { regionAt, type Actor, type World } from './world';
+import { BEGINNER_ZONE, CHAIN_FIRST, QUESTS, NPC_KEYS, SHOPS, npcKeyOf, monsterKind, isGiverOf, type QuestDef } from './data';
+import { templateById } from './items';
+import { firstQuestOpen, regionAt, type Actor, type World } from './world';
 
 /** Kann der Spieler die Aufgabe jetzt annehmen? (Stufe, Vorgänger der Kette abgegeben, noch nicht angenommen) */
 export function questAvailable(p: Actor, def: QuestDef): boolean {
-  if (def.hidden || p.quests[def.id] || p.level < def.minLevel) return false;
+  if (def.hidden || p.quests[def.id] || p.level < def.minLevel || !firstQuestOpen(p, def)) return false;
   return !def.requires || p.quests[def.requires]?.state === 'turned';
 }
 
@@ -75,6 +76,10 @@ export function questTarget(w: World, p: Actor, def: QuestDef, done: boolean): {
       return c ? { x: Math.round(c.x + c.w / 2), y: Math.round(c.y + c.h / 2) } : undefined;
     }
     case 'kill': return nearest((a) => a.kindId === def.target);
+    case 'buy': {
+      const n = sellerOf(w, p, def.target);
+      return n ? { x: n.x, y: n.y } : undefined;
+    }
     case 'unique': return def.target ? nearest((a) => a.unique === def.target) : undefined;
     case 'bring': {
       if (def.chestRegion) {
@@ -85,6 +90,13 @@ export function questTarget(w: World, p: Actor, def: QuestDef, done: boolean): {
     }
     default: return undefined;
   }
+}
+
+/** Nächster Händler (Tagladen), der die Vorlage führt */
+function sellerOf(w: World, p: Actor, templateId: string): World['npcs'][number] | undefined {
+  return w.npcs
+    .filter((n) => n.kind === 'merchant' && (SHOPS[n.shop ?? 'basic'] ?? []).includes(templateId))
+    .sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
 }
 
 /** Auftraggeber einer Aufgabe: Position und Anzeigetext „Name (Region)“. */
@@ -123,7 +135,10 @@ export function questWhere(w: World, def: QuestDef, done = false): string {
   else if (def.kind === 'talk') {
     const n = w.npcs.find((x) => npcKeyOf(x.name) === def.target);
     if (n) return `${n.name} (${regionAt(w, n.x, n.y)?.name ?? '?'})`;
-  } else if (def.kind === 'bring' && def.chestRegion) names.add(def.chestRegion);
+  } else if (def.kind === 'buy') {
+    const n = w.npcs.find((x) => x.kind === 'merchant' && (SHOPS[x.shop ?? 'basic'] ?? []).includes(def.target));
+    if (n) return `${n.name} (${regionAt(w, n.x, n.y)?.name ?? '?'})`;
+  } else if (def.chain === CHAIN_FIRST && def.kind === 'kill') names.add(BEGINNER_ZONE.name); else if (def.kind === 'bring' && def.chestRegion) names.add(def.chestRegion);
   else {
     const kinds = def.kind === 'bring' ? def.monsters ?? [] : def.kind === 'kill' ? [def.target] : [];
     for (const a of w.actors) {
@@ -144,6 +159,7 @@ export function targetName(def: QuestDef): string {
   if (def.kind === 'kill') return monsterKind(def.target).name;
   if (def.kind === 'talk') return NPC_KEYS[def.target] ?? def.target;
   if (def.kind === 'camp') return CAMP_NAMES[def.target] ?? def.target;
+  if (def.kind === 'buy') return templateById(def.target).name;
   return def.item ?? def.target;
 }
 
@@ -171,6 +187,12 @@ export function nextStep(w: World, p: Actor): NextStep | null {
     const g = giverLocation(w, def);
     return { kind: 'turnin', text: `Abgeben: „${def.name}“ bei ${g?.text ?? 'dem Auftraggeber'}`, x: g?.pos.x, y: g?.pos.y };
   }
+  // 1b) Erster Auftrag läuft: er bleibt der nächste Schritt, bis er abgegeben ist (nichts anderes lenkt den Neuling ab)
+  for (const def of QUESTS) {
+    if (def.chain !== CHAIN_FIRST || p.quests[def.id]?.state !== 'active') continue;
+    const t = questTarget(w, p, def, false);
+    return { kind: 'quest', text: `Erster Auftrag: „${def.name}“ – ${questWhere(w, def) || 'Ziel suchen'}`, x: t?.x, y: t?.y };
+  }
   // 2) Geschichte: nächstes Kettenglied, das jetzt angenommen werden kann
   const chained = QUESTS.filter((q) => q.chain && questAvailable(p, q) && p.level - q.minLevel <= 6).sort((a, b) => a.minLevel - b.minLevel)[0];
   if (chained) {
@@ -181,7 +203,8 @@ export function nextStep(w: World, p: Actor): NextStep | null {
   let hunt: Actor | undefined;
   let hd = Infinity;
   for (const a of w.actors) {
-    if (a.kind !== 'monster' || !a.alive || !a.unique || Math.abs(a.level - p.level) > 4) continue;
+    // Neulinge (Stufe 1–3) schickt der Hinweis nicht zu Unikaten über ihrer Stufe
+    if (a.kind !== 'monster' || !a.alive || !a.unique || Math.abs(a.level - p.level) > 4 || (p.level <= BEGINNER_ZONE.maxLevel && a.level > p.level + 1)) continue;
     const d = Math.hypot(a.x - p.x, a.y - p.y);
     if (d < hd) { hd = d; hunt = a; }
   }
@@ -196,7 +219,8 @@ export function nextStep(w: World, p: Actor): NextStep | null {
     if (!best || d < best.d) best = { def, t, d };
   }
   if (best) return { kind: 'quest', text: `Aufgabe: „${best.def.name}“ – ${questWhere(w, best.def) || 'Ziel suchen'}`, x: best.t.x, y: best.t.y };
-  // 5) Jagdgebiet: die fortgeschrittenste Zone, deren Stufenbereich zur Stufe passt
+  // 5) Jagdgebiet: auf Stufe 1–3 die Anfängerfelder vor dem Tor, danach die fortgeschrittenste Zone, deren Stufenbereich zur Stufe passt
+  if (p.level <= BEGINNER_ZONE.maxLevel && w.beginner.length) return { kind: 'zone', text: `Jagdgebiet für Stufe ${p.level}: ${BEGINNER_ZONE.name} (Ratten und Wildhunde, Stufe 1–3)`, x: BEGINNER_ZONE.hunt.x, y: BEGINNER_ZONE.hunt.y };
   let zone: (typeof w.regions)[number] | undefined;
   let zl = -1;
   for (const r of w.regions) {
