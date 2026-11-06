@@ -36,6 +36,7 @@ import { monsterKey } from './monster';
 import { figureTexture, initSilhouettes, prefetchFigure, pumpFigures, resetFigureBudgets, silhouette, silhouetteOf, SIL_TEX, uploadAhead, type FigReq, type Silhouette } from './monsterSheet';
 import { npcDef, npcFigKey } from './npc';
 import { TownLife } from './townLife';
+import { Wildlife, landmarksOf } from './wildlife';
 import { initLootAtlas, pumpLootIcons, useLootIcon } from './lootAtlas';
 import { onSettings, settings } from './settings';
 import type { RemoteSession } from '../net/client';
@@ -198,6 +199,7 @@ export class GameScene extends Phaser.Scene {
   private fx!: Fx;
   private atmo!: Atmosphere;
   private townLife!: TownLife;
+  private wildlife!: Wildlife;
   private marks: QuestMark[] = [];
   private gfxGround!: Phaser.GameObjects.Graphics;
   private gfxShimmer!: Phaser.GameObjects.Graphics;
@@ -299,6 +301,7 @@ export class GameScene extends Phaser.Scene {
       const img = this.npcViews.get(id);
       return img?.visible ? { sx: img.x, sy: img.y, head: this.figSize(img)?.top ?? 56 } : null;
     });
+    this.wildlife = new Wildlife(this, this.sfx, landmarksOf(mapJson as unknown as Parameters<typeof landmarksOf>[0]));
     this.minimap = new Minimap(this.world, this.tiles);
     if (this.remote) this.ui.say(`Verbunden als ${p.name}${this.remote.pvp ? ' – PvP außerhalb der Städte aktiv, Angreifer werden zu Mördern' : ''}. Klick auf Spieler greift an.`);
     else if (saved && importPlayer(this.world, p, saved)) this.ui.say('Spielstand geladen.');
@@ -1410,6 +1413,7 @@ export class GameScene extends Phaser.Scene {
     this.updateRoofs(px, py);
     this.updateNpcs(time);
     this.updateTownLife(time, p);
+    this.updateWildlife(time, p);
     this.updateChests(time, px, py);
     this.updateLoot(time, g);
     this.updateActors(time, p, g);
@@ -2357,6 +2361,7 @@ export class GameScene extends Phaser.Scene {
     for (const v of this.actorViews.values()) if (v.img.visible) keys.add(v.img.texture.key);
     for (const img of this.npcViews.values()) if (img.visible) keys.add(img.texture.key);
     for (const k of this.townLife.keysInUse()) keys.add(k);
+    for (const k of this.wildlife.keysInUse()) keys.add(k);
     return keys;
   }
 
@@ -2366,6 +2371,16 @@ export class GameScene extends Phaser.Scene {
     this.townLife.update({
       time, dtMs: time - this.lastTime, hour: this.atmo.hour(), night: this.night, zoom: cam.zoom, region: this.regionName, grid: this.world.grid, player: p,
       view: cam.worldView, smiths: this.world.npcs.filter((n) => n.kind === 'smith'),
+    });
+  }
+
+  /** Wildnis (wildlife.ts): harmlose Tiere, Landmarken mit Notizen, Reisende auf der Handelsstraße; reiner Client */
+  private updateWildlife(time: number, p: Actor): void {
+    const cam = this.cameras.main;
+    const w = this.world.grid.w;
+    this.wildlife.update({
+      time, dtMs: time - this.lastTime, hour: this.atmo.hour(), night: this.night, zoom: cam.zoom, region: this.regionName, grid: this.world.grid, player: p,
+      gid: (x, y) => this.tiles[y * w + x] ?? 0, zoneAt: (x, y) => regionAt(this.world, x, y)?.name ?? '', view: cam.worldView,
     });
   }
 

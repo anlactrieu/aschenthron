@@ -255,8 +255,8 @@ export function congratText(role: Role | 'npc', level: number, rng: Rng): string
 
 /* ------------------------------------------------------------------------------------------------ Bilder (Atlas) */
 
-const ATLAS = 'town_life';
-const PAL: Record<string, string> = {
+export const ATLAS = 'town_life';
+export const PAL: Record<string, string> = {
   w: '#f0ead8', W: '#cfc6ae', s: '#a89c80', r: '#c8362a', o: '#e0a030', k: '#1a1410', t: '#6a5a46',
   c: '#b8864a', d: '#7a5030', C: '#d8aa6a', p: '#e8a0a0',
   g: '#6a6a72', G: '#9a9aa4', b: '#26242a', B: '#4a4850', y: '#d8c060',

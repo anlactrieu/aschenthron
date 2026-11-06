@@ -867,6 +867,68 @@ for o in removed:
         objs.append(o); left[kd] += 1; dropped -= 1
 print("Auflockern: %d Monster entfernt, %d Rudel zu Einzelgängern" % (dropped, singled), file=sys.stderr)
 
+# ------------------------------------------------------------------ Landmarken der Wildnis (P5, nur Optik)
+# Ganz am Ende und ohne Zufall: weder Kacheln noch andere Objekte ändern sich (MAP_VERSION bleibt), die Sim kennt den Typ "landmark" nicht.
+# Das Spiel zeichnet sie als Bilder (src/render/wildlife.ts); sie blockieren nichts. Art: ruin, shrine, gallows, camp, corpse.
+# `text` ist der Notiztext (Leichen und Lager): kurze Hinweise auf Orte und Gerüchte; `topic` bleibt leer und ist für die Gesprächs-Stichworte reserviert.
+_LM_GROUND = {3, 4, 8, 9}
+_LM_REGIONS = {o["name"]: (o["x"] // TS, o["y"] // TS, o["x"] // TS + o["width"] // TS - 1, o["y"] // TS + o["height"] // TS - 1) for o in objs if o["type"] == "region"}
+_LM_BUSY = [(o["x"] // TS, o["y"] // TS) for o in objs if o["type"] in ("npc", "chest", "find", "camp", "townstart", "start")]
+_LM_BUSY += [(o["x"] // TS + dx, o["y"] // TS + dy) for o in objs if o["type"] == "camp" for dx in range(0, o["width"] // TS + 1, 2) for dy in range(0, o["height"] // TS + 1, 2)]
+_LM_SAFE = [r for n, r in _LM_REGIONS.items() if n in ("Aschenhafen", "Felsenwacht")]
+_LM_TAKEN = []
+def _lm_ok(x, y, region, kind):
+    r = _LM_REGIONS[region]
+    if not (r[0] + 2 <= x <= r[2] - 2 and r[1] + 2 <= y <= r[3] - 2): return False
+    if any(a - 3 <= x <= c + 3 and b - 3 <= y <= d + 3 for a, b, c, d in _LM_SAFE): return False
+    # das Räuberlager ist ganz Weg (Gid 7): dort zählt der Weg als Boden
+    dirt = region == "Räuberlager"
+    if g[y][x] not in (_LM_GROUND | ({7} if dirt else set())): return False
+    # ebene, wegfreie Umgebung: Kachel und Nachbarn begehbar, keine Wegkachel in 1 Feld Abstand
+    for dx in range(-1, 2):
+        for dy in range(-1, 2):
+            if g[y + dy][x + dx] in BLOCK or (g[y + dy][x + dx] == 7 and not dirt): return False
+    if any(abs(x - a) <= 2 and abs(y - b) <= 2 for a, b in _LM_BUSY): return False
+    return not any(abs(x - a) < 12 and abs(y - b) < 12 for a, b in _LM_TAKEN)
+def landmark(kind, name, region, x, y, text=""):
+    for rad in range(0, 14):
+        for dy in range(-rad, rad + 1):
+            for dx in range(-rad, rad + 1):
+                if max(abs(dx), abs(dy)) != rad: continue
+                if _lm_ok(x + dx, y + dy, region, kind):
+                    props = dict(kind=kind, id="lm%d" % (len(_LM_TAKEN) + 1), topic="")
+                    if text: props["text"] = text
+                    obj(name, "landmark", x + dx, y + dy, **props)
+                    _LM_TAKEN.append((x + dx, y + dy))
+                    return
+    sys.exit("kein Platz für Landmarke %s bei %d,%d" % (name, x, y))
+landmark("shrine", "Wegschrein", "Roggenfelder", 86, 136)
+landmark("ruin", "Verfallene Mühle", "Roggenfelder", 68, 156)
+landmark("corpse", "Toter Abenteurer", "Roggenfelder", 60, 128, "Ich dachte, die Roggenfelder wären sicher. Ratten, immer Ratten. Wer mehr will, soll den Wald im Norden meiden und Jägerin Ysa fragen.")
+landmark("camp", "Verlassenes Lagerfeuer", "Roggenfelder", 80, 160, "Wir lagerten hier drei Nächte. Am vierten Morgen fehlte einer. Die Spuren führten zum Moor.")
+landmark("gallows", "Galgen", "Düsterwald", 47, 92)
+landmark("corpse", "Toter Abenteurer", "Düsterwald", 34, 102, "Zum Räuberlager geht es nach Norden, immer dem Weg nach. Aber die Wachen dort kennen kein Erbarmen. Sagt Haldor in Felsenwacht, dass ich es versucht habe.")
+landmark("camp", "Verlassenes Lagerfeuer", "Düsterwald", 62, 86, "Die Asche ist kalt. Wer auch immer hier saß, ist in Eile aufgebrochen – und ohne seinen Stiefel.")
+landmark("ruin", "Zerfallener Wachturm", "Düsterwald", 30, 112)
+landmark("gallows", "Galgen", "Räuberlager", 38, 58)
+landmark("corpse", "Toter Abenteurer", "Räuberlager", 58, 60, "Der Goblinbau liegt weit im Nordwesten, hinter dem Lager. Die Goblins haben einen König. Er trägt eine Krone aus Knochen.")
+landmark("shrine", "Wegschrein", "Moorlande", 124, 100)
+landmark("corpse", "Toter Abenteurer", "Moorlande", 142, 126, "Der Eremit im Moor sammelt Irrlichter, sagt man. Ich habe eines gesehen. Es hat mich nicht losgelassen.")
+landmark("camp", "Verlassenes Lagerfeuer", "Moorlande", 152, 110, "Hier hat jemand Kräuter getrocknet. Die Hexe der Moorlande zahlt gut dafür – wenn man ihr lebend begegnet.")
+landmark("ruin", "Versunkener Schrein", "Moorlande", 112, 130)
+landmark("ruin", "Gruftkapelle", "Totenacker", 130, 156)
+landmark("gallows", "Galgen", "Totenacker", 116, 162)
+landmark("corpse", "Toter Abenteurer", "Totenacker", 150, 164, "Die Katakomben liegen im Osten. Nachts rühren sich die Gräber. Kommt nicht nach Sonnenuntergang, wenn ihr nicht bleiben wollt.")
+landmark("shrine", "Wegschrein", "Hochland", 160, 70)
+landmark("camp", "Verlassenes Lagerfeuer", "Hochland", 174, 56, "Schatzsucher Pell hat von einer Mine im Osten erzählt. Das Silber, sagte er, schimmere durch die Wand.")
+landmark("corpse", "Toter Abenteurer", "Hochland", 150, 80, "Das Hochland ist rau, aber der Weg zur Tiefenmine ist frei. Dahinter beginnt die Asche. Wer weiter will, braucht bessere Rüstung als meine.")
+landmark("ruin", "Eingestürzte Warte", "Hochland", 186, 74)
+landmark("ruin", "Aschenwacht", "Aschenöde", 190, 112)
+landmark("gallows", "Galgen", "Aschenöde", 182, 100)
+landmark("corpse", "Toter Abenteurer", "Aschenöde", 206, 126, "Ritter Aldric hatte recht: Der Thron wartet am Ende der Asche. Ich kam nur bis hierher. Nimm mein Schwert nicht – es ist verflucht.")
+landmark("camp", "Verlassenes Lagerfeuer", "Aschenöde", 214, 100, "Das Feuer brennt nicht mehr. Die Asche hier ist grau wie überall, nur die Spuren sind frisch.")
+print("Landmarken:", len(_LM_TAKEN), file=sys.stderr)
+
 data = [g[y][x] for y in range(H) for x in range(W)]
 tmj = {"compressionlevel": -1, "height": H, "width": W, "infinite": False, "orientation": "orthogonal", "renderorder": "right-down",
        "tilewidth": TS, "tileheight": TS, "type": "map", "version": "1.10", "nextlayerid": 3, "nextobjectid": oid[0], "tilesets": [],

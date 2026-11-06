@@ -587,3 +587,268 @@ export function wallTile(style: WallStyle, open: number, wxAbs: number, wyAbs: n
   wallCache.set(key, r);
   return r;
 }
+
+/* ---------------------------------------------------------------- Landmarken der Wildnis (wildlife.ts) */
+
+/** Steinquader mit Fugen: Licht oben links, Schatten rechts und unten */
+function ashlar(r: Raster, x0: number, y0: number, w: number, h: number, ramp: Ramp5, seed: number): void {
+  for (let y = y0; y < y0 + h; y++) {
+    for (let x = x0; x < x0 + w; x++) {
+      const row = Math.floor((y - y0) / 4);
+      const joint = (y - y0) % 4 === 3 || (x - x0 + (row % 2) * 3) % 7 === 6;
+      let t = 3;
+      if (x - x0 < 2 || y - y0 < 1) t = 4;
+      else if (x >= x0 + w - 2 || y >= y0 + h - 1) t = 2;
+      if (joint) t = 1;
+      else if (h3(x, y, seed) < 0.12) t = Math.max(1, t - 1);
+      r.set(x, y, tone(ramp, t));
+    }
+  }
+}
+
+/** Moosflecken auf Stein */
+function mossy(r: Raster, seed: number, n: number): void {
+  for (let i = 0; i < n; i++) {
+    const x = Math.floor(h3(i, seed, 1) * r.w);
+    const y = Math.floor(h3(i, seed, 2) * r.h);
+    if (r.filled(x, y)) r.set(x, y, tone(R.moss, 2 + (i % 2)));
+  }
+}
+
+/** Ruine, drei Formen: Mauerrest mit Torbogen (0), Turmstumpf (1), Mühlenrumpf mit gebrochenen Flügeln (2) */
+export function ruin(v: number): Raster {
+  const k = v % 3;
+  const r = new Raster(k === 0 ? 52 : 34, 40);
+  if (k === 0) {
+    // zwei Mauerstücke, dazwischen ein Torbogen ohne Tor, Trümmer davor
+    ashlar(r, 2, 14, 16, 22, R.stone, v);
+    ashlar(r, 34, 8, 16, 28, R.stone, v + 3);
+    for (let x = 18; x < 34; x++) {
+      const top = 14 - Math.round(Math.sqrt(Math.max(0, 64 - (x - 26) ** 2)) * 0.9) + 8;
+      for (let y = Math.max(8, top); y < 17; y++) r.set(x, y, tone(R.stone, y < 11 ? 4 : 3));
+    }
+    for (let y = 17; y < 36; y++) for (let x = 18; x < 34; x++) if ((x - 26) ** 2 + (y - 22) ** 2 * 0.35 > 70 && y < 24) r.set(x, y, tone(R.stone, 2));
+    for (let x = 4; x < 17; x += 4) r.rect(x, 11 + (x % 3), 3, 3, tone(R.stone, 3));
+    for (let x = 36; x < 49; x += 5) r.rect(x, 5 + (x % 4), 3, 3, tone(R.stone, 3));
+  } else if (k === 1) {
+    // Turmstumpf, oben ausgebrochen, innen dunkel
+    for (let y = 8; y < 36; y++) {
+      const w = 7 + (y > 28 ? (y - 28) * 0.3 : 0);
+      for (let x = Math.floor(17 - w); x < Math.ceil(17 + w); x++) {
+        const edge = y < 8 + 3 * h3(x, 5, v) ? 0 : 1;
+        if (!edge) continue;
+        const u = (x - (17 - w)) / (2 * w);
+        const row = Math.floor(y / 4);
+        const joint = y % 4 === 3 || (x + (row % 2) * 3) % 6 === 5;
+        r.set(x, y, tone(R.stone, joint ? 1 : u < 0.25 ? 4 : u > 0.75 ? 2 : 3));
+      }
+    }
+    r.ellipse(17, 9, 6.5, 2.2, tone(R.stone, 0));
+    r.rect(14, 18, 4, 7, tone(R.stone, 0));
+    r.rect(14, 18, 4, 1, tone(R.stone, 2));
+  } else {
+    // Mühle: runder Stumpf, davon zwei gesplitterte Flügelbalken
+    for (let y = 12; y < 36; y++) {
+      const w = 6 + (y - 12) * 0.22;
+      for (let x = Math.floor(17 - w); x < Math.ceil(17 + w); x++) {
+        const u = (x - (17 - w)) / (2 * w);
+        r.set(x, y, tone(R.stone, y % 4 === 3 ? 1 : u < 0.3 ? 4 : u > 0.72 ? 2 : 3));
+      }
+    }
+    r.ellipse(17, 12, 6, 2, tone(R.stoneDark, 1));
+    r.rect(15, 28, 5, 8, tone(R.wood, 1));
+    r.line(17, 14, 3, 3, R.wood[3]);
+    r.line(18, 14, 4, 3, R.wood[2]);
+    r.line(17, 14, 30, 5, R.wood[3]);
+    r.line(17, 13, 24, 1, R.wood[2]);
+    r.line(3, 3, 7, 6, R.wood[1]);
+  }
+  mossy(r, v + 11, 14);
+  // Trümmer und Gras am Fuß
+  for (let i = 0; i < 6; i++) {
+    const x = 2 + Math.floor(h3(i, v, 7) * (r.w - 6));
+    r.rect(x, 35 + (i % 3), 2 + (i % 2), 2, tone(R.stone, 2 + (i % 2)));
+  }
+  return finish(r, { cx: r.w / 2, cy: 37, rx: r.w / 2 - 2, ry: 2.5, a: 100 });
+}
+
+/** Wegschrein: Steinsäule mit Nische, Kerze und Blumen davor */
+export function shrine(): Raster {
+  const r = new Raster(22, 34);
+  ashlar(r, 4, 8, 14, 22, R.stoneTan, 2);
+  r.rect(2, 4, 18, 4, tone(R.stoneTan, 3));
+  r.rect(2, 4, 18, 1, tone(R.stoneTan, 4));
+  r.rect(2, 7, 18, 1, tone(R.stoneTan, 1));
+  r.rect(6, 1, 10, 3, tone(R.stoneTan, 3));
+  r.rect(6, 1, 10, 1, tone(R.stoneTan, 4));
+  // Nische mit Kerze
+  r.rect(8, 12, 6, 9, tone(R.char, 1));
+  r.rect(8, 12, 6, 1, tone(R.stoneTan, 1));
+  r.rect(10, 16, 2, 5, R.linen[4]);
+  r.set(10, 15, 0xe8c050);
+  r.set(11, 15, 0xe8c050);
+  r.set(10, 14, 0xf4e090);
+  // Stufe und Blumen
+  r.rect(1, 30, 20, 3, tone(R.stoneTan, 2));
+  r.rect(1, 30, 20, 1, tone(R.stoneTan, 3));
+  for (const [x, c] of [[3, 0xa86a80], [6, 0xc8c4b4], [15, 0xc8b35a], [18, 0x7a6a9e]] as const) {
+    r.rect(x, 27, 1, 3, R.leaf[3]);
+    r.set(x, 26, c);
+  }
+  mossy(r, 5, 6);
+  return finish(r, { cx: 11, cy: 31, rx: 10, ry: 2.5, a: 100 });
+}
+
+/** Galgen: Pfosten, Querbalken mit Strebe, Seil mit Schlinge, ein umgestürzter Schemel */
+export function gallows(): Raster {
+  const r = new Raster(36, 46);
+  r.rect(6, 4, 4, 38, R.wood[2]);
+  r.rect(6, 4, 1, 38, R.wood[4]);
+  r.rect(9, 4, 1, 38, R.wood[1]);
+  r.rect(6, 4, 26, 4, R.wood[3]);
+  r.rect(6, 4, 26, 1, R.wood[4]);
+  r.rect(6, 7, 26, 1, R.wood[1]);
+  r.line(10, 16, 16, 8, R.wood[2]);
+  r.line(10, 17, 16, 9, R.wood[1]);
+  // Seil und Schlinge
+  r.rect(27, 8, 1, 10, 0xa89060);
+  r.ellipse(27.5, 20, 2.6, 3, (x, y, nx, ny) => (nx * nx + ny * ny > 0.45 ? 0xa89060 : null));
+  for (let y = 9; y < 17; y += 2) r.set(28, y, 0x7a6840);
+  // Sockel aus Steinen und Schemel
+  r.rect(3, 40, 10, 4, tone(R.stone, 3));
+  r.rect(3, 40, 10, 1, tone(R.stone, 4));
+  r.rect(20, 40, 8, 3, R.wood[3]);
+  r.rect(20, 40, 8, 1, R.wood[4]);
+  r.rect(21, 42, 1, 3, R.wood[1]);
+  r.rect(26, 42, 1, 3, R.wood[1]);
+  return finish(r, { cx: 18, cy: 43, rx: 15, ry: 2.5, a: 100 });
+}
+
+/** Verlassenes Lagerfeuer: Steinring, verkohlte Scheite, kalte Asche, ein Bündel daneben (kein Feuer) */
+export function campCold(): Raster {
+  const r = new Raster(34, 20);
+  r.ellipse(12, 12, 10, 5.5, tone(R.stone, 3));
+  r.ellipse(12, 12, 8, 4, tone(R.stone, 1));
+  r.ellipse(12, 12, 6.5, 3.2, tone(R.char, 2));
+  for (let i = 0; i < 7; i++) r.set(8 + Math.floor(h3(i, 1, 9) * 9), 10 + Math.floor(h3(i, 2, 9) * 5), tone(R.stone, 2));
+  r.line(7, 13, 17, 9, R.char[0]);
+  r.line(8, 9, 16, 14, R.char[1]);
+  r.line(7, 14, 17, 10, R.char[3]);
+  for (let a = 0; a < 12; a++) {
+    const t = (a / 12) * Math.PI * 2;
+    r.rect(Math.round(12 + Math.cos(t) * 9), Math.round(12 + Math.sin(t) * 4.8) - 1, 3, 2, tone(R.stone, a % 3 === 0 ? 4 : 3));
+  }
+  // Bündel (Rucksack) und Stock
+  r.ellipse(27, 12, 4.5, 4, R.cloth[2]);
+  r.ellipse(26, 10.5, 2.6, 2, R.cloth[3]);
+  r.rect(24, 13, 7, 1, R.cloth[1]);
+  r.line(31, 4, 28, 16, R.wood[3]);
+  return finish(r, { cx: 17, cy: 15, rx: 15, ry: 3, a: 90 });
+}
+
+/** Toter Abenteurer: liegt auf dem Rücken, daneben Rucksack, ein ins Erdreich gestecktes Schwert und ein Zettel */
+export function corpse(v: number): Raster {
+  const r = new Raster(40, 24);
+  const cloak = v % 2 ? R.cloth : R.moss;
+  // Körper (liegt waagerecht, Kopf links)
+  r.ellipse(26, 14, 11, 3.6, tone(cloak, 2));
+  r.ellipse(25, 13, 9, 2, tone(cloak, 3));
+  r.rect(35, 13, 3, 3, tone(R.bark, 2));
+  r.rect(36, 16, 3, 2, tone(R.bark, 1));
+  r.ellipse(11, 13, 4.5, 4, 0xbba48a);
+  r.ellipse(10, 12, 3, 2.4, 0xd4bea0);
+  r.rect(7, 9, 9, 3, tone(R.iron, 3));
+  r.rect(7, 9, 9, 1, tone(R.iron, 4));
+  r.set(9, 14, 0x201810);
+  r.set(12, 14, 0x201810);
+  r.line(15, 14, 18, 15, 0xbba48a);
+  // Rucksack
+  r.ellipse(6, 18, 4, 3, R.cloth[2]);
+  r.rect(3, 17, 7, 1, R.cloth[1]);
+  // Schwert im Boden
+  r.rect(30, 3, 1, 14, R.iron[4]);
+  r.rect(31, 3, 1, 14, R.iron[2]);
+  r.rect(28, 2, 5, 1, R.wood[3]);
+  r.rect(30, 0, 1, 2, R.wood[2]);
+  // Zettel am Boden
+  r.rect(19, 18, 6, 4, 0xe8e0c8);
+  r.rect(19, 18, 6, 1, 0xfff6e0);
+  r.rect(20, 20, 4, 1, 0x8a7a58);
+  r.set(21, 19, 0x8a7a58);
+  r.set(23, 19, 0x8a7a58);
+  return finish(r, { cx: 20, cy: 18, rx: 17, ry: 3, a: 90 });
+}
+
+/** Händlerkarren von der Seite, nach rechts fahrend: Plane auf zwei Rädern, Deichsel, Packpferd (zwei Radstellungen) */
+export function merchantCart(frame: number): Raster {
+  const r = new Raster(66, 40);
+  // Pferd
+  const horse = (ox: number): void => {
+    r.ellipse(ox + 10, 18, 8, 5, 0x6a4a30);
+    r.ellipse(ox + 9, 17, 6, 3, 0x82603e);
+    r.rect(ox + 15, 9, 4, 8, 0x6a4a30);
+    r.ellipse(ox + 19, 8, 3.4, 2.6, 0x6a4a30);
+    r.rect(ox + 21, 8, 2, 3, 0x82603e);
+    r.set(ox + 20, 7, 0x100c08);
+    r.rect(ox + 13, 8, 2, 7, 0x2a1c12);
+    r.rect(ox + 1, 16, 2, 6, 0x2a1c12);
+    const s = frame ? 1 : -1;
+    for (const [lx, dir] of [[4, 1], [7, -1], [13, 1], [16, -1]] as const) r.rect(ox + lx + dir * s, 22, 2, 8, 0x4a3220);
+    for (const [lx, dir] of [[4, 1], [7, -1], [13, 1], [16, -1]] as const) r.rect(ox + lx + dir * s, 29, 2, 2, 0x1a1210);
+  };
+  horse(44);
+  // Deichsel und Wagenkasten
+  r.line(44, 20, 33, 22, R.wood[2]);
+  r.rect(2, 20, 34, 6, R.wood[3]);
+  r.rect(2, 20, 34, 1, R.wood[4]);
+  r.rect(2, 25, 34, 1, R.wood[1]);
+  for (let x = 6; x < 34; x += 7) r.rect(x, 21, 1, 4, R.wood[1]);
+  // Plane über Bögen
+  r.ellipse(18, 19, 17, 10, (_x, y) => (y < 20 ? R.linen[3] : null));
+  for (let x = 4; x < 34; x += 8) r.line(x, 9, x + 1, 20, R.linen[2]);
+  r.line(6, 10, 30, 10, R.linen[4]);
+  // Warenkisten hinten
+  r.rect(30, 16, 6, 5, R.wood[2]);
+  r.rect(30, 16, 6, 1, R.wood[4]);
+  // Räder
+  for (const wx of [10, 28]) {
+    r.ellipse(wx, 28, 6, 6, (_x, _y, nx, ny) => (nx * nx + ny * ny > 0.5 ? R.wood[1] : null));
+    for (let a = 0; a < 6; a++) {
+      const t = (a / 6) * Math.PI + (frame ? Math.PI / 6 : 0);
+      r.line(wx - Math.cos(t) * 4, 28 - Math.sin(t) * 4, wx + Math.cos(t) * 4, 28 + Math.sin(t) * 4, R.wood[3]);
+    }
+    r.rect(wx - 1, 27, 2, 2, R.iron[3]);
+  }
+  return finish(r, { cx: 33, cy: 36, rx: 30, ry: 2.5, a: 90 });
+}
+
+/** Händlerkarren von vorn (`down`, zum Betrachter fahrend, mit Pferd davor) oder von hinten (Rückwand mit Klappe, Pferd verdeckt) */
+export function merchantCartV(down: boolean): Raster {
+  const r = new Raster(34, down ? 50 : 40);
+  const top = down ? 0 : 0;
+  const baseY = down ? 32 : 34;
+  // Räder (schmal, von vorn)
+  for (const wx of [3, 30]) r.ellipse(wx, baseY - 4, 2.4, 6.4, (_x, _y, nx) => (Math.abs(nx) > 0.4 ? R.wood[1] : R.wood[3]));
+  // Wagenkasten
+  r.rect(5, baseY - 10, 24, 9, R.wood[3]);
+  r.rect(5, baseY - 10, 24, 1, R.wood[4]);
+  r.rect(5, baseY - 2, 24, 1, R.wood[1]);
+  if (!down) for (let x = 8; x < 28; x += 5) r.rect(x, baseY - 8, 1, 6, R.wood[1]);
+  // Plane
+  r.ellipse(17, baseY - 8, 12.5, 12, (_x, y, _nx, ny) => (y < baseY - 8 ? tone(R.linen, ny < -0.5 ? 4 : 3) : null));
+  if (down) r.ellipse(17, baseY - 9, 6, 6.5, (_x, y) => (y < baseY - 9 ? R.char[1] : null));
+  else for (let y = top + 8; y < baseY - 9; y += 3) r.rect(9, y, 16, 1, R.linen[2]);
+  if (down) {
+    // Pferd von vorn: Brust, Kopf, Ohren
+    r.ellipse(17, baseY + 5, 6, 5, (_x, _y, nx) => tone([0x2a1c12, 0x4a3220, 0x6a4a30, 0x82603e, 0x9a7650], nx < -0.3 ? 4 : 3));
+    r.ellipse(17, baseY + 12, 2.6, 4, 0x82603e);
+    r.rect(15, baseY + 15, 4, 2, 0x4a3220);
+    r.set(15, baseY + 11, 0x100c08);
+    r.set(19, baseY + 11, 0x100c08);
+    r.rect(14, baseY + 7, 1, 2, 0x2a1c12);
+    r.rect(20, baseY + 7, 1, 2, 0x2a1c12);
+    r.rect(12, baseY + 12, 2, 5, 0x4a3220);
+    r.rect(21, baseY + 12, 2, 5, 0x4a3220);
+  }
+  return finish(r, { cx: 17, cy: down ? 46 : 36, rx: 16, ry: 2.5, a: 90 });
+}
