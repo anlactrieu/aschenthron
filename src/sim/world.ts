@@ -3,12 +3,13 @@ import { findPath, isWalkable, type Grid, type Pt } from './path';
 import { itemReq, itemAffixes, gemTemplateId, handsOf, weaponSpeedOf, rollGem, rollUniqueSpecial, rollWorldDrop, rollWorldSpecial, rollPotion, rollSpecial, templateById, generateItem, generateNamed, rollNamed, rollBase, rollLoot, rerollAffixes, extendAffixes, SETS, type GemInfo, type Item, type PowerId, type SetBonus, type EquipSlot, type Stat } from './items';
 import {
   ATTR_KEYS, ATTR_NAME, xpToNext, questXp, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, skillReq, skillRankOf, ACTIVE_POWER, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
-  monsterKind, npcKeyOf, lootGroupOf, LOOT_GROUPS, KILL_GOALS, LEVEL_TITLES, type LootGroup, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, NAMED_SHARE, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
+  monsterKind, npcKeyOf, isGiverOf, lootGroupOf, LOOT_GROUPS, KILL_GOALS, LEVEL_TITLES, type LootGroup, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, NAMED_SHARE, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
   FAMILY_RES, MELEE_SKILL_KRAFT_SCALE, MAX_RES, SLOW_FACTOR, STATUS_IDS, PASSIVE_CAP, DMG_NAME, type DmgType, type StatusId, type SkillDef, type PassiveKey,
   ATTR_THRESHOLD, ATTR_THRESHOLD_2, ATTR_THRESHOLD_BONUS, LEVEL_MILESTONES, milestonePoints, WILL_RES_PER_2, WILL_STATUS_PER_POINT, WILL_STATUS_CAP, GEM_MIN_LEVEL, GEM_DROP, GEM_SOCKET_COST, WORLD_BOSS_LOOT, type QuestDef,
 } from './data';
 import { EFFECTS, cleanse, controlDr, dispel, mergeStatus } from './effects';
 import { NAMED } from './named';
+import { answerOf, canAsk, keywordLabel, learnedFrom } from './topics';
 
 export const TICK_RATE = 20;
 export const NPC_RANGE = 3;
@@ -85,6 +86,7 @@ export type Command =
   | { type: 'acceptQuest'; questId: string }
   | { type: 'turnInQuest'; questId: string; pick?: number }
   | { type: 'talk'; npcId: number }
+  | { type: 'askTopic'; npcId: number; topic: string }
   | { type: 'craft'; itemId: number; op: 'upgrade' | 'reroll' | 'extend' }
   | { type: 'socket'; gemId: number; itemId: number; index?: number };
 
@@ -161,6 +163,8 @@ export interface Actor {
   kills?: Record<string, number>;
   /** Spieler (P3): schon einmal gefundene benannte Funde und Unikate (Bestiarium, Händlerware) */
   found?: string[];
+  /** Spieler (P2): bekannte Stichworte aus Gesprächen (Notizbuch) */
+  topics?: string[];
   /** Spieler (P3): verdiente Titel und der gezeigte */
   titles?: string[];
   title?: string;
@@ -793,7 +797,27 @@ function finishQuest(w: World, a: Actor, def: QuestDef, pick = 0): void {
     markFound(w, a, item);
   }
   w.events.push({ type: 'questTurned', questId: def.id, xp: xpGain, gold: goldGain, ...(item ? { item } : {}), to: a.id });
+  if (def.teaches) learnTopics(w, a, def.teaches);
   gainXp(w, a, xpGain);
+}
+
+/** Nimmt eine Aufgabe an (Lager, die schon geräumt sind, zählen sofort als erfüllt). */
+function beginQuest(w: World, a: Actor, def: QuestDef): void {
+  a.quests[def.id] = { state: 'active', progress: 0 };
+  if (def.kind === 'camp' && w.camps.find((c) => c.id === def.target)?.cleared) {
+    a.quests[def.id] = { state: 'done', progress: def.count };
+    w.events.push({ type: 'questDone', questId: def.id, to: a.id });
+  }
+}
+
+/** Merkt Stichworte im Notizbuch des Spielers (P2); meldet nur die wirklich neuen. */
+function learnTopics(w: World, a: Actor, keys: string[]): void {
+  const known = (a.topics ??= []);
+  for (const k of keys) {
+    if (known.includes(k)) continue;
+    known.push(k);
+    note(w, a, `Neues Stichwort: ${keywordLabel(k)}`);
+  }
 }
 
 /** Attribute, die für das Lernen eines Skills (bei Passiven: für den nächsten Rang) noch fehlen, als Text („Verstand 31“). */
@@ -1099,17 +1123,13 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       if (a.quests[def.id]) return fail(w, 'Aufgabe bereits angenommen.');
       if (a.level < def.minLevel) return fail(w, `Benötigt Level ${def.minLevel}.`);
       if (def.requires && a.quests[def.requires]?.state !== 'turned') return fail(w, `Erst „${questById(def.requires)?.name ?? '?'}“ abschließen.`);
-      a.quests[def.id] = { state: 'active', progress: 0 };
-      if (def.kind === 'camp' && w.camps.find((c) => c.id === def.target)?.cleared) {
-        a.quests[def.id] = { state: 'done', progress: def.count };
-        w.events.push({ type: 'questDone', questId: def.id, to: a.id });
-      }
+      beginQuest(w, a, def);
       break;
     }
     case 'turnInQuest': {
       const def = questById(cmd.questId);
       const st = a.quests[cmd.questId];
-      const giver = w.npcs.find((n) => n.quests?.includes(cmd.questId) && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
+      const giver = def && w.npcs.find((n) => isGiverOf(n, def) && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
       if (!def || !st || !giver) return fail(w, 'Hier gibt es nichts abzugeben.');
       if (st.state !== 'done') return fail(w, 'Aufgabe noch nicht erfüllt.');
       finishQuest(w, a, def, cmd.pick ?? 0);
@@ -1127,6 +1147,26 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
           st.state = 'done';
           finishQuest(w, a, def);
         }
+      }
+      break;
+    }
+    case 'askTopic': {
+      const n = w.npcs.find((x) => x.id === cmd.npcId);
+      if (!n || Math.hypot(n.x - a.x, n.y - a.y) > NPC_RANGE) return fail(w, 'Zu weit entfernt.');
+      const ans = answerOf(n.name, cmd.topic);
+      if (!ans) return fail(w, `${n.name} weiß nichts darüber.`);
+      if (!canAsk(n.name, cmd.topic, a.topics)) return fail(w, 'Dieses Stichwort kennst du noch nicht.');
+      w.events.push({ type: 'talk', npcId: n.id, to: a.id });
+      // zu schwach: der NPC weicht aus, man merkt sich nur das Stichwort
+      if (a.level < (ans.minLevel ?? 1)) {
+        learnTopics(w, a, [cmd.topic]);
+        break;
+      }
+      learnTopics(w, a, learnedFrom(n.name, cmd.topic));
+      const def = ans.quest ? questById(ans.quest) : undefined;
+      if (def && !a.quests[def.id] && a.level >= def.minLevel && (!def.requires || a.quests[def.requires]?.state === 'turned')) {
+        beginQuest(w, a, def);
+        note(w, a, `Neuer Auftrag: „${def.name}“`);
       }
       break;
     }
@@ -1720,7 +1760,7 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
     // Beim Jagen nebenbei: freie Töte-Aufgaben (ohne Kette) für diese Monsterart starten automatisch
     if (m.kindId && !m.summoned) {
       for (const q of QUESTS) {
-        if (q.kind !== 'kill' || q.chain || q.target !== m.kindId || pl.quests[q.id] || pl.level < q.minLevel) continue;
+        if (q.kind !== 'kill' || q.chain || q.hidden || q.target !== m.kindId || pl.quests[q.id] || pl.level < q.minLevel) continue;
         if (q.requires && pl.quests[q.requires]?.state !== 'turned') continue;
         pl.quests[q.id] = { state: 'active', progress: 0 };
         note(w, pl, `Aufgabe „${q.name}“ läuft jetzt mit – deine Kills zählen.`);

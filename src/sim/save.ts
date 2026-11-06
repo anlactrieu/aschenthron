@@ -1,12 +1,13 @@
 import { monsterKind, migrateXpV1, XP_VERSION, milestonePoints, ATTR_KEYS, MAP_VERSION, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, questById, skillById, totalXpFor, LOOT_GROUPS, LEVEL_TITLES } from './data';
 import { NAMED } from './named';
+import { KEYWORDS } from './topics';
 import { isWalkable } from './path';
 import { EQUIP_SLOT_LIST, GEM_KINDS, LEGENDARIES, SETS, TEMPLATES, handsOf, type Item } from './items';
 import { maxHpOf, maxManaOf, type Actor, type World } from './world';
 
 const KEYS = [
   'x', 'y', 'hp', 'mana', 'level', 'xp', 'statPoints', 'attrs', 'gold', 'skills', 'inventory', 'equipment', 'stash', 'maxHp', 'quests', 'skillRanks', 'skillPoints', 'freeRespec', 'spec', 'bounties', 'bountyDay',
-  'kills', 'found', 'titles', 'title',
+  'kills', 'found', 'titles', 'title', 'topics',
 ] as const;
 
 
@@ -137,6 +138,8 @@ export function importPlayer(w: World, p: Actor, json: string): boolean {
     p.titles = [...new Set(Array.isArray(s.titles) ? s.titles.filter((t): t is string => typeof t === 'string' && allTitles.has(t)) : [])];
     for (const [lv, t] of Object.entries(LEVEL_TITLES)) if (p.level >= Number(lv) && !p.titles.includes(t)) p.titles.push(t);
     p.title = typeof s.title === 'string' && p.titles.includes(s.title) ? s.title : undefined;
+    // P2: Stichworte aus Gesprächen (Altstände: leer; Unbekanntes fällt weg)
+    p.topics = [...new Set(Array.isArray(s.topics) ? s.topics.filter((t): t is string => typeof t === 'string' && KEYWORDS.has(t)) : [])];
     p.skillCd = {};
     p.path = [];
     p.targetId = null;

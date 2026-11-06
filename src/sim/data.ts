@@ -631,6 +631,19 @@ export interface QuestDef {
   choices?: { label: string; gold: number; xp: number; item?: boolean }[];
   /** Abschlusstext (Chatzeile bei Abgabe) */
   outro?: string;
+  /** P2: Versteckter Auftrag, nur über ein Gesprächsthema (`NPC_TOPICS`, Antwort mit `quest`) zu bekommen; steht bei keinem NPC in `quests` */
+  hidden?: boolean;
+  /** P2: Name des NPC, bei dem ein versteckter Auftrag abgegeben wird */
+  giver?: string;
+  /** P2: Stichworte, die man mit der Abgabe lernt (führen zum nächsten Glied der Kette) */
+  teaches?: string[];
+  /** P2: Name der versteckten Kette (nur für die Anzeige) */
+  thread?: string;
+}
+
+/** Gibt dieser NPC die Aufgabe aus bzw. nimmt sie an? Normale Aufgaben stehen in `quests` des NPC, versteckte nennen ihn als `giver`. */
+export function isGiverOf(n: { name: string; quests?: string[] }, def: QuestDef): boolean {
+  return !!n.quests?.includes(def.id) || (!!def.hidden && def.giver === n.name);
 }
 
 const q = (id: string, name: string, text: string, minLevel: number, target: string, count: number, xpMul: number, goldMul: number): QuestDef => {
@@ -760,6 +773,37 @@ QUESTS.push(
   chainQ(CHAIN_THRONE, 3.5, { id: 'c_thr6', kind: 'visit', name: 'Vor dem Thron', text: 'Betritt den Thron der Asche und sieh dem König ins Gesicht. Maren will wissen, ob die Chronik enden darf.', minLevel: 28, requires: 'c_thr5', place: 'Thron der Asche', outro: 'Maren legt die Feder nieder. „Dann schreibt jetzt kein Chronist mehr. Sondern du.“' }),
 );
 
+// P2: Versteckte Aufträge. Sie gibt es nur über Stichworte, die man in anderen Gesprächen aufschnappt (`NPC_TOPICS`);
+// jedes Glied lehrt mit der Abgabe das Stichwort für das nächste, das bei einem anderen NPC gefragt wird.
+type HiddenStep = ChainStep & { giver: string; teaches?: string[] };
+const hiddenQ = (thread: string, mult: number, st: HiddenStep): QuestDef => {
+  const base = chainQ(thread, mult, st);
+  delete base.chain;
+  return { ...base, hidden: true, thread };
+};
+export const THREAD_ROTSCHAL = 'Rotschals Handel';
+export const THREAD_GLOCKE = 'Die Totenglocke';
+export const THREAD_TAM = 'Der verschwundene Schüler';
+export const THREAD_SIEGEL = 'Der gebrochene Eid';
+
+QUESTS.push(
+  hiddenQ(THREAD_ROTSCHAL, 2, { id: 'h_rot1', kind: 'bring', name: 'Rote Fetzen', text: 'Hauptmann Brandt will Beweise gegen den Händler Rotschal. Räuber tragen rote Fetzen am Gürtel: Sammle 4 davon.', minLevel: 4, giver: 'Hauptmann Brandt', item: 'Rote Fetzen', monsters: ['bandit_novice', 'highwayman', 'bandit_archer', 'bandit'], chance: 0.5, count: 4, teaches: ['tunnel'], outro: 'Brandt hält die Fetzen ins Licht. „Ein alter Tunnel unter dem Räuberlager, das sagen sie alle. Frag Ysa nach dem [[tunnel|Tunnel]].“' }),
+  hiddenQ(THREAD_ROTSCHAL, 2.5, { id: 'h_rot2', kind: 'unique', name: 'Hauptmann Kolm', text: 'Hauptmann Kolm bewacht den alten Schmugglertunnel und führt Buch über jede Ladung. Erlege ihn und bring Ysa sein Buch.', minLevel: 8, giver: 'Jägerin Ysa', target: 'captain_kolm', teaches: ['schmugglerbuch'], outro: 'Ysa blättert und pfeift leise. „Namen. Preise. Daten. Das gehört in die Hände eines Händlers, der Gewicht hat. Frag Mirel nach dem [[schmugglerbuch|Schmugglerbuch]].“' }),
+  hiddenQ(THREAD_ROTSCHAL, 3, { id: 'h_rot3', kind: 'kill', name: 'Die Hauptleute', text: 'Mirel will die Fäden der Mittelsmänner durchtrennen. Erschlage 3 Räuberhauptleute im Räuberlager.', minLevel: 10, giver: 'Händlerin Mirel', target: 'bandit_captain', count: 3, reward: 'rare', outro: 'Mirel zählt Münzen, die sie nicht mehr verkaufen muss. „Gut gemacht. Rotschals Kundschaft braucht jetzt einen neuen Hafen.“' }),
+
+  hiddenQ(THREAD_GLOCKE, 2, { id: 'h_glo1', kind: 'bring', name: 'Glockensplitter', text: 'Orvan will wissen, wovon der Klang der Totenglocke trägt. Sammle 5 Glockensplitter von den Untoten auf dem Totenacker.', minLevel: 9, giver: 'Erzmagier Orvan', item: 'Glockensplitter', monsters: ['skeleton', 'bone_acolyte', 'wraith', 'zombie'], chance: 0.4, count: 5, teaches: ['sael'], outro: 'Orvan hält einen Splitter ans Ohr. „Ein Name, in Bronze gegossen: Sael. Frag Haldor am Tor nach [[sael|Sael]].“' }),
+  hiddenQ(THREAD_GLOCKE, 2.5, { id: 'h_glo2', kind: 'unique', name: 'Geistfürst Sael', text: 'Haldor bittet dich, Geistfürst Sael am Totenacker zu bannen, damit die Glocke schweigt.', minLevel: 12, giver: 'Torwache Haldor', target: 'ghost_lord_sael', teaches: ['turm'], outro: 'Haldor lauscht in die Nacht. „Still. Aber wo läutete sie? Im Glockenturm der Katakomben. Frag Kjorra nach dem [[turm|Turm]].“' }),
+  hiddenQ(THREAD_GLOCKE, 3, { id: 'h_glo3', kind: 'visit', name: 'Der Glockenturm', text: 'Kjorra schickt dich zum Eingang der Katakomben: Sieh dir den Ort an, an dem Sael die Glocke läutete, und komm lebend zurück.', minLevel: 13, giver: 'Meisterin Kjorra', place: 'Katakomben', reward: 'rare', outro: 'Kjorra nickt. „Der Turm steht noch. Die Glocke hängt schief. Das ist genug Wissen für heute.“' }),
+
+  hiddenQ(THREAD_TAM, 2, { id: 'h_tam1', kind: 'bring', name: 'Tams Taschenreste', text: 'Hafenmeister Joren bittet dich, im Düsterwald nach Spuren von Tam zu suchen. Sammle 3 Taschenreste von Spinnen und Goblins.', minLevel: 5, giver: 'Hafenmeister Joren', item: 'Tams Taschenreste', monsters: ['forest_spider', 'goblin', 'goblin_scout'], chance: 0.45, count: 3, teaches: ['netz'], outro: 'Joren dreht ein Stück Leder in den Fingern. „Tams Gürtelschnalle. Und Seide daran. Das führt zu einem [[netz|Netz]]. Frag Brandt.“' }),
+  hiddenQ(THREAD_TAM, 2, { id: 'h_tam2', kind: 'camp', name: 'Die Brut im Wald', text: 'Hauptmann Brandt will die Spinnenhöhle im Düsterwald ausräuchern, in der Tam verschwunden sein muss.', minLevel: 6, giver: 'Hauptmann Brandt', target: 'spinnenhoehle', count: 1, teaches: ['giftmutter'], outro: 'Brandt reicht dir einen Dolch. „Tams Dolch. Er lag auf der Truhe. Die Spinnen haben eine Mutter. Sprich mit Varn über die [[giftmutter|Giftmutter]].“' }),
+  hiddenQ(THREAD_TAM, 3, { id: 'h_tam3', kind: 'unique', name: 'Giftmutter Zischel', text: 'Lehrer Varn bittet dich, die Giftmutter Zischel zu erlegen und Tams Spur zu Ende zu verfolgen.', minLevel: 8, giver: 'Lehrer Varn', target: 'venom_mother', reward: 'rare', outro: 'Varn setzt sich langsam. „Er lebt. Das Lehrhaus hat noch einen Schüler.“' }),
+
+  hiddenQ(THREAD_SIEGEL, 2, { id: 'h_asche1', kind: 'bring', name: 'Verbrannte Seiten', text: 'Maren braucht 5 verbrannte Chronikseiten, die in der Aschenöde treiben. Die Wesen dort tragen sie mit sich.', minLevel: 20, giver: 'Chronistin Maren', item: 'Verbrannte Seiten', monsters: ['ash_walker', 'cinder_wisp', 'imp', 'night_stalker'], chance: 0.35, count: 5, teaches: ['valdor'], outro: 'Maren fügt die Seiten zusammen. „Ein Name steht darauf, dick durchgestrichen: Valdor. Frag Ruven nach [[valdor|Valdor]].“' }),
+  hiddenQ(THREAD_SIEGEL, 3, { id: 'h_asche2', kind: 'unique', name: 'Schreckensritter Valdor', text: 'Späher Ruven bittet dich, Schreckensritter Valdor in der Aschenöde zu erschlagen und sein Wappen zu bringen.', minLevel: 24, giver: 'Späher Ruven', target: 'dread_valdor', teaches: ['ascheneid'], outro: 'Ruven wiegt das Wappen in der Hand. „Sein Eid ist gebrochen. Was bleibt von seinen Rittern? Frag Tessa nach dem [[ascheneid|Ascheneid]].“' }),
+  hiddenQ(THREAD_SIEGEL, 3.5, { id: 'h_asche3', kind: 'kill', name: 'Die Todesritter', text: 'Wachführerin Tessa bittet dich, 3 Todesritter zu erschlagen, die ohne Valdor führerlos durch die Öde ziehen.', minLevel: 25, giver: 'Wachführerin Tessa', target: 'death_knight', count: 3, reward: 'unique', outro: 'Tessa schreibt deinen Namen ins Wachbuch. „Der Eid ist erfüllt. Fast.“' }),
+);
+
 // Ankunftskette für neue Spieler: ein Rundgang, bei dem jede Rolle der Stadt einmal erklärt wird (reine Gesprächsaufgaben, kleine Belohnung)
 QUESTS.push(
   chainQ(CHAIN_ARRIVAL, 3, { id: 'c_arr1', kind: 'talk', name: 'Im Lehrhaus', text: 'Hafenmeister Joren schickt dich zum Lehrhaus nördlich der Straße: Lehrer Varn zeigt dir, wie du Fertigkeiten lernst.', minLevel: 1, target: 'varn', outro: 'Varn: „Fertigkeiten lernst du hier gegen Skillpunkte und Gold. Jede Stufe bringt einen Punkt. Wähle dir einen Stil, nicht alles.“' }),
@@ -843,6 +887,8 @@ export const NPC_LORE: Record<string, string[]> = {
     'Der Aschenkönig fiel, doch hinter ihm liegt eine Pforte im Aschengrund. Morvath wacht dort. Was er behütet, will ich nicht aussprechen.',
   ],
 };
+
+export { NPC_TOPICS } from './topicsData';
 
 export function questById(id: string): QuestDef | undefined {
   return QUESTS.find((x) => x.id === id);

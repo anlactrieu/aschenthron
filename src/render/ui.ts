@@ -1,5 +1,5 @@
 import { assignHotbar, HOTBAR_SLOTS, hotbarFor } from './hotbar';
-import { skillReq, SPECS, SPEC_LEVEL, NPC_ROLE, npcKeyOf, ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_2, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, STATUS_IDS, SCHOOL_NAME, schoolOf, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, questXp, MAX_LEVEL, monsterKind, uniqueDef, LOOT_GROUPS, KILL_GOALS, UNIQUES, MONSTERS, NPC_LORE, type QuestDef, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
+import { skillReq, SPECS, SPEC_LEVEL, NPC_ROLE, npcKeyOf, ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_2, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, STATUS_IDS, SCHOOL_NAME, schoolOf, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, questXp, MAX_LEVEL, monsterKind, uniqueDef, LOOT_GROUPS, KILL_GOALS, UNIQUES, MONSTERS, NPC_LORE, NPC_TOPICS, isGiverOf, type QuestDef, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
 import { NAMED } from '../sim/named';
 import { Rng } from '../sim/rng';
 import { LEGENDARIES, POWER_TEXT, TEMPLATES, SETS, TIER_COLOR, GEM_COLOR, affixRange, generateLegendary, generateNamed, gemAffix, gemName, handsOf, itemAffixes, itemReq, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
@@ -14,6 +14,8 @@ import { ACTIONS, actionFor, keyLabel, keyOf, rebind, resetKeys, setCapturing, s
 import type { AchievementTracker } from './achievements';
 import { ACHIEVEMENTS } from './achievements';
 import { type NextStep, giverLocation, questAvailable, questChains, questWhere, targetName } from '../sim/quests';
+import { answerOf, canAsk, hasTopics, keywordLabel, openKeys, splitMarks } from '../sim/topics';
+import { greeting, gameHour } from './talk';
 import { lookKey, lookOf, playerPortrait } from './art';
 import { heroMode } from './heroSheet';
 import { initCredits, toggleCredits } from './credits';
@@ -290,6 +292,8 @@ export class Ui {
   private tracker = el('div');
   private trackerKey = '';
   private sideClosed = '';
+  /** Geöffnetes Gesprächsthema (nur Anzeige; die Sim lernt es über `askTopic`) */
+  private topicView: { npcId: number; key: string } | null = null;
   /** Nächster Schritt (von der Szene alle 0,5 s gesetzt) */
   step: NextStep | null = null;
   private bannerTimer = 0;
@@ -585,7 +589,7 @@ export class Ui {
     this.updateHud(p, target);
     this.updateTracker(w, p);
     const near = w.npcs.filter((n) => Math.hypot(n.x - p.x, n.y - p.y) <= NPC_RANGE);
-    const key = JSON.stringify([settings().hotbar, this.open, this.tab, p.inventory, this.bagFilter, this.bagSort, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.freeRespec, p.gold, p.level, p.spec, near.map((n) => n.id), p.quests, p.bounties, p.kills, p.found, p.titles, p.title, p.xp > 0, this.board?.map((r) => r.name + r.xp).join(), this.ach?.unlocked.size, this.ach?.stats.kills, this.sel?.d.item.id, this.sel?.d.templateId, this.touchMain]);
+    const key = JSON.stringify([settings().hotbar, this.open, this.tab, p.inventory, this.bagFilter, this.bagSort, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.freeRespec, p.gold, p.level, p.spec, near.map((n) => n.id), p.quests, p.bounties, p.kills, p.found, p.titles, p.title, p.topics, this.topicView, p.xp > 0, this.board?.map((r) => r.name + r.xp).join(), this.ach?.unlocked.size, this.ach?.stats.kills, this.sel?.d.item.id, this.sel?.d.templateId, this.touchMain]);
     if (key === this.key || this.dragging) return;
     this.key = key;
     if (isTouch && this.sel && !this.selValid(p)) this.sel = null;
@@ -1710,6 +1714,7 @@ export class Ui {
     body.append(el('div', 'a-note', 'Endziel: Besiege den Aschenkönig auf dem Thron der Asche (ab Stufe 28).'));
     if (!active.length) body.append(el('div', 'a-note', 'Keine. Questgeber (gelbes ! über dem Kopf) stehen in den Städten.'));
     for (const q of active) body.append(this.questCard(q, p, w));
+    this.renderNotebook(body, p);
     for (const chain of questChains()) {
       const done = chain.quests.filter((q) => p.quests[q.id]?.state === 'turned').length;
       const cur = chain.quests.find((q) => p.quests[q.id] && p.quests[q.id]!.state !== 'turned');
@@ -1819,13 +1824,14 @@ export class Ui {
     const merchants = near.filter((n) => n.kind === 'merchant');
     const stash = near.find((n) => n.kind === 'stash');
     const smith = near.find((n) => n.kind === 'smith');
-    const givers = near.filter((n) => n.kind === 'quest' || !!n.quests?.length);
-    const talkers = near.filter((n) => NPC_LORE[n.name]);
+    const hidden = (n: Npc) => QUESTS.filter((q) => q.hidden && isGiverOf(n, q) && p.quests[q.id]).map((q) => q.id);
+    const givers = near.filter((n) => n.kind === 'quest' || !!n.quests?.length || hidden(n).length > 0);
+    const talkers = near.filter((n) => NPC_LORE[n.name] || hasTopics(n.name));
     // Rolle jedes NPCs in Reichweite: was kann ich hier tun?
     for (const n of near) if (NPC_ROLE[n.name]) body.append(el('div', 'a-note', `${n.name}: ${NPC_ROLE[n.name]}`));
     // Gesprächsziel einer offenen Aufgabe ohne eigenen Dialogtext (Lehrer, Händler, Schmied, Lager)
     for (const n of near) {
-      if (NPC_LORE[n.name]) continue;
+      if (NPC_LORE[n.name] || hasTopics(n.name)) continue;
       const pend = QUESTS.find((q) => q.kind === 'talk' && q.target === npcKeyOf(n.name) && p.quests[q.id]?.state === 'active');
       if (!pend) continue;
       const b = el('button', 'a-btn', `Anliegen vortragen: ${pend.name}`);
@@ -1837,12 +1843,17 @@ export class Ui {
       body.append(el('div', 'a-sec', `Gespräch – ${t.name}`));
       const box = el('div', 'a-card');
       box.style.cssText += ';display:block;font-style:italic;line-height:1.5';
-      for (const para of NPC_LORE[t.name]!) {
+      const hello = el('div', '', greeting(p, gameHour()));
+      hello.style.margin = '0 0 6px';
+      hello.style.color = '#d9c9a3';
+      box.append(hello);
+      for (const para of NPC_LORE[t.name] ?? []) {
         const d = el('div', '', `„${para}“`);
         d.style.margin = '0 0 6px';
         box.append(d);
       }
       body.append(box);
+      if (hasTopics(t.name)) this.topicBlock(body, t, p);
       const pending = QUESTS.find((q) => q.kind === 'talk' && q.target === npcKeyOf(t.name) && p.quests[q.id]?.state === 'active');
       if (pending) {
         const b = el('button', 'a-btn', `Anliegen vortragen: ${pending.name}`);
@@ -2000,7 +2011,7 @@ export class Ui {
     for (const g of givers) {
       body.append(el('div', 'a-sec', `${g.name} – Aufgaben`));
       let locked = 0;
-      for (const id of g.quests ?? []) {
+      for (const id of [...(g.quests ?? []), ...hidden(g)]) {
         const def = questById(id);
         if (!def) continue;
         const st = p.quests[id];
@@ -2074,6 +2085,96 @@ export class Ui {
     }, toBag);
     this.side.replaceChildren(...[title, body, this.selPanel(p)].filter((x): x is HTMLElement => !!x));
     this.sideShown = true;
+  }
+
+  /** Text mit anklickbaren Stichworten: bekannte mit Antwort sind Knöpfe, ohne Antwort nur hervorgehoben. */
+  private markedText(text: string, n: Npc, p: Actor): HTMLElement {
+    const out = el('div');
+    out.style.cssText = 'margin:0 0 6px;line-height:1.6';
+    for (const part of splitMarks(text)) {
+      if (typeof part === 'string') {
+        out.append(part);
+        continue;
+      }
+      const ask = canAsk(n.name, part.key, p.topics);
+      const b = el(ask ? 'button' : 'span', 'a-kw', part.label);
+      b.style.cssText += `;color:#ffd84a;font:inherit;font-style:normal;border:0;border-bottom:1px dotted #ffd84a;background:rgba(255,216,74,.1);padding:0 3px;margin:0 1px;${ask ? 'cursor:pointer' : 'opacity:.7'}`;
+      if (ask) b.onclick = () => this.askTopic(n, part.key);
+      out.append(b);
+    }
+    return out;
+  }
+
+  private askTopic(n: Npc, key: string): void {
+    this.topicView = { npcId: n.id, key };
+    this.send({ type: 'askTopic', npcId: n.id, topic: key });
+    this.key = '';
+  }
+
+  /** Themen eines NPC: Einstiegszeile mit Stichworten, offene Antwort, bereits Gehörtes zum Nachfragen. */
+  private topicBlock(body: HTMLElement, n: Npc, p: Actor): void {
+    const box = el('div', 'a-card');
+    box.style.cssText += ';display:block;line-height:1.5';
+    const open = NPC_TOPICS[n.name]!.open;
+    box.append(this.markedText(open, n, p));
+    const view = this.topicView?.npcId === n.id ? this.topicView.key : null;
+    if (view) {
+      const ans = answerOf(n.name, view);
+      const card = el('div');
+      card.style.cssText = 'margin-top:6px;padding:6px 8px;border-left:3px solid #ffd84a;background:rgba(255,216,74,.06)';
+      const hd = el('div', '', `„${keywordLabel(view)}“`);
+      hd.style.cssText = 'color:#ffd84a;font-weight:bold;margin-bottom:3px';
+      card.append(hd);
+      if (!ans) card.append(el('i', 'a-note', `${n.name} weiß darüber nichts.`));
+      else if (!canAsk(n.name, view, p.topics)) card.append(el('i', 'a-note', 'Von diesem Stichwort hast du noch nie gehört.'));
+      else if (p.level < (ans.minLevel ?? 1)) card.append(el('i', '', `„${ans.tooLow ?? 'Dazu bist du noch nicht weit genug.'}“`));
+      else {
+        for (const t of ans.text) card.append(this.markedText(`„${t}“`, n, p));
+        const def = ans.quest ? questById(ans.quest) : undefined;
+        const st = def ? p.quests[def.id] : undefined;
+        if (def && st) {
+          if (st.state === 'turned' && ans.done) card.append(el('i', '', `„${ans.done}“`));
+          const lbl = st.state === 'turned' ? 'abgeschlossen' : st.state === 'done' ? 'erfüllt – hier abgeben' : this.questGoal(def, p);
+          const row = el('div', 'a-note', `Auftrag „${def.name}“: ${lbl}`);
+          row.style.color = '#9be37a';
+          card.append(row);
+        }
+      }
+      box.append(card);
+    }
+    // Gehörtes aus anderen Gesprächen ansprechen
+    const open_ = new Set(openKeys(n.name));
+    const heard = (p.topics ?? []).filter((k) => !open_.has(k));
+    if (heard.length) {
+      const row = el('div', 'a-note', 'Gehörtes ansprechen:');
+      row.style.marginTop = '6px';
+      for (const k of heard) {
+        const knows = !!answerOf(n.name, k);
+        const b = el('button', 'a-kw', keywordLabel(k));
+        b.style.cssText += `;margin:2px 4px 0 0;color:#ffd84a;font:inherit;border:1px solid #6a5a2a;background:rgba(255,216,74,.1);padding:0 6px;cursor:pointer;${knows ? '' : 'opacity:.55'}`;
+        b.onclick = () => (knows ? this.askTopic(n, k) : ((this.topicView = { npcId: n.id, key: k }), (this.key = '')));
+        row.append(b);
+      }
+      box.append(row);
+    }
+    body.append(box);
+  }
+
+  /** Notizbuch im Aufgabenfenster: alle bekannten Stichworte. */
+  private renderNotebook(body: HTMLElement, p: Actor): void {
+    body.append(el('div', 'a-sec', `Notizbuch – Bekannte Stichworte (${p.topics?.length ?? 0})`));
+    if (!p.topics?.length) {
+      body.append(el('div', 'a-note', 'Noch leer. Sprich mit den Leuten und klicke die hervorgehobenen Wörter an; was du hörst, merkst du dir und kannst es anderen gegenüber ansprechen.'));
+      return;
+    }
+    const row = el('div');
+    row.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px';
+    for (const k of p.topics) {
+      const chip = el('span', 'a-note', keywordLabel(k));
+      chip.style.cssText += ';color:#ffd84a;border:1px solid #6a5a2a;padding:0 6px;border-radius:3px';
+      row.append(chip);
+    }
+    body.append(row, el('div', 'a-note', 'Tipp: Stichworte aus einem Gespräch kannst du bei jedem anderen unter „Gehörtes ansprechen“ erfragen.'));
   }
 
   private skillCard(s: SkillDef, p: Actor): HTMLElement {

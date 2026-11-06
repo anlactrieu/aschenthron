@@ -1,9 +1,9 @@
-import { QUESTS, NPC_KEYS, npcKeyOf, monsterKind, type QuestDef } from './data';
+import { QUESTS, NPC_KEYS, npcKeyOf, monsterKind, isGiverOf, type QuestDef } from './data';
 import { regionAt, type Actor, type World } from './world';
 
 /** Kann der Spieler die Aufgabe jetzt annehmen? (Stufe, Vorgänger der Kette abgegeben, noch nicht angenommen) */
 export function questAvailable(p: Actor, def: QuestDef): boolean {
-  if (p.quests[def.id] || p.level < def.minLevel) return false;
+  if (def.hidden || p.quests[def.id] || p.level < def.minLevel) return false;
   return !def.requires || p.quests[def.requires]?.state === 'turned';
 }
 
@@ -89,7 +89,7 @@ export function questTarget(w: World, p: Actor, def: QuestDef, done: boolean): {
 
 /** Auftraggeber einer Aufgabe: Position und Anzeigetext „Name (Region)“. */
 export function giverLocation(w: World, def: QuestDef): { pos: { x: number; y: number }; text: string } | undefined {
-  const g = w.npcs.find((n) => n.quests?.includes(def.id));
+  const g = w.npcs.find((n) => isGiverOf(n, def));
   return g ? { pos: { x: g.x, y: g.y }, text: `${g.name} (${regionAt(w, g.x, g.y)?.name ?? '?'})` } : undefined;
 }
 
