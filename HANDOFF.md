@@ -1,10 +1,10 @@
 # HANDOFF – Aschenthron
 
 ## ERLEDIGT (2026-11-06): Reste Welle 2 – NÄCHSTER SCHRITT: Nutzer-Test
-- **Stand:** Commit 94ef1e2 (Sonnet-Session `reste-welle2`). Von der Hauptsession geprüft: tsc, Lint, 462 Tests und Build grün, Golden-Snapshots unverändert. SPEC „Reste Welle 2“, Übergabe `welle2-reste-handoff.md` im Notizordner. `neuer-look` enthält P2, P4, P5, P6, beide Bot-Runden und diese Reste. **Nichts davon ist live** (main steht auf Welle 1).
+- **Stand:** Commit 94ef1e2 (Sonnet-Session `reste-welle2`). Von der Hauptsession geprüft: tsc, Lint, 462 Tests und Build grün, Golden-Snapshots unverändert. SPEC „Reste Welle 2“, Übergabe `welle2-reste-handoff.md` im Notizordner. `neuer-look` enthält P2, P4, P5, P6, beide Bot-Runden und diese Reste. **Live seit 2026-11-06** (main = neuer-look = dcbfdfb, Pages-Deploy grün).
 - **Inhalt:** `buyBlock` in `world.ts` sperrt Heil- und Manatränke unter der Vorlagenstufe (kleine Tränke ab Stufe 1, normale ab 5, große ab 10, riesige ab 20); Ausrüstung bleibt auf Vorrat kaufbar, Schriftrollen sind ausgenommen. Der Stadtrand-Hänger wird in `fight` gelöst: Die Schutzzone von Aschenhafen endet bei x < 49, und ein Ziel genau an der Grenze wird verworfen. Gerüchte zu Nachthändlern und Gefahrenorten gibt es als Stichworte bei Mirel, Dorn, Joren und Brandt. Pace mit Sperre 22,2 h (Median, 8 Seeds).
 - **Letzte 3 Entscheidungen:** (1) Kaufsperre nur für Tränke, weil Ausrüstung beim Anlegen geprüft wird. (2) Hänger in `fight` lösen statt im Angriffsbefehl, damit Klick-zum-Angriff erhalten bleibt. (3) Gerüchte als eigene Stichworte, `DangerSpot.hint` bleibt ungenutzt.
-- **Offen:** Nutzer spielt `neuer-look` im Browser (Dev-Server), dann nach Okay `main` mergen und pushen. Danach P5-Patrouille, Death Timer, Mehrspieler mit echtem Server, P8 zweite Insel, Entscheidungen 6 (Fertigkeiten) und 7 (Wegweiser).
+- **Offen:** Nutzer testet online, Rückmeldungen sind die nächsten Aufgaben. Danach P5-Patrouille, Death Timer, Mehrspieler mit echtem Server, P8 zweite Insel, Entscheidungen 6 (Fertigkeiten) und 7 (Wegweiser).
 - **Learnings:** Der Pace-Bot greift nur an, wenn `p.targetId === null`, ein ewig gesetztes Ziel lässt ihn stehen. 16 parallele Pace-Läufe auf 12 Kernen brauchen ~35 min.
 
 ## ERLEDIGT (2026-11-06): Pace-Bot 2 – Balance geklärt
