@@ -1,5 +1,6 @@
 import type { Grid } from './path';
 import { DANGER_OFFSETS, DANGER_SPOTS } from './data';
+import { addNightNpcs, syncNpcPresence } from './night';
 import { CAMP_RESPAWN_TICKS, addNpc, createWorld, giveStarterKit, inSafeZone, setupPatrols, spawnMonster, spawnPlayer, type NpcKind, type Rect, type TrainerField, type World } from './world';
 
 interface TiledProp {
@@ -98,6 +99,8 @@ export function buildWorld(seed: number, map: TiledMap, opts: { player?: boolean
     spawnMonster(world, d.x + dx, d.y + dy, k).packId = 200001 + i;
   }));
   world.start = { x: start.x / ts, y: start.y / ts };
+  addNightNpcs(world);
+  syncNpcPresence(world);
   if (opts.player === false) return { world, tiles, playerId: -1 };
   const player = spawnPlayer(world, start.x / ts, start.y / ts);
   giveStarterKit(world, player);

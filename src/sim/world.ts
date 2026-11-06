@@ -11,6 +11,7 @@ import { EFFECTS, cleanse, controlDr, dispel, mergeStatus } from './effects';
 import { NAMED } from './named';
 import { CORPSE_OWNER_TICKS, deathRules, dropCount, droppable } from './death';
 import { LANDMARK_TOPICS } from './topicsData';
+import { closedMessage, isShop, syncClock } from './night';
 import { answerOf, canAsk, keywordLabel, learnedFrom } from './topics';
 
 export const TICK_RATE = 20;
@@ -190,6 +191,10 @@ export interface Actor {
   callAt?: number;
   fleeUntil?: number;
   fled?: boolean;
+  /** P6: Gegner, den nur die Nacht bringt (verschwindet am Morgen) */
+  nightSpawn?: boolean;
+  /** P6: Werte vor der Nachtverstärkung (gesetzt = Nachtwerte aktiv) */
+  nightBase?: { maxHp: number; hp: number; damage: [number, number]; aggro: number; reward: number };
   /** Lager-Kennung (nur Besatzung eines Lagers) */
   campId?: string;
   /** Champion-Modifikator und Mini-Boss-Kennung */
@@ -284,6 +289,10 @@ export interface Npc {
   /** Lehrer: Fachgebiet (ohne Angabe: alle) */
   field?: TrainerField;
   quests?: string[];
+  /** P6: nur nachts da (`away` = gerade nicht da) / Laden gerade zu; gesetzt von `syncNpcPresence`, auch auf dem Client */
+  nightOnly?: boolean;
+  away?: boolean;
+  closed?: boolean;
   /** Schlendert in diesem Umkreis (Felder) um `home`, solange niemand in der Nähe ist (nur wenn `World.npcWander`) */
   wander?: number;
   home?: Pt;
@@ -365,6 +374,10 @@ export interface World {
   /** Stadt-NPCs dürfen schlendern (nur Einzelspieler; online kennen Clients die NPC-Positionen nur am Heimatplatz) */
   npcWander: boolean;
   fx: Rng;
+  /** P6: Nacht ist angewendet (Stärkung, Zusatzgegner) */
+  night: boolean;
+  /** Testhilfe: Uhrzeit festhalten (`?stunde=`, nur Einzelspieler); sonst folgt die Uhr dem Tick (`clock.ts`) */
+  fixedHour: number | null;
 }
 
 export interface PackPatrol {
@@ -377,7 +390,7 @@ export interface PackPatrol {
 }
 
 export function createWorld(seed: number, grid: Grid, safe: Rect[] = []): World {
-  return { tick: 0, grid, rng: new Rng(seed), actors: [], nextId: 1, events: [], ground: [], safe, npcs: [], start: { x: 1, y: 1 }, towns: [], regions: [], pvp: false, chests: [], camps: [], finds: [], landmarks: [], telegraphs: [], cmdActor: null, packs: new Map(), npcWander: false, fx: new Rng((seed ^ 0x9e3779b9) >>> 0) };
+  return { tick: 0, grid, rng: new Rng(seed), actors: [], nextId: 1, events: [], ground: [], safe, npcs: [], start: { x: 1, y: 1 }, towns: [], regions: [], pvp: false, chests: [], camps: [], finds: [], landmarks: [], telegraphs: [], cmdActor: null, packs: new Map(), npcWander: false, fx: new Rng((seed ^ 0x9e3779b9) >>> 0), night: false, fixedHour: null };
 }
 
 export function addNpc(w: World, kind: NpcKind, name: string, x: number, y: number, extra: Partial<Npc> = {}): Npc {
@@ -728,7 +741,15 @@ export function trainerTeaches(n: Npc, s: { area: string; tier: number }): boole
 }
 
 export function nearNpc(w: World, a: Actor, kind: NpcKind): Npc | undefined {
-  return w.npcs.find((n) => n.kind === kind && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
+  return w.npcs.find((n) => n.kind === kind && !n.away && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
+}
+
+/** Laden in Reichweite: Händler und Nachthändler; `open` nur, wenn er gerade verkauft (`msg` sagt sonst warum nicht) */
+export function shopNear(w: World, a: Actor): { open?: Npc; msg?: string } {
+  const near = w.npcs.filter((n) => isShop(n) && !n.away && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
+  const open = near.find((n) => !n.closed);
+  if (open) return { open };
+  return { msg: near.length ? closedMessage(near[0]!) : 'Kein Händler in der Nähe.' };
 }
 
 const SELL_RANK: Record<string, number> = { normal: 0, magic: 1, rare: 2 };
@@ -1019,7 +1040,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
     case 'trainSkill': {
       const s = skillById(cmd.skillId);
       if (!s) return;
-      const trainers = w.npcs.filter((n) => n.kind === 'trainer' && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
+      const trainers = w.npcs.filter((n) => n.kind === 'trainer' && !n.away && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
       if (!trainers.length) return fail(w, 'Kein Lehrer in der Nähe.');
       if (!trainers.some((n) => trainerTeaches(n, s))) {
         if (trainers.every((n) => n.field && n.field !== skillField(s))) return fail(w, skillField(s) === 'Magie' ? 'Zauber lehrt dir ein Magielehrer.' : 'Das lehrt dir ein Kampflehrer, kein Magier.');
@@ -1078,8 +1099,9 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       useSkill(w, a, cmd.skillId, cmd.targetId);
       break;
     case 'buy': {
-      const merchants = w.npcs.filter((n) => n.kind === 'merchant' && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
-      if (!merchants.length) return fail(w, 'Kein Händler in der Nähe.');
+      const shopOpen = shopNear(w, a);
+      if (!shopOpen.open) return fail(w, shopOpen.msg!);
+      const merchants = w.npcs.filter((n) => isShop(n) && !n.away && !n.closed && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
       // Händlerware aus Kill-Zielen: jeder Händler, nur freigeschaltete Funde
       if (cmd.named !== undefined && !merchantNamed(a).includes(cmd.named)) return fail(w, 'Das führt der Händler nicht.');
       if (cmd.named === undefined && !merchants.some((m) => (SHOPS[m.shop ?? 'basic'] ?? []).includes(cmd.templateId))) return fail(w, 'Das führt der Händler nicht.');
@@ -1096,7 +1118,8 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       break;
     }
     case 'sell': {
-      if (!nearNpc(w, a, 'merchant')) return fail(w, 'Kein Händler in der Nähe.');
+      const shopSell = shopNear(w, a);
+      if (!shopSell.open) return fail(w, shopSell.msg!);
       const it = a.inventory.find((i) => i.id === cmd.itemId);
       if (!it) return;
       a.inventory = a.inventory.filter((i) => i.id !== it.id);
@@ -1106,7 +1129,8 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       break;
     }
     case 'sellBulk': {
-      if (!nearNpc(w, a, 'merchant')) return fail(w, 'Kein Händler in der Nähe.');
+      const shopBulk = shopNear(w, a);
+      if (!shopBulk.open) return fail(w, shopBulk.msg!);
       const items = bulkSellable(a, cmd.upTo);
       if (!items.length) return fail(w, 'Nichts zu verkaufen.');
       const ids = new Set(items.map((i) => i.id));
@@ -1133,7 +1157,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
     }
     case 'acceptQuest': {
       const def = questById(cmd.questId);
-      const giver = w.npcs.find((n) => n.quests?.includes(cmd.questId) && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
+      const giver = w.npcs.find((n) => !n.away && n.quests?.includes(cmd.questId) && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
       if (!def || !giver) return fail(w, 'Hier gibt es diese Aufgabe nicht.');
       if (a.quests[def.id]) return fail(w, 'Aufgabe bereits angenommen.');
       if (a.level < def.minLevel) return fail(w, `Benötigt Level ${def.minLevel}.`);
@@ -1144,7 +1168,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
     case 'turnInQuest': {
       const def = questById(cmd.questId);
       const st = a.quests[cmd.questId];
-      const giver = def && w.npcs.find((n) => isGiverOf(n, def) && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
+      const giver = def && w.npcs.find((n) => !n.away && isGiverOf(n, def) && Math.hypot(n.x - a.x, n.y - a.y) <= NPC_RANGE);
       if (!def || !st || !giver) return fail(w, 'Hier gibt es nichts abzugeben.');
       if (st.state !== 'done') return fail(w, 'Aufgabe noch nicht erfüllt.');
       finishQuest(w, a, def, cmd.pick ?? 0);
@@ -1152,7 +1176,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
     }
     case 'talk': {
       const n = w.npcs.find((x) => x.id === cmd.npcId);
-      if (!n || Math.hypot(n.x - a.x, n.y - a.y) > NPC_RANGE) return fail(w, 'Zu weit entfernt.');
+      if (!n || n.away || Math.hypot(n.x - a.x, n.y - a.y) > NPC_RANGE) return fail(w, 'Zu weit entfernt.');
       w.events.push({ type: 'talk', npcId: n.id, to: a.id });
       // Gesprächsaufgaben mit diesem NPC als Ziel sind sofort erfüllt und abgegeben
       for (const def of QUESTS) {
@@ -1174,7 +1198,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
     }
     case 'askTopic': {
       const n = w.npcs.find((x) => x.id === cmd.npcId);
-      if (!n || Math.hypot(n.x - a.x, n.y - a.y) > NPC_RANGE) return fail(w, 'Zu weit entfernt.');
+      if (!n || n.away || Math.hypot(n.x - a.x, n.y - a.y) > NPC_RANGE) return fail(w, 'Zu weit entfernt.');
       const ans = answerOf(n.name, cmd.topic);
       if (!ans) return fail(w, `${n.name} weiß nichts darüber.`);
       if (!canAsk(n.name, cmd.topic, a.topics)) return fail(w, 'Dieses Stichwort kennst du noch nicht.');
@@ -2104,6 +2128,7 @@ function updateTeleport(w: World, a: Actor): void {
 
 export function tick(w: World): void {
   w.tick++;
+  syncClock(w);
   if (w.tick % 100 === 0) cleanupSummons(w);
   processTelegraphs(w);
   for (const c of w.chests) if (c.opened && w.tick >= c.respawnAt) c.opened = false;
@@ -2396,7 +2421,7 @@ function patrolStep(w: World, m: Actor): void {
 /** Stadt-NPCs schlendern gemächlich in kleinem Umkreis, bleiben aber stehen, sobald jemand mit ihnen reden könnte. */
 function npcWanderStep(w: World, players: Actor[]): void {
   for (const n of w.npcs) {
-    if (!n.wander) continue;
+    if (!n.wander || n.away) continue;
     if (!n.home) n.home = { x: n.x, y: n.y };
     if (!players.some((p) => Math.abs(p.x - n.x) < SLEEP_DIST && Math.abs(p.y - n.y) < SLEEP_DIST)) continue;
     if (players.some((p) => Math.hypot(p.x - n.x, p.y - n.y) <= NPC_RANGE + 1.5)) {

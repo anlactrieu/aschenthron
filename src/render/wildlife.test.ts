@@ -44,7 +44,7 @@ describe('Wildnis: Landmarken in der Karte', () => {
     }
   });
   it('die Karte selbst bleibt unberührt: Landmarken sind nur Objekte, die Sim kennt keine', () => {
-    expect(world.npcs.length).toBe(22);
+    expect(world.npcs.filter((n) => !n.nightOnly).length).toBe(22); // dazu die Nacht-NPCs aus P6
     expect(world.regions.length).toBe(16);
     expect(ground.length).toBe(g.w * g.h);
   });

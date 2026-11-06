@@ -62,10 +62,10 @@ describe('P3: Aufgabenketten', () => {
     }
   });
 
-  it('Lore-NPCs: 7 benannte NPCs mit 2–4 Absätzen, alle auf der Karte erreichbar', () => {
+  it('Lore-NPCs: 7 Tages-NPCs und 3 Nacht-NPCs (P6) mit 2–4 Absätzen, alle auf der Karte erreichbar', () => {
     const { w, p } = build();
     const names = Object.keys(NPC_LORE);
-    expect(names).toHaveLength(7);
+    expect(names).toHaveLength(10);
     for (const n of names) {
       const para = NPC_LORE[n]!;
       expect(para.length).toBeGreaterThanOrEqual(2);

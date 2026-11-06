@@ -29,6 +29,8 @@ import { Sfx } from './audio';
 import { Minimap } from './minimap';
 import { isTouch } from './touch';
 import { Atmosphere, isDungeon, LIGHT_DEPTH } from './atmosphere';
+import { hourOf } from '../sim/clock';
+import { syncNpcPresence } from '../sim/night';
 import { Fx } from './fx';
 import { playPixelfx, registerPixelfx, type FxName } from './pixelfx';
 import { attackFrame, onceFrame, walkFrame, type FigView, type FigureSheet } from './figure';
@@ -298,6 +300,13 @@ export class GameScene extends Phaser.Scene {
     initSilhouettes(this);
     initLootAtlas(this);
     this.atmo = new Atmosphere(this, this.sfx);
+    // Uhr der Sim (P6): Einzelspieler zählt den eigenen Tick, online kommt der Tick des Servers; `?stunde=` friert sie lokal ein
+    this.atmo.source = () => hourOf(this.world);
+    if (!this.remote) {
+      const sh = params.get('stunde');
+      if (sh !== null && Number.isFinite(Number(sh))) this.world.fixedHour = Number(sh);
+      syncNpcPresence(this.world);
+    }
     this.townLife = new TownLife(this, this.sfx);
     this.townLife.setNpcAnchor((id) => {
       const img = this.npcViews.get(id);
@@ -673,7 +682,7 @@ export class GameScene extends Phaser.Scene {
     let npcBest: { score: number; npc: Npc } | null = null;
     for (const n of this.world.npcs) {
       const img = this.npcViews.get(n.id);
-      if (!img) continue;
+      if (!img || n.away) continue;
       const b = this.bodyBox(img) ?? img.getBounds();
       const body = b.contains(wx, wy);
       const box = new Phaser.Geom.Rectangle(b.centerX - 55, b.top - 64, 110, b.height + 64);
@@ -2115,6 +2124,10 @@ export class GameScene extends Phaser.Scene {
     const p = this.player();
     const seen = new Set<string>();
     for (const n of this.world.npcs) {
+      if (n.away) {
+        this.npcViews.get(n.id)?.setVisible(false);
+        continue;
+      }
       let img = this.npcViews.get(n.id);
       const np = this.dispPos(n);
       const { sx, sy } = toScreen(np.x, np.y);
@@ -2181,7 +2194,7 @@ export class GameScene extends Phaser.Scene {
       const nBob = !chestLike && !nSkel && !nSil && time < dir.movingUntil ? -Math.abs(Math.sin((time / STEP_MS) * Math.PI * 0.5)) * 1.2 : 0;
       img.setVisible(!nWait).setPosition(sx, sy + 8 + nBob).setDepth(sy + 8);
       if (nWait) continue;
-      this.label(`n${n.id}`, n.name, sx, sy + 8 - (this.figSize(img)?.top ?? 56) - 4, '#e8d9b0', seen);
+      this.label(`n${n.id}`, n.closed ? `${n.name} (geschlossen)` : n.name, sx, sy + 8 - (this.figSize(img)?.top ?? 56) - 4, n.closed ? '#9a8e78' : '#e8d9b0', seen);
       const mark = this.questMark(n, p);
       if (mark) this.label(`m${n.id}`, mark, sx, sy - 70 + Math.sin(time / 200) * 2, mark === '!' ? '#ffe45a' : mark === '…' ? '#8fd0ff' : '#7fe08a', seen, 22);
     }

@@ -24,6 +24,31 @@ export interface NpcTopics {
 }
 
 export const NPC_TOPICS: Record<string, NpcTopics> = {
+  // ------------------------------------------------------------ Nacht-NPCs (P6, nur nachts da)
+  'Hehler Grau': {
+    open: 'Frag nach der [[nachtware|Ware]], der [[nachtschicht|Nachtschicht]] oder nach den [[grabgaenger|Grabgängern]] vor der Stadt.',
+    topics: {
+      nachtware: { text: ['Was ich habe, gibt es bei Tag nirgends zu kaufen: Anhänger aus den Gräbern, Ringe ohne Herkunft, Tränke für große Wunden. Die Händler am Markt sperren bei Einbruch der Dunkelheit zu, ich sperre dann erst auf.'] },
+      nachtschicht: { text: ['Von der Nachtschicht lebe ich. Die Wachen drücken beide Augen zu, solange kein Blut fließt, und der Rest der Stadt schläft. Wenn du Kundschaft sein willst, komm nach Einbruch der Dunkelheit, bis zum Morgengrauen.'] },
+      grabgaenger: { text: ['Die Toten steigen nachts aus den Gräbern, auf dem Totenacker und im Moor zahlreicher als am Tag, und sie schlagen härter zu. Bei Sonnenaufgang sind sie wieder fort. Wer nachts jagt, bekommt mehr Erfahrung und mehr Ärger.'] },
+    },
+  },
+  'Nachthändlerin Vess': {
+    open: 'Frag nach den [[nachtjaeger|Nachtjägern]], dem [[hehlerhafen|Hehler im Hafen]] oder dem [[morgengrauen|Morgengrauen]].',
+    topics: {
+      nachtjaeger: { text: ['Wölfe jagen im Dunkeln größer und mutiger. Im Hochland die Schattenwölfe, in der Aschenöde die Nachtjäger. Sie wittern dich weiter als bei Tag, also halte Tränke bereit.'] },
+      hehlerhafen: { text: ['Im Hafen sitzt ein Kerl namens Grau, der dasselbe verkauft wie ich. Ich bin besser sortiert, er ist billiger. Such dir aus, wem du eher traust.'] },
+      morgengrauen: { text: ['Mit dem ersten Licht ziehen sich die Nachtgänger zurück und die Läden öffnen wieder. Ich auch. Wer die Nacht überlebt hat, sollte schlafen gehen.'] },
+    },
+  },
+  'Totengräber Hobb': {
+    open: 'Frag nach den [[gruber|Gräbern]], dem [[nachtdienst|Nachtdienst]] oder dem [[morgenlicht|Morgenlicht]].',
+    topics: {
+      gruber: { text: ['Ich begrabe, was tagsüber liegen bleibt. Nachts gräbt sich einiges von allein wieder aus. Auf dem Totenacker mehr als irgendwo sonst.'] },
+      nachtdienst: { text: ['Tagsüber schlafe ich, nachts bin ich in der Stadt unterwegs. Draußen lege ich mich nicht mehr hin, seit mir ein Skelett die Schaufel weggenommen hat.'] },
+      morgenlicht: { text: ['Das erste Licht schickt sie zurück. Wer in der Dämmerung auf den Wegen bleibt, kommt meist durch.'] },
+    },
+  },
   // ------------------------------------------------------------ Aschenhafen
   'Hafenmeister Joren': {
     open: 'Frag mich nach dem [[hafen|Hafen]], den [[wege|Wegen]] aus der Stadt oder dem [[nebel|Nebel]], der abends vom Wasser kommt.',

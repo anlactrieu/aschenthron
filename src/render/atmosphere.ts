@@ -1,16 +1,18 @@
 import type Phaser from 'phaser';
 import type { Sfx } from './audio';
+import { DUNGEON_REGIONS } from '../sim/clock';
 
 /**
  * Tag/Nacht und Wetter als reiner Render-Layer (nichts davon steht in der Sim oder im Spielstand).
- * - Tageszeit: Echtzeit, ein voller Zyklus dauert 24 Minuten (1 Spielstunde = 1 Minute). Eine bildschirmfüllende
+ * - Tageszeit: die Uhr der Sim (P6, `sim/clock.ts`, aus dem Tick abgeleitet, im Mehrspieler vom Server): ein voller Zyklus
+ *   dauert 24 Minuten (1 Spielstunde = 1 Minute). Ohne Quelle (Tests) läuft sie nach der Echtzeit. Eine bildschirmfüllende
  *   Fläche mit Multiply-Mischung in der Szene färbt die Welt (Dämmerung warm, Nacht bläulich dunkel, Morgen warm).
  *   Sie liegt bei `LIGHT_DEPTH - 1`: Fenster- und Laternenlicht (additiv, Tiefe `LIGHT_DEPTH`) liegt darüber und
  *   wird nicht mitgedimmt.
  * - Dungeons ignorieren den Zyklus (konstante Dunkelheit über den Vignetten-Verlauf der Szene), Städte bleiben heller.
  * - Wetter je Außenzone, wechselt per Zufall alle ca. 3,5 Minuten (aus der Uhr abgeleitet, daher ohne Speicherstand):
  *   Regen (Moorlande, selten Aschenhafen-Umland), Nebel (Moorlande, Totenacker), Ascheflocken (Aschenöde, Aschengrund).
- * Testparameter: `?stunde=22` (feste Uhrzeit), `?wetter=regen|nebel|asche|klar`.
+ * Testparameter: `?stunde=22` (feste Uhrzeit; im Einzelspieler setzt GameScene sie auch in der Sim, online gilt sie nur für das Bild), `?wetter=regen|nebel|asche|klar`.
  */
 
 /** Tiefe der Lichter (Fenster, Laternen): über der Tönung, unter Regen und Ascheflocken */
@@ -22,7 +24,7 @@ export type Weather = 'clear' | 'rain' | 'fog' | 'ash';
 export type ZoneClass = 'indoor' | 'town' | 'outdoor';
 
 /** Dungeons und Innenzonen: Tageszeit und Wetter greifen dort nicht. */
-export const DUNGEONS = ['Gruft der Moorhexe', 'Katakomben', 'Tiefenmine', 'Thron der Asche', 'Goblinbau', 'Spinnennest'];
+export const DUNGEONS = DUNGEON_REGIONS;
 const TOWNS = ['Aschenhafen', 'Felsenwacht'];
 const ASH_ZONES = ['Aschenöde', 'Aschengrund', 'Thron der Asche'];
 
@@ -104,6 +106,8 @@ export class Atmosphere {
   private mix = { indoor: 0, town: 0 };
   private fixedHour: number | null;
   private fixedWeather: Weather | null;
+  /** Uhr der Sim (Spielstunde); ohne Quelle Echtzeit */
+  source: (() => number) | null = null;
   private t = 0;
   /** Debug: aktuelle Werte (lesbar über window.__game) */
   state = { hour: 12, weather: 'clear' as Weather, k: 0, color: '255,255,255' };
@@ -124,7 +128,7 @@ export class Atmosphere {
 
   /** Aktuelle Spielstunde 0–24 */
   hour(): number {
-    return this.fixedHour ?? ((Date.now() % DAY_MS) / DAY_MS) * 24;
+    return this.fixedHour ?? this.source?.() ?? ((Date.now() % DAY_MS) / DAY_MS) * 24;
   }
 
   /** Wie dunkel es draußen ist: 0 am Mittag, 1 tief in der Nacht (für Fenster- und Laternenlicht) */

@@ -606,11 +606,39 @@ export const SAFE_REGEN = 0.5;
 export const FIELD_REGEN = 0.02;
 
 export const SHOPS: Record<string, string[]> = {
+  // Nachthändler (P6, nur nachts da): Ware, die sonst nur als Beute fällt
+  night: ['bone_charm', 'copper_amulet', 'wisdom_amulet', 'hunter_talisman', 'ember_pendant', 'moon_amulet', 'ember_ring', 'moon_ring', 'wolf_cloak', 'bone_shield', 'heal_huge', 'mana_huge'],
   // Moosbrück: Werkstatt für Build-Ausrüstung bis Stufe 11 (Stäbe, Parierwaffen, Schilde, Ringe) und Tränke; höhere Build-Stücke fallen nur als Beute
   artisan: ['heal_mid', 'heal_big', 'mana_mid', 'mana_big', 'parry_blade', 'mender_staff', 'mender_ring', 'pyre_staff', 'rime_staff', 'bulwark_shield', 'windrunner_boots', 'flow_ring', 'binding_amulet'],
   basic: ['rusty_sword', 'bone_club', 'steel_sword', 'leather_cap', 'iron_helm', 'ash_mail', 'worn_gloves', 'cloth_boots', 'iron_greaves', 'iron_ring', 'scroll_hafen', 'scroll_wacht', 'heal_small', 'heal_mid', 'mana_small', 'mana_mid', 'hunt_bow', 'yew_bow', 'twig_staff', 'oak_staff', 'battle_axe', 'cloth_robe', 'leather_vest', 'wood_arrows', 'iron_arrows', 'wood_shield', 'cloth_belt', 'leather_belt', 'rag_cloak', 'wool_cloak', 'cloth_pants', 'leather_pants', 'iron_dagger', 'woodcutter_axe'],
   advanced: ['scroll_hafen', 'scroll_wacht', 'steel_sword', 'cinder_axe', 'war_blade', 'iron_helm', 'warden_helm', 'plate_cuirass', 'bone_plate', 'iron_gauntlets', 'ember_gauntlets', 'iron_greaves', 'steel_boots', 'silver_ring', 'heal_mid', 'heal_big', 'mana_mid', 'mana_big', 'yew_bow', 'horn_bow', 'oak_staff', 'bone_staff', 'acolyte_robe', 'hunter_vest', 'bone_leather', 'iron_arrows', 'steel_arrows', 'ember_arrows', 'iron_shield', 'steel_shield', 'leather_belt', 'iron_belt', 'wool_cloak', 'hunter_cloak', 'leather_pants', 'chain_legs', 'steel_dagger', 'battle_axe', 'claymore', 'war_hammer', 'great_axe', 'bone_dagger', 'war_bow', 'crystal_staff', 'dread_cleaver', 'dread_blade', 'doom_hammer', 'dread_bow', 'cinder_staff', 'ash_greatsword', 'ash_saber', 'ash_dagger', 'ash_bow', 'void_staff', 'parry_blade', 'mender_staff', 'mender_ring', 'pyre_staff', 'rime_staff', 'bulwark_shield', 'windrunner_boots', 'flow_ring', 'binding_amulet'],
 };
+
+/**
+ * P6 Tag und Nacht. Nacht = 21–5:30 Uhr (`clock.ts`). Läden (Händler) schließen dann; der Nachthändler ("Hehler") steht nur nachts da
+ * und führt Ware, die sonst nur als Beute fällt (Amulette, Ringe, Riesentränke).
+ * Untote und Nachtjäger draußen (nie Bosse, Unikate, Dungeons): mehr Leben, mehr Schaden, größere Wahrnehmung, mehr Erfahrung.
+ */
+export const NIGHT = { hp: 1.25, dmg: 1.2, aggro: 1.5, reward: 1.25 };
+/** Außer den Untoten (Familie `undead`) wird auch dieses Wild stärker */
+export const NIGHT_HUNTERS = ['wolf', 'dire_wolf', 'shadow_wolf', 'night_stalker'];
+/** Zusätzliche Gegner nur in der Nacht: `count` Stück je Nacht, verteilt auf die Ruheplätze vorhandener Monster der Zone (deterministisch aus der Nachtnummer), am Morgen verschwunden */
+export interface NightSpawn { zone: string; kinds: string[]; count: number }
+export const NIGHT_SPAWNS: NightSpawn[] = [
+  { zone: 'Düsterwald', kinds: ['skeleton', 'wraith'], count: 3 },
+  { zone: 'Düsterwald', kinds: ['wolf'], count: 2 },
+  { zone: 'Moorlande', kinds: ['wraith', 'skeleton', 'zombie'], count: 5 },
+  { zone: 'Totenacker', kinds: ['skeleton', 'wraith', 'zombie', 'bone_knight'], count: 8 },
+  { zone: 'Hochland', kinds: ['shadow_wolf'], count: 4 },
+  { zone: 'Aschenöde', kinds: ['night_stalker', 'shadow_wolf'], count: 4 },
+];
+/** Nur nachts anwesende NPCs (Ort in der Stadt, begehbare Kachel; `shop` = Nachthändler) */
+export interface NightNpc { name: string; kind: 'quest' | 'merchant'; x: number; y: number; shop?: string }
+export const NIGHT_NPCS: NightNpc[] = [
+  { name: 'Hehler Grau', kind: 'quest', x: 16, y: 159, shop: 'night' },
+  { name: 'Nachthändlerin Vess', kind: 'quest', x: 104, y: 63, shop: 'night' },
+  { name: 'Totengräber Hobb', kind: 'quest', x: 44, y: 166 },
+];
 
 /** Gegenstands-Drops: Ausrüstung seltener, Tränke häufiger. Faktor auf die Monster-dropChance. */
 export const GEAR_DROP_FACTOR = 0.35;
@@ -854,6 +882,9 @@ export const NPC_KEYS: Record<string, string> = {
 
 /** Rollenhinweis im Fenster jedes Stadt-NPCs: Was kann ich hier tun? */
 export const NPC_ROLE: Record<string, string> = {
+  'Hehler Grau': 'Nachthändler: führt nachts Amulette, Ringe und große Tränke, die sonst nur als Beute fallen. Tagsüber nicht da.',
+  'Nachthändlerin Vess': 'Nachthändlerin der Felsenwacht: dieselbe Ware wie der Hehler im Hafen, nur nachts da.',
+  'Totengräber Hobb': 'Totengräber: erzählt, was nachts auf den Gräbern geschieht. Nur nachts da.',
   'Hafenmeister Joren': 'Willkommen! Frag mich, wenn du nicht weißt, wohin.',
   'Lehrer Varn': 'Kampflehrer: Nahkampf, Fernkampf und Überleben lernen; hier verteilst du auch deine Skillpunkte neu.',
   'Magierin Selka': 'Magielehrerin: Zauber lernen (Feuer, Frost, Heilung, Schutz). Kampffertigkeiten lehrt Varn.',
@@ -903,6 +934,21 @@ export const NPC_LORE: Record<string, string[]> = {
     'Psst. Nicht so laut. Die Mine hat Ohren, und manche davon haben acht Beine.',
     'Ich habe alles gekartet. Jede Truhe, jeden Gang. Aber ich habe vergessen, dass man am Ende wieder hinaus muss.',
     'Wenn du Truhen öffnest, denk an mich. Und wenn du auf einen schwarzen Beutel stößt – der gehört mir.',
+  ],
+  'Hehler Grau': [
+    'Psst. Wer um diese Stunde noch Münzen zählt, hat gute Gründe. Ich frage nicht nach deinen, du nicht nach meinen.',
+    'Bei Tag bin ich nicht hier, und die Händler am Markt haben nachts zu. Was ich habe, fällt sonst nur den Toten aus der Tasche: Amulette, Ringe, Tränke für große Wunden.',
+    'Pass auf dich auf. Nachts stehen die Untoten auf dem Totenacker und im Moor dichter, und die Wölfe im Hochland sind hungriger.',
+  ],
+  'Nachthändlerin Vess': [
+    'Die Felsenwacht schläft, wenn die Fackeln brennen. Ich nicht. Wer zu Mitternacht noch Kundschaft ist, ist meine Kundschaft.',
+    'Tagsüber verkauft Händler Dorn Waffen und Rüstung. Ich verkaufe, was er nicht führen darf.',
+    'Nachtjäger gibt es nur im Dunkeln, heißt es. Im Aschengrund sind sie größer. Vergiss die Tränke nicht.',
+  ],
+  'Totengräber Hobb': [
+    'Ich grabe nur, wenn niemand zusieht. Tagsüber schlafen die Toten leichter als die Lebenden.',
+    'Seit der Thron brennt, steigen sie nachts aus den Gräbern auf dem Totenacker. Stärker als am Tag, und mehr, als ich begraben kann.',
+    'Wenn du nachts hinaus musst: nimm Tränke mit, bleib auf der Straße und warte bis zum Morgengrauen. Mit dem ersten Licht ziehen sie ab.',
   ],
   'Ritter Aldric': [
     'Sie nennen mich den Sterbenden, aber das ist ein Titel, der mir mit jedem Tag ungenauer erscheint.',

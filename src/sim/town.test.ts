@@ -10,7 +10,8 @@ const map = mapJson as unknown as TiledMap;
 const { world: w } = buildWorld(1, map, { player: false });
 const { grid, tiles } = loadMap(map);
 const tile = (x: number, y: number) => tiles[Math.round(y) * map.width + Math.round(x)];
-const inTown = w.npcs.filter((n) => regionAt(w, n.x, n.y)?.name === 'Aschenhafen');
+// Tagesbesetzung: die Nacht-NPCs (P6, nur nachts da) stehen in Gassen und haben keinen eigenen Raum
+const inTown = w.npcs.filter((n) => !n.nightOnly && regionAt(w, n.x, n.y)?.name === 'Aschenhafen');
 const FLOOR = 15;
 const WALL = 18;
 

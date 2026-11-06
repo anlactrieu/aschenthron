@@ -1,8 +1,10 @@
 import type { Actor } from '../sim/world';
 import { DAY_MS } from './atmosphere';
+import { hourOf, type Clocked } from '../sim/clock';
 
-/** Aktuelle Spielstunde 0–24 (wie die Atmosphäre: `?stunde=22` fixiert sie). */
-export function gameHour(): number {
+/** Aktuelle Spielstunde 0–24: mit Welt die Uhr der Sim (P6), sonst Echtzeit (`?stunde=22` fixiert sie). */
+export function gameHour(w?: Clocked): number {
+  if (w) return hourOf(w);
   const h = new URLSearchParams(location.search).get('stunde');
   return h !== null && Number.isFinite(Number(h)) ? Number(h) : ((Date.now() % DAY_MS) / DAY_MS) * 24;
 }

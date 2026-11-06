@@ -1,4 +1,5 @@
 import { buildWorld, type TiledMap } from '../sim/tiled';
+import { syncNpcPresence } from '../sim/night';
 import { actorFromLite, type Snapshot } from '../sim/net';
 import type { Command, GameEvent, World } from '../sim/world';
 
@@ -65,6 +66,7 @@ export class RemoteSession {
   private apply(s: Snapshot): void {
     const w = this.world;
     w.tick = s.tick;
+    syncNpcPresence(w); // Uhr der Sim: Nacht-NPCs und geschlossene Läden folgen dem Tick des Servers
     w.actors = [s.you, ...s.actors.map((l) => actorFromLite(l, s.tick))];
     w.ground = s.ground;
     for (const c of s.chests) {

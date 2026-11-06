@@ -140,13 +140,14 @@ describe('Lager erobern', () => {
     p.y = m.y;
     p.hp = p.maxHp = 99999;
     const n0 = w.actors.length;
+    const count = () => w.actors.filter((a) => !a.nightSpawn).length; // Nachtgänger (P6) zählen nicht zu den Zufallsbegegnungen
     let max = 0;
     for (let sec = 0; sec < 2400; sec++) {
       p.x += sec % 2 ? 2 : -2;
       p.targetId = null;
       for (let i = 0; i < 20; i++) tick(w);
       drainEvents(w);
-      max = Math.max(max, w.actors.length);
+      max = Math.max(max, count());
     }
     expect(max - n0).toBeLessThan(28); // ohne Lebensdauer wüchse es auf über 60
   }, 60000);

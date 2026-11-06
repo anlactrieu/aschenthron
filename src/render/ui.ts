@@ -5,7 +5,7 @@ import { Rng } from '../sim/rng';
 import { LEGENDARIES, POWER_TEXT, TEMPLATES, SETS, TIER_COLOR, GEM_COLOR, affixRange, generateLegendary, generateNamed, gemAffix, gemName, handsOf, itemAffixes, itemReq, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
 import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
-  bulkSellable, sellPrice, critChance, attrBonus, equipSlotFor, socketCost, maxHpOf, maxManaOf, missingReq, nearNpc, trainerTeaches, powerOf, resistOf, type Actor, type Command, type Npc, type World,
+  bulkSellable, sellPrice, critChance, attrBonus, equipSlotFor, socketCost, maxHpOf, maxManaOf, missingReq, nearNpc, shopNear, trainerTeaches, powerOf, resistOf, type Actor, type Command, type Npc, type World,
   gearStat, parryChance, passiveSum, questRewardChoices, missingSkillReq, groupKills, merchantNamed, namedPrice,
 } from '../sim/world';
 import { buildProfile } from '../sim/build';
@@ -16,6 +16,8 @@ import { ACHIEVEMENTS } from './achievements';
 import { type NextStep, giverLocation, questAvailable, questChains, questWhere, targetName } from '../sim/quests';
 import { answerOf, canAsk, hasTopics, keywordLabel, openKeys, splitMarks } from '../sim/topics';
 import { greeting, gameHour } from './talk';
+import { clockText, hourOf, isNightHour } from '../sim/clock';
+import { closedMessage, isShop } from '../sim/night';
 import { lookKey, lookOf, playerPortrait } from './art';
 import { heroMode } from './heroSheet';
 import { initCredits, toggleCredits } from './credits';
@@ -236,6 +238,8 @@ const CSS = `
 #hud-tl .hdr{display:flex;flex-direction:column;justify-content:center;min-width:168px;padding:0 4px 0 8px;gap:0}
 #hud-tl .nm{font-size:20px;line-height:1.1;color:var(--gold);text-shadow:0 2px var(--ink);max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #hud-tl .lv{font-size:16px;line-height:1.1;color:var(--txt);margin-bottom:2px}
+#hud-tl .clk{font-size:14px;line-height:1.1;color:#b8c4e8;text-shadow:0 1px var(--ink)}
+#hud-tl .clk.day{color:#e8d49a}
 #hud-tl .pbar{height:18px;margin:4px 5px 4px 3px}
 ${BAR_CSS}
 `;
@@ -279,6 +283,8 @@ export class Ui {
   private tl = el('div', 'w-frame');
   private tlName = el('div', 'nm');
   private tlLevel = el('div', 'lv');
+  /** Uhrzeit der Sim (P6) unter der Stufe */
+  private tlClock = el('div', 'clk');
   private tlParts: { hp: { liq: HTMLElement; t: HTMLElement }; mp: { liq: HTMLElement; t: HTMLElement } } | null = null;
   private hotbar = el('div');
   private xpBar = el('div', 'a-bar');
@@ -533,7 +539,7 @@ export class Ui {
     const hp = el('div', 'pbar hp');
     const mp = el('div', 'pbar mp');
     this.tlParts = { hp: this.barParts(hp), mp: this.barParts(mp) };
-    hdr.append(this.tlName, this.tlLevel, hp, mp);
+    hdr.append(this.tlName, this.tlLevel, this.tlClock, hp, mp);
     this.tl.append(fc, hdr);
   }
 
@@ -573,6 +579,16 @@ export class Ui {
     face.src = out.toDataURL();
   }
 
+  /** Uhrzeit der Sim: "☀ 14:05" / "☾ 22:40 · Nacht" (nur bei Änderung der Minute neu gesetzt) */
+  private updateClock(w: World): void {
+    const h = hourOf(w);
+    const night = isNightHour(h);
+    const txt = `${night ? '☾' : '☀'} ${clockText(h)}${night ? ' · Nacht' : ''}`;
+    if (this.tlClock.textContent !== txt) this.tlClock.textContent = txt;
+    this.tlClock.classList.toggle('day', !night);
+    this.tlClock.title = night ? 'Nachts schließen die Läden; Untote und Nachtjäger sind stärker, der Nachthändler ist da.' : 'Tag: Läden offen.';
+  }
+
   /** Lässt den Schnellleisten-Platz einer neu gelernten Fertigkeit pulsieren, sobald sie dort liegt. */
   pulseSkill(id: string): void {
     this.newSkill = { id, until: performance.now() + 3000 };
@@ -586,10 +602,11 @@ export class Ui {
     this.lastP = p;
     this.updatePortrait(p);
     this.lastW = w;
+    this.updateClock(w);
     this.updateHud(p, target);
     this.updateTracker(w, p);
-    const near = w.npcs.filter((n) => Math.hypot(n.x - p.x, n.y - p.y) <= NPC_RANGE);
-    const key = JSON.stringify([settings().hotbar, this.open, this.tab, p.inventory, this.bagFilter, this.bagSort, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.freeRespec, p.gold, p.level, p.spec, near.map((n) => n.id), p.quests, p.bounties, p.kills, p.found, p.titles, p.title, p.topics, this.topicView, p.xp > 0, this.board?.map((r) => r.name + r.xp).join(), this.ach?.unlocked.size, this.ach?.stats.kills, this.sel?.d.item.id, this.sel?.d.templateId, this.touchMain]);
+    const near = w.npcs.filter((n) => !n.away && Math.hypot(n.x - p.x, n.y - p.y) <= NPC_RANGE);
+    const key = JSON.stringify([settings().hotbar, this.open, near.map((n) => n.closed), this.tab, p.inventory, this.bagFilter, this.bagSort, p.equipment, p.stash, p.attrs, p.statPoints, p.skills, p.skillRanks, p.skillPoints, p.freeRespec, p.gold, p.level, p.spec, near.map((n) => n.id), p.quests, p.bounties, p.kills, p.found, p.titles, p.title, p.topics, this.topicView, p.xp > 0, this.board?.map((r) => r.name + r.xp).join(), this.ach?.unlocked.size, this.ach?.stats.kills, this.sel?.d.item.id, this.sel?.d.templateId, this.touchMain]);
     if (key === this.key || this.dragging) return;
     this.key = key;
     if (isTouch && this.sel && !this.selValid(p)) this.sel = null;
@@ -799,7 +816,7 @@ export class Ui {
       acts.append(b);
     };
     const w = this.lastW;
-    const merchant = !!w && !!nearNpc(w, p, 'merchant');
+    const merchant = !!w && !!shopNear(w, p).open;
     const stash = !!w && !!nearNpc(w, p, 'stash');
     if (d.from === 'bag') {
       add(d.item.slot === 'potion' ? 'Benutzen' : 'Anlegen', () => this.send(d.item.slot === 'potion' ? { type: 'usePotion', itemId: d.item.id } : { type: 'equip', itemId: d.item.id }));
@@ -985,7 +1002,7 @@ export class Ui {
     if (zone.startsWith('equip:')) return d.from === 'bag' && (zone === 'equip:ring2' ? d.item.slot === 'ring' : d.item.slot === zone.slice(6));
     if (zone === 'bag') return d.from === 'equip' || d.from === 'stash' || d.from === 'shop';
     if (zone === 'stash') return d.from === 'bag' && !!this.lastW && !!this.lastP && !!nearNpc(this.lastW, this.lastP, 'stash');
-    if (zone === 'sell') return d.from === 'bag' && !!this.lastW && !!this.lastP && !!nearNpc(this.lastW, this.lastP, 'merchant');
+    if (zone === 'sell') return d.from === 'bag' && !!this.lastW && !!this.lastP && !!shopNear(this.lastW, this.lastP).open;
     return false;
   }
 
@@ -1821,7 +1838,8 @@ export class Ui {
     this.sideClosed = '';
     const body = el('div', 'a-body');
     const trainers = near.filter((n) => n.kind === 'trainer');
-    const merchants = near.filter((n) => n.kind === 'merchant');
+    const shops = near.filter(isShop);
+    const merchants = shops.filter((n) => !n.closed);
     const stash = near.find((n) => n.kind === 'stash');
     const smith = near.find((n) => n.kind === 'smith');
     const hidden = (n: Npc) => QUESTS.filter((q) => q.hidden && isGiverOf(n, q) && p.quests[q.id]).map((q) => q.id);
@@ -1843,7 +1861,7 @@ export class Ui {
       body.append(el('div', 'a-sec', `Gespräch – ${t.name}`));
       const box = el('div', 'a-card');
       box.style.cssText += ';display:block;font-style:italic;line-height:1.5';
-      const hello = el('div', '', greeting(p, gameHour()));
+      const hello = el('div', '', greeting(p, gameHour(this.lastW ?? undefined)));
       hello.style.margin = '0 0 6px';
       hello.style.color = '#d9c9a3';
       box.append(hello);
@@ -1861,8 +1879,12 @@ export class Ui {
         body.append(b);
       }
     }
+    for (const c of shops.filter((n) => n.closed)) {
+      body.append(el('div', 'a-sec', `${c.name} – geschlossen`));
+      body.append(el('div', 'a-note', closedMessage(c) ?? ''));
+    }
     for (const m of merchants) {
-      body.append(el('div', 'a-sec', `${m.name} – Waren`));
+      body.append(el('div', 'a-sec', `${m.name} – ${m.shop === 'night' ? 'Nachtware' : 'Waren'}`));
       const grid = el('div', 'a-grid');
       for (const id of SHOPS[m.shop ?? 'basic'] ?? []) {
         const t = templateById(id);
