@@ -193,7 +193,7 @@ export interface DangerSpot { id: string; name: string; zone: string; x: number;
 export const DANGER_SPOTS: DangerSpot[] = [
   // Einstieg für Neulinge: beide Orte liegen im Osten der Felder, gut zwölf Felder hinter der Anfängerzone (früher direkt vor dem Osttor)
   { id: 'wolfsbau', name: 'Wolfsbau', zone: 'Roggenfelder', x: 92, y: 124, kinds: ['dire_wolf', 'dire_wolf', 'dire_wolf', 'wolf'], hint: 'Ein Rudel Schreckenswölfe haust im Nordosten der Felder, wo sie an den Wald stoßen. Zu früh kommt man dort nicht lebend raus.' },
-  { id: 'raeubernest', name: 'Räubernest im Röhricht', zone: 'Roggenfelder', x: 89, y: 147, kinds: ['bandit_captain', 'bandit', 'bandit', 'bandit'], hint: 'Im Röhricht im Südosten der Felder lauert ein Hauptmann mit seiner Bande.' },
+  { id: 'raeubernest', name: 'Räubernest im Röhricht', zone: 'Roggenfelder', x: 92, y: 141, kinds: ['bandit_captain', 'bandit', 'bandit', 'bandit'], hint: 'Im Röhricht im Osten der Felder lauert ein Hauptmann mit seiner Bande.' },
 ];
 
 /**
@@ -207,7 +207,7 @@ export const BEGINNER_ZONE = {
   kinds: ['field_rat', 'burrow_rat', 'wild_hound'],
   maxLevel: 3,
   swap: { feral_hound: 'wild_hound', giant_rat: 'burrow_rat', goblin: 'field_rat', goblin_scout: 'wild_hound' } as Record<string, string>,
-  moves: { rat_king: { x: 88, y: 126 } } as Record<string, { x: number; y: number }>,
+  moves: { rat_king: { x: 84, y: 161 } } as Record<string, { x: number; y: number }>,
   /** Jagdhinweis für Stufe 1–3 (`nextStep`): mitten zwischen den Ratten vor dem Osttor */
   hunt: { x: 60, y: 158 },
 };

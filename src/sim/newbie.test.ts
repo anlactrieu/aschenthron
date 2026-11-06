@@ -7,7 +7,7 @@ import { syncClock } from './night';
 import { nextStep, questAvailable, questMarks } from './quests';
 import { pickTarget } from './pacebot';
 import {
-  applyCommand, beginnerKind, buyPrice, createWorld, drainEvents, getActor, inBeginnerZone, inSafeZone, spawnMonster, tick, TICK_RATE,
+  applyCommand, beginnerKind, buyPrice, createWorld, drainEvents, getActor, inBeginnerZone, inSafeZone, spawnMonster, spawnPlayer, tick, TICK_RATE,
   type Actor, type Command, type World,
 } from './world';
 
@@ -94,6 +94,18 @@ describe('Einstieg: Anfängerzone', () => {
     for (const m of w.actors) {
       if (m.kind !== 'monster' || !m.home || beginnerKind(m)) continue;
       for (const g of GATES) expect(Math.hypot(m.home.x - g.x, m.home.y - g.y), `${m.kindId}@${m.home.x},${m.home.y}`).toBeGreaterThan(REACH);
+    }
+  });
+
+  it('Rattenkönig und Gefahrenorte stehen weit weg von starken Gegnern (Hinweis „Gesucht“ ab Stufe 4 führt nicht in ein Rudel)', () => {
+    const { w } = build();
+    const strong = (a: Actor) => a.kind === 'monster' && !beginnerKind(a) && a.level >= 6;
+    const king = w.actors.find((a) => a.unique === 'rat_king')!;
+    for (const m of w.actors.filter((a) => strong(a) && a !== king)) expect(Math.hypot(m.x - king.x, m.y - king.y), `${m.kindId}@${m.x},${m.y}`).toBeGreaterThanOrEqual(12);
+    for (const [i, d] of DANGER_SPOTS.entries()) {
+      const pack = w.actors.filter((a) => a.packId === 200001 + i);
+      const others = w.actors.filter((a) => a.kind === 'monster' && a.packId !== 200001 + i && (a.champ || a.unique || strong(a)) && !a.campId);
+      for (const m of pack) for (const o of others) expect(Math.hypot(m.x - o.x, m.y - o.y), `${d.id} ${o.kindId}@${o.x},${o.y}`).toBeGreaterThanOrEqual(9);
     }
   });
 
@@ -255,6 +267,16 @@ describe('Einstieg: erster Auftrag', () => {
     talkTo(w, p, 'Händlerin Mirel', (npcId) => ({ type: 'talk', npcId }));
     expect(p.inventory.length).toBe(heals);
     expect(p.quests.c_first1?.state).toBe('active');
+  });
+
+  it('Kettenaufgaben anderer Ketten lassen freie Aufgaben weiter mitlaufen (Goblinkönig)', () => {
+    const w = createWorld(5, { w: 40, h: 40, walkable: new Array(1600).fill(true) });
+    const p = spawnPlayer(w, 10, 10);
+    p.level = 12;
+    p.quests.c_gob4 = { state: 'active', progress: 0 };
+    slay(w, p, spawnMonster(w, 12, 10, 'goblin_king'));
+    expect(p.quests.c_gob4?.state).toBe('done');
+    expect(p.quests.q_goblin_king?.state).toBe('done');
   });
 
   it('alte Spielstände mit begonnener Ankunftskette bekommen ihn nicht', () => {

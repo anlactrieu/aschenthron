@@ -1890,8 +1890,8 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
       for (const q of QUESTS) {
         if (q.kind !== 'kill' || q.chain || q.hidden || q.target !== m.kindId || pl.quests[q.id] || pl.level < q.minLevel) continue;
         if (q.requires && pl.quests[q.requires]?.state !== 'turned') continue;
-        // Läuft schon eine Kettenaufgabe auf diese Art (erster Auftrag: Ratten), zählt erst sie; die freie Aufgabe kommt danach
-        if (QUESTS.some((c) => c.chain && c.kind === 'kill' && c.target === q.target && pl.quests[c.id]?.state === 'active')) continue;
+        // Läuft der erste Auftrag auf diese Art (Ratten), zählt erst er; die freie Aufgabe kommt danach
+        if (QUESTS.some((c) => c.chain === CHAIN_FIRST && c.kind === 'kill' && c.target === q.target && pl.quests[c.id]?.state === 'active')) continue;
         pl.quests[q.id] = { state: 'active', progress: 0 };
         note(w, pl, `Aufgabe „${q.name}“ läuft jetzt mit – deine Kills zählen.`);
       }

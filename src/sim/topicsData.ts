@@ -128,7 +128,7 @@ export const NPC_TOPICS: Record<string, NpcTopics> = {
     },
   },
   'Hauptmann Brandt': {
-    open: 'Die Wache sucht Hilfe gegen [[raeuber|Räuber]], [[goblins|Goblins]] und alles, was nachts schreit. Im [[roehricht|Röhricht]] im Südosten der Felder soll sich eine Bande eingenistet haben.',
+    open: 'Die Wache sucht Hilfe gegen [[raeuber|Räuber]], [[goblins|Goblins]] und alles, was nachts schreit. Im [[roehricht|Röhricht]] im Osten der Felder soll sich eine Bande eingenistet haben.',
     topics: {
       raeuber: { text: ['Im Nordwesten liegt das Räuberlager, geführt von Harkon. Davor streifen Lehrlinge und Wegelagerer durch den Wald. Ohne Rüstung ist das kein Ausflug.'] },
       roehricht: { text: ['Zwischen dem Schilf liegt das Räubernest mit einem Hauptmann und drei Schlägern. Die Händler nehmen lieber den langen Weg um das Röhricht herum. Ich schicke keine Rekruten hin, bevor sie nicht ihren ersten Schlag eingesteckt haben.'] },
