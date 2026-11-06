@@ -1,12 +1,12 @@
 # HANDOFF – Aschenthron
 
-## LÄUFT (2026-11-06): T4C-Charme Welle 2, Teil 1
-- **Stand:** Zwei Sonnet-Sessions parallel im geteilten Checkout auf `neuer-look`, kein Push, `HANDOFF.md` pflegt nur die Hauptsession:
-  - `p2-gespraeche` (local_328db655…): P2 Gespräche – `src/sim/data.ts` (`NPC_TOPICS`), `src/sim/quests.ts` (`askTopic`, versteckte Aufträge), `src/sim/save.ts` (bekannte Stichworte + Migration), `src/render/ui.ts` (Gesprächsfenster, Notizbuch).
-  - `p5-wildnis` (local_9ca5f104…): P5 Wildnis, nur Client – neu `src/render/wildlife.ts`, `src/render/world/props.ts` (Landmarken), `scripts/gen_map.py` + `src/data/aschenthron.json`, Haken in `GameScene.ts`. Die kämpfende Patrouille kommt erst nach P4.
-- **Letzte 3 Entscheidungen:** (1) Nutzer: kleinere Modelle, wo möglich, ohne Qualitätsverlust → beide Sessions auf Sonnet, mit Pflicht zu Prüfung, Browser-Test und `/code-review`. (2) P2 ∥ P5 laut SPEC-Wellenplan, weil sie getrennte Dateien haben; P5 ohne Sim-Teil, damit `world.ts` frei bleibt für P4. (3) Beide schreiben nur ihren eigenen Umsetzungsstand-Abschnitt in `SPEC.md`, P5 erst ganz am Ende.
-- **Offen:** Ergebnisse beider Sessions prüfen (Diff, tsc/Lint/Tests/Build), dann P4 Kampf → P6 Tag/Nacht nacheinander (beide in `world.ts`/`data.ts`). Todesstrafe entschieden (SPEC Entscheidung 5: nah an D4O, harmonisiert). Danach die P5-Patrouille. Außerdem weiter offen: der Online-Test des Nutzers für Welle 1.
-- **Learnings:** keine neuen.
+## ERLEDIGT (2026-11-06): T4C-Charme Welle 2, Teil 1 (P2 Gespräche, P5 Wildnis)
+- **Stand:** Zwei Sonnet-Sessions parallel auf `neuer-look`, kein Push. Gemeinsam von der Hauptsession geprüft: tsc, Lint, 397 Tests und Build grün. Im Spiel nur von den Sessions selbst gesehen. Übergaben liegen im Notizordner (`p2-gespraeche-handoff.md`, `p5-wildnis-handoff.md`, Screenshots `p5-wildnis/`).
+  - P2 760b0ef: `src/sim/topicsData.ts` (`NPC_TOPICS`), `topics.ts` (`canAsk`, `learnedFrom`, `KEYWORDS`), `world.ts` (`askTopic`, `learnTopics`), `data.ts` (`hiddenQ`, `isGiverOf`), `save.ts` (`topics`), `ui.ts` (`topicBlock`, `markedText`, `renderNotebook`). 4 versteckte Ketten. Pace unverändert (L30 24,9 h).
+  - P5 9bbb34b, 9437428, 1d2b16e: `src/render/wildlife.ts`, `world/critters.ts`, Landmarken (Kartenobjekt `landmark`, `MAP_VERSION` bleibt 4), Reisende über `travelerAt` und `ROUTE`, Haken `updateWildlife`. Kein Frame über 33 ms gemessen.
+- **Letzte 3 Entscheidungen:** (1) Nutzer: Todesstrafe so nah wie möglich an D4O, aber mit unserem System harmonisiert (SPEC Entscheidung 5). (2) Versteckte Aufträge über `QuestDef.giver` statt `Npc.quests`, damit sich die Karte nicht ändert. (3) P4 startet erst jetzt, weil es dieselben Dateien wie P2 und P5 berührt (`data.ts`, `world.ts`, `GameScene.ts`).
+- **Offen:** P4 Kampf (läuft, siehe unten) → P6 Tag/Nacht → P5-Patrouille. Aus P2/P5 übernommen: „?“-Marker über dem Geber versteckter Aufträge, Notizen der Landmarken an P2-Stichworte hängen, Kill-Ziel als Auftrag. Weiter offen: der Online-Test des Nutzers.
+- **Learnings:** Der Auto-Start freier Kill-Aufgaben in `world.ts` nimmt jede `kill`-Aufgabe ohne `chain` an, neue Quest-Gruppen dort ausschließen (`q.hidden`). Parallele Sessions sollten eigene Dev-Builds auf eigenem Port nutzen (`vite build --mode development` + `vite preview`), weil der geteilte Dev-Server bei fremden Edits neu lädt.
 
 ## ERLEDIGT (2026-11-04, spät): T4C-Charme Welle 1
 - **Stand:** Plan in `SPEC.md` „Plan: T4C-Charme“ (P1–P9) + Nutzerentscheidungen (91f1a2a). Drei Sessions parallel auf `neuer-look`, geteilter Checkout, kein Push, `HANDOFF.md` pflegt nur die Hauptsession: `p1-staedte` (Sonnet; `townLife.ts`, `npc.ts`, `audio.ts`, `town.ts`, Karte, Haken `GameScene.ts`), `p7-musik` (Sonnet; `music.ts`), `p3-fortschritt` (Opus; `src/sim/**`, `ui.ts`, `achievements.ts`, `server/**`; darf Teilaufgaben an Sonnet-Sessions geben).
