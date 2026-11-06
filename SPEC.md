@@ -660,3 +660,51 @@ Median: P5 23,9 h, Alt 29,3 h, Neu 32,9 h (Seed 99 als 40 h gezählt).
 
   **Befund:** Die Nachtgegner allein kosten etwa 0,6 h im Median (Spalte 3). Der Sprung auf 29 h kommt von den geschlossenen Läden: der Bot (`pace.sim.ts`, nicht geändert) fährt zum nächsten `merchant`, verkauft nachts nichts und pendelt bis 5:30 zwischen Stadt und Jagd (Stadtfahrten 5800–13500 statt ~170). Das ist ein Bot-Artefakt (ein Spieler jagt nachts und verkauft tagsüber), zeigt aber auch: schwere Taschen kosten nachts Zeit. Seed 99 (33,5 h vorher) ist die schon bekannte Bot-Schleife aus P4.
 - **Mängel / offen:** (1) Jeder Neustart (Seite neu laden, Server neu starten) setzt die Uhr auf 8 Uhr; Einzelspieler-Sitzungen unter 13 Minuten sehen keine Nacht. (2) Gegner, die erst während der Nacht entstehen (Zufallsbegegnungen), bekommen keine Nachtwerte. (3) Die Hover-Gefahrenfarbe ignoriert die Nachtwerte. (4) Online setzt `?stunde=` nur Bild und HUD, die Sim folgt dem Server. (5) Der Nachthändler bietet auch die „Auf Bestellung“-Ware (benannte Funde) an, weil jeder NPC mit `shop` als Laden zählt. (6) Der Pace-Bot sollte nachts jagen und tagsüber verkaufen (Sache von `bot-schleife`). (7) Alles im Browser-Pane unter hoher Systemlast (~1 fps) gesehen, die Nachtstimmung im Bild nicht ausführlich begutachtet.
+
+**Nachtrag „Bot-Schleife 2“ (2026-11-06, nur `src/sim/pace.sim.ts`, neu `src/sim/pacebot.ts` + `pacebot.test.ts`, `tools/pace-all.sh`; Sim unberührt).**
+- **Frage:** Kommt die Pace über 30 h vom Bot oder von der Nacht-Balance? Messung: 8 Seeds (2024, 7, 99, 11, 12, 13, 21, 42), Nacht an und aus (`PACE_NIGHT=0` setzt nur im Harness `World.fixedHour = 12`), Bot-Varianten (`PACE_BOT`): `old` = vor fa18c17, `fa18` = Stand fa18c17, `new` = Review-Reste behoben + nachts in der Stadt warten (Tränke < 2) bzw. nur Ziele bis Stufe+0 (Tränke < 4), solange alle Läden zu sind, `vess` = wie `new`, kauft nachts zusätzlich bei Hehler Grau/Vess (`isShop`: `kind quest` mit `shop` funktioniert für `buy`/`sell` ohne Sim-Änderung, keine Datenänderung nötig). Standard ist jetzt `vess`.
+- **Review-Reste (fa18c17) behoben** (`new`/`vess`): Bann nur dort, wo gejagt wird (nicht in der Stadt, nicht ohne Ziel in 12 Feldern); Quest-XP (`questTurned`) zählt nicht in `gained`; Fallback `far` nach Nähe statt höchster Stufe. Zusätzlich ein Hänger-Wächter: Seed 21 stand 40 h bei Stufe 11 neben einem Schreckenswolf (50,142), den er nie angriff (Ursache in der Sim nicht untersucht; Verdacht Schutzzone/Angriff blockiert). Ziel wird nach 30 s ohne Bewegung und ohne Leben-Änderung 20 min ignoriert. Tests: `pacebot.test.ts` (15, Zielwahl, Platzwechsel, Nachtvorsicht, Hänger).
+
+**Messung** (L30 in Spielstunden / Tode; „über 40 h“ = Lauf bei 40 h abgebrochen, als 40 gezählt):
+
+Nacht aus (12 Uhr): L30 / Tode
+| Seed | old | fa18 | new |
+|---|---|---|---|
+| 2024 | 25.1 h / 122 | 25.1 h / 122 | 25.1 h / 122 |
+| 7 | 22.6 h / 106 | 22.6 h / 106 | 22.6 h / 106 |
+| 99 | 33.5 h / 52 | 28.4 h / 83 | 22.6 h / 63 |
+| 11 | 23.0 h / 89 | 23.0 h / 89 | 23.0 h / 89 |
+| 12 | 20.9 h / 53 | 20.9 h / 53 | 20.9 h / 53 |
+| 13 | 24.7 h / 73 | 24.8 h / 68 | 24.1 h / 96 |
+| 21 | 22.0 h / 84 | 22.0 h / 84 | 22.0 h / 84 |
+| 42 | 30.2 h / 163 | 30.2 h / 163 | 30.2 h / 163 |
+| Median | 23.9 h | 23.9 h | 22.8 h |
+| Summe Tode | 742 | 768 | 776 |
+| >30 h | 2 | 1 | 1 |
+| Tode 1-10/11-20/21-30 (Summe) | 244/109/389 | 244/109/415 | 244/106/426 |
+| Stadtfahrten (Median) | 162 | 182 | 177 |
+| Hänger (Summe) | 0 | 0 | 0 |
+| Warten min (Median) | 0 | 0 | 0 |
+
+Nacht an: L30 / Tode
+| Seed | old | fa18 | new | vess |
+|---|---|---|---|---|
+| 2024 | 25.6 h / 68 | 29.9 h / 124 | 28.5 h / 58 | 25.2 h / 101 |
+| 7 | 28.4 h / 47 | 36.2 h / 186 | 27.2 h / 56 | 21.2 h / 66 |
+| 99 | 33.2 h / 67 | über 40 h (St. 29) / 228 | 33.3 h / 114 | 22.8 h / 74 |
+| 11 | 30.1 h / 140 | 26.9 h / 117 | 28.6 h / 52 | 22.9 h / 72 |
+| 12 | 36.5 h / 91 | 35.9 h / 224 | 28.1 h / 56 | 20.2 h / 32 |
+| 13 | 27.1 h / 94 | 28.4 h / 121 | 32.2 h / 118 | 20.0 h / 61 |
+| 21 | 31.3 h / 112 | 28.4 h / 139 | 24.7 h / 41 | 21.6 h / 42 |
+| 42 | 34.5 h / 77 | 31.0 h / 144 | 30.6 h / 72 | 25.2 h / 111 |
+| Median | 30.7 h | 30.4 h | 28.6 h | 22.2 h |
+| Summe Tode | 696 | 1283 | 567 | 559 |
+| >30 h | 5 | 4 | 3 | 0 |
+| Tode 1-10/11-20/21-30 (Summe) | 222/123/351 | 286/308/689 | 227/86/254 | 213/110/236 |
+| Stadtfahrten (Median) | 7017 | 150 | 191 | 159 |
+| Hänger (Summe) | 0 | 0 | 0 | 4 |
+| Warten min (Median) | 0 | 0 | 349 | 0 |
+
+- **Befund.** (1) Ohne Nacht liegen alle Bots bei 22,8–23,9 h (Median); der alte Bot ohne Nacht reproduziert exakt die P5-Tabelle. Seed 42 (30,2 h) und Seed 99 beim alten Bot sind schon am Mittag langsam, also Bot/P5, nicht P6. (2) Mit Nacht kostet der Stand fa18c17 +6,5 h Median (30,4 vs 23,9) und verdoppelt die Tode in 11–20 und verdreifacht sie dort (109 → 308; 21–30: 415 → 689). (3) Dieser Zuschlag kommt fast ganz vom Bot: Sobald er nachts bei Grau/Vess einkaufen kann (`vess`), liegt der Median bei 22,2 h, kein Seed über 25,2 h, auch die Tode (559) liegen unter dem Mittagswert. Mit Warten und Vorsicht allein (`new`) sinkt die Todeszahl auf 567 (−56 % gegen fa18), die Zeit nur auf 28,6 h (3 Seeds über 30 h, Wartezeit im Median 349 min), weil die Nacht ohne Nachschub trotzdem Zeit kostet. (4) Die P6-Nachtwerte selbst (HP ×1,25, Schaden ×1,2, 26 Zusatzgegner) sind in den Läufen mit Nachschub nicht auffällig: `vess` Nacht (22,2 h) ≈ `new` Mittag (22,8 h).
+- **Empfehlung.** P6-Nachtwerte nicht ändern. Wer Pace unter 30 h will, braucht keine Balance-Änderung, nur den Bot, der nachts nachkauft. Offen für P6, nicht für den Bot: Der Nachthändler ist der einzige Nachschub nachts und liegt nur an zwei Orten (Grau 16,159 / Vess 104,63); Spieler ohne Vorräte, die das nicht wissen, erleben die Nacht wie fa18 (Todesserien). Ein Hinweis im Spiel (Gerücht/Gespräch) wäre die billigere Maßnahme als weichere Werte. Eine Datenänderung wäre dafür nicht nötig.
+- **Ehrlich.** Ein Lauf je Zelle, Streuung zwischen Seeds mehrere Stunden; Aussagen unter ±3 h tragen nicht. `vess` kauft Riesen-Heiltränke (600 LP, Stufe 21+ laut Daten, `buy` prüft sie nicht), die tagsüber nicht erhältlich sind; ein Teil des Vorsprungs ist also stärkere Ausrüstung, nicht nur Nachschub. Die Hänger-Signatur wurde nach dem Code-Review ohne `p.hp` gebaut (Regeneration setzte die Uhr zurück); die Tabellen entstanden mit der früheren Signatur (nur bei `vess` Seed 21 löste der Wächter aus, 4 Mal), nicht neu gemessen. Quest-XP-Abgleich nur gegen handgebaute Ereignisse getestet, der Bot nimmt selbst keine Quests an. Fenster-XP zählt auch Kills auf Stadtfahrten (alt, nicht behoben). Der Wolf-Hänger ist als mögliche Sim-Lücke offen.
