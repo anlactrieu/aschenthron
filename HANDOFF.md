@@ -1,5 +1,12 @@
 # HANDOFF – Aschenthron
 
+## ERLEDIGT (2026-11-06): Pace-Bot 2 – Balance geklärt
+- **Stand:** Commit baa9baa (`src/sim/pacebot.ts` + `pacebot.test.ts`, `pace.sim.ts`, `tools/pace-all.sh`; Varianten `PACE_BOT=old|fa18|new|vess`, Standard `vess`; `PACE_NIGHT=0` = feste Mittagszeit; `StuckWatch`). Von der Hauptsession geprüft: tsc, Lint, 456 Tests und Build grün. Tabellen in SPEC „Nachtrag Bot-Schleife 2“.
+- **Befund:** Die Pace über 30 h war ein Bot-Effekt. Wenn der Bot nachts beim Hehler oder Nachthändler (Grau 16,159 / Vess 104,63) nachkauft, liegt der Median mit Nacht bei 22,2 h, kein Seed über 25,2 h (ohne Nacht 22,8 h). Die P6-Nachtwerte bleiben unverändert. Ziel 20–30 h erreicht.
+- **Letzte 3 Entscheidungen:** (1) P6-Werte nicht anfassen (Kontrolllauf zeigt keine Auffälligkeit). (2) Bot-Varianten behalten statt ersetzen, damit künftige Vergleiche auf gleicher Sim möglich sind. (3) Hinweis auf den Nachthändler im Spiel statt weicherer Werte, weil Spieler ohne Wissen sonst die Todesserien des alten Bots erleben.
+- **Offen:** (a) Mögliche Sim-Lücke: `buy` prüft die Stufenanforderung nicht (Riesen-Heiltrank Stufe 21+ ist schon früh kaufbar, z. B. bei Vess). (b) Wolf-Hänger Seed 21 bei (50,142): Der Bot greift einen Schreckenswolf nie an, Ursache in der Sim ungeklärt. (c) Gerücht oder Gespräch, das auf den Nachthändler hinweist, dazu Gerüchte zu Gefahrenorten. (d) P5-Patrouille, Death Timer. (e) Nutzer-Test im Browser, dann `main` nach Okay.
+- **Learnings:** Pace-Läufe immer aus einem Snapshot-Ordner starten, sonst lesen später startende Jobs geänderten Code. Der Kontrolllauf `PACE_NIGHT=0` reproduziert die P5-Tabelle exakt und eignet sich als Referenz.
+
 ## ERLEDIGT (2026-11-06): P6 Tag/Nacht + Pace-Bot (Balance noch offen)
 - **Stand:** P6 6b989ad…3e8b930 (`src/sim/clock.ts`, `night.ts`, `NIGHT_NPCS`, `SHOPS.night`, `Npc.closed/away`, Uhr im HUD) und Bot fa18c17 (`src/sim/pace.sim.ts`: Platzwechsel bei XP-Flaute; nachts geschlossene Läden → weiterjagen; `tools/pace-all.sh`). Von der Hauptsession geprüft: tsc, Lint, 441 Tests und Build grün, Golden-Snapshots unverändert. Im Spiel nur von den Sessions gesehen. Übergaben `bot-schleife-handoff.md` und die P6-Übergabe liegen im Notizordner.
 - **Pace (6 Seeds, Median L30):** P5-Stand 23,9 h → P6 mit altem Bot 29,3 h → P6 mit neuem Bot 32,9 h (Seed 99 über 40 h). Das Ziel 20–30 h ist verfehlt.
