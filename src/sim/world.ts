@@ -1751,7 +1751,7 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
   t.diedAt = w.tick;
   w.events.push({ type: 'died', id: t.id });
   if (t.kind === 'monster') onMonsterDeath(w, a, t);
-  else onPlayerDeath(w, t);
+  else onPlayerDeath(w, t, a.kind === 'player');
   return amount;
 }
 
@@ -2014,9 +2014,9 @@ export function namedPrice(id: string): number {
   return generateNamed(0, id).value * 3;
 }
 
-function onPlayerDeath(w: World, p: Actor): void {
+function onPlayerDeath(w: World, p: Actor, byPlayer = false): void {
   // Strafe nach Stufe (death.ts): XP nur aus dem aktuellen Level, nie darunter; Gold; Rucksack-Gegenstände. Angelegtes bleibt.
-  const rules = deathRules(p.level);
+  const rules = deathRules(p.level, byPlayer);
   const xpLost = Math.floor((p.xp - totalXpFor(p.level)) * rules.xpFrac);
   p.xp -= xpLost;
   const goldLost = Math.floor(p.gold * rules.goldFrac);

@@ -40,6 +40,30 @@ describe('Todesstrafe nach Stufe (P4)', () => {
     expect(dropCount(deathRules(3), 99)).toBe(0);
   });
 
+  it('Tod durch Spieler: nur Gold, keine XP, kein Rucksack', () => {
+    expect(deathRules(15, true)).toEqual({ xpFrac: 0, goldFrac: 0.1, itemFrac: 0, itemMax: 0 });
+    expect(deathRules(3, true).goldFrac).toBe(0);
+    const { w, p } = setup(15);
+    w.pvp = true;
+    p.gold = 400;
+    for (let i = 0; i < 4; i++) p.inventory.push(ring(w));
+    const xp = p.xp;
+    const killer = addPlayer(w, 'Mörder');
+    killer.x = 15;
+    killer.y = 15;
+    killer.damage = [9999, 9999];
+    p.x = 16;
+    p.y = 15;
+    w.safe = [];
+    drainEvents(w);
+    applyCommand(w, killer.id, { type: 'attack', targetId: p.id });
+    let e: GameEvent | undefined;
+    for (let i = 0; i < TICK_RATE * 5 && !e; i++) { tick(w); e = drainEvents(w).find((x) => x.type === 'deathPenalty'); }
+    expect(e).toMatchObject({ xpLost: 0, goldLost: 40 });
+    expect(p.xp).toBe(xp);
+    expect(p.inventory).toHaveLength(4);
+  });
+
   it('Stufe 3: kein Verlust an XP, Gold oder Rucksack', () => {
     const { w, p } = setup(3);
     p.gold = 500;

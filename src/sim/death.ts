@@ -21,10 +21,11 @@ export interface DeathRules {
 export const NEWBIE_SAFE_LEVEL = 5;
 export const MID_LEVEL = 10;
 
-export function deathRules(level: number): DeathRules {
+export function deathRules(level: number, pvp = false): DeathRules {
   if (level <= NEWBIE_SAFE_LEVEL) return { xpFrac: 0, goldFrac: 0, itemFrac: 0, itemMax: 0 };
-  if (level <= MID_LEVEL) return { xpFrac: 0.05, goldFrac: 0.05, itemFrac: 0.1, itemMax: 1 };
-  return { xpFrac: 0.1, goldFrac: 0.1, itemFrac: 0.1, itemMax: 3 };
+  const base: DeathRules = level <= MID_LEVEL ? { xpFrac: 0.05, goldFrac: 0.05, itemFrac: 0.1, itemMax: 1 } : { xpFrac: 0.1, goldFrac: 0.1, itemFrac: 0.1, itemMax: 3 };
+  // Tod durch einen Spieler (Realmud: XP 0, Rucksack 0, Ausrüstung 0, Gold 10 %): nur das Gold zählt
+  return pvp ? { ...base, xpFrac: 0, itemFrac: 0, itemMax: 0 } : base;
 }
 
 /** Verlierbar sind Waffen, Rüstung, Schmuck usw. Tränke, Edelsteine, benannte Funde und Unikate nie (D4O nimmt Sonderstücke aus Leichenhaufen aus). */

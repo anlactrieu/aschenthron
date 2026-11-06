@@ -36,11 +36,8 @@ Levelbereich MVP: 1–20 mit Platzhalter-XP-Kurve. Hub: Händler, Skill-Lehrer, 
 3. Mini-Server für dich und Freunde: Handel, Gruppen, Gilden
 4. PvP: Duelle, offene Welt mit PK-Regeln, Gildenkriege
 
-## Todesstrafe (entschieden: mittel)
-- ca. 5 % XP des aktuellen Levels weg (nie Level-Verlust unter Schwelle, Feinjustierung beim Balancing)
-- 1–3 zufällige Items fallen an der Todesstelle, bevorzugt nicht Ausgerüstetes
-- Respawn in der Stadt, Leichenlauf zum Einsammeln der Items (zeitlich begrenzt)
-- Safe-Zonen in Städten
+## Todesstrafe (entschieden: mittel; seit P4 durch D4O-nahe Regeln ersetzt)
+Gilt jetzt nach Stufe gestaffelt, mit Gold, Besitzersperre am Leichenhaufen und PvP-Sonderfall; Regeln und Quellen siehe „Umsetzungsstand P4“ weiter unten. Unverändert: Respawn in der Stadt, Leichenlauf 5 Minuten, Safe-Zonen in Städten, Angelegtes bleibt.
 
 ## Charakter (entschieden)
 - 5 Attribute: Kraft, Gewandtheit, Ausdauer, Verstand, Willenskraft (eigene Formeln, eigene Namen im Spiel prüfen)
@@ -589,6 +586,7 @@ Noch offen: 6 Fertigkeiten, 7 Wegweiser, 8 zweite Insel (siehe unten).
 | ab 11 | 10 % der XP dieses Levels | 10 % | 10 % (aufgerundet, mind. 1), max. 3 | 0 |
 
 - XP = Anteil dessen, was seit dem letzten Aufstieg gesammelt wurde (nie unter die Stufenschwelle, wie T4C „current level experience“). Das ersetzt die frühere Regel „5 % der Stufenspanne“ (im Mittel gleich groß, bei frisch erreichter Stufe milder).
+- **Tod durch einen Spieler (PvP):** nur Gold (Realmud: XP 0, Rucksack 0, Ausrüstung 0, Gold 10 %), gleiche Stufenstaffelung (`deathRules(level, pvp)`, Test in `death.test.ts`). Der Pace-Bot kämpft nie gegen Spieler.
 - Gold geht wie bei T4C verloren (kein Haufen, bewusst: Goldsenke, keine Änderung an `GroundItem`).
 - Rucksack-Gegenstände fallen an der Todesstelle als **Leichenhaufen** (Leichenlauf wie bisher 5 Minuten), die ersten **60 s nur für den Besitzer** (`GroundItem.owner/ownerUntil`, `isLocked`, geprüft bei `pickup` und `tryPickup`).
 - **Nie verloren:** Angelegtes, Tränke (Rollen und Heiltränke retten den Leichenlauf), Edelsteine, **benannte Funde** und Unikate (D4O nimmt Sonderstücke aus Leichenhaufen aus; bei fester, benannter Beute wäre ein Verlust zu hart).
@@ -606,7 +604,7 @@ Noch offen: 6 Fertigkeiten, 7 Wegweiser, 8 zweite Insel (siehe unten).
 | 12 | 22,7 h / 54 | 22,9 h / 55 |
 | 13 | 22,3 h / 67 | 24,7 h / 73 |
 
-Median vorher 23,8 h (Seed 11 als „über 40 h“ gezählt), nachher 24,0 h. Nur Todesstrafe (Zwischenmessung): Seed 2024 25,8 h, Seed 7 27,9 h. **Befund:** Die zwei Ausreißer (2024, 99) sind Bot-Schleifen, kein Balance-Effekt: Seed 2024 sitzt von Minute 172 bis 636 auf Stufe 13 bei (22,65) im Räuberlager und tötet nur den nachspawnenden Champion „Blutsaugender Räuber“ (L10); Gold steigt, XP kaum. Der Bot wählt das nächste Ziel in `[Stufe−4, Stufe+1]` und verlässt so einen Platz nie. Dieselbe Falle hat in der Vorher-Messung Seed 11 getroffen. Einzeln abgeschaltete Teile (Ruf, Flucht, Gefahrenorte) brachten Stufe 20 nach 482–568 min (Seeds 2024/99) und bei Seed 99 L30 nach 26,2–28,8 h (Seed 2024 lief nur 18 h); der Verursacher ist nicht eindeutig, weil jede Änderung den Zufallsstrom verschiebt. Der Bot wurde bewusst nicht geändert (Vergleichbarkeit). Todesstrafe und KI machen den Bot im Schnitt etwas langsamer und sterben lassen ihn öfter, das Ziel 20–30 h hält im Median.
+Median vorher 23,8 h (Seed 11 als „über 40 h“ gezählt), nachher 24,0 h. Nur Todesstrafe (Zwischenmessung): Seed 2024 25,8 h, Seed 7 27,9 h. **Befund:** Zählung: nachher 2 von 6 Seeds über 30 h (2024, 99), vorher 1 von 6 (Seed 11, hing). Bei Seed 2024 ist eine Bot-Schleife nachgewiesen, kein Balance-Effekt: Seed 2024 sitzt von Minute 172 bis 636 auf Stufe 13 bei (22,65) im Räuberlager und tötet nur den nachspawnenden Champion „Blutsaugender Räuber“ (L10); Gold steigt, XP kaum. Der Bot wählt das nächste Ziel in `[Stufe−4, Stufe+1]` und verlässt so einen Platz nie. Der Vorher-Lauf von Seed 11 hing ebenfalls (über 40 h, 6 Tode); die Ursache dort wurde nicht untersucht, für Seed 99 ist die Schleife nur vermutet. Einzeln abgeschaltete Teile (Ruf, Flucht, Gefahrenorte) brachten Stufe 20 nach 482–568 min (Seeds 2024/99) und bei Seed 99 L30 nach 26,2–28,8 h (Seed 2024 lief nur 18 h); der Verursacher ist nicht eindeutig, weil jede Änderung den Zufallsstrom verschiebt. Der Bot wurde bewusst nicht geändert (Vergleichbarkeit). Todesstrafe und KI machen den Bot im Schnitt etwas langsamer und sterben lassen ihn öfter, das Ziel 20–30 h hält im Median.
 
 **Gegner-KI (`world.ts`, Werte `data.ts`, Tests `ai.test.ts`).** `MonsterKind.calls/flees`. **Ruf** (`callForHelp`, in `alertPack`): ein Rufer (Goblins, Häuptling/Kriegsherr/Brecher/Schamane, Banditen, Hauptmann) holt beim ersten Kontakt gleichartige Rufer derselben Beutegruppe im Umkreis `CALL_RANGE` 12 (auch aus anderen Rudeln), je Rufer alle 20 s, Ereignis `call` → Sprechblase „Zu mir!“ mit Ring. **Flucht** (`fleeStep`): nur Goblin, Kundschafter, Krieger, Schütze, Räuberlehrling, Wegelagerer, Räuberschütze, Räuber, nur einmal je Leben, unter 25 % Leben, 8 s Richtung Heimat (`autoAttack` aus, Ziel bleibt), danach zurück in den Kampf, Ereignis `flee` → „Rückzug!“. Nie: Untote, Bosse, Unikate, Champions, Häuptlinge, Beschwörungen (Test). Feste Schwellen und Ticks, kein Zufall; Mehrspieler: Events laufen über `makeSnapshot` (`call`/`flee` nach Sichtbarkeit).
 
@@ -618,4 +616,6 @@ Median vorher 23,8 h (Seed 11 als „über 40 h“ gezählt), nachher 24,0 h. Nu
 
 **Im Spiel geprüft** (Dev-Build `vite build --mode development`, eigener Port 5191, Browser-Pane; Bildrate im versteckten Pane niedrig, Schritte per `__game.step`): Hover am Schreckenswolf (Lv 11) bei Spielerstufe 3/6/8/10/12/17 → rot „tödlich“, orange „gefährlich“, gelb „etwas stärker“, weiß „ebenbürtig“, grau „harmlos“ (Farbwerte aus dem Label gelesen); Goblin bei 1 Leben: „Rückzug!“, Goblin eines anderen Rudels schließt sich an: „Zu mir!“; Tod auf Stufe 17: −500 XP, −90 Gold, 1 Ring am Todesort mit 60-s-Sperre und 5-min-Frist, nach Rücklauf wieder im Rucksack; „?“ über Hauptmann Brandt bei erledigtem `h_rot1`.
 
-**Offen / Mängel.** Kein Death Timer und keine Wiederbelebung durch NPC; Gefahrenorte ohne Gerüchte in Gesprächen und ohne Kartenzeichen; nur zwei Orte (Düsterwald-Eingang ist wegen `p3.test.ts` frei geblieben); Gold-Verlust ohne Haufen; Bot-Schleife siehe oben (Messung streut stark, 8 Seeds wären besser als 6); die „kämpfende Wachpatrouille“ aus P5 ist nicht Teil von P4 geworden; Rufen und Fliehen im Mehrspieler nur im Sim-Test, nicht mit echtem Server geprüft.
+**Golden-Snapshots:** keine hat sich geändert (`git diff 97d959b..HEAD -- src/sim/__snapshots__` leer), also nichts zu aktualisieren; geänderte Tests: `game.test.ts` (Stufe der Todes-Tests angehoben, weil Stufe 1–5 jetzt verlustfrei ist).
+
+**Offen / Mängel.** Namensfarben von Champions, Unikaten und Bossen sind beim Zeigen durch die Gefahrenfarbe ersetzt (Aura bleibt); Landmarke lm6 lehrt das Stichwort `rotschal` direkt (Einstieg in „Rotschals Handel“ ohne Odda, bewusst als zweiter Weg); „?“-Marker nur an Brandt (Typ `quest`) geprüft, nicht an einem Geber ohne Auftragsliste; Kein Death Timer und keine Wiederbelebung durch NPC; Gefahrenorte ohne Gerüchte in Gesprächen und ohne Kartenzeichen; nur zwei Orte (Düsterwald-Eingang ist wegen `p3.test.ts` frei geblieben); Gold-Verlust ohne Haufen; Bot-Schleife siehe oben (Messung streut stark, 8 Seeds wären besser als 6); die „kämpfende Wachpatrouille“ aus P5 ist nicht Teil von P4 geworden; Rufen und Fliehen im Mehrspieler nur im Sim-Test, nicht mit echtem Server geprüft.
