@@ -1395,7 +1395,7 @@ export class Ui {
       'Oben rechts steht dein nächster Schritt; „Hinlaufen“ führt dich dorthin.',
       `C: Attribute verteilen · K: Fertigkeiten lernen · ${keyLabel(keyOf('heal'))}/${keyLabel(keyOf('mana'))}: Tränke · ${keyLabel(keyOf('rest'))}: rasten · 1–9: Fertigkeiten.`,
       'Gegenstände im Rucksack: Doppelklick legt an oder benutzt, Ziehen verschiebt. Ein grünes ▲ zeigt eine Verbesserung.',
-      'Stirbst du, erwachst du in der Stadt; Rucksack-Beute liegt 5 Minuten an der Todesstelle, Angelegtes bleibt.',
+      'Stirbst du, erwachst du in der Stadt. Bis Stufe 5 kostet es nichts, danach XP und Gold (5 %, ab Stufe 11 je 10 %) und ein paar Rucksack-Gegenstände, die 5 Minuten an der Todesstelle liegen. Angelegtes, Tränke und benannte Funde bleiben.',
       'Ist der Rucksack zu schwer: verkaufen, einlagern (Lager-Truhe) oder Kraft steigern.',
     ]) body.append(el('div', 'a-note', `• ${t}`));
     body.append(el('div', 'a-sec', 'Anzeige und Ton'));

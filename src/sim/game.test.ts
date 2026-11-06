@@ -89,7 +89,7 @@ describe('Charakter und Leveln (M3)', () => {
 describe('Todesstrafe (M4)', () => {
   it('XP-Verlust ohne Levelverlust, Items fallen, Respawn in der Stadt', () => {
     const { w, p } = fresh();
-    gainXp(w, p, totalXpFor(4) + 20);
+    gainXp(w, p, totalXpFor(12) + 20);
     const lvl = p.level;
     for (let i = 0; i < 5; i++) p.inventory.push(generateItem(w.rng, w.nextId++, 'iron_ring', 'normal'));
     p.x = 10;
@@ -116,6 +116,7 @@ describe('Todesstrafe (M4)', () => {
 
   it('Items am Leichenort verfallen nach 5 Minuten', () => {
     const { w, p } = fresh();
+    gainXp(w, p, totalXpFor(7));
     p.inventory.push(generateItem(w.rng, w.nextId++, 'iron_ring', 'normal'));
     p.x = 10;
     p.y = 10;

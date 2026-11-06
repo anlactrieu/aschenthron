@@ -3,12 +3,13 @@ import { findPath, isWalkable, type Grid, type Pt } from './path';
 import { itemReq, itemAffixes, gemTemplateId, handsOf, weaponSpeedOf, rollGem, rollUniqueSpecial, rollWorldDrop, rollWorldSpecial, rollPotion, rollSpecial, templateById, generateItem, generateNamed, rollNamed, rollBase, rollLoot, rerollAffixes, extendAffixes, SETS, type GemInfo, type Item, type PowerId, type SetBonus, type EquipSlot, type Stat } from './items';
 import {
   ATTR_KEYS, ATTR_NAME, xpToNext, questXp, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, skillReq, skillRankOf, ACTIVE_POWER, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
-  monsterKind, npcKeyOf, isGiverOf, lootGroupOf, LOOT_GROUPS, KILL_GOALS, LEVEL_TITLES, type LootGroup, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, NAMED_SHARE, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
+  monsterKind, CALL_RANGE, CALL_COOLDOWN, FLEE_HP, FLEE_TICKS, npcKeyOf, isGiverOf, lootGroupOf, LOOT_GROUPS, KILL_GOALS, LEVEL_TITLES, type LootGroup, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, NAMED_SHARE, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
   FAMILY_RES, MELEE_SKILL_KRAFT_SCALE, MAX_RES, SLOW_FACTOR, STATUS_IDS, PASSIVE_CAP, DMG_NAME, type DmgType, type StatusId, type SkillDef, type PassiveKey,
   ATTR_THRESHOLD, ATTR_THRESHOLD_2, ATTR_THRESHOLD_BONUS, LEVEL_MILESTONES, milestonePoints, WILL_RES_PER_2, WILL_STATUS_PER_POINT, WILL_STATUS_CAP, GEM_MIN_LEVEL, GEM_DROP, GEM_SOCKET_COST, WORLD_BOSS_LOOT, type QuestDef,
 } from './data';
 import { EFFECTS, cleanse, controlDr, dispel, mergeStatus } from './effects';
 import { NAMED } from './named';
+import { CORPSE_OWNER_TICKS, deathRules, dropCount, droppable } from './death';
 import { answerOf, canAsk, keywordLabel, learnedFrom } from './topics';
 
 export const TICK_RATE = 20;
@@ -183,6 +184,10 @@ export interface Actor {
   lastHitAt: number;
   /** Rudel-Kennung (0 = Einzelgänger): Rudelmitglieder greifen gemeinsam an */
   packId: number;
+  /** KI (P4): frühester Tick für den nächsten Hilferuf; Flucht bis `fleeUntil`, `fled` = in diesem Leben schon geflohen */
+  callAt?: number;
+  fleeUntil?: number;
+  fled?: boolean;
   /** Lager-Kennung (nur Besatzung eines Lagers) */
   campId?: string;
   /** Champion-Modifikator und Mini-Boss-Kennung */
@@ -216,6 +221,9 @@ export interface GroundItem {
   y: number;
   item: Item;
   expiresAt: number | null;
+  /** Leichenhaufen: nur der Besitzer darf bis `ownerUntil` aufheben */
+  owner?: number;
+  ownerUntil?: number;
 }
 
 export interface Rect {
@@ -294,7 +302,7 @@ type GameEventBase =
   | { type: 'levelUp'; level: number }
   | { type: 'gold'; amount: number }
   | { type: 'learned'; skillId: string; rank?: number }
-  | { type: 'deathPenalty'; xpLost: number; dropped: Item[] }
+  | { type: 'deathPenalty'; xpLost: number; goldLost: number; dropped: Item[] }
   | { type: 'respawned' }
   | { type: 'teleported' }
   | { type: 'potion'; item: Item }
@@ -312,6 +320,8 @@ type GameEventBase =
   | { type: 'miss'; attackerId: number; targetId: number }
   | { type: 'telegraph'; x: number; y: number; r: number; ms: number }
   | { type: 'summon'; id: number }
+  | { type: 'call'; id: number }
+  | { type: 'flee'; id: number }
   | { type: 'mheal'; id: number; targetId: number; amount: number }
   | { type: 'charge'; id: number }
   | { type: 'respecced' }
@@ -880,6 +890,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
     case 'pickup': {
       const g = w.ground.find((x) => x.id === cmd.groundId);
       if (!g) return;
+      if (isLocked(w, g, a)) return fail(w, 'Das ist die Beute eines anderen Gefallenen.');
       a.targetId = null;
       a.pickupId = g.id;
       a.path = findPath(w.grid, { x: Math.round(a.x), y: Math.round(a.y) }, { x: g.x, y: g.y });
@@ -1993,25 +2004,23 @@ export function namedPrice(id: string): number {
 }
 
 function onPlayerDeath(w: World, p: Actor): void {
-  // XP-Verlust: 5 % der Spanne des aktuellen Levels, nie unter die Level-Schwelle
-  const span = totalXpFor(Math.min(p.level + 1, MAX_LEVEL)) - totalXpFor(Math.min(p.level, MAX_LEVEL - 1));
-  const floor = totalXpFor(p.level);
-  const xpLost = Math.max(0, Math.min(p.xp - floor, Math.floor(span * 0.05)));
+  // Strafe nach Stufe (death.ts): XP nur aus dem aktuellen Level, nie darunter; Gold; Rucksack-Gegenstände. Angelegtes bleibt.
+  const rules = deathRules(p.level);
+  const xpLost = Math.floor((p.xp - totalXpFor(p.level)) * rules.xpFrac);
   p.xp -= xpLost;
-  // 1–3 Items aus dem Rucksack fallen; Angelegtes geht nie verloren
-  const count = w.rng.int(1, 3);
+  const goldLost = Math.floor(p.gold * rules.goldFrac);
+  p.gold -= goldLost;
   const dropped: Item[] = [];
-  for (let i = 0; i < count; i++) {
-    const pool = p.inventory;
-    if (!pool.length) break;
-    const it = pool[w.rng.int(0, pool.length - 1)]!;
+  const pool = p.inventory.filter(droppable);
+  for (let n = dropCount(rules, pool.length); n > 0; n--) {
+    const it = pool.splice(w.rng.int(0, pool.length - 1), 1)[0]!;
     dropped.push(it);
     p.inventory = p.inventory.filter((x) => x.id !== it.id);
   }
   const x = Math.round(p.x);
   const y = Math.round(p.y);
-  for (const item of dropped) w.ground.push({ id: w.nextId++, x, y, item, expiresAt: w.tick + CORPSE_LOOT_TTL });
-  w.events.push({ type: 'deathPenalty', xpLost, dropped, to: p.id });
+  for (const item of dropped) w.ground.push({ id: w.nextId++, x, y, item, expiresAt: w.tick + CORPSE_LOOT_TTL, owner: p.id, ownerUntil: w.tick + CORPSE_OWNER_TICKS });
+  w.events.push({ type: 'deathPenalty', xpLost, goldLost, dropped, to: p.id });
   // Respawn in der Stadt
   const town = w.towns.length
     ? w.towns.reduce((best, t) => (Math.hypot(t.x - p.x, t.y - p.y) < Math.hypot(best.x - p.x, best.y - p.y) ? t : best))
@@ -2243,6 +2252,8 @@ function reviveMonster(w: World, m: Actor): void {
   if (m.campId) { const cp = w.camps.find((x) => x.id === m.campId); if (cp) cp.cleared = false; }
   m.patrolling = false;
   m.patrolSeq = -1;
+  m.fled = false;
+  m.fleeUntil = undefined;
   m.hp = m.maxHp;
   m.x = m.home!.x;
   m.y = m.home!.y;
@@ -2264,14 +2275,51 @@ function reviveMonster(w: World, m: Actor): void {
 
 /** Rudelmitglieder in der Nähe greifen dasselbe Ziel an. */
 function alertPack(w: World, m: Actor, targetId: number): void {
-  if (!m.packId) return;
-  for (const o of w.actors) {
+  for (const o of m.packId ? w.actors : []) {
     if (o.kind === 'monster' && o.alive && o.packId === m.packId && o.targetId === null && o.id !== m.id && Math.hypot(o.x - m.x, o.y - m.y) <= PACK_ALERT_RANGE) {
       o.targetId = targetId;
       o.patrolling = false;
       o.autoAttack = true;
     }
   }
+  callForHelp(w, m, targetId);
+}
+
+/** Goblins und Banditen rufen beim ersten Kontakt gleichartige Gegner im Umkreis (auch aus anderen Rudeln); je Rufer nur alle CALL_COOLDOWN Ticks. Feste Schwellen, kein Zufall. */
+function callForHelp(w: World, m: Actor, targetId: number): void {
+  if (!m.kindId || !monsterKind(m.kindId).calls || w.tick < (m.callAt ?? 0)) return;
+  const group = lootGroupOf(m.kindId);
+  let heard = 0;
+  for (const o of w.actors) {
+    if (o.kind !== 'monster' || !o.alive || o.id === m.id || o.targetId !== null || !o.kindId || !monsterKind(o.kindId).calls) continue;
+    if (lootGroupOf(o.kindId) !== group || Math.hypot(o.x - m.x, o.y - m.y) > CALL_RANGE) continue;
+    o.targetId = targetId;
+    o.patrolling = false;
+    o.autoAttack = true;
+    heard++;
+  }
+  if (!heard) return;
+  m.callAt = w.tick + CALL_COOLDOWN;
+  w.events.push({ type: 'call', id: m.id });
+}
+
+/** Flucht bei wenig Leben: einmal je Leben, Richtung Heimat, danach zurück in den Kampf. Bosse, Champions und Unikate bleiben. */
+function fleeStep(w: World, m: Actor): boolean {
+  if (!m.kindId || !m.home || m.boss || m.unique || m.champ || m.summonedBy) return false;
+  if (m.fleeUntil !== undefined && w.tick >= m.fleeUntil) {
+    m.fleeUntil = undefined;
+    m.autoAttack = true;
+    return false;
+  }
+  if (m.fleeUntil === undefined) {
+    if (m.fled || !monsterKind(m.kindId).flees || m.hp >= m.maxHp * FLEE_HP) return false;
+    m.fled = true;
+    m.fleeUntil = w.tick + FLEE_TICKS;
+    m.autoAttack = false;
+    m.path = findPath(w.grid, { x: Math.round(m.x), y: Math.round(m.y) }, m.home);
+    w.events.push({ type: 'flee', id: m.id });
+  }
+  return true;
 }
 
 /** Legt für jedes Rudel (Rudel-Id > 0, ohne Bosse und Mini-Bosse) 1–2 Wegpunkte im Umkreis des Rudelplatzes fest; Nutzt nur den Zufallsstrom `fx`. */
@@ -2387,6 +2435,7 @@ function monsterAi(w: World, m: Actor, players: Actor[]): void {
     patrolStep(w, m);
     return;
   }
+  if (fleeStep(w, m)) return;
   const t = getActor(w, m.targetId);
   const lost = !t || !t.alive || (inSafeZone(w, t.x, t.y) && t.pkUntil <= w.tick) || Math.hypot(m.x - home.x, m.y - home.y) > LEASH;
   if (lost) {
@@ -2514,6 +2563,11 @@ function openChest(w: World, a: Actor, c: Chest): void {
   }
 }
 
+/** Leichenhaufen gehören ihrem Besitzer, solange die Sperre läuft. */
+function isLocked(w: World, g: GroundItem, a: Actor): boolean {
+  return g.owner !== undefined && g.owner !== a.id && (g.ownerUntil ?? 0) > w.tick;
+}
+
 function tryPickup(w: World, a: Actor): void {
   const g = w.ground.find((x) => x.id === a.pickupId);
   if (!g) {
@@ -2526,6 +2580,10 @@ function tryPickup(w: World, a: Actor): void {
   }
   a.pickupId = null;
   a.path = [];
+  if (isLocked(w, g, a)) {
+    w.events.push({ type: 'fail', reason: 'Das ist die Beute eines anderen Gefallenen.', to: a.id });
+    return;
+  }
   if (carriedWeight(a) + g.item.weight > carryCapacity(a)) {
     w.events.push({ type: 'tooHeavy', item: g.item, to: a.id });
     return;

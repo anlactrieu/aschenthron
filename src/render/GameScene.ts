@@ -1355,7 +1355,7 @@ export class GameScene extends Phaser.Scene {
         }
         case 'deathPenalty':
           this.achBump('deaths');
-          say(`Du bist gestorben: −${e.xpLost} XP. ${e.dropped.length ? `${e.dropped.length} Gegenstand/Gegenstände aus dem Rucksack liegen an der Todesstelle – hol sie innerhalb von 5 Minuten zurück. ` : ''}Angelegte Ausrüstung bleibt immer erhalten.`);
+          say(`Du bist gestorben${e.xpLost || e.goldLost ? `: −${e.xpLost} XP, −${e.goldLost} Gold` : ' – auf deiner Stufe noch ohne Verlust'}. ${e.dropped.length ? `${e.dropped.length} Gegenstand/Gegenstände aus dem Rucksack liegen an der Todesstelle – hol sie innerhalb von 5 Minuten zurück (die ersten 60 s nur du). ` : ''}Angelegte Ausrüstung, Tränke und benannte Funde bleiben immer bei dir.`);
           if (this.achv.stats.deaths <= 1) say('Tipp: Du erwachst in der Stadt. Rasten (R) und Tränke (Q/E) retten dich im Kampf; fliehen ist keine Schande.');
           this.sfx.death();
           this.cameras.main.shake(300, 0.008);

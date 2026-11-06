@@ -134,7 +134,7 @@ export function makeSnapshot(w: World, you: Actor, events: GameEvent[]): Snapsho
       case 'loot': return near({ x: e.x, y: e.y }, you);
       case 'telegraph': return near({ x: e.x, y: e.y }, you);
       case 'miss': return byId.has(e.targetId) || e.targetId === you.id || e.attackerId === you.id;
-      case 'summon': case 'charge': return byId.has(e.id) || e.id === you.id;
+      case 'summon': case 'charge': case 'call': case 'flee': return byId.has(e.id) || e.id === you.id;
       case 'mheal': return byId.has(e.targetId);
       case 'chestOpened': case 'worldBoss': return true;
       default: return false;

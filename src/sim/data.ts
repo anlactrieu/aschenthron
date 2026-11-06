@@ -160,6 +160,10 @@ export interface MonsterKind {
   summonKind?: string;
   /** Schadensart der Angriffe (Standard physisch) */
   dmgType?: DmgType;
+  /** Ruft beim ersten Kontakt gleichartige Gegner in `CALL_RANGE` zu Hilfe (Goblins, Banditen) */
+  calls?: boolean;
+  /** Flieht einmal bei wenig Leben (nie Untote, Bosse, Häuptlinge) */
+  flees?: boolean;
 }
 
 /** Zentrale Skalierung: alle Monsterwerte folgen diesen Formeln (Balancing-Regler). */
@@ -177,10 +181,15 @@ const MOVE_SLOW = 0.85;
 const MOVE_FAST = 0.93;
 /** Aggro-Radius normaler Monster höchstens so groß, damit Bogenschützen (Reichweite 9) zuerst schießen. */
 const AGGRO_MAX = 5;
+/** Gegner-KI (P4): Ruf-Reichweite, Fluchtschwelle (Anteil Leben) und Fluchtdauer in Ticks. */
+export const CALL_RANGE = 12;
+export const CALL_COOLDOWN = 20 * 20;
+export const FLEE_HP = 0.25;
+export const FLEE_TICKS = 20 * 8;
 
 function mk(
   id: string, name: string, level: number, family: MonsterFamily, color: number,
-  o: { speed?: number; cd?: number; aggro?: number; hp?: number; dmg?: number; boss?: boolean; drop?: number; abil?: Ability[]; summon?: string; dt?: DmgType } = {},
+  o: { speed?: number; cd?: number; aggro?: number; hp?: number; dmg?: number; boss?: boolean; drop?: number; abil?: Ability[]; summon?: string; dt?: DmgType; calls?: boolean; flees?: boolean } = {},
 ): MonsterKind {
   const hpM = (o.hp ?? 1) * (o.boss ? SCALE.bossHp : 1);
   const dmgM = (o.dmg ?? 1) * (o.boss ? SCALE.bossDmg : 1);
@@ -199,6 +208,8 @@ function mk(
     abilities: o.abil,
     summonKind: o.summon,
     dmgType: o.dt,
+    ...(o.calls ? { calls: true } : {}),
+    ...(o.flees ? { flees: true } : {}),
   };
 }
 
@@ -215,20 +226,20 @@ export const MONSTERS: MonsterKind[] = [
   mk('shadow_wolf', 'Schattenwolf', 19, 'beast', 0x4a4a62, { speed: 0.125, hp: 0.9, cd: 16 }),
   mk('night_stalker', 'Nachtjäger', 24, 'beast', 0x3a3a52, { speed: 0.13, hp: 1.1, cd: 15, dmg: 1.15 }),
   // Goblins
-  mk('goblin', 'Goblin', 2, 'humanoid', 0x6a9a4a, { hp: 0.9 }),
-  mk('goblin_scout', 'Goblinkundschafter', 4, 'humanoid', 0x7ab05a, { speed: 0.115, hp: 0.9 }),
-  mk('goblin_warrior', 'Goblinkrieger', 8, 'humanoid', 0x5a8a3a, { hp: 1.25, dmg: 1.1 }),
-  mk('goblin_shaman', 'Goblinschamane', 10, 'humanoid', 0x8ac06a, { hp: 0.85, dmg: 1.25, abil: ['cast', 'heal', 'ward'], dt: 'fire' }),
-  mk('goblin_archer', 'Goblinschütze', 5, 'humanoid', 0x7ab05a, { hp: 0.8, dmg: 0.9, cd: 24, abil: ['archer'] }),
-  mk('goblin_chief', 'Goblinhäuptling', 13, 'humanoid', 0x4a7a2a, { hp: 1.8, dmg: 1.2, cd: 22 }),
-  mk('goblin_brute', 'Goblinbrecher', 11, 'humanoid', 0x4f7f30, { hp: 1.4, dmg: 1.15, cd: 22 }),
-  mk('goblin_warlord', 'Goblinkriegsherr', 12, 'humanoid', 0x3f6f28, { hp: 1.6, dmg: 1.2, cd: 22 }),
+  mk('goblin', 'Goblin', 2, 'humanoid', 0x6a9a4a, { hp: 0.9, calls: true, flees: true }),
+  mk('goblin_scout', 'Goblinkundschafter', 4, 'humanoid', 0x7ab05a, { speed: 0.115, hp: 0.9, calls: true, flees: true }),
+  mk('goblin_warrior', 'Goblinkrieger', 8, 'humanoid', 0x5a8a3a, { hp: 1.25, dmg: 1.1, calls: true, flees: true }),
+  mk('goblin_shaman', 'Goblinschamane', 10, 'humanoid', 0x8ac06a, { hp: 0.85, dmg: 1.25, abil: ['cast', 'heal', 'ward'], dt: 'fire', calls: true }),
+  mk('goblin_archer', 'Goblinschütze', 5, 'humanoid', 0x7ab05a, { hp: 0.8, dmg: 0.9, cd: 24, abil: ['archer'], calls: true, flees: true }),
+  mk('goblin_chief', 'Goblinhäuptling', 13, 'humanoid', 0x4a7a2a, { hp: 1.8, dmg: 1.2, cd: 22, calls: true }),
+  mk('goblin_brute', 'Goblinbrecher', 11, 'humanoid', 0x4f7f30, { hp: 1.4, dmg: 1.15, cd: 22, calls: true }),
+  mk('goblin_warlord', 'Goblinkriegsherr', 12, 'humanoid', 0x3f6f28, { hp: 1.6, dmg: 1.2, cd: 22, calls: true }),
   // Banditen
-  mk('bandit_novice', 'Räuberlehrling', 3, 'humanoid', 0xb06a4a),
-  mk('highwayman', 'Wegelagerer', 7, 'humanoid', 0xa05a3a, { dmg: 1.1 }),
-  mk('bandit_archer', 'Räuberschütze', 6, 'humanoid', 0xa07a4a, { hp: 0.8, dmg: 0.95, cd: 24, abil: ['archer'] }),
-  mk('bandit', 'Räuber', 10, 'humanoid', 0x905030, { hp: 1.15, dmg: 1.15 }),
-  mk('bandit_captain', 'Räuberhauptmann', 13, 'humanoid', 0x7a3a2a, { hp: 1.7, dmg: 1.25 }),
+  mk('bandit_novice', 'Räuberlehrling', 3, 'humanoid', 0xb06a4a, { calls: true, flees: true }),
+  mk('highwayman', 'Wegelagerer', 7, 'humanoid', 0xa05a3a, { dmg: 1.1, calls: true, flees: true }),
+  mk('bandit_archer', 'Räuberschütze', 6, 'humanoid', 0xa07a4a, { hp: 0.8, dmg: 0.95, cd: 24, abil: ['archer'], calls: true, flees: true }),
+  mk('bandit', 'Räuber', 10, 'humanoid', 0x905030, { hp: 1.15, dmg: 1.15, calls: true, flees: true }),
+  mk('bandit_captain', 'Räuberhauptmann', 13, 'humanoid', 0x7a3a2a, { hp: 1.7, dmg: 1.25, calls: true }),
   // Spinnen
   mk('forest_spider', 'Waldspinne', 4, 'spider', 0x3a3a48, { speed: 0.115, hp: 0.9, abil: ['poisonBite'] }),
   mk('venom_spider', 'Giftspinne', 9, 'spider', 0x3a5a3a, { speed: 0.115, hp: 0.95, dmg: 1.15, abil: ['poisonBite'], dt: 'poison' }),
