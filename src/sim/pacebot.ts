@@ -119,6 +119,11 @@ export class StuckWatch {
 
   ignored = (w: Pick<World, 'tick'>, id: number): boolean => (this.ignore.get(id) ?? 0) > w.tick;
 
+  /** Angriff abgelehnt (z. B. Spieler steht noch in der Stadt): Ziel für diese Runde meiden, damit der Bot weiterläuft */
+  reject(w: Pick<World, 'tick'>, id: number, tickRate: number): void {
+    this.ignore.set(id, w.tick + 10 * tickRate);
+  }
+
   /** Jeden Schritt aufrufen; `true` = Ziel verwerfen (Bot soll neu wählen) */
   step(w: World, p: Actor, tickRate: number): boolean {
     if (!repaired(this.bot)) return false;

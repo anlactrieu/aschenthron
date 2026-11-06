@@ -154,7 +154,10 @@ describe('Level-Tempo (Messung)', () => {
         continue;
       }
       const target = pickTarget(w, p, { bot: BOT, free: (a) => !spots.banned(w, a.x, a.y) && !stuck.ignored(w, a.id), caution: care.caution });
-      if (target) applyCommand(w, p.id, { type: 'attack', targetId: target.id });
+      if (target) {
+        applyCommand(w, p.id, { type: 'attack', targetId: target.id });
+        if (p.targetId === null) stuck.reject(w, target.id, TICK_RATE);
+      }
     }
     const mins = (tk?: number) => (tk ? `${(tk / TICK_RATE / 60).toFixed(0)} min` : 'nicht erreicht');
     console.log(`PACE Level5 ${mins(reached[5])} | Level10 ${mins(reached[10])} | Level20 ${mins(reached[20])} | Level30 ${mins(reached[30])} | Tode ${deaths} | Stadtfahrten ${trips} | Endlevel ${p.level} | XP-Bedarf Cap ${totalXpFor(MAX_LEVEL)} | Spielzeit ${(w.tick / TICK_RATE / 3600).toFixed(1)} h | Hänger ${stuckCount} | Warten ${(waited / TICK_RATE / 60).toFixed(0)} min | Bot ${BOT} Nacht ${process.env.PACE_NIGHT === '0' ? 'aus' : 'an'} | Tode je Level ${JSON.stringify(deathLevels)}`);

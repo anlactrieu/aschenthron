@@ -236,3 +236,25 @@ describe('P2 Themen: Spielstand', () => {
     expect(Object.keys(c.p.quests)).toEqual(['h_rot1']);
   });
 });
+
+describe('Gerüchte (Gefahrenorte und Nachthändler)', () => {
+  it('jeder Gefahrenort wird in einem Stadtgespräch erwähnt', async () => {
+    const { DANGER_SPOTS } = await import('./data');
+    const all = Object.values(NPC_TOPICS).flatMap((n) => Object.values(n.topics).flatMap((a) => a.text));
+    for (const d of DANGER_SPOTS) expect(all.some((t) => t.includes(d.name.split(' ')[0]!) || t.includes(d.name)), d.id).toBe(true);
+  });
+  it('mindestens zwei Stadt-NPCs erwähnen Hehler Grau und Nachthändlerin Vess mit offenem Stichwort', () => {
+    const who = ['Händlerin Mirel', 'Händler Dorn'].filter((n) => {
+      const t = NPC_TOPICS[n]!;
+      return openKeys(n).some((k) => /Grau|Vess/.test(t.topics[k]?.text.join(' ') ?? ''));
+    });
+    expect(who.length).toBe(2);
+  });
+  it('das Gerücht ist im Gespräch abrufbar', () => {
+    const { w, p } = build();
+    ask(w, p, 'Hauptmann Brandt', 'roehricht');
+    expect(fails(w)).toHaveLength(0);
+    expect(canAsk('Hauptmann Brandt', 'roehricht', p.topics)).toBe(true);
+    expect(p.topics).toContain('roehricht');
+  });
+});

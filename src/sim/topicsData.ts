@@ -51,10 +51,11 @@ export const NPC_TOPICS: Record<string, NpcTopics> = {
   },
   // ------------------------------------------------------------ Aschenhafen
   'Hafenmeister Joren': {
-    open: 'Frag mich nach dem [[hafen|Hafen]], den [[wege|Wegen]] aus der Stadt oder dem [[nebel|Nebel]], der abends vom Wasser kommt.',
+    open: 'Frag mich nach dem [[hafen|Hafen]], den [[wege|Wegen]] aus der Stadt oder dem [[nebel|Nebel]], der abends vom Wasser kommt. Die Fischer reden außerdem über ein [[wolfsrudel|Wolfsrudel]].',
     topics: {
       hafen: { text: ['Aschenhafen lebt von dem, was die Schiffe nicht mehr bringen. Früher kamen Gewürze und Wolle, heute Flüchtlinge und Schmuggelware. Beides lade ich ab, ohne Fragen: Ein Hafenmeister, der Fragen stellt, lebt nicht lange.'] },
       wege: { text: ['Nach Osten führt die Handelsstraße zur [[felsenwacht|Felsenwacht]], ein langer Marsch durch Wald und Moor. Im Norden liegen die Roggenfelder, im Westen der Düsterwald. Bleib auf den Wegen, bis du Stufe zehn erreicht hast.'] },
+      wolfsrudel: { text: ['Im Wolfsbau, weit westlich der Straße, hat sich ein Rudel Schreckenswölfe eingegraben. Zwei Fischer sind dort einmal abgekommen, einer kam zurück. Wer vor Stufe zehn dort hineingeht, taugt nicht mehr zum Erzählen.'] },
       nebel: { text: ['Der Nebel kriecht seit dem Fall des Throns vom Wasser her. Die Fischer behaupten, er rieche nach Asche. Ich behaupte, er riecht nach Fisch, und bin trotzdem froh, wenn die Laternen brennen.'] },
       felsenwacht: { text: ['Die Felsenwacht ist unsere Schwesterstadt im Osten, eine Festung am Bergpass. Dort sitzt, wer mit Waffen mehr zu tun hat als mit Netzen. Wenn du Neuigkeiten willst, frag [[haldor|Haldor]] am Tor.'] },
       haldor: { text: ['Haldor steht seit Jahrzehnten am Tor der Felsenwacht und hört alles. Wer ihm zuhört, erfährt mehr als von jedem Ausrufer.'] },
@@ -91,10 +92,11 @@ export const NPC_TOPICS: Record<string, NpcTopics> = {
     },
   },
   'Händlerin Mirel': {
-    open: 'Ich handle mit [[waren|Waren]] und höre, was Kunden sonst keinem sagen, etwa über [[kundschaft|Kundschaft]], die lieber nachts kommt.',
+    open: 'Ich handle mit [[waren|Waren]] und höre, was Kunden sonst keinem sagen, etwa über [[kundschaft|Kundschaft]], die lieber nachts kommt. Und über den [[ladenschluss|Ladenschluss]].',
     topics: {
       waren: { text: ['Waffen für den Anfang, Tränke für den Notfall. Was du nicht brauchst, kaufe ich dir ab, nicht zum Höchstpreis, aber ehrlich. Die besten Stücke findest du bei den Bossen, nicht bei mir.'] },
       kundschaft: { text: ['Manche Kunden zahlen in alter Münze und fragen nie nach dem Wechselgeld. Ich frage nicht zurück. Nur dass ich zwei von ihnen nicht mehr sehe, macht mich nachdenklich.'] },
+      ladenschluss: { text: ['Bei Einbruch der Dunkelheit sperre ich zu, und alle Händler am Markt tun es mir nach. Wer nachts dringend Tränke braucht, geht zu Hehler Grau am Hafen. Der nimmt dafür mehr und fragt weniger. In der Felsenwacht soll eine Frau namens Vess dasselbe treiben.'] },
       schmugglerbuch: {
         minLevel: 10,
         tooLow: 'Ein Buch, das Räuberhauptleute führen, ist nichts für Anfänger. Komm wieder, wenn du ein paar Lager hinter dir hast.',
@@ -126,9 +128,10 @@ export const NPC_TOPICS: Record<string, NpcTopics> = {
     },
   },
   'Hauptmann Brandt': {
-    open: 'Die Wache sucht Hilfe gegen [[raeuber|Räuber]], [[goblins|Goblins]] und alles, was nachts schreit.',
+    open: 'Die Wache sucht Hilfe gegen [[raeuber|Räuber]], [[goblins|Goblins]] und alles, was nachts schreit. Im [[roehricht|Röhricht]] südlich der Straße soll sich eine Bande eingenistet haben.',
     topics: {
       raeuber: { text: ['Im Nordwesten liegt das Räuberlager, geführt von Harkon. Davor streifen Lehrlinge und Wegelagerer durch den Wald. Ohne Rüstung ist das kein Ausflug.'] },
+      roehricht: { text: ['Zwischen dem Schilf liegt das Räubernest mit einem Hauptmann und drei Schlägern. Die Händler nehmen lieber den langen Weg um das Röhricht herum. Ich schicke keine Rekruten hin, bevor sie nicht ihren ersten Schlag eingesteckt haben.'] },
       goblins: { text: ['Die Goblins graben, plündern und lieben Feuer. Das Beste gegen sie ist eine breite Straße und ein scharfes Schwert. Wer hundert von ihnen erlegt, dem schulde ich einen Krug.'] },
       rotschal: {
         minLevel: 4,
@@ -198,9 +201,10 @@ export const NPC_TOPICS: Record<string, NpcTopics> = {
     },
   },
   'Händler Dorn': {
-    open: 'Ich handle mit Waren für Fortgeschrittene und weiß, wer sie braucht: [[soeldner|Söldner]], [[jaeger|Jäger]] und Narren.',
+    open: 'Ich handle mit Waren für Fortgeschrittene und weiß, wer sie braucht: [[soeldner|Söldner]], [[jaeger|Jäger]] und Narren. Nach Sonnenuntergang kenne ich nur noch die [[spaetkunden|Spätkunden]].',
     topics: {
       soeldner: { text: ['Söldner zahlen schlecht und kaufen oft. Jäger zahlen gut und kaufen wenig. Narren zahlen immer, leider nur einmal.'] },
+      spaetkunden: { text: ['Wenn ich abends zusperre, öffnet in einer Seitengasse die Nachthändlerin Vess. Ihre Ware kommt von Toten, ihre Preise von Lebenden. Wer in der Dunkelheit Ringe, Anhänger oder starke Tränke sucht, findet sie dort. Im Hafen im Westen hockt ein Kerl namens Grau, der dasselbe tut.'] },
       jaeger: { text: ['Die Jäger der Felsenwacht gehen ins Hochland, wo die Trolle brüllen. Wer von dort lebend zurückkommt, kauft bei mir den besten Bogen.'] },
     },
   },

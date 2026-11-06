@@ -2,9 +2,9 @@ import { assignHotbar, HOTBAR_SLOTS, hotbarFor } from './hotbar';
 import { skillReq, SPECS, SPEC_LEVEL, NPC_ROLE, npcKeyOf, ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_2, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, STATUS_IDS, SCHOOL_NAME, schoolOf, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, questXp, MAX_LEVEL, monsterKind, uniqueDef, LOOT_GROUPS, KILL_GOALS, UNIQUES, MONSTERS, NPC_LORE, NPC_TOPICS, isGiverOf, type QuestDef, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
 import { NAMED } from '../sim/named';
 import { Rng } from '../sim/rng';
-import { LEGENDARIES, POWER_TEXT, TEMPLATES, SETS, TIER_COLOR, GEM_COLOR, affixRange, generateLegendary, generateNamed, gemAffix, gemName, handsOf, itemAffixes, itemReq, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
+import { LEGENDARIES, POWER_TEXT, TEMPLATES, SETS, TIER_COLOR, GEM_COLOR, affixRange, generateLegendary, generateNamed, gemAffix, gemName, handsOf, itemAffixes, itemReq, reqOfTemplate, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
 import {
-  NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyPrice, carriedWeight, carryCapacity, damageRange,
+  NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyBlock, buyPrice, carriedWeight, carryCapacity, damageRange,
   bulkSellable, sellPrice, critChance, attrBonus, equipSlotFor, socketCost, maxHpOf, maxManaOf, missingReq, nearNpc, shopNear, trainerTeaches, powerOf, resistOf, type Actor, type Command, type Npc, type World,
   gearStat, parryChance, passiveSum, questRewardChoices, missingSkillReq, groupKills, merchantNamed, namedPrice,
 } from '../sim/world';
@@ -1898,8 +1898,13 @@ export class Ui {
           heal: t.heal, mana: t.mana, ...(t.town ? { town: t.town } : {}), reqKraft: t.reqKraft, value: t.value, affixes: [],
         };
         const s = this.slotEl(fake);
-        const price = el('div', 'n', `${buyPrice(id)}g`);
-        price.style.color = p.gold >= buyPrice(id) ? '#ffd84a' : '#ff7a6a';
+        const block = buyBlock(p, id);
+        const price = el('div', 'n', block ? `Stufe ${reqOfTemplate(t).level}` : `${buyPrice(id)}g`);
+        price.style.color = !block && p.gold >= buyPrice(id) ? '#ffd84a' : '#ff7a6a';
+        if (block) {
+          s.style.opacity = '0.55';
+          s.title = block;
+        }
         s.append(price);
         this.makeDraggable(s, { item: fake, from: 'shop', templateId: id }, equippedFor(p, fake), () => this.send({ type: 'buy', templateId: id }));
         grid.append(s);

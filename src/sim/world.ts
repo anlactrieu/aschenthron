@@ -1,6 +1,6 @@
 import { Rng } from './rng';
 import { findPath, isWalkable, type Grid, type Pt } from './path';
-import { itemReq, itemAffixes, gemTemplateId, handsOf, weaponSpeedOf, rollGem, rollUniqueSpecial, rollWorldDrop, rollWorldSpecial, rollPotion, rollSpecial, templateById, generateItem, generateNamed, rollNamed, rollBase, rollLoot, rerollAffixes, extendAffixes, SETS, type GemInfo, type Item, type PowerId, type SetBonus, type EquipSlot, type Stat } from './items';
+import { itemReq, reqOfTemplate, itemAffixes, gemTemplateId, handsOf, weaponSpeedOf, rollGem, rollUniqueSpecial, rollWorldDrop, rollWorldSpecial, rollPotion, rollSpecial, templateById, generateItem, generateNamed, rollNamed, rollBase, rollLoot, rerollAffixes, extendAffixes, SETS, type GemInfo, type Item, type PowerId, type SetBonus, type EquipSlot, type Stat } from './items';
 import {
   ATTR_KEYS, ATTR_NAME, xpToNext, questXp, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, skillReq, skillRankOf, ACTIVE_POWER, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
   monsterKind, CALL_RANGE, CALL_COOLDOWN, FLEE_HP, FLEE_TICKS, npcKeyOf, isGiverOf, lootGroupOf, LOOT_GROUPS, KILL_GOALS, LEVEL_TITLES, type LootGroup, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, NAMED_SHARE, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
@@ -775,6 +775,17 @@ export function buyPrice(templateId: string): number {
   return Math.round(t.value * 2 * (t.slot === 'weapon' && t.minLevel >= 11 ? 1.6 : 1));
 }
 
+/**
+ * Stufensperre beim Kauf von Tränken (Heil-/Manatränke). Ausrüstung darf man auf Vorrat kaufen, ihre Stufe greift erst beim Anlegen;
+ * Tränke werden nicht angelegt, also sperrt sie der Händler selbst – mit derselben Schwelle wie Ausrüstung (`reqOfTemplate`: Vorlagenstufe − 1).
+ */
+export function buyBlock(a: Actor, templateId: string): string | null {
+  const t = templateById(templateId);
+  if (t.slot !== 'potion' || (t.heal === undefined && t.mana === undefined)) return null;
+  const need = reqOfTemplate(t).level ?? 1;
+  return a.level < need ? `Benötigt Stufe ${need}.` : null;
+}
+
 export function getActor(w: World, id: number): Actor | undefined {
   return w.actors.find((a) => a.id === id);
 }
@@ -1105,6 +1116,8 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       // Händlerware aus Kill-Zielen: jeder Händler, nur freigeschaltete Funde
       if (cmd.named !== undefined && !merchantNamed(a).includes(cmd.named)) return fail(w, 'Das führt der Händler nicht.');
       if (cmd.named === undefined && !merchants.some((m) => (SHOPS[m.shop ?? 'basic'] ?? []).includes(cmd.templateId))) return fail(w, 'Das führt der Händler nicht.');
+      const blocked = cmd.named === undefined ? buyBlock(a, cmd.templateId) : null;
+      if (blocked) return fail(w, blocked);
       const price = cmd.named !== undefined ? namedPrice(cmd.named) : buyPrice(cmd.templateId);
       if (a.gold < price) return fail(w, 'Nicht genug Gold.');
       const item = cmd.named !== undefined ? generateNamed(w.nextId++, cmd.named) : generateItem(w.rng, w.nextId++, cmd.templateId, 'normal');
@@ -1558,8 +1571,14 @@ function bowAi(w: World, a: Actor, t: Actor): boolean {
 }
 
 function fight(w: World, a: Actor, t: Actor): void {
+  if (a.kind === 'player' && inSafeZone(w, a.x, a.y)) {
+    // Ziel verwerfen statt stumm zu hängen (Randfall: Spieler steht noch in der Stadt, das Ziel schon davor; s. safeedge.test)
+    a.targetId = null;
+    a.path = [];
+    w.events.push({ type: 'fail', reason: 'In der Stadt ist Kämpfen verboten.', to: a.id });
+    return;
+  }
   if (a.cooldownLeft > 0) return;
-  if (a.kind === 'player' && inSafeZone(w, a.x, a.y)) return;
   startCooldown(a);
   const [lo, hi] = damageRange(a);
   dealDamage(w, a, t, w.rng.int(lo, hi), false, undefined, false, true, a.dmgType);
