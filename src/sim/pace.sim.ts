@@ -1,7 +1,7 @@
 import { describe, it } from 'vitest';
 import mapJson from '../data/aschenthron.json';
 import { buildWorld, type TiledMap } from './tiled';
-import { MAX_LEVEL, SHOPS, totalXpFor } from './data';
+import { MAX_LEVEL, SHOPS, totalXpFor, xpToNext } from './data';
 import { handsOf, templateById, type Item } from './items';
 import {
   missingReq, damageRange, applyCommand, regionAt, buyPrice, armorOf, carryCapacity, drainEvents, getActor, inSafeZone, maxHpOf, tick, TICK_RATE,
@@ -16,7 +16,9 @@ import {
 const score = (i: Item) => (i.damage?.[1] ?? 0) * 1.5 + (i.armor ?? 0) * 2 + i.affixes.length * 3;
 
 function townTrip(w: World, p: Actor): boolean {
-  const merchant = w.npcs.filter((n) => n.kind === 'merchant').sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0]!;
+  const byDist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y);
+  const merchants = w.npcs.filter((n) => n.kind === 'merchant').sort(byDist);
+  const merchant = merchants.find((n) => !n.closed && !n.away) ?? merchants[0]!;
   if (Math.hypot(merchant.x - p.x, merchant.y - p.y) > 2.5) {
     if (p.path.length === 0) applyCommand(w, p.id, { type: 'moveTo', x: Math.round(merchant.x), y: Math.round(merchant.y + 1) });
     return false;
@@ -51,6 +53,12 @@ function townTrip(w: World, p: Actor): boolean {
   return true;
 }
 
+/** Wie ein Spieler: Wirft ein Platz zu wenig XP ab (Aufstieg dauert länger als STALL_MIN), zieht der Bot weiter und meidet ihn eine Weile. */
+const WINDOW_MIN = 20;
+const STALL_MIN = 240;
+const BAN_MIN = 90;
+const BAN_RADIUS = 25;
+
 describe('Level-Tempo (Messung)', () => {
   it('Bot-Lauf: Zeit bis Level 5/10/20/30', () => {
     const { world: w, playerId } = buildWorld(Number(process.env.PACE_SEED ?? 2024), mapJson as unknown as TiledMap);
@@ -62,6 +70,10 @@ describe('Level-Tempo (Messung)', () => {
     const lastHits: string[] = [];
     let mode: 'hunt' | 'town' = 'town'; // wie ein echter Spieler: erst mit dem Startgold einkaufen
     const maxTicks = TICK_RATE * 3600 * Number(process.env.PACE_HOURS ?? 40); // Ziel Stufe 30 nach 20–30 h (P3)
+    let gained = 0; // XP-Gewinn im laufenden Fenster (nur Jagd, Stadtfahrten zählen nicht)
+    let windowTicks = 0;
+    const bans: { x: number; y: number; until: number }[] = [];
+    const banned = (x: number, y: number) => bans.some((b) => b.until > w.tick && Math.hypot(b.x - x, b.y - y) < BAN_RADIUS);
     let prev: { x: number; y: number };
     let prevTid: number | null;
     for (let t = 0; t < maxTicks; t++) {
@@ -70,6 +82,7 @@ describe('Level-Tempo (Messung)', () => {
       tick(w);
       for (const e of drainEvents(w)) {
         if (e.type === 'hit' && e.targetId === p.id) lastHits.push(getActor(w, e.attackerId)?.name ?? '?');
+        if (e.type === 'xp' && (e.to === undefined || e.to === p.id)) gained += e.amount;
         if (e.type === 'levelUp') { reached[e.level] ??= w.tick; if (process.env.PACE_LEVELS) console.log(`LEVEL ${e.level} nach ${(w.tick / TICK_RATE / 60).toFixed(0)} min @${Math.round(p.x)},${Math.round(p.y)} ${regionAt(w, p.x, p.y)?.name ?? '-'} hp ${maxHpOf(p)} ar ${armorOf(p)} dmg ${damageRange(p).join('-')}`); }
         if (e.type === 'deathPenalty') {
           deaths++;
@@ -94,14 +107,31 @@ describe('Level-Tempo (Messung)', () => {
       }
       const heavy = p.inventory.reduce((n, i) => n + i.weight, 0) > carryCapacity(p) * 0.45;
       const lowSupplies = heals.length === 0 && p.hp < maxHpOf(p) * 0.5;
-      if (mode === 'hunt' && (heavy || lowSupplies)) {
+      // P6: Läden nachts zu – dann nicht in die Stadt fahren, sondern weiterjagen (Wartezeit würde die Messung verfälschen)
+      const shopsOpen = w.npcs.some((n) => n.kind === 'merchant' && !n.closed && !n.away);
+      if (mode === 'hunt' && shopsOpen && (heavy || lowSupplies)) {
         mode = 'town';
         trips++;
         p.targetId = null;
         p.path = [];
       }
+      if (mode === 'hunt') {
+        windowTicks += 10;
+        if (windowTicks >= WINDOW_MIN * 60 * TICK_RATE) {
+          const rate = gained / WINDOW_MIN; // XP je Minute
+          if (rate * STALL_MIN < xpToNext(p.level) && !banned(p.x, p.y)) {
+            bans.push({ x: p.x, y: p.y, until: w.tick + BAN_MIN * 60 * TICK_RATE });
+            if (process.env.PACE_SPOTS) console.log(`WEITER nach ${(w.tick / TICK_RATE / 60).toFixed(0)} min L${p.level} @${Math.round(p.x)},${Math.round(p.y)} rate ${rate.toFixed(1)} XP/min, Bedarf ${xpToNext(p.level)}`);
+            p.targetId = null;
+            p.path = [];
+          }
+          gained = 0;
+          windowTicks = 0;
+        }
+      }
       if (mode === 'town') {
-        if (townTrip(w, p) && p.hp >= maxHpOf(p) * 0.9) mode = 'hunt';
+        if (!shopsOpen) mode = 'hunt';
+        else if (townTrip(w, p) && p.hp >= maxHpOf(p) * 0.9) mode = 'hunt';
         continue;
       }
       if (inSafeZone(w, p.x, p.y) && p.hp < maxHpOf(p) * 0.9) continue;
@@ -111,13 +141,15 @@ describe('Level-Tempo (Messung)', () => {
         applyCommand(w, p.id, { type: 'pickup', groundId: loot.id });
         continue;
       }
+      const free = (a: Actor) => !banned(a.x, a.y);
       const m = w.actors
-        .filter((a) => a.kind === 'monster' && a.alive && !a.boss && !a.unique && a.level <= p.level + 1 && a.level >= p.level - 4)
+        .filter((a) => a.kind === 'monster' && a.alive && !a.boss && !a.unique && a.level <= p.level + 1 && a.level >= p.level - 4 && free(a))
         .sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
       if (m) applyCommand(w, p.id, { type: 'attack', targetId: m.id });
       else if (p.level >= 1) {
         // keine passenden Gegner nah: zum nächsten passenden laufen (beliebig weit)
-        const far = w.actors.filter((a) => a.kind === 'monster' && a.alive && !a.boss && !a.unique && a.level <= p.level + 2).sort((a, b) => b.level - a.level)[0];
+        const farAll = w.actors.filter((a) => a.kind === 'monster' && a.alive && !a.boss && !a.unique && a.level <= p.level + 2);
+        const far = (farAll.some(free) ? farAll.filter(free) : farAll).sort((a, b) => b.level - a.level)[0];
         if (far) applyCommand(w, p.id, { type: 'attack', targetId: far.id });
       }
     }
