@@ -1,5 +1,12 @@
 # HANDOFF – Aschenthron
 
+## LÄUFT (2026-11-06): Einstieg für Neulinge
+- **Stand:** Nutzer-Test Welle 2 ergab: Start überladen, Nacht zum Start, Wölfe am Tor, Tode bei den Ratten, kein Plan, was zu tun ist. Entscheidungen in SPEC „Einstieg für Neulinge“ (d28982a). Umsetzung läuft in der Session `Aschenthron: Einstieg für Neulinge` (local_906ac692…) auf `neuer-look`, kein Push auf `main`. Alle 19 alten Untersessions wurden auf Wunsch des Nutzers gelöscht.
+- **Letzte 3 Entscheidungen (Nutzer):** (1) Neue Charaktere starten immer morgens (~7 Uhr), damit die erste Nacht nicht sofort kommt. (2) Anfängerzone um Aschenhafen mit Stufe 1–3 ohne fremde Nachspawns, Wölfe und Goblins weiter draußen wie in D4O. (3) Ein klarer erster Auftrag am Startpunkt (Tränke → Ratten → zurück → Hinweis auf Varn). Varn schrittweise freischalten, Startpaket und Einblend-Hinweise sind vorerst nicht gewählt.
+- **Offen:** Ergebnis der Session prüfen (tsc, Lint, Tests, Build, Pace ≥ 8 Seeds ohne Tode auf Stufe 1–3, L30 20–30 h), danach Nutzer-Test und `main` nur nach Okay. Falls der erste Auftrag nicht reicht: die oben nicht gewählten Optionen.
+- **Dateien (vermutlich):** `src/sim/clock.ts`, `night.ts`, Spawn- und Zonendaten, `world.ts` (Auto-Start der Kill-Aufgaben), `data.ts` (Quests), `ui.ts`/`minimap.ts` (Markierung).
+- **Learnings:** Für den Nutzer zählt nicht nur die Pace des Bots, denn der Bot kennt Tränke und den Nachthändler, ein echter Neuling nicht. Der Einstieg muss deshalb ohne Vorwissen getestet werden.
+
 ## ERLEDIGT (2026-11-06): Reste Welle 2 – NÄCHSTER SCHRITT: Nutzer-Test
 - **Stand:** Commit 94ef1e2 (Sonnet-Session `reste-welle2`). Von der Hauptsession geprüft: tsc, Lint, 462 Tests und Build grün, Golden-Snapshots unverändert. SPEC „Reste Welle 2“, Übergabe `welle2-reste-handoff.md` im Notizordner. `neuer-look` enthält P2, P4, P5, P6, beide Bot-Runden und diese Reste. **Live seit 2026-11-06** (main = neuer-look = dcbfdfb, Pages-Deploy grün).
 - **Inhalt:** `buyBlock` in `world.ts` sperrt Heil- und Manatränke unter der Vorlagenstufe (kleine Tränke ab Stufe 1, normale ab 5, große ab 10, riesige ab 20); Ausrüstung bleibt auf Vorrat kaufbar, Schriftrollen sind ausgenommen. Der Stadtrand-Hänger wird in `fight` gelöst: Die Schutzzone von Aschenhafen endet bei x < 49, und ein Ziel genau an der Grenze wird verworfen. Gerüchte zu Nachthändlern und Gefahrenorten gibt es als Stichworte bei Mirel, Dorn, Joren und Brandt. Pace mit Sperre 22,2 h (Median, 8 Seeds).
