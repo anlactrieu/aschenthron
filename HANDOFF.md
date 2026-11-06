@@ -1,5 +1,12 @@
 # HANDOFF – Aschenthron
 
+## ERLEDIGT (2026-11-06): P4 Kampf mit Gefahr
+- **Stand:** Sonnet-Session `p4-kampf` (local_942e4d9b…), Commits 49c4ab0…ce16826 auf `neuer-look`, kein Push. Von der Hauptsession geprüft: tsc, Lint, 416 Tests und Build grün, Golden-Snapshots unverändert. Im Spiel nur von der Session gesehen. Details, Quellen und Pace-Tabelle stehen in SPEC „Umsetzungsstand P4“, die Übergabe in `p4-kampf-handoff.md` im Notizordner.
+- **Inhalt:** Todesstrafe in `src/sim/death.ts` (`deathRules(level, pvp)`, angewendet in `onPlayerDeath`): Stufe 1–5 frei, 6–10 halb, ab 11 XP 10 % des Levels / Gold 10 % / Rucksack bis 3. Nie verloren gehen Angelegtes, Tränke, Edelsteine und benannte Funde. Der Leichenhaufen ist 60 s nur für den Besitzer (`GroundItem.owner/ownerUntil`). Im PvP geht nur Gold verloren. KI: `callForHelp`/`alertPack`, `fleeStep` (`MonsterKind.calls/flees`). Gefahrenorte über `DANGER_SPOTS`. Hover-Stufenfarbe, „?“-Marker für versteckte Aufträge, Landmarken-Notizen lehren Stichworte.
+- **Letzte 3 Entscheidungen:** (1) Realmud-Werte (Tod durch Monster) als D4O-Vorbild, die Staffelung für Neulinge ist unsere Abweichung. (2) Gold geht verloren statt als Haufen liegen zu bleiben (Goldsenke wie bei T4C). (3) Gefahrenorte als Daten statt in der Karte, `MAP_VERSION` bleibt.
+- **Offen:** Bot-Schleife im Räuberlager (der Bot farmt einen nachspawnenden Champion, Pace streut deshalb stark: Seed 99 kommt auf 33,5 h). Death Timer, Gerüchte zu Gefahrenorten, Mehrspieler mit echtem Server, Champion-Namensfarben. Danach P6 Tag/Nacht → P5-Patrouille. Weiter offen: der Online-Test des Nutzers.
+- **Learnings:** Pace mit mindestens 6 Seeds messen (Bot-Farmschleifen verzerren einzelne Läufe). `vite preview --outDir` liefert das alte `dist`, eigene Dev-Builds deshalb per `python3 -m http.server` aus dem Build-Ordner bedienen.
+
 ## ERLEDIGT (2026-11-06): T4C-Charme Welle 2, Teil 1 (P2 Gespräche, P5 Wildnis)
 - **Stand:** Zwei Sonnet-Sessions parallel auf `neuer-look`, kein Push. Gemeinsam von der Hauptsession geprüft: tsc, Lint, 397 Tests und Build grün. Im Spiel nur von den Sessions selbst gesehen. Übergaben liegen im Notizordner (`p2-gespraeche-handoff.md`, `p5-wildnis-handoff.md`, Screenshots `p5-wildnis/`).
   - P2 760b0ef: `src/sim/topicsData.ts` (`NPC_TOPICS`), `topics.ts` (`canAsk`, `learnedFrom`, `KEYWORDS`), `world.ts` (`askTopic`, `learnTopics`), `data.ts` (`hiddenQ`, `isGiverOf`), `save.ts` (`topics`), `ui.ts` (`topicBlock`, `markedText`, `renderNotebook`). 4 versteckte Ketten. Pace unverändert (L30 24,9 h).
