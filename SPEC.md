@@ -717,3 +717,13 @@ Nacht an: L30 / Tode
 - **Messung** (`tools/pace-all.sh`, 8 Seeds, Bot `vess`, Snapshot-Ordner; L30-Median): mit Kaufstufe **22,2 h** (20,6–27,4 h; Tode 556), gleicher Stand ohne die Sperre 25,1 h (20,4–31,4 h; Tode 704). Vorher (Nachtrag Bot-Schleife 2): 22,2 h. Die Sperre kostet also in der Messung nichts; der Unterschied zur Variante ohne Sperre (+2,9 h zu Lasten der Variante ohne) ist Streuung durch divergierende Läufe (je Zelle ein Lauf, Aussagen unter ±3 h tragen nicht), kein Effekt der Sperre. Seed 21 mit Sperre 27,4 h, Seed 42 27,2 h.
 - **Golden-Snapshots:** keine geändert, alle 462 Tests grün (Zähler- und Zufallspfade unberührt).
 - **Offen/ehrlich:** Wolf-Hänger im Bot-Lauf nicht nachgestellt (s. o.); die Sperre betrifft Heil-/Manatränke aller Händler (Stufe 5 für „Heiltrank“, Stufe-1-Spieler können ihn also nicht kaufen, falls sie ihn vorher kauften); Browser-Prüfung im Vite-Dev-Server (Port 5199), da der Produktions-Build keinen `__game`-Haken hat.
+
+## Einstieg für Neulinge (2026-11-06, vom Nutzer entschieden, noch NICHT umgesetzt)
+**Rückmeldung des Nutzers (erster Online-Test Welle 2):** Als neuer Spieler überfordert. Bei Lehrer Varn kann man sofort sehr viel lernen, ohne zu wissen, was sinnvoll ist. Start zufällig bei Nacht, vor der Stadt warten Wölfe, die viel zu stark sind, man kommt nicht raus. Selbst bei den Ratten stirbt man schnell, weil Wölfe, Goblins und nachspawnende andere Monster dazwischen sind. Er hat mit ein paar NPCs gesprochen, aber nicht verstanden, was zu tun ist, und ist ohne Tränke und ohne Fertigkeit rausgelaufen. Der Einstieg in D4O war leichter; der Start ist zu überladen.
+
+**Entscheidungen:**
+1. **Startzeit:** Neue Charaktere starten immer morgens (ca. 7 Uhr), damit vor der ersten Nacht ein langer Tag liegt. Bestehende Spielstände unberührt.
+2. **Anfängerzone:** Rund um Aschenhafen nur Ratten und ähnlich schwache Tiere (Stufe 1–3), keine fremden Arten, die dort nachspawnen (auch nicht nachts). Wölfe, Goblins usw. erst weiter draußen, wie in D4O. Das Tor darf nie von starken Gegnern belagert sein.
+3. **Ein klarer erster Auftrag:** Ein NPC direkt am Startpunkt sagt genau, was zu tun ist, Schritt für Schritt mit Markierung auf Karte/Minimap: z. B. (a) beim Händler kleine Heiltränke holen, (b) vor der Stadt Ratten jagen, (c) zurückkommen, danach Hinweis auf Varn. Abgelehnt bzw. nicht gewählt: Varn schrittweise freischalten, Startpaket, Einblend-Hinweise (können später kommen, falls der erste Auftrag nicht reicht).
+
+**Prüfkriterium:** Ein Neuling, der nichts weiß und nur dem ersten Auftrag folgt, erreicht ohne Tod Stufe 3. Pace-Bot (`tools/pace-all.sh`, ≥ 8 Seeds) zeigt keine Tode auf Stufe 1–3 und L30-Median bleibt im Ziel 20–30 h.
