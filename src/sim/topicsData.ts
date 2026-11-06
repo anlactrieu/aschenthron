@@ -280,3 +280,20 @@ export const NPC_TOPICS: Record<string, NpcTopics> = {
     },
   },
 };
+
+/**
+ * Notizen der Landmarken (P5) hängen an Stichworten (P2): wer die Notiz liest, notiert das Stichwort.
+ * Schlüssel = Landmarken-Id der Karte (`lm…`). Lagerfeuer lm7 und lm25 sind reine Stimmung.
+ */
+export const LANDMARK_TOPICS: Record<string, string> = {
+  lm3: 'spuren',
+  lm4: 'moor',
+  lm6: 'rotschal',
+  lm10: 'bau',
+  lm12: 'moorwind',
+  lm13: 'veshra',
+  lm17: 'nachts',
+  lm19: 'mine',
+  lm20: 'pforte',
+  lm24: 'thron',
+};

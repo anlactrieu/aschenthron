@@ -2,7 +2,9 @@ import Phaser from 'phaser';
 import mapJson from '../data/aschenthron.json';
 import { assignHotbar, hotbarFor } from './hotbar';
 import { buildWorld, type TiledMap } from '../sim/tiled';
-import { DMG_COLOR, STATUS_COLOR, monsterKind, npcKeyOf, questById, QUESTS, SKILLS, STATUS_IDS } from '../sim/data';
+import { DMG_COLOR, STATUS_COLOR, isGiverOf, monsterKind, npcKeyOf, questById, QUESTS, SKILLS, STATUS_IDS } from '../sim/data';
+import { LANDMARK_TOPICS } from '../sim/topicsData';
+import { THREAT_COLOR, THREAT_TEXT, threatOf } from '../sim/threat';
 import { giverLocation, nextStep, type NextStep, questAvailable, questMarks, type QuestMark } from '../sim/quests';
 import { exportPlayer, importPlayer } from '../sim/save';
 import {
@@ -302,6 +304,7 @@ export class GameScene extends Phaser.Scene {
       return img?.visible ? { sx: img.x, sy: img.y, head: this.figSize(img)?.top ?? 56 } : null;
     });
     this.wildlife = new Wildlife(this, this.sfx, landmarksOf(mapJson as unknown as Parameters<typeof landmarksOf>[0]));
+    this.wildlife.onNote = (lm) => { if (LANDMARK_TOPICS[lm.id]) this.send({ type: 'readNote', id: lm.id }); };
     this.minimap = new Minimap(this.world, this.tiles);
     if (this.remote) this.ui.say(`Verbunden als ${p.name}${this.remote.pvp ? ' – PvP außerhalb der Städte aktiv, Angreifer werden zu Mördern' : ''}. Klick auf Spieler greift an.`);
     else if (saved && importPlayer(this.world, p, saved)) this.ui.say('Spielstand geladen.');
@@ -1117,6 +1120,17 @@ export class GameScene extends Phaser.Scene {
             this.cameras.main.shake(180, 0.004);
             say(`${boss.name} ruft Verstärkung!`);
             this.sfx.boss();
+          }
+          break;
+        }
+        case 'call':
+        case 'flee': {
+          // Sprechblase über dem Rufer bzw. Flüchtenden (P4)
+          const pos = this.bodyPos(getActor(w, e.id));
+          if (pos) {
+            const call = e.type === 'call';
+            this.fx.floatText(pos.x, pos.y - 44, call ? 'Zu mir!' : 'Rückzug!', call ? '#ffb04a' : '#c8c8d8', 14, 1300);
+            if (call) this.fx.ring(pos.x, pos.y + 18, 120, 0xffb04a, 500);
           }
           break;
         }
@@ -2213,6 +2227,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private questMark(n: Npc, p: Actor): string {
+    // Versteckte Aufträge nennen den NPC als `giver`: fertig = „?“, auch bei NPCs ohne eigene Auftragsliste
+    for (const [id, st] of Object.entries(p.quests)) {
+      const def = questById(id);
+      if (st.state === 'done' && def?.hidden && isGiverOf(n, def)) return '?';
+    }
     if (n.kind !== 'quest') return '';
     let avail = false;
     for (const id of n.quests ?? []) {
@@ -2561,7 +2580,7 @@ export class GameScene extends Phaser.Scene {
           g.fillStyle(c, 1);
           g.fillCircle(sx + big / 2 + 7 + i * 9, top + 2, 3);
         });
-        if (a.boss || a.champ || a.unique || a.id === p.targetId || hovered) this.label(`a${a.id}`, a.name, sx, top - 10, a.unique ? '#ff9a2a' : a.boss ? '#ff9a4a' : a.champ ? '#ffe45a' : '#e6cfcf', seen);
+        if (a.boss || a.champ || a.unique || a.id === p.targetId || hovered) this.label(`a${a.id}`, `${a.name} (Lv ${a.level})${hovered ? ` · ${THREAT_TEXT[threatOf(p.level, a)]}` : ''}`, sx, top - 10, THREAT_COLOR[threatOf(p.level, a)], seen);
         if (a.champ || a.unique) {
           g.fillStyle(0x200000, 0.9);
           g.fillRect(sx - big / 2, top, big, 5);

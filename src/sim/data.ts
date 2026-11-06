@@ -183,6 +183,18 @@ const MOVE_FAST = 0.93;
 const AGGRO_MAX = 5;
 /** Gegner-KI (P4): Ruf-Reichweite, Fluchtschwelle (Anteil Leben) und Fluchtdauer in Ticks. */
 export const CALL_RANGE = 12;
+
+/**
+ * Gefahrenorte (P4): Gruppen weit über der Stufe ihrer Zone, abseits von Straße und Lagern, damit man sie
+ * zu früh betritt (Hover-Farbe rot, Fluchtweg zählt). Entstehen beim Weltaufbau (`buildWorld`), die Karte bleibt unverändert.
+ * Versatz je Gegner in Kacheln; Prüfung der Begehbarkeit in `danger.test.ts`.
+ */
+export interface DangerSpot { id: string; name: string; zone: string; x: number; y: number; kinds: string[]; hint: string }
+export const DANGER_SPOTS: DangerSpot[] = [
+  { id: 'wolfsbau', name: 'Wolfsbau', zone: 'Roggenfelder', x: 57, y: 138, kinds: ['dire_wolf', 'dire_wolf', 'dire_wolf', 'wolf'], hint: 'Ein Rudel Schreckenswölfe haust weit westlich der Straße. Zu früh kommt man dort nicht lebend raus.' },
+  { id: 'raeubernest', name: 'Räubernest im Röhricht', zone: 'Roggenfelder', x: 76, y: 145, kinds: ['bandit_captain', 'bandit', 'bandit', 'bandit'], hint: 'Im Röhricht südlich der Straße lauert ein Hauptmann mit seiner Bande.' },
+];
+export const DANGER_OFFSETS: [number, number][] = [[0, 0], [2, 0], [-2, 0], [0, 2]];
 export const CALL_COOLDOWN = 20 * 20;
 export const FLEE_HP = 0.25;
 export const FLEE_TICKS = 20 * 8;

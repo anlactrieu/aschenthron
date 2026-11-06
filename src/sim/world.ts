@@ -10,6 +10,7 @@ import {
 import { EFFECTS, cleanse, controlDr, dispel, mergeStatus } from './effects';
 import { NAMED } from './named';
 import { CORPSE_OWNER_TICKS, deathRules, dropCount, droppable } from './death';
+import { LANDMARK_TOPICS } from './topicsData';
 import { answerOf, canAsk, keywordLabel, learnedFrom } from './topics';
 
 export const TICK_RATE = 20;
@@ -88,6 +89,7 @@ export type Command =
   | { type: 'turnInQuest'; questId: string; pick?: number }
   | { type: 'talk'; npcId: number }
   | { type: 'askTopic'; npcId: number; topic: string }
+  | { type: 'readNote'; id: string }
   | { type: 'craft'; itemId: number; op: 'upgrade' | 'reroll' | 'extend' }
   | { type: 'socket'; gemId: number; itemId: number; index?: number };
 
@@ -351,6 +353,8 @@ export interface World {
   chests: Chest[];
   camps: Camp[];
   finds: Find[];
+  /** Landmarken mit Notiz (Id und Ort aus der Karte), für `readNote` */
+  landmarks: { id: string; x: number; y: number }[];
   telegraphs: { id: number; x: number; y: number; r: number; at: number; dmg: number; src: number }[];
   /** Akteur des gerade ausgeführten Befehls (für `fail`-Ereignisse) */
   cmdActor: number | null;
@@ -373,7 +377,7 @@ export interface PackPatrol {
 }
 
 export function createWorld(seed: number, grid: Grid, safe: Rect[] = []): World {
-  return { tick: 0, grid, rng: new Rng(seed), actors: [], nextId: 1, events: [], ground: [], safe, npcs: [], start: { x: 1, y: 1 }, towns: [], regions: [], pvp: false, chests: [], camps: [], finds: [], telegraphs: [], cmdActor: null, packs: new Map(), npcWander: false, fx: new Rng((seed ^ 0x9e3779b9) >>> 0) };
+  return { tick: 0, grid, rng: new Rng(seed), actors: [], nextId: 1, events: [], ground: [], safe, npcs: [], start: { x: 1, y: 1 }, towns: [], regions: [], pvp: false, chests: [], camps: [], finds: [], landmarks: [], telegraphs: [], cmdActor: null, packs: new Map(), npcWander: false, fx: new Rng((seed ^ 0x9e3779b9) >>> 0) };
 }
 
 export function addNpc(w: World, kind: NpcKind, name: string, x: number, y: number, extra: Partial<Npc> = {}): Npc {
@@ -1159,6 +1163,13 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
           finishQuest(w, a, def);
         }
       }
+      break;
+    }
+    case 'readNote': {
+      const lm = w.landmarks.find((x) => x.id === cmd.id);
+      const key = LANDMARK_TOPICS[cmd.id];
+      if (!lm || !key || Math.hypot(lm.x - a.x, lm.y - a.y) > 4) return;
+      learnTopics(w, a, [key]);
       break;
     }
     case 'askTopic': {

@@ -1,4 +1,5 @@
 import type { Grid } from './path';
+import { DANGER_OFFSETS, DANGER_SPOTS } from './data';
 import { CAMP_RESPAWN_TICKS, addNpc, createWorld, giveStarterKit, inSafeZone, setupPatrols, spawnMonster, spawnPlayer, type NpcKind, type Rect, type TrainerField, type World } from './world';
 
 interface TiledProp {
@@ -75,6 +76,7 @@ export function buildWorld(seed: number, map: TiledMap, opts: { player?: boolean
       world.chests.push({ id: world.nextId++, x: o.x / ts, y: o.y / ts, level: Number(prop(o, 'level') ?? 1), tier: (prop(o, 'tier') ?? 'wood') as 'wood', opened: false, respawnAt: 0, ...(prop(o, 'camp') ? { camp: prop(o, 'camp') } : {}) });
     }
     if (o.type === 'find') world.finds.push({ id: `${prop(o, 'quest')}:${Math.round(o.x / ts)},${Math.round(o.y / ts)}`, quest: prop(o, 'quest')!, x: o.x / ts, y: o.y / ts, text: prop(o, 'text') ?? o.name });
+    if (o.type === 'landmark') world.landmarks.push({ id: prop(o, 'id')!, x: Math.round(o.x / ts), y: Math.round(o.y / ts) });
     if (o.type === 'camp') world.camps.push({ id: prop(o, 'id')!, name: o.name, x: o.x / ts, y: o.y / ts, w: o.width / ts, h: o.height / ts, cleared: false });
     if (o.type === 'townstart') world.towns.push({ x: o.x / ts, y: o.y / ts, name: o.name });
     if (o.type === 'monster') {
@@ -90,6 +92,11 @@ export function buildWorld(seed: number, map: TiledMap, opts: { player?: boolean
     }
   }
   setupPatrols(world);
+  // Gefahrenorte (P4) erst nach den Patrouillen: eigene Rudel-Kennung, bleiben am Platz
+  DANGER_SPOTS.forEach((d, i) => d.kinds.forEach((k, j) => {
+    const [dx, dy] = DANGER_OFFSETS[j % DANGER_OFFSETS.length]!;
+    spawnMonster(world, d.x + dx, d.y + dy, k).packId = 200001 + i;
+  }));
   world.start = { x: start.x / ts, y: start.y / ts };
   if (opts.player === false) return { world, tiles, playerId: -1 };
   const player = spawnPlayer(world, start.x / ts, start.y / ts);

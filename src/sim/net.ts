@@ -53,6 +53,8 @@ export function validateCommand(w: World, c: unknown): Command | null {
       return int(o.npcId) ? { type: 'talk', npcId: o.npcId } : null;
     case 'askTopic':
       return int(o.npcId) && str(o.topic) && /^[a-z0-9_]+$/.test(o.topic) ? { type: 'askTopic', npcId: o.npcId, topic: o.topic } : null;
+    case 'readNote':
+      return str(o.id) && /^lm[0-9]+$/.test(o.id) ? { type: 'readNote', id: o.id } : null;
     case 'acceptQuest': case 'turnInQuest':
       return str(o.questId) ? ({ type: o.type, questId: o.questId, ...(o.type === 'turnInQuest' && int(o.pick) && o.pick >= 0 && o.pick < 3 ? { pick: o.pick } : {}) } as Command) : null;
     case 'craft':
