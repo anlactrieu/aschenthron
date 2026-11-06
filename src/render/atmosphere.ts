@@ -115,7 +115,7 @@ export class Atmosphere {
   constructor(private scene: Phaser.Scene, private sfx: Sfx) {
     const q = new URLSearchParams(location.search);
     const h = q.get('stunde');
-    this.fixedHour = h !== null && Number.isFinite(Number(h)) ? Number(h) : null;
+    this.fixedHour = h && Number.isFinite(Number(h)) ? Number(h) : null;
     const w = q.get('wetter');
     this.fixedWeather = w ? ({ regen: 'rain', nebel: 'fog', asche: 'ash', klar: 'clear' } as Record<string, Weather>)[w] ?? null : null;
     // Riesig und mittig: bei Zoom 0.5 muss die Fläche trotz Kamerazoom das ganze Bild decken

@@ -285,6 +285,9 @@ export class Ui {
   private tlLevel = el('div', 'lv');
   /** Uhrzeit der Sim (P6) unter der Stufe */
   private tlClock = el('div', 'clk');
+  /** Spielstunde fürs HUD: die der Atmosphäre (folgt der Sim, online mit `?stunde=` dem Bild); ohne Quelle die der Sim */
+  clockHour: (() => number) | null = null;
+  private clockNight: boolean | null = null;
   private tlParts: { hp: { liq: HTMLElement; t: HTMLElement }; mp: { liq: HTMLElement; t: HTMLElement } } | null = null;
   private hotbar = el('div');
   private xpBar = el('div', 'a-bar');
@@ -581,10 +584,12 @@ export class Ui {
 
   /** Uhrzeit der Sim: "☀ 14:05" / "☾ 22:40 · Nacht" (nur bei Änderung der Minute neu gesetzt) */
   private updateClock(w: World): void {
-    const h = hourOf(w);
+    const h = this.clockHour?.() ?? hourOf(w);
     const night = isNightHour(h);
     const txt = `${night ? '☾' : '☀'} ${clockText(h)}${night ? ' · Nacht' : ''}`;
     if (this.tlClock.textContent !== txt) this.tlClock.textContent = txt;
+    if (night === this.clockNight) return;
+    this.clockNight = night;
     this.tlClock.classList.toggle('day', !night);
     this.tlClock.title = night ? 'Nachts schließen die Läden; Untote und Nachtjäger sind stärker, der Nachthändler ist da.' : 'Tag: Läden offen.';
   }

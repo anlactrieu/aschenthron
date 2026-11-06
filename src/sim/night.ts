@@ -28,6 +28,8 @@ export function nightBuffable(w: World, m: Actor): boolean {
   return !DUNGEON_REGIONS.includes(regionAt(w, m.home.x, m.home.y)?.name ?? '');
 }
 
+const nightDamage = (d: readonly [number, number]): [number, number] => [Math.max(1, Math.round(d[0] * NIGHT.dmg)), Math.max(2, Math.round(d[1] * NIGHT.dmg))];
+
 /** Schaltet die Nachtwerte eines Gegners ein oder aus (die ursprünglichen Werte bleiben in `nightBase`) */
 export function setNightBuff(m: Actor, on: boolean): void {
   if (on === !!m.nightBase) return;
@@ -35,7 +37,7 @@ export function setNightBuff(m: Actor, on: boolean): void {
     m.nightBase = { maxHp: m.maxHp, hp: m.hp, damage: [m.damage[0], m.damage[1]], aggro: m.aggroRange, reward: m.rewardMult };
     m.maxHp = Math.round(m.maxHp * NIGHT.hp);
     m.hp = m.alive ? Math.min(m.maxHp, Math.round(m.hp * NIGHT.hp)) : m.maxHp;
-    m.damage = [Math.max(1, Math.round(m.damage[0] * NIGHT.dmg)), Math.max(2, Math.round(m.damage[1] * NIGHT.dmg))];
+    m.damage = nightDamage(m.damage);
     m.aggroRange += NIGHT.aggro;
     m.rewardMult *= NIGHT.reward;
   } else if (m.nightBase) {
@@ -53,7 +55,7 @@ export function setNightBuff(m: Actor, on: boolean): void {
 export function rebaseNight(m: Actor): void {
   if (!m.nightBase) return;
   m.nightBase.damage = [m.damage[0], m.damage[1]];
-  m.damage = [Math.max(1, Math.round(m.damage[0] * NIGHT.dmg)), Math.max(2, Math.round(m.damage[1] * NIGHT.dmg))];
+  m.damage = nightDamage(m.damage);
 }
 
 /** Anwesenheit der Nacht-NPCs und Öffnung der Läden, rein aus der Uhr (auch auf dem Client nach jedem Schnappschuss) */

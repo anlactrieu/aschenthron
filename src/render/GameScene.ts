@@ -302,9 +302,10 @@ export class GameScene extends Phaser.Scene {
     this.atmo = new Atmosphere(this, this.sfx);
     // Uhr der Sim (P6): Einzelspieler zählt den eigenen Tick, online kommt der Tick des Servers; `?stunde=` friert sie lokal ein
     this.atmo.source = () => hourOf(this.world);
+    this.ui.clockHour = () => this.atmo.hour();
     if (!this.remote) {
       const sh = params.get('stunde');
-      if (sh !== null && Number.isFinite(Number(sh))) this.world.fixedHour = Number(sh);
+      if (sh && Number.isFinite(Number(sh))) this.world.fixedHour = Number(sh);
       syncNpcPresence(this.world);
     }
     this.townLife = new TownLife(this, this.sfx);
