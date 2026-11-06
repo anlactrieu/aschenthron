@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import mapJson from '../data/aschenthron.json';
 import { assignHotbar, hotbarFor } from './hotbar';
 import { buildWorld, type TiledMap } from '../sim/tiled';
-import { DMG_COLOR, STATUS_COLOR, isGiverOf, monsterKind, npcKeyOf, questById, QUESTS, SHOPS, SKILLS, STATUS_IDS } from '../sim/data';
+import { CHAIN_FIRST, DMG_COLOR, STATUS_COLOR, isGiverOf, monsterKind, npcKeyOf, questById, QUESTS, SHOPS, SKILLS, STATUS_IDS } from '../sim/data';
 import { LANDMARK_TOPICS } from '../sim/topicsData';
 import { THREAT_COLOR, THREAT_TEXT, threatOf } from '../sim/threat';
 import { giverLocation, nextStep, type NextStep, questAvailable, questMarks, type QuestMark } from '../sim/quests';
@@ -815,7 +815,9 @@ export class GameScene extends Phaser.Scene {
       if (idle && this.step) this.ui.say(`Nächster Schritt: ${this.step.text}`);
       return;
     }
-    const next = QUESTS.find((q) => !p.quests[q.id] && questAvailable(p, q));
+    // Neulinge: zuerst der erste Auftrag bei Joren, nicht die erste freie Aufgabe der Liste
+    const open = (q: (typeof QUESTS)[number]) => !p.quests[q.id] && questAvailable(p, q);
+    const next = QUESTS.find((q) => q.chain === CHAIN_FIRST && open(q)) ?? QUESTS.find(open);
     this.lastHint = time;
     if (!next) return;
     const loc = giverLocation(this.world, next);

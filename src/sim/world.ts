@@ -903,7 +903,7 @@ function giftBuyQuest(w: World, a: Actor, n: Npc): void {
     if (def.kind !== 'buy' || st?.state !== 'active' || !(SHOPS[n.shop ?? 'basic'] ?? []).includes(def.target)) continue;
     const left = def.count - st.progress;
     if (!n.closed && a.gold >= buyPrice(def.target) * left) {
-      note(w, a, `${n.name}: „Die ${templateById(def.target).name} liegen in meinen Waren. Je ${buyPrice(def.target)} Gold.“`);
+      note(w, a, `${n.name}: „${templateById(def.target).name} führe ich, je ${buyPrice(def.target)} Gold. Doppelklick auf die Ware kauft sie.“`);
       continue;
     }
     for (let i = 0; i < left; i++) {
