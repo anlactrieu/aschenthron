@@ -569,3 +569,53 @@ Noch offen: 6 Fertigkeiten, 7 Wegweiser, 8 zweite Insel (siehe unten).
 - **Reisende:** Händlerkarren (Fuhrmann `res_farmer`) und zwei Pilger (`res_elder`, `res_fisher`) auf der Handelsstraße Hafen-Osttor → (90,141) → (90,106) → (113,106) → Felsenwacht-Südtor, nur tagsüber, Position = reine Funktion der Zeit, blenden an den Toren aus. Nutzen vorhandene Bewohner-Figuren, kein neuer Backauftrag.
 - **Gemessen** (Dev-Build, `?neu&stunde=12&wetter=klar`, 1024x768, Schleife per `__game.step`, versteckter Pane, andere Sessions liefen parallel): Spielstart 6–7 Frames > 33 ms hinter dem Vorhang (max 74–92 ms) mit wie ohne Wildnis; danach Sprung Roggenfelder, Straße Roggenfelder→Moorlande (500 Schritte), Sprung Moorlande, Moor→Totenacker, Düsterwald→Roggenfelder: **0 Frames > 33 ms**, max 15–31 ms (ohne Wildnis 14–32 ms), Median 2,3–3,1 ms; dasselbe nachts (`?stunde=22`, Fledermäuse aktiv): 0 Frames > 33 ms, max 14–21 ms. Teleport an den Karren (Figur kalt): max 14 ms. Ein Lauf unter paralleler Last (Tests) zeigte einzelne 36–113 ms, Wiederholung im Ruhezustand sauber.
 - **Offen:** Kämpfende Wachpatrouille (nach P4, `world.ts`); Anknüpfung der Notizen an P2-Stichworte; Landmarken ohne Kollision (Held läuft durch Ruinen); Ruinen-Bogen etwas schmal, Frösche im dunklen Moor klein; Tiere ohne eigene Geräusche außer Krähen; `gen_map.py --preview` stürzt mit KeyError 21 ab (schon vorher).
+
+### Umsetzungsstand P4 Kampf mit Gefahr (2026-11-06)
+
+**Recherche Todesstrafe (T4C/D4O).** Quellenlage dünn: Es gibt keine einheitliche Regel, die Strafe ist *je Server* eingestellt (seit v1.81.5.1228 im Changelog serverseitig konfigurierbar). Betreiber laut Steam „Dialsoft, D4O AG“.
+- **Belegt** (Wortlaut der Betreiberseiten):
+  - Realmud-Server, Tod durch Monster: XP **10 %** („10% of current level experience“), Gold **10 %**, Rucksack **5 %**, Ausrüstung **0 %**; Tod durch Spieler: XP 0, Gold 10, Rucksack 0, Ausrüstung 0. Quellen: <https://support.t4c.com/knowledgebase.php?article=14>, <https://support.t4c.com/knowledgebase.php?article=29>, <https://www.t4c.com/cms/realmud-server-settings.html>.
+  - Weitere Server (nur Tooltip auf der Realmud-Seite, Monstertod): 4th Saga XP 5 / Gold 10 / Rucksack 15 / Ausrüstung 0; Neerya XP 15 / Gold 15 / Rucksack 0 / Ausrüstung 0; Abomination (PvP-Testserver) XP 5 / Gold 35 / Rucksack 30 / Ausrüstung 5. Quelle: Realmud-Seite oben; Abomination auch <https://www.t4c.com/cms/article/Opening-Announcement-Abomination-Server.html> (Stand 08/2024).
+  - Es gibt „death piles“ (Trading Rules, Realmud: bestimmte Gegenstände dürfen nicht aus einem Haufen genommen werden) und einen „death timer“, nach dessen Ablauf man zum Tempel teleportiert wird (Changelog v1.81.5.1278, 20.03.2026): <https://t4c-world.com/?page=changelog>.
+- **Nicht belegt / vermutet:** Wovon die XP-Prozente genau gerechnet werden („current level experience“ – wir lesen: seit dem letzten Aufstieg gesammelte XP); Dauer des Death Timers; ob „Backpack 5 %“ Anteil der Gegenstände oder Chance je Gegenstand ist; Bergung der eigenen Leiche (nirgends beschrieben); Schutz für Neulinge (nur indirekt über „Start Level“ bei PvP). Der Changelog wurde nur zum Teil gelesen (rund 40 000 von 340 000 Zeichen wörtlich).
+- Die Recherche lief über Seitenabrufe durch Unter-Agenten; Zahlen oben stehen so auf den genannten Seiten, einzelne Widersprüche der Seiten (Start-Stufe Realmud 10 vs. 25, PvP-Text vs. Tabelle) sind unaufgelöst und für PvM unerheblich.
+
+**Regeln (umgesetzt, `src/sim/death.ts`, Anwendung in `world.ts` `onPlayerDeath`).** Wir nehmen Realmud/Monstertod als Vorbild; Werte nur nach Stufe, ohne Zufall:
+
+| Stufe | XP | Gold | Rucksack | Ausrüstung |
+|---|---|---|---|---|
+| 1–5 | 0 | 0 | 0 | 0 |
+| 6–10 | 5 % der XP dieses Levels | 5 % | 10 % der verlierbaren Gegenstände, max. 1 | 0 |
+| ab 11 | 10 % der XP dieses Levels | 10 % | 10 % (aufgerundet, mind. 1), max. 3 | 0 |
+
+- XP = Anteil dessen, was seit dem letzten Aufstieg gesammelt wurde (nie unter die Stufenschwelle, wie T4C „current level experience“). Das ersetzt die frühere Regel „5 % der Stufenspanne“ (im Mittel gleich groß, bei frisch erreichter Stufe milder).
+- Gold geht wie bei T4C verloren (kein Haufen, bewusst: Goldsenke, keine Änderung an `GroundItem`).
+- Rucksack-Gegenstände fallen an der Todesstelle als **Leichenhaufen** (Leichenlauf wie bisher 5 Minuten), die ersten **60 s nur für den Besitzer** (`GroundItem.owner/ownerUntil`, `isLocked`, geprüft bei `pickup` und `tryPickup`).
+- **Nie verloren:** Angelegtes, Tränke (Rollen und Heiltränke retten den Leichenlauf), Edelsteine, **benannte Funde** und Unikate (D4O nimmt Sonderstücke aus Leichenhaufen aus; bei fester, benannter Beute wäre ein Verlust zu hart).
+- **Abweichungen von D4O und Begründung:** (1) Staffelung für Neulinge, in D4O nicht belegt; Stufe 1–5 ohne Verlust, sonst stirbt man am Anfang gegen Ratten und lernt nur Frust (T4C gilt als „sink or swim“ für Neue). (2) Leichenhaufen mit Besitzersperre und 5-Minuten-Frist: bei D4O ist Bergung nicht belegt; unser Leichenlauf aus dem alten Entwurf bleibt, weil die Kurve aus P3 (L30 ≈ 25 h) harte Verluste sonst nicht trägt. (3) Rucksack-Anteil mit Deckel von 3 statt freiem Prozentsatz (Realmud 5 %). (4) Kein Death Timer, kein Priester-Wiedererwecken: Respawn sofort in der Stadt wie bisher.
+- Nachricht im Spiel (`GameScene`, `deathPenalty`) nennt jetzt Gold und die 60-s-Sperre; Hilfetext in `ui.ts` angepasst.
+
+**Pace (`npm run pace`, Bot, feste Beute; gleiche Läufe vorher auf `97d959b`, nachher auf dem Ergebnis von P4):**
+
+| Seed | vorher L30 / Tode | nachher L30 / Tode |
+|---|---|---|
+| 2024 | 24,9 h / 88 | 32,4 h / 103 |
+| 7 | 22,8 h / 40 | 22,6 h / 106 |
+| 99 | 27,6 h / 84 | 33,5 h / 52 |
+| 11 | über 40 h (hängt) / 6 | 23,0 h / 89 |
+| 12 | 22,7 h / 54 | 22,9 h / 55 |
+| 13 | 22,3 h / 67 | 24,7 h / 73 |
+
+Median vorher 23,8 h (Seed 11 als „über 40 h“ gezählt), nachher 24,0 h. Nur Todesstrafe (Zwischenmessung): Seed 2024 25,8 h, Seed 7 27,9 h. **Befund:** Die zwei Ausreißer (2024, 99) sind Bot-Schleifen, kein Balance-Effekt: Seed 2024 sitzt von Minute 172 bis 636 auf Stufe 13 bei (22,65) im Räuberlager und tötet nur den nachspawnenden Champion „Blutsaugender Räuber“ (L10); Gold steigt, XP kaum. Der Bot wählt das nächste Ziel in `[Stufe−4, Stufe+1]` und verlässt so einen Platz nie. Dieselbe Falle hat in der Vorher-Messung Seed 11 getroffen. Einzeln abgeschaltete Teile (Ruf, Flucht, Gefahrenorte) brachten bei Seed 2024/99 Stufe 20 nach 482–568 min und L30 nach 26,2–28,8 h; der Verursacher ist nicht eindeutig, weil jede Änderung den Zufallsstrom verschiebt. Der Bot wurde bewusst nicht geändert (Vergleichbarkeit). Todesstrafe und KI machen den Bot im Schnitt etwas langsamer und sterben lassen ihn öfter, das Ziel 20–30 h hält im Median.
+
+**Gegner-KI (`world.ts`, Werte `data.ts`, Tests `ai.test.ts`).** `MonsterKind.calls/flees`. **Ruf** (`callForHelp`, in `alertPack`): ein Rufer (Goblins, Häuptling/Kriegsherr/Brecher/Schamane, Banditen, Hauptmann) holt beim ersten Kontakt gleichartige Rufer derselben Beutegruppe im Umkreis `CALL_RANGE` 12 (auch aus anderen Rudeln), je Rufer alle 20 s, Ereignis `call` → Sprechblase „Zu mir!“ mit Ring. **Flucht** (`fleeStep`): nur Goblin, Kundschafter, Krieger, Schütze, Räuberlehrling, Wegelagerer, Räuberschütze, Räuber, nur einmal je Leben, unter 25 % Leben, 8 s Richtung Heimat (`autoAttack` aus, Ziel bleibt), danach zurück in den Kampf, Ereignis `flee` → „Rückzug!“. Nie: Untote, Bosse, Unikate, Champions, Häuptlinge, Beschwörungen (Test). Feste Schwellen und Ticks, kein Zufall; Mehrspieler: Events laufen über `makeSnapshot` (`call`/`flee` nach Sichtbarkeit).
+
+**Gefahr sichtbar.** `src/sim/threat.ts`: Stufenabstand Monster − Spieler (+1 Champion, +3 Boss/Unikat): ≤ −5 grau, ≤ 0 weiß, 1–2 gelb, 3–4 orange, ab 5 rot. Beim Zeigen steht „Name (Lv N) · Wort“ in dieser Farbe (`GameScene.updateActors`); `label()` aktualisiert jetzt auch die Farbe. Die XP hängen nicht am Stufenabstand, „grau“ heißt nur „harmlos“.
+
+**Gefahrenorte.** `DANGER_SPOTS` in `data.ts` (Karte und `MAP_VERSION` unverändert, Spawn in `buildWorld` nach `setupPatrols`, eigene Rudel-Kennung ab 200001, bleiben am Platz): **Wolfsbau** bei (57,138) mit 3 Schreckenswölfen (L11) und 1 Wolf in den Roggenfeldern (Stufe 1–5), **Räubernest im Röhricht** bei (76,145) mit Hauptmann (L13) und 3 Räubern (L10), ebenfalls Roggenfelder, weit weg von der Handelsstraße (x ≈ 90). Ein erster Platz im Düsterwald-Eingang wurde verworfen (`p3.test.ts` verlangt dort höchstens 3er-Rudel). Hinweise (`hint`) stehen in den Daten, sind aber noch in keinem Gespräch eingebaut.
+
+**Reste aus P2/P5.** „?“-Marker über jedem Geber eines fertigen versteckten Auftrags (`GameScene.questMark`, `isGiverOf`, auch bei NPCs ohne Auftragsliste). Landmarken-Notizen lehren Stichworte: `LANDMARK_TOPICS` (10 der 12 Notizen; Lagerfeuer lm7/lm25 bleiben Stimmung) in `topicsData.ts`, Befehl `readNote {id}` (`world.landmarks` aus der Karte, Reichweite 4, Netzprüfung `^lm[0-9]+$`), Haken `Wildlife.onNote`.
+
+**Im Spiel geprüft** (Dev-Build `vite build --mode development`, eigener Port 5191, Browser-Pane; Bildrate im versteckten Pane niedrig, Schritte per `__game.step`): Hover am Schreckenswolf (Lv 11) bei Spielerstufe 3/6/8/10/12/17 → rot „tödlich“, orange „gefährlich“, gelb „etwas stärker“, weiß „ebenbürtig“, grau „harmlos“ (Farbwerte aus dem Label gelesen); Goblin bei 1 Leben: „Rückzug!“, Goblin eines anderen Rudels schließt sich an: „Zu mir!“; Tod auf Stufe 17: −500 XP, −90 Gold, 1 Ring am Todesort mit 60-s-Sperre und 5-min-Frist, nach Rücklauf wieder im Rucksack; „?“ über Hauptmann Brandt bei erledigtem `h_rot1`.
+
+**Offen / Mängel.** Kein Death Timer und keine Wiederbelebung durch NPC; Gefahrenorte ohne Gerüchte in Gesprächen und ohne Kartenzeichen; nur zwei Orte (Düsterwald-Eingang ist wegen `p3.test.ts` frei geblieben); Gold-Verlust ohne Haufen; Bot-Schleife siehe oben (Messung streut stark, 8 Seeds wären besser als 6); die „kämpfende Wachpatrouille“ aus P5 ist nicht Teil von P4 geworden; Rufen und Fliehen im Mehrspieler nur im Sim-Test, nicht mit echtem Server geprüft.

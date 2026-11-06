@@ -2672,6 +2672,7 @@ export class GameScene extends Phaser.Scene {
       this.labels.set(id, t);
     }
     if (t.text !== text) t.setText(text);
+    if (t.style.color !== color) t.setColor(color);
     // Namen wachsen beim Herauszoomen mit, damit sie auf dem Bildschirm mindestens ~9 px groß bleiben (Zoom bis 0.5);
     // beim Standard-Zoom 1 bleibt der Faktor 1 (kein unscharfes Hochskalieren)
     const k = Math.max(1, 9 / (size * this.cameras.main.zoom));
