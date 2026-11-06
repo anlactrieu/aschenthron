@@ -118,7 +118,7 @@ export function questMarks(w: World, p: Actor): QuestMark[] {
 }
 
 /** Ortsangabe für die Aufgabenliste: Region-Name(n), in denen das Ziel zu finden ist. */
-export function questWhere(w: World, def: QuestDef, done = false): string {
+export function questWhere(w: World, def: QuestDef, done = false, p?: Actor): string {
   if (done) return giverLocation(w, def)?.text ?? '';
   if (def.kind === 'champion') return 'Champions in der Wildnis (Gegner mit Aura)';
   if (def.kind === 'find') {
@@ -136,7 +136,8 @@ export function questWhere(w: World, def: QuestDef, done = false): string {
     const n = w.npcs.find((x) => npcKeyOf(x.name) === def.target);
     if (n) return `${n.name} (${regionAt(w, n.x, n.y)?.name ?? '?'})`;
   } else if (def.kind === 'buy') {
-    const n = w.npcs.find((x) => x.kind === 'merchant' && (SHOPS[x.shop ?? 'basic'] ?? []).includes(def.target));
+    // derselbe Händler wie die Markierung (nächster zum Spieler, sonst der erste)
+    const n = p ? sellerOf(w, p, def.target) : w.npcs.find((x) => x.kind === 'merchant' && (SHOPS[x.shop ?? 'basic'] ?? []).includes(def.target));
     if (n) return `${n.name} (${regionAt(w, n.x, n.y)?.name ?? '?'})`;
   } else if (def.chain === CHAIN_FIRST && def.kind === 'kill') names.add(BEGINNER_ZONE.name); else if (def.kind === 'bring' && def.chestRegion) names.add(def.chestRegion);
   else {
@@ -191,7 +192,7 @@ export function nextStep(w: World, p: Actor): NextStep | null {
   for (const def of QUESTS) {
     if (def.chain !== CHAIN_FIRST || p.quests[def.id]?.state !== 'active') continue;
     const t = questTarget(w, p, def, false);
-    return { kind: 'quest', text: `Erster Auftrag: „${def.name}“ – ${questWhere(w, def) || 'Ziel suchen'}`, x: t?.x, y: t?.y };
+    return { kind: 'quest', text: `Erster Auftrag: „${def.name}“ – ${questWhere(w, def, false, p) || 'Ziel suchen'}`, x: t?.x, y: t?.y };
   }
   // 2) Geschichte: nächstes Kettenglied, das jetzt angenommen werden kann
   const chained = QUESTS.filter((q) => q.chain && questAvailable(p, q) && p.level - q.minLevel <= 6).sort((a, b) => a.minLevel - b.minLevel)[0];

@@ -908,7 +908,9 @@ function giftBuyQuest(w: World, a: Actor, n: Npc): void {
     }
     for (let i = 0; i < left; i++) {
       const item = generateItem(w.rng, w.nextId++, def.target, 'normal');
-      a.inventory.push(item);
+      // wie beim Kauf: zu schwer → neben den Spieler legen statt den Rucksack zu überladen
+      if (carriedWeight(a) + item.weight > carryCapacity(a)) w.ground.push({ id: w.nextId++, x: Math.round(a.x), y: Math.round(a.y), item, expiresAt: null });
+      else a.inventory.push(item);
       w.events.push({ type: 'pickedUp', item, to: a.id });
     }
     note(w, a, `${n.name}: „Nimm die hier, du zahlst, wenn du Gold hast.“`);
