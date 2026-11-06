@@ -825,7 +825,6 @@ export function merchantCart(frame: number): Raster {
 /** Händlerkarren von vorn (`down`, zum Betrachter fahrend, mit Pferd davor) oder von hinten (Rückwand mit Klappe, Pferd verdeckt) */
 export function merchantCartV(down: boolean): Raster {
   const r = new Raster(34, down ? 50 : 40);
-  const top = down ? 0 : 0;
   const baseY = down ? 32 : 34;
   // Räder (schmal, von vorn)
   for (const wx of [3, 30]) r.ellipse(wx, baseY - 4, 2.4, 6.4, (_x, _y, nx) => (Math.abs(nx) > 0.4 ? R.wood[1] : R.wood[3]));
@@ -837,7 +836,7 @@ export function merchantCartV(down: boolean): Raster {
   // Plane
   r.ellipse(17, baseY - 8, 12.5, 12, (_x, y, _nx, ny) => (y < baseY - 8 ? tone(R.linen, ny < -0.5 ? 4 : 3) : null));
   if (down) r.ellipse(17, baseY - 9, 6, 6.5, (_x, y) => (y < baseY - 9 ? R.char[1] : null));
-  else for (let y = top + 8; y < baseY - 9; y += 3) r.rect(9, y, 16, 1, R.linen[2]);
+  else for (let y = 8; y < baseY - 9; y += 3) r.rect(9, y, 16, 1, R.linen[2]);
   if (down) {
     // Pferd von vorn: Brust, Kopf, Ohren
     r.ellipse(17, baseY + 5, 6, 5, (_x, _y, nx) => tone([0x2a1c12, 0x4a3220, 0x6a4a30, 0x82603e, 0x9a7650], nx < -0.3 ? 4 : 3));

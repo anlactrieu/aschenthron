@@ -877,7 +877,7 @@ _LM_BUSY = [(o["x"] // TS, o["y"] // TS) for o in objs if o["type"] in ("npc", "
 _LM_BUSY += [(o["x"] // TS + dx, o["y"] // TS + dy) for o in objs if o["type"] == "camp" for dx in range(0, o["width"] // TS + 1, 2) for dy in range(0, o["height"] // TS + 1, 2)]
 _LM_SAFE = [r for n, r in _LM_REGIONS.items() if n in ("Aschenhafen", "Felsenwacht")]
 _LM_TAKEN = []
-def _lm_ok(x, y, region, kind):
+def _lm_ok(x, y, region):
     r = _LM_REGIONS[region]
     if not (r[0] + 2 <= x <= r[2] - 2 and r[1] + 2 <= y <= r[3] - 2): return False
     if any(a - 3 <= x <= c + 3 and b - 3 <= y <= d + 3 for a, b, c, d in _LM_SAFE): return False
@@ -895,7 +895,7 @@ def landmark(kind, name, region, x, y, text=""):
         for dy in range(-rad, rad + 1):
             for dx in range(-rad, rad + 1):
                 if max(abs(dx), abs(dy)) != rad: continue
-                if _lm_ok(x + dx, y + dy, region, kind):
+                if _lm_ok(x + dx, y + dy, region):
                     props = dict(kind=kind, id="lm%d" % (len(_LM_TAKEN) + 1), topic="")
                     if text: props["text"] = text
                     obj(name, "landmark", x + dx, y + dy, **props)

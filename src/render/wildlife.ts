@@ -144,8 +144,8 @@ export const TRAVELERS: TravelerDef[] = [
 /** Ort eines Reisenden zur Zeit `t` (ms): hin und zurück, ohne Zustand. `fade` (0..1) blendet an den Toren ein und aus */
 export function travelerAt(def: TravelerDef, t: number, route: typeof ROUTE = ROUTE): { x: number; y: number; dx: number; dy: number; fade: number } {
   const L = routeLength(route);
-  const m = (((def.offset + (t / 1000) * def.speed) % (2 * L)) + 2 * L) % (2 * L);
-  const fwd = m < L === (def.start === 1);
+  const m = (((def.offset + (def.start === 1 ? 0 : L) + (t / 1000) * def.speed) % (2 * L)) + 2 * L) % (2 * L);
+  const fwd = m < L;
   const s = m < L ? m : 2 * L - m;
   const p = routeAt(s, route);
   const sgn = fwd ? 1 : -1;
@@ -377,7 +377,7 @@ export class Wildlife {
   /** Zahlen zum Prüfen (Browser-Konsole, Tests): lebende Tiere je Art, sichtbare Landmarken und Reisende */
   stats(): { critters: Record<string, number>; landmarks: number; travelers: number } {
     const critters: Record<string, number> = {};
-    for (const c of this.critters) if (c.img.visible || c.state !== 'free') critters[c.kind] = (critters[c.kind] ?? 0) + (c.state === 'free' ? 0 : 1);
+    for (const c of this.critters) if (c.state !== 'free') critters[c.kind] = (critters[c.kind] ?? 0) + 1;
     return { critters, landmarks: this.lms.filter((l) => l.img.visible).length, travelers: this.travelers.filter((t) => t.img.visible || t.cart?.visible).length };
   }
 
@@ -401,8 +401,8 @@ export class Wildlife {
       const { sx, sy } = toScreen(lm.x, lm.y);
       const on = d < 40 && sx > c.view.x - 160 && sx < c.view.x + c.view.width + 160 && sy > c.view.y - 120 && sy < c.view.y + c.view.height + 200;
       if (img.visible !== on) img.setVisible(on);
-      if (on && (lm.kind === 'ruin' || lm.kind === 'gallows' || lm.kind === 'shrine' || lm.kind === 'camp' || lm.kind === 'corpse')) {
-        // flacher Schatten unter den hohen Bildern
+      if (on) {
+        // flacher Schatten unter dem Bild
         this.shadow.fillStyle(0x000000, 0.14);
         this.shadow.fillEllipse(sx, sy + TILE_H / 2 + 1, lm.kind === 'ruin' ? 70 : 30, 9);
       }
@@ -566,9 +566,21 @@ export class Wildlife {
     return false;
   }
 
-  private free(a: Critter, c: WildCtx): (x: number, y: number) => boolean {
-    const gnd = GROUND[a.kind];
-    return (x, y) => isWalkable(c.grid, Math.round(x), Math.round(y)) && (a.kind === 'crow' || gnd.has(c.gid(Math.round(x), Math.round(y))));
+  private canStand(a: Critter, c: WildCtx, x: number, y: number): boolean {
+    const tx = Math.round(x);
+    const ty = Math.round(y);
+    return isWalkable(c.grid, tx, ty) && (a.kind === 'crow' || GROUND[a.kind].has(c.gid(tx, ty)));
+  }
+
+  /** Ein Schritt in Richtung `ang`; false, wenn dort kein passender Boden ist */
+  private move(a: Critter, c: WildCtx, speed: number, ang: number, sec: number): boolean {
+    const nx = a.x + Math.cos(ang) * speed * sec;
+    const ny = a.y + Math.sin(ang) * speed * sec;
+    if (!this.canStand(a, c, nx, ny)) return false;
+    a.x = nx;
+    a.y = ny;
+    if (Math.abs(Math.cos(ang)) > 0.2) a.flip = Math.cos(ang) < 0;
+    return true;
   }
 
   private release(a: Critter): void {
@@ -588,16 +600,6 @@ export class Wildlife {
       }
     }
     if (a.fade >= 0 && (dpl > DESPAWN_DIST || a.zone !== c.region || (a.kind === 'bat' && !night && c.night < 0.25))) a.fade = -1 / 500;
-    const free = this.free(a, c);
-    const move = (speed: number, ang: number): boolean => {
-      const nx = a.x + Math.cos(ang) * speed * sec;
-      const ny = a.y + Math.sin(ang) * speed * sec;
-      if (!free(nx, ny)) return false;
-      a.x = nx;
-      a.y = ny;
-      if (Math.abs(Math.cos(ang)) > 0.2) a.flip = Math.cos(ang) < 0;
-      return true;
-    };
     switch (a.kind) {
       case 'deer': {
         if (a.state !== 'flee' && dpl < 6.5) {
@@ -607,7 +609,7 @@ export class Wildlife {
         }
         if (a.state === 'flee') {
           if (c.time >= a.until) {
-            const ang = fleeAngle(c.player, a, this.rng, free);
+            const ang = fleeAngle(c.player, a, this.rng, (x, y) => this.canStand(a, c, x, y));
             if (ang === null) {
               a.state = 'idle';
               a.until = c.time + 1500;
@@ -616,7 +618,7 @@ export class Wildlife {
             a.ang = ang;
             a.until = c.time + 350;
           }
-          if (!move(5.4, a.ang)) a.until = c.time;
+          if (!this.move(a, c, 5.4, a.ang, sec)) a.until = c.time;
           if (dpl > 15 && c.time - a.since > 1500) {
             a.state = 'idle';
             a.until = c.time + 2500 + this.rng() * 3000;
@@ -625,7 +627,7 @@ export class Wildlife {
           const dx = a.tx - a.x;
           const dy = a.ty - a.y;
           const d = Math.hypot(dx, dy);
-          if (d < 0.1 || !move(0.9, Math.atan2(dy, dx))) {
+          if (d < 0.1 || !this.move(a, c, 0.9, Math.atan2(dy, dx), sec)) {
             a.state = 'idle';
             a.until = c.time + 1500 + this.rng() * 3000;
           }
@@ -638,7 +640,7 @@ export class Wildlife {
             const len = 1.5 + this.rng() * 2.5;
             const tx = a.x + Math.cos(ang) * len;
             const ty = a.y + Math.sin(ang) * len;
-            if (free(tx, ty) && lineClear(c.grid, a.x, a.y, tx, ty)) {
+            if (this.canStand(a, c, tx, ty) && lineClear(c.grid, a.x, a.y, tx, ty)) {
               a.tx = tx;
               a.ty = ty;
               a.state = 'walk';
@@ -671,7 +673,7 @@ export class Wildlife {
           const len = 1.2 + this.rng() * 0.8;
           const tx = a.x + Math.cos(ang) * len;
           const ty = a.y + Math.sin(ang) * len;
-          if (!free(tx, ty)) return;
+          if (!this.canStand(a, c, tx, ty)) return;
           a.tx = tx;
           a.ty = ty;
           a.cx = a.x;

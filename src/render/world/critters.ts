@@ -3,7 +3,7 @@
  * wenige flache Töne, Licht von oben links; alle Tiere blicken nach rechts (gespiegelt wird beim Anzeigen). Fußpunkt = Unterkante.
  * Die Krähe kommt aus dem Stadtleben (townLife.ts), sie wird dort schon gezeichnet.
  */
-import { INK, Raster, h3, mix, type Rgb } from './raster';
+import { INK, Raster, h3, type Rgb } from './raster';
 import { tone, type Ramp5 } from './props';
 
 const FUR: Ramp5 = [0x2a1a10, 0x4a3220, 0x6c4a2a, 0x8c6438, 0xb4884e];
@@ -115,5 +115,3 @@ export function bat(frame: number): Raster {
   return r.outline(INK);
 }
 
-/** Kann man mischen? Hilfsfarbe für Nacht-Aufhellung der Fledermaus-Ränder, nur zum Test genutzt */
-export const batRim = (night: number): Rgb => mix(0x7a6a96, 0xc8b8e8, night);

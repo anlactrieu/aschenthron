@@ -45,6 +45,8 @@ describe('Wildnis: Landmarken in der Karte', () => {
   });
   it('die Karte selbst bleibt unberührt: Landmarken sind nur Objekte, die Sim kennt keine', () => {
     expect(world.npcs.length).toBe(22);
+    expect(world.regions.length).toBe(16);
+    expect(ground.length).toBe(g.w * g.h);
   });
 });
 
@@ -70,6 +72,12 @@ describe('Wildnis: Handelsstraße und Reisende', () => {
       }
       expect(turned).toBe(true);
       expect(Math.hypot(last.dx, last.dy)).toBeCloseTo(1, 5);
+      // die Blickrichtung entspricht der tatsächlichen Bewegung (kein Rückwärtslaufen)
+      for (let t = 1000; t < 200000; t += 7000) {
+        const a = travelerAt(def, t);
+        const b = travelerAt(def, t + 500);
+        if (a.fade > 0.3 && b.fade > 0.3 && Math.abs(b.x - a.x) + Math.abs(b.y - a.y) < 2) expect((b.x - a.x) * a.dx + (b.y - a.y) * a.dy).toBeGreaterThan(0);
+      }
     }
   });
   it('Reisende nutzen vorhandene Bewohner-Figuren (kein neuer Backauftrag)', () => {
