@@ -7,9 +7,13 @@
  */
 import { SHADE, type Posed } from './heroRig.js';
 
-export type FigView = 'side' | 'front' | 'back';
+/** Ansichten: Draufsicht 3, Iso 5 (Schrägen nach unten bzw. oben, links jeweils gespiegelt), siehe `viewOf` in iso.ts */
+export type FigView = 'side' | 'front' | 'back' | 'frontDiag' | 'backDiag';
 export type FigAnim = 'idle' | 'walk' | 'attack' | 'hit' | 'die';
+/** Bildzeilen der Sheets, die heute gebacken werden (beide Modi, bis P9.1 die Rigs für die Schrägen erweitert) */
 export const FIG_VIEWS: FigView[] = ['side', 'front', 'back'];
+/** Ansichtsliste je Modus: Ziel für P9.1 (der Cache-Schlüssel muss sie dann enthalten); die ersten 3 bleiben in dieser Reihenfolge */
+export const figViews = (iso: boolean): FigView[] => (iso ? ['side', 'front', 'back', 'frontDiag', 'backDiag'] : ['side', 'front', 'back']);
 export const FIG_ANIMS: FigAnim[] = ['idle', 'walk', 'attack', 'hit', 'die'];
 
 /** Farbverlauf hell -> dunkel, 5. Wert = Naht */

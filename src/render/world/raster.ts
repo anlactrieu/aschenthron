@@ -5,7 +5,7 @@
  * Rampen, Licht von oben links, kräftiger Umriss nur an Objekten.
  */
 
-/** Kunstpixel je Kachel und Anzeige-Maßstab (24 * 2 = 48 = TILE_W) */
+/** Kunstpixel je Kachel und Anzeige-Maßstab (24 * 2 = 48 = TILE_W der Draufsicht; Iso-Raute 32x16 Kunstpixel: ISO_ART_W/H in iso.ts) */
 export const ART = 24;
 export const ART_SCALE = 2;
 

@@ -20,8 +20,8 @@ import { Raster, toCanvas } from './world/raster';
 import { grave, pillar, rock, tree } from './world/props';
 import { heroMode, heroPortraitCanvas } from './heroSheet';
 
-export const TILE_W = 48;
-export const TILE_H = 48;
+import { TILE_H, TILE_W } from './iso';
+export { TILE_H, TILE_W };
 
 function mkCanvas(w: number, h: number): HTMLCanvasElement {
   const c = document.createElement('canvas');
