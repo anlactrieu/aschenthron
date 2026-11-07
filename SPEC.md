@@ -745,7 +745,7 @@ Entscheidungen (2026-11-07):
 - **Kräftiger Sound:** satte Einschläge je Waffenart (Klinge, Wucht, Bogen, Magie), lauter bei Kritischen.
 - **Schadenszahlen:** größer, springend, Kritische deutlich hervorgehoben. Weniger, dafür lesbare Zahlen.
 
-## Umsetzungsplan P9 Iso (Plan 2026-11-07, P9.0 umgesetzt, siehe „Umsetzungsstand P9.0“)
+## Umsetzungsplan P9 Iso (Plan 2026-11-07, P9.0 bis P9.5 umgesetzt, siehe „Umsetzungsstand P9.0“ bis „P9.5“)
 Grundlage: Probe `scripts/bake-iso-probe.ts` mit `probe/iso/` (`vergleich.png`, `held-richtungen.png`), Aufwandstabelle unter „Ansicht: Probe Draufsicht gegen Iso“.
 
 **Entscheidungen des Nutzers (2026-11-07):**
@@ -975,6 +975,13 @@ Reihenfolge: 4 Runden mit 6 Sessions. Erst P9.0, dann P9.1, P9.2 und P9.3 gleich
   - `/code-review` über den ganzen Umbau.
   - Der Nutzer testet lokal.
   - `main` wird nur nach seinem ausdrücklichen Okay gepusht.
+
+**Umsetzungsstand P9.5 (2026-11-07, Branch `claude/p9-5-standard-3a74b5`, nicht gepusht)**
+- **Iso ist die einzige Ansicht.** `?ansicht=iso` und `ISO` sind weg; `iso.ts` kennt nur noch Iso 64x32, Funktionen ohne `iso`-Parameter (`project`, `viewOf`, `tileRange`, `mapBounds`, `arrowStep`, `groundSize(w)`). `FIG_VIEWS` ist die Liste der 5 Ansichten (Vorgabe von `bakeFigure`, Worker bekommt sie mit); `sheetViews.ts` und `figViews(iso)` gibt es nicht mehr.
+- **Gelöscht:** Draufsicht-Chunks und -Häuser in `GameScene.ts`, `paintGround`, `stampDetail`/`stampWaterDetail`, `wallTile`/`WALLS`, die Draufsicht-Bauer in `houses.ts` (übrig: `detectHouses`, `signRaster`, `houseDecor`, `WINDOW_LIGHT`), `scripts/bake-world.ts`, `scripts/bake-iso-probe.ts` (beide rendern die Draufsicht; Stand im Git-Verlauf bis 229f3f1; die Bilder in `probe/iso/` bleiben als Beleg).
+- **Geändert:** `figureBaseline.json` (Hash der 5-Ansichten-Sheets, Stand P9.5), Zeitgrenze in `monster.test.ts` (5 Ansichten: 7 s allein, 22 s im vollen Testlauf). Sim, Server, Netz, Spielstände, Karte und alle Sim-Snapshots blieben unberührt.
+- **Fehler aus P9.4 behoben:** `figSize`/`bodyBox` lasen die Textur eines Akteurs, die der Sheet-Cache schon verworfen hatte (Tod des Helden im Rattenschwarm, Zaubereffekt auf eben entfernte Figur): die Szene fror ein. Jetzt liefert beides `null`.
+- **Bildzeit:** Tabelle im Notizordner (`p9-5/bildzeit.md`). CPU-Zeit je Frame Iso gegenüber Draufsicht mit 8 Gegnern: Stadt +1,4 ms, Felder +0,6 ms, Katakomben +1,3 ms (Median), kein Frame über 33 ms.
 
 ### Risiken
 - **Wände und Dungeons** sind der größte Brocken, wegen der Verdeckung in engen Gängen und weil die Wände aus dem Boden-Chunk herausgelöst werden müssen.

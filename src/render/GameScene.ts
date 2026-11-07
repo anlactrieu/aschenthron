@@ -2188,6 +2188,8 @@ export class GameScene extends Phaser.Scene {
   /** Sichtbare Höhe/Breite einer Ninja-Figurentextur (über den Füßen, in Bildpunkten); `null` bei DCSS-/prozeduralen Figuren. */
   /** Körperkasten einer Skelett-Figur (Bildschirm-Pixel) oder `null` für alte Figuren */
   private bodyBox(img: Phaser.GameObjects.Image): Phaser.Geom.Rectangle | null {
+    // Textur schon vom Sheet-Cache verworfen (Ansicht eines gerade gestorbenen oder entfernten Akteurs, z. B. für Zaubereffekte): kein Maß
+    if (!img.texture?.has('__BASE')) return null;
     const src = img.texture.getSourceImage() as { figSheet?: unknown } | undefined;
     const fig = src?.figSheet || img.texture.key === SIL_TEX ? this.figSize(img) : null;
     return fig ? new Phaser.Geom.Rectangle(img.x - fig.w / 2, img.y - fig.top, fig.w, fig.top) : null;
@@ -2199,6 +2201,8 @@ export class GameScene extends Phaser.Scene {
       const s = silhouetteOf(img.frame.name);
       return s ? { top: s.top, w: s.w, dir: true, all: true } : null;
     }
+    // Textur schon vom Sheet-Cache verworfen (Ansicht eines gerade gestorbenen oder entfernten Akteurs, z. B. für Zaubereffekte): kein Maß
+    if (!img.texture?.has('__BASE')) return null;
     const src = img.texture.getSourceImage() as { figTop?: number; figW?: number; figDir?: boolean; figSheet?: { mirrorAll?: boolean } } | undefined;
     return src && src.figTop !== undefined ? { top: src.figTop, w: src.figW ?? 0, dir: !!src.figDir, all: !!src.figSheet?.mirrorAll } : null;
   }
