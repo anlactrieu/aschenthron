@@ -1,5 +1,7 @@
 import type Phaser from 'phaser';
 import { rect } from './art';
+import { ISO } from './iso';
+import { blockRaster, isoPropKey, isoPropRaster, type IsoProp } from './isoTownArt';
 import { Raster, toCanvas } from './world/raster';
 import { barrel, boat, crates, flowerBox, lantern, post, ship, stall, wallTile, well } from './world/props';
 
@@ -61,11 +63,13 @@ export function registerTownArt(scene: Phaser.Scene): void {
   const add = (key: string, c: HTMLCanvasElement) => {
     if (!scene.textures.exists(key)) scene.textures.addCanvas(key, c);
   };
-  // Wand-/Türkacheln außerhalb erkannter Häuser (in der jetzigen Karte keine): schlichte Ziegelwand der Code-Welt
-  for (let v = 0; v < 4; v++) add(`twn_wall_${v}`, toCanvas(wallTile('brick', 15, v, 0)));
+  // Wand-/Türkacheln außerhalb erkannter Häuser (in der jetzigen Karte keine): schlichte Ziegelwand der Code-Welt, in Iso ein Ziegelblock
+  for (let v = 0; v < 4; v++) add(`twn_wall_${v}`, toCanvas(ISO ? blockRaster(v, null) : wallTile('brick', 15, v, 0)));
   DOOR_ICONS.forEach((icon) => {
-    for (const axis of ['x', 'y'] as const) add(`twn_door_${icon}_${axis}`, toCanvas(wallTile('brick', 15, 0, 1)));
+    for (const axis of ['x', 'y'] as const) add(`twn_door_${icon}_${axis}`, toCanvas(ISO ? blockRaster(0, { icon, axis, draw: drawDoorIcon }) : wallTile('brick', 15, 0, 1)));
   });
+  // Iso: Stände, Blumenkästen und Zäune je in beiden Zugrichtungen (isoTownProp in isoHouses.ts wählt sie)
+  if (ISO) for (const kind of ['stall', 'flowers', 'fence'] as IsoProp[]) for (const axis of ['x', 'y'] as const) add(isoPropKey(kind, axis), toCanvas(isoPropRaster(kind, axis)));
   // Stadt-Props der Code-Welt (world/props.ts), Maßstab 2, Fußpunkt unten mittig
   const W = (key: string, make: () => Raster) => add(key, toCanvas(make()));
   W('twn_barrel', barrel);

@@ -3,7 +3,7 @@ import mapJson from '../data/aschenthron.json';
 import { buildWorld, type TiledMap } from '../sim/tiled';
 import { isWalkable } from '../sim/path';
 import { RESIDENT_KINDS } from './npc';
-import { FLAT_DECOR, TOWNS, congratText, dayPhase, inShift, lineClear, looksOf, pickShout, pickSpot, spriteRows } from './townLife';
+import { DIAMOND_H, DIAMOND_W, FLAT_DECOR, TOWNS, congratText, dayPhase, diamondRows, inShift, leftward, lineClear, looksOf, pickShout, pickSpot, spriteRows } from './townLife';
 
 const { world } = buildWorld(1, mapJson as unknown as TiledMap);
 const g = world.grid;
@@ -123,5 +123,41 @@ describe('Stadtleben: Texte', () => {
 describe('Stadtleben: Bilder', () => {
   it('alle Zeilen eines Sprites gleich breit', () => {
     for (const [name, rows] of Object.entries(spriteRows())) for (const r of rows) expect(r.length, `${name}: ${r}`).toBe(rows[0]!.length);
+  });
+});
+
+describe('Stadtleben: Tiere und flaches Dekor in Iso', () => {
+  it('Blickrichtung richtet sich nach dem Bildschirm', () => {
+    // Draufsicht: Rasterdelta
+    expect(leftward(false, -1, 0, false)).toBe(true);
+    expect(leftward(false, 1, 3, true)).toBe(false);
+    expect(leftward(false, 0, 2, true)).toBe(false);
+    // Iso: (dx − dy) entscheidet; x−1 und y+1 laufen nach links, y−1 nach rechts (obwohl dx = 0 bzw. dx > 0)
+    expect(leftward(true, -1, 0, false)).toBe(true);
+    expect(leftward(true, 0, 1, false)).toBe(true);
+    expect(leftward(true, 0, -1, true)).toBe(false);
+    expect(leftward(true, 2, 1, true)).toBe(false);
+    expect(leftward(true, 1, 2, false)).toBe(true);
+    // senkrecht auf dem Bildschirm (dx = dy): bleibt
+    expect(leftward(true, 1, 1, true)).toBe(true);
+    expect(leftward(true, -1, -1, false)).toBe(false);
+  });
+  it('flaches Dekor wird zur Raute: nichts außerhalb, Mitte gefüllt, nur bekannte Farben', () => {
+    for (const kind of FLAT_DECOR) {
+      const rows = diamondRows(spriteRows()[kind]!);
+      expect(rows.length).toBe(DIAMOND_H);
+      let filled = 0;
+      rows.forEach((row, y) => {
+        expect(row.length).toBe(DIAMOND_W);
+        for (let x = 0; x < DIAMOND_W; x++) {
+          const nx = (x + 0.5 - DIAMOND_W / 2) / (DIAMOND_W / 2);
+          const ny = (y + 0.5 - DIAMOND_H / 2) / (DIAMOND_H / 2);
+          if (Math.abs(nx) + Math.abs(ny) > 1) expect(row[x], `${kind} ${x},${y}`).toBe('.');
+          else if (row[x] !== '.') filled++;
+        }
+      });
+      expect(rows[DIAMOND_H / 2]![DIAMOND_W / 2], kind).not.toBe('.');
+      expect(filled, kind).toBeGreaterThan(DIAMOND_W * DIAMOND_H * 0.3);
+    }
   });
 });

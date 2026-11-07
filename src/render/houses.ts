@@ -383,7 +383,7 @@ function doorLeaf(r: Raster, oy: number): void {
 }
 
 /** Hängendes Berufsschild (Holzbrett, dunkler Rand, Symbol), 16x16 */
-function signRaster(icon: DoorIcon): Raster {
+export function signRaster(icon: DoorIcon): Raster {
   const r = new Raster(16, 16);
   r.rect(0, 0, 16, 16, INK);
   r.rect(1, 1, 14, 14, 0x6a4a2c);

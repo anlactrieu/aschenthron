@@ -7,7 +7,7 @@
  */
 import type Phaser from 'phaser';
 import { isWalkable, type Grid } from '../sim/path';
-import { facingView, FOOT_DY, FRONT_DY, gridStep, groundSize, ISO, mirrors, sheetView, standDepth, toScreen, turn } from './iso';
+import { facingView, FOOT_DY, FRONT_DY, gridStep, groundSize, ISO, mirrors, project, sheetView, standDepth, toScreen, turn } from './iso';
 import type { FigView } from './figure';
 import { walkFrame } from './figure';
 import { idleFrame } from './hero';
@@ -61,6 +61,16 @@ interface TownDef {
 export type DecorKind = 'banner' | 'board' | 'cart' | 'hay' | 'sacks' | 'baskets';
 /** Nur diese stehen auf begehbaren Kacheln (flach, man geht darüber); die anderen nur auf schon blockierten */
 export const FLAT_DECOR: ReadonlySet<DecorKind> = new Set(['hay', 'sacks', 'baskets']);
+
+/**
+ * Blickt ein Tier nach links? Maßgebend ist der Bildschirm: in der Draufsicht das Rasterdelta, in Iso `(dx − dy)·32`. Läuft es auf dem
+ * Bildschirm senkrecht (Iso, dx = dy), bleibt `prev`.
+ */
+export function leftward(iso: boolean, dx: number, dy: number, prev: boolean): boolean {
+  if (!iso) return dx < 0;
+  const sx = project(true, dx, dy).sx;
+  return Math.abs(sx) < 1e-9 ? prev : sx < 0;
+}
 
 const rs = (role: Role, look: string, zones: string[], shift: Shift, home: readonly [number, number], o: Partial<ResidentDef> = {}): ResidentDef => ({
   role, look, zones, shift, home, speed: 1, idle: [2, 8], shout: [16, 34], ...o,
@@ -329,6 +339,21 @@ export function initTownAtlas(scene: Phaser.Scene): void {
       }
     });
   }
+  // Iso: flaches Dekor als Raute
+  if (ISO) {
+    for (const kind of FLAT_DECOR) {
+      const rows = diamondRows(SPRITES[kind]!);
+      const b = place(`${kind}_iso`, DIAMOND_W, DIAMOND_H);
+      rows.forEach((row, y) => {
+        for (let x = 0; x < DIAMOND_W; x++) {
+          const col = PAL[row[x]!];
+          if (!col) continue;
+          ctx.fillStyle = col;
+          ctx.fillRect(b.x + x, b.y + y, 1, 1);
+        }
+      });
+    }
+  }
   // Fackelschein: weicher warmer Kreis
   const g = place('glow', 64, 64);
   const grad = ctx.createRadialGradient(g.x + 32, g.y + 32, 2, g.x + 32, g.y + 32, 32);
@@ -340,6 +365,37 @@ export function initTownAtlas(scene: Phaser.Scene): void {
   const tex = scene.textures.addCanvas(ATLAS, canvas);
   if (!tex) return;
   for (const [name, b] of frames) tex.add(name, 0, b.x, b.y, b.w, b.h);
+}
+
+/** Raute (Iso) für flaches Dekor: Breite und Höhe in Kunstpixeln (Maßstab 2 ergibt die Kachel 64×32) */
+export const DIAMOND_W = 32;
+export const DIAMOND_H = 16;
+
+/**
+ * Flaches Dekor als Rautenbild: das Seitenbild wird über die Kachelfläche gespannt (jede Rautenzelle fragt ihren Punkt auf dem
+ * Quadrat ab), Zellen ohne Farbe bleiben leer, der Rand der Raute wird dunkel. Liefert Zeilen aus Palettenzeichen, '.' = leer.
+ */
+export function diamondRows(rows: readonly string[], rim = 'k'): string[] {
+  const w = rows[0]!.length;
+  const out: string[] = [];
+  for (let y = 0; y < DIAMOND_H; y++) {
+    let line = '';
+    for (let x = 0; x < DIAMOND_W; x++) {
+      const nx = (x + 0.5 - DIAMOND_W / 2) / (DIAMOND_W / 2);
+      const ny = (y + 0.5 - DIAMOND_H / 2) / (DIAMOND_H / 2);
+      const d = Math.abs(nx) + Math.abs(ny);
+      if (d > 1) {
+        line += '.';
+        continue;
+      }
+      const u = (nx + ny) / 2 + 0.5;
+      const v = (ny - nx) / 2 + 0.5;
+      const c = rows[Math.min(rows.length - 1, Math.floor(v * rows.length))]![Math.min(w - 1, Math.floor(u * w))]!;
+      line += c === '.' ? (d > 0.82 ? '.' : 't') : d > 0.9 ? rim : c;
+    }
+    out.push(line);
+  }
+  return out;
 }
 
 /** Beschreibungen, die der Test prüft: gleiche Zeilenbreite in jedem Sprite */
@@ -521,6 +577,8 @@ export class TownLife {
     return def.decor.map((d) => {
       const { sx, sy } = toScreen(d.x, d.y);
       const key = { banner: 'banner', board: 'board', cart: 'cart', hay: 'hay', sacks: 'sacks', baskets: 'baskets' }[d.kind];
+      // Iso: flaches Dekor liegt als Raute auf der Kachel, unter allen Figuren (Boden −1e6)
+      if (ISO && FLAT_DECOR.has(d.kind)) return this.scene.add.image(sx, sy, ATLAS, `${key}_iso`).setOrigin(0.5, 0.5).setScale(2).setDepth(-8e5).setVisible(false);
       // Fußpunkt am unteren Rand der Kachel; Wandschmuck hängt vor die Mauer, daher knapp über dem Boden-Fuß der Kachel
       const foot = sy + FRONT_DY - (FLAT_DECOR.has(d.kind) ? 6 : 0);
       return this.scene.add.image(sx, foot, ATLAS, key).setOrigin(0.5, 1).setScale(2).setDepth(ISO ? standDepth(sy) : foot + 1).setVisible(false);
@@ -743,7 +801,7 @@ export class TownLife {
       const sp = 4.2 * (dt / 1000);
       a.x += (dx / d) * sp;
       a.y += (dy / d) * sp;
-      a.flip = dx < 0;
+      a.flip = leftward(ISO, dx, dy, a.flip);
       a.alt = Math.min(70, a.alt + dt * 0.12);
       if (c.time > a.until) {
         a.state = 'away';
@@ -757,7 +815,7 @@ export class TownLife {
         a.x = (mid[0] + mid[2]) / 2 + Math.cos(t) * 7;
         a.y = (mid[1] + mid[3]) / 2 + Math.sin(t) * 3 - 2;
         a.alt = 96;
-        a.flip = Math.sin(t) > 0;
+        a.flip = leftward(ISO, -Math.sin(t) * 7, Math.cos(t) * 3, a.flip);
       } else a.alt = 0;
       if (c.time > a.until) {
         const p = this.fresh(a, a.def.zones, c);
@@ -784,7 +842,7 @@ export class TownLife {
         a.alt = Math.max(0, a.alt - dt * 0.07);
         a.x += (dx / (d || 1)) * 3 * (dt / 1000);
         a.y += (dy / (d || 1)) * 3 * (dt / 1000);
-        a.flip = dx < 0;
+        a.flip = leftward(ISO, dx, dy, a.flip);
         if (a.alt <= 0) {
           a.state = 'idle';
           a.until = c.time + 2000 + this.rng() * 5000;
@@ -800,7 +858,7 @@ export class TownLife {
         if (tileWalk(c.grid, nx, ny)) {
           a.x = nx;
           a.y = ny;
-          a.flip = dx < 0;
+          a.flip = leftward(ISO, dx, dy, a.flip);
         } else {
           a.state = 'idle';
           a.until = c.time + 800;
