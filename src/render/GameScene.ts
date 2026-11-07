@@ -188,7 +188,6 @@ export class GameScene extends Phaser.Scene {
   private lastBoard = -1e9;
   private zoneMood: Mood = 'town';
   private achv = new AchievementTracker();
-  /** Hit-Stop: so viele ms bleibt die Simulation stehen (nur Einzelspieler), gibt Treffern Wucht */
   /** Trefferstopp (reine Darstellung): Angreifer und Ziel stehen kurz still, die Sim läuft weiter; danach gleiten sie ohne Sprung nach */
   private freezeUntil = 0;
   private frozen = new Map<number, { x: number; y: number }>();
@@ -1054,7 +1053,7 @@ export class GameScene extends Phaser.Scene {
             if (toPlayer) this.cameras.main.shake(60, 0.002);
             if (fromPlayer) {
               const wt = at?.equipment?.weapon?.templateId ?? '';
-              const kind = sk?.area === 'Magie' ? 'magic' : sk?.area === 'Fernkampf' || at?.equipment?.weapon?.kind === 'bow' ? 'bow' : /hammer|club|axe/.test(wt) ? 'blunt' : 'blade';
+              const kind = sk?.area === 'Magie' ? 'magic' : sk?.area === 'Fernkampf' || at?.equipment?.weapon?.kind === 'bow' ? 'bow' : /hammer|club|axe|mace|flail|maul/.test(wt) ? 'blunt' : 'blade';
               this.sfx.impact(kind, power);
             } else if (toPlayer) this.sfx.hurt();
           };
@@ -2717,7 +2716,7 @@ export class GameScene extends Phaser.Scene {
     if (until > this.freezeUntil) this.freezeUntil = until;
     for (const id of ids) {
       if (this.frozen.has(id)) continue;
-      const cur = this.dispPosRaw({ id, x: 0, y: 0, ...(getActor(this.world, id) ?? {}) });
+      const cur = this.dispPos({ id, x: 0, y: 0, ...(getActor(this.world, id) ?? {}) });
       this.frozen.set(id, { x: cur.x, y: cur.y });
     }
   }

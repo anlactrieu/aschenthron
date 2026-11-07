@@ -1787,7 +1787,7 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
   // Passive Treffer-Procs (nur Nahkampf des Spielers); eigener Zufallsstrom `fx`, damit der Kampfwurf-Strom unverändert bleibt
   const meleeProc = a.kind === 'player' && t.kind === 'monster' && !noReflect && dt === 'physical' && a.equipment.weapon?.kind !== 'bow' && a.equipment.weapon?.kind !== 'staff';
   // Grundangriffe kommen seltener: Proc-Chancen wachsen mit, damit die Wirkung pro Sekunde gleich bleibt
-  const procK = !skill && a.kind === 'player' ? BASIC_TEMPO : 1;
+  const procK = (!skill || skill === 'quick_shot') && a.kind === 'player' ? BASIC_TEMPO : 1;
   if (meleeProc) {
     const might = passiveSum(a, 'mightProc') * procK;
     if (might > 0 && w.fx.next() * 100 < might) {
