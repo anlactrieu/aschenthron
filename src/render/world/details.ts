@@ -3,7 +3,7 @@
  * Kunstraster, die der Chunk-Maler einmalig in den Boden stempelt. Streuung je Biom in Gruppen (grober 4x4-Hash), wie
  * vorher in `groundLook.ts`. Kleine Objekte bekommen einen weichen Umriss, flache Dinge (Risse, Moos) keinen.
  */
-import { ART, INK, Raster, h3, rng, type Rgb } from './raster';
+import { ART, INK, Raster, abgr, h3, mix, rgbOf, rng, type Rgb } from './raster';
 import { Z } from '../groundLook';
 
 type Pal = Record<string, Rgb>;
@@ -247,10 +247,10 @@ export function biomeOf(gid: number, zone: number): string | null {
 
 const DENSITY = 0.62;
 
-/** Streut höchstens ein Detail auf die Kachel (x, y) und stempelt es an (ox, oy) in `out`; Gruppen über einen 4x4-Hash. */
-export function stampDetail(out: Raster, x: number, y: number, gid: number, zone: number, ox: number, oy: number): void {
+/** Wählt das Detail der Kachel (x, y): höchstens eins, Gruppen über einen 4x4-Hash; null = keins */
+function pickDetail(x: number, y: number, gid: number, zone: number): { id: string; spr: Raster } | null {
   const bk = biomeOf(gid, zone);
-  if (!bk) return;
+  if (!bk) return null;
   const biome = BIOMES[bk]!;
   let tot = 0;
   for (const c of biome) tot += c.w;
@@ -260,9 +260,17 @@ export function stampDetail(out: Raster, x: number, y: number, gid: number, zone
     if (pick < c.w) { cl = c; break; }
     pick -= c.w;
   }
-  if (!cl.ids.length || h3(x, y, 2) >= cl.dens * DENSITY) return;
-  const spr = detail(cl.ids[Math.floor(h3(x, y, 3) * cl.ids.length)]!);
-  if (!spr || spr.w > ART || spr.h > ART) return;
+  if (!cl.ids.length || h3(x, y, 2) >= cl.dens * DENSITY) return null;
+  const id = cl.ids[Math.floor(h3(x, y, 3) * cl.ids.length)]!;
+  const spr = detail(id);
+  return spr ? { id, spr } : null;
+}
+
+/** Streut höchstens ein Detail auf die Kachel (x, y) und stempelt es an (ox, oy) in `out`; Gruppen über einen 4x4-Hash. */
+export function stampDetail(out: Raster, x: number, y: number, gid: number, zone: number, ox: number, oy: number): void {
+  const d = pickDetail(x, y, gid, zone);
+  if (!d || d.spr.w > ART || d.spr.h > ART) return;
+  const spr = d.spr;
   out.blit(spr, ox + Math.floor(h3(x, y, 4) * (ART - spr.w)), oy + Math.floor(h3(x, y, 5) * (ART - spr.h)), h3(x, y, 6) < 0.5);
 }
 
@@ -276,4 +284,104 @@ export function stampWaterDetail(out: Raster, x: number, y: number, zone: number
   if (!id) return;
   const spr = detail(id)!;
   out.blit(spr, ox + 2 + Math.floor(h3(x, y, 24) * (ART - 4 - spr.w)), oy + 2 + Math.floor(h3(x, y, 25) * (ART - 4 - spr.h)));
+}
+
+/* ---------------------------------------------------------------- Iso (P9.2) */
+
+/**
+ * Flache Details liegen auf dem Boden (Risse, Pfützen, Moos, Laub, Knochen, Seerosen …): in Iso werden sie auf die Kachelraute
+ * projiziert. Alles andere steht (Büschel, Blumen, Pilze, Steine, Schilf …) und wird nach der Projektion aufrecht gestempelt.
+ */
+const FLAT = new Set([
+  'crack_0', 'crack_1', 'crack_2', 'crack_3', 'crack_red', 'crack_red_b', 'embers_0', 'embers_1', 'web',
+  'puddle', 'puddle_s', 'puddle_purple', 'moss', 'moss_dark', 'ripple', 'ripple_b', 'lily', 'lily_flower',
+  'leaves', 'leaves_b', 'twig', 'branch', 'char_twig', 'char_branch', 'roots', 'bone', 'bone_x', 'rib', 'clover',
+]);
+export const isFlatDetail = (id: string): boolean => FLAT.has(id);
+
+/** Mustertexel je Kachelkante für flache Details (Raute 32x16 Kunstpixel = 16x16 Texel) */
+const TEXEL = 16;
+
+/** Pixelmitte (u, v) im Iso-Chunk-Raster → Kachelkoordinaten relativ zur Chunk-Ecke (Kachel x0, y0 liegt bei 0..1) */
+const lxOf = (u: number, v: number): number => ((u + 0.5 - 256) / 16 + (v + 0.5) / 8) * 0.5;
+const lyOf = (u: number, v: number): number => ((v + 0.5) / 8 - (u + 0.5 - 256) / 16) * 0.5;
+
+/** Schreibt Pixel p (ABGR, evtl. halbtransparent) auf den Chunk-Raster; nur wenn die Pixelmitte in der Kachel (ix, iy) liegt */
+function putIso(out: Raster, u: number, v: number, p: number, ix: number, iy: number): void {
+  if (u < 0 || v < 0 || u >= out.w || v >= out.h) return;
+  if (Math.floor(lxOf(u, v)) !== ix || Math.floor(lyOf(u, v)) !== iy) return;
+  const a = p >>> 24;
+  if (!a) return;
+  const i = v * out.w + u;
+  if (a === 255) out.d[i] = p;
+  else {
+    const q = out.d[i]!;
+    out.d[i] = q >>> 24 ? abgr(mix(rgbOf(q), rgbOf(p), a / 255), 255) : p;
+  }
+}
+
+/**
+ * Stempelt Sprite `spr` für die Kachel (x, y) in den Iso-Chunk-Raster (512x256, Chunk-Ecke bei Kachel x0, y0).
+ * Flach: Umkehrabbildung über die Kachelraute, Lage und Drehung (Spiegelung, Vertauschen der Achsen) über Hashes; das Bild bleibt in der Kachel.
+ * Stehend: unten mittig auf einem Punkt in der Kachel, so gelegt, dass das ganze Bild innerhalb der Raute bleibt (kein Überstehen in Nachbarn).
+ */
+function placeIso(out: Raster, spr: Raster, flat: boolean, x: number, y: number, x0: number, y0: number): void {
+  const ix = x - x0;
+  const iy = y - y0;
+  // Mitte der Kachelraute in Pixelkanten: u + 0,5 = 256 + 16·(lx − ly), v + 0,5 = 8·(lx + ly) mit lx = ix + 0,5, ly = iy + 0,5
+  const cu = 256 + 16 * (ix - iy);
+  const cv = 8 * (ix + iy + 1);
+  if (flat) {
+    const swap = h3(x, y, 7) < 0.5;
+    const flip = h3(x, y, 6) < 0.5;
+    const dw = swap ? spr.h : spr.w;
+    const dh = swap ? spr.w : spr.h;
+    if (dw > TEXEL || dh > TEXEL) return;
+    const ox = Math.floor(h3(x, y, 4) * (TEXEL - dw + 1));
+    const oy = Math.floor(h3(x, y, 5) * (TEXEL - dh + 1));
+    for (let v = cv - 8; v < cv + 8; v++) {
+      for (let u = cu - 16; u < cu + 16; u++) {
+        const fu = lxOf(u, v) - ix;
+        const fv = lyOf(u, v) - iy;
+        if (fu < 0 || fv < 0 || fu >= 1 || fv >= 1) continue;
+        const tu = Math.floor(fu * TEXEL) - ox;
+        const tv = Math.floor(fv * TEXEL) - oy;
+        if (tu < 0 || tv < 0 || tu >= dw || tv >= dh) continue;
+        let sx = swap ? tv : tu;
+        const sy = swap ? tu : tv;
+        if (flip) sx = spr.w - 1 - sx;
+        putIso(out, u, v, spr.d[sy * spr.w + sx]!, ix, iy);
+      }
+    }
+    return;
+  }
+  const w = spr.w;
+  const h = spr.h;
+  // Unterkante yb (rel. Rautenmitte, nach unten +): die Eckpunkte des Bildes bleiben in |dx|/16 + |dy|/8 <= 1
+  const A = 8 * (1 - w / 32);
+  const lo = h - A;
+  const hi = A;
+  const yb = lo <= hi ? lo + h3(x, y, 5) * (hi - lo) : (lo + hi) / 2;
+  const reach = 16 * (1 - Math.max(Math.abs(yb), Math.abs(yb - h)) / 8) - w / 2;
+  const cx = (h3(x, y, 4) * 2 - 1) * Math.max(0, reach);
+  const left = Math.round(cu + cx - w / 2);
+  const top = Math.round(cv + yb - h);
+  const flip = h3(x, y, 6) < 0.5;
+  for (let sy = 0; sy < h; sy++) for (let sx = 0; sx < w; sx++) putIso(out, left + sx, top + sy, spr.d[sy * w + (flip ? w - 1 - sx : sx)]!, ix, iy);
+}
+
+/** Iso-Variante von `stampDetail`: flache Details projiziert, stehende aufrecht (siehe `placeIso`) */
+export function stampDetailIso(out: Raster, x: number, y: number, gid: number, zone: number, x0: number, y0: number): void {
+  const d = pickDetail(x, y, gid, zone);
+  if (d) placeIso(out, d.spr, isFlatDetail(d.id), x, y, x0, y0);
+}
+
+/** Iso-Variante von `stampWaterDetail`: Seerosen und Wellenstriche liegen flach auf dem Wasser */
+export function stampWaterDetailIso(out: Raster, x: number, y: number, zone: number, dist: number, x0: number, y0: number): void {
+  const swamp = zone === Z.swamp || zone === Z.gruft;
+  const r = h3(x, y, 21);
+  let id: string | null = null;
+  if (dist <= 2 && r < (swamp ? 0.26 : 0.06)) id = h3(x, y, 22) < 0.3 ? 'lily_flower' : 'lily';
+  else if (dist >= 3 && r > 0.85) id = h3(x, y, 23) < 0.5 ? 'ripple' : 'ripple_b';
+  if (id) placeIso(out, detail(id)!, true, x, y, x0, y0);
 }
