@@ -121,7 +121,7 @@ export function makeSnapshot(w: World, you: Actor, events: GameEvent[]): Snapsho
     if (a.id === you.id || !near(a, you)) continue;
     byId.set(a.id, a);
     // lange tote Monster werden nicht mehr gesendet
-    if (!a.alive && a.kind === 'monster' && w.tick - a.diedAt > 20 * 4) continue;
+    if (!a.alive && a.kind !== 'player' && w.tick - a.diedAt > 20 * 4) continue;
     actors.push({
       id: a.id, kind: a.kind, kindId: a.kindId, name: a.name, x: a.x, y: a.y, hp: a.hp, maxHp: a.maxHp, alive: a.alive,
       boss: a.boss, enraged: a.enraged, level: a.level, targetId: a.targetId, diedAt: a.diedAt, pk: a.pkUntil > w.tick, champ: a.champ, unique: a.unique, st: statusList(a),

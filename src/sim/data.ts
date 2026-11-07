@@ -211,6 +211,37 @@ export const BEGINNER_ZONE = {
   /** Jagdhinweis für Stufe 1–3 (`nextStep`): mitten zwischen den Ratten vor dem Osttor */
   hunt: { x: 60, y: 158 },
 };
+/** Rudel-Kennung der Gefahrenorte ab hier (`DANGER_PACK + Nummer`) */
+export const DANGER_PACK = 200001;
+/**
+ * Wachpatrouille (P5): zwei Straßenwachen gehen die Handelsstraße (`ROUTE`) hin und zurück, sind echte Wesen der Sim (`kind: 'guard'`)
+ * und greifen Monster am Rand des Streifens an, vor allem solche, die einen Spieler jagen. Sie rühren Anfängerzone, Gefahrenorte,
+ * Lager, Bosse und Unikate nicht an. Gefallene Wachen kehren nach `respawnTicks` am Hafen zurück. Kills der Wache bringen nichts, außer
+ * ein Spieler hat mitgekämpft (dann zählt sein Anteil wie bei einem Gefährten).
+ */
+export const GUARD = {
+  name: 'Straßenwache',
+  count: 2,
+  level: 14,
+  hp: 1100,
+  damage: [14, 24] as [number, number],
+  attackCooldown: 18,
+  /** Tiles pro Tick beim Eingreifen und Zurückkehren / auf Streife */
+  runSpeed: 0.11,
+  walkSpeed: 0.05,
+  /** Weglänge ab dem Hafen, bei der die erste Wache beginnt; weitere folgen `gap` Kacheln dahinter */
+  startS: 10,
+  gap: 2.5,
+  /** Sichtweite für Monster am Streckenrand und für Verfolger eines Spielers (Kacheln) */
+  sight: 10,
+  help: 16,
+  /** Monster nur bis zu diesem Abstand von der Strecke angreifen; weiter entfernt gibt die Wache auf und kehrt zurück */
+  reach: 13,
+  leash: 17,
+  /** Wachen handeln nur, solange ein Spieler so nah ist; sonst gehen sie nur ihre Strecke weiter */
+  wake: 38,
+  respawnTicks: 20 * 150,
+};
 export const DANGER_OFFSETS: [number, number][] = [[0, 0], [2, 0], [-2, 0], [0, 2]];
 export const CALL_COOLDOWN = 20 * 20;
 export const FLEE_HP = 0.25;

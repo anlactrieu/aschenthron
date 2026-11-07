@@ -88,6 +88,8 @@ export function npcsNearSave(): { kind: string; name: string }[] {
   return out;
 }
 const VIEW = 30;
+/** Figur der Straßenwache (npc.ts) */
+const GUARD_LOOK = 'res_guard';
 /**
  * Kamera-Zoom nur in Stufen, bei denen 1 Kunstpixel (= 2 Weltpixel, `FIG_SCALE`) ganze Bildschirmpixel misst:
  * 0.5 = 1 px, 1 = 2 px, 1.5 = 3 px, 2 = 4 px. Die Canvas rendert mit 1 Pixel je CSS-Pixel (DPR wird vom Browser hochskaliert),
@@ -674,7 +676,7 @@ export class GameScene extends Phaser.Scene {
       if (img?.visible && !c.opened && img.getBounds().contains(wx, wy) && (!best || img.depth > best.depth)) best = { depth: img.depth, chest: c };
     }
     for (const a of this.world.actors) {
-      if (a.id === this.playerId || !a.alive || (a.kind === 'player' && !this.remote)) continue;
+      if (a.id === this.playerId || !a.alive || a.kind === 'guard' || (a.kind === 'player' && !this.remote)) continue;
       const v = this.actorViews.get(a.id);
       if (!v || !v.img.visible) continue;
       // Skelett-Figuren: Rahmen hat viel Platz für Waffe und Liegen, getroffen wird nur der Körper
@@ -2360,6 +2362,10 @@ export class GameScene extends Phaser.Scene {
       const look = heroLookOf(lookOf(a));
       return silhouette(this, heroKey(look), { t: 'h', look }, false, view) ?? (view === 'side' ? null : silhouette(this, heroKey(look), { t: 'h', look }));
     }
+    if (a.kind === 'guard') {
+      const greq: FigReq = { t: 'n', kind: GUARD_LOOK };
+      return silhouette(this, npcFigKey(GUARD_LOOK), greq, false, view) ?? (view === 'side' ? null : silhouette(this, npcFigKey(GUARD_LOOK), greq));
+    }
     const req: FigReq = { t: 'm', id: a.kindId! };
     // noch kein Riss dieser Ansicht (Budget): bis dahin der seitliche
     return silhouette(this, monsterKey(a.kindId!), req, false, view) ?? (view === 'side' ? null : silhouette(this, monsterKey(a.kindId!), req));
@@ -2373,6 +2379,7 @@ export class GameScene extends Phaser.Scene {
       return heroTexture(this, lookOf(a), () => this.figuresInUse(), cur?.startsWith('hero_') ? cur : undefined) ?? 'wait';
     }
     if (figureMode() !== 'skelett') return null;
+    if (a.kind === 'guard') return figureTexture(this, npcFigKey(GUARD_LOOK), { t: 'n', kind: GUARD_LOOK });
     const id = a.kindId!;
     return figureTexture(this, monsterKey(id), { t: 'm', id });
   }
@@ -2393,6 +2400,7 @@ export class GameScene extends Phaser.Scene {
         // Schattenriss schon vorab (sonst steht die Art ihren ersten Frame ohne Klickfläche da)
         silhouette(this, monsterKey(id), { t: 'm', id }, true);
       }
+      if (this.world.actors.some((a) => a.kind === 'guard' && a.alive && near(a.x, a.y))) prefetchFigure(npcFigKey(GUARD_LOOK), { t: 'n', kind: GUARD_LOOK });
       for (const n of this.world.npcs) if (near(n.x, n.y) && npcDef(n.kind, n.name)) prefetchFigure(npcFigKey(n.kind, n.name), { t: 'n', kind: n.kind, name: n.name });
     }
     if (heroMode() === 'skelett') prefetchHero(lookOf(p));
@@ -2435,7 +2443,7 @@ export class GameScene extends Phaser.Scene {
     for (const a of this.world.actors) {
       let view = this.actorViews.get(a.id);
       const near = Math.abs(a.x - p.x) <= VIEW && Math.abs(a.y - p.y) <= VIEW;
-      if (!near || (!a.alive && a.kind === 'monster' && this.world.tick - a.diedAt > TICK_RATE * 4)) {
+      if (!near || (!a.alive && a.kind !== 'player' && this.world.tick - a.diedAt > TICK_RATE * 4)) {
         view?.img.setVisible(false);
         continue;
       }
@@ -2499,7 +2507,7 @@ export class GameScene extends Phaser.Scene {
       } else if (waiting) {
         // leere Textur, denn die vorige kann schon aus dem Cache geflogen sein
         img.setTexture('__DEFAULT');
-      } else if (a.kind === 'player') {
+      } else if (a.kind !== 'monster') {
         const look = lookOf(a);
         img.setTexture(ensureTexture(this, lookKey(look, frame, !!view.up && !view.side, !!view.side), () => playerCanvas(look, frame, !!view.up && !view.side, !!view.side)));
       } else {
@@ -2540,13 +2548,13 @@ export class GameScene extends Phaser.Scene {
         // (ein Schattenriss hat kein Sterbebild: er verblasst gleich)
         const dead = (this.world.tick - a.diedAt) / TICK_RATE;
         if (sil) view.silDead = true;
-        const age = sil ? dead * 2 + 0.25 : view.silDead ? 1 : a.kind === 'monster' ? Math.max(0, dead - 2) / 2 : 0;
+        const age = sil ? dead * 2 + 0.25 : view.silDead ? 1 : a.kind !== 'player' ? Math.max(0, dead - 2) / 2 : 0;
         img.setAngle(0).setAlpha(Math.max(0, 1 - age)).setTintMode(Phaser.TintModes.MULTIPLY).setTint(0xb0a0a0).setScale(FIG_SCALE);
         img.setDepth(sy);
         continue;
       }
       if (!a.alive) {
-        const age = a.kind === 'monster' ? (this.world.tick - a.diedAt) / (TICK_RATE * 4) : 0;
+        const age = a.kind !== 'player' ? (this.world.tick - a.diedAt) / (TICK_RATE * 4) : 0;
         img.setAngle(view.flip ? -90 : 90).setAlpha(Math.max(0, 0.6 - age * 0.6)).setTintMode(Phaser.TintModes.MULTIPLY).setTint(0x664444).setScale(1);
         img.setDepth(sy);
         continue;
@@ -2613,6 +2621,12 @@ export class GameScene extends Phaser.Scene {
           g.fillRect(sx - big / 2, top, big * Math.max(0, a.hp / a.maxHp), 5);
         }
       } else {
+        if (a.kind === 'guard' && (a.hp < a.maxHp - 0.5 || a.targetId !== null)) {
+          g.fillStyle(0x001020, 0.9);
+          g.fillRect(sx - 14, sy + 8 - (fig ? fig.top + 2 : 56), 28, 5);
+          g.fillStyle(0x4a9ae0, 1);
+          g.fillRect(sx - 14, sy + 8 - (fig ? fig.top + 2 : 56), 28 * Math.max(0, a.hp / a.maxHp), 5);
+        }
         if (a.id !== p.id) this.label(`a${a.id}`, `${a.name} (Lv ${a.level})${a.pkUntil > this.world.tick ? ' ☠' : ''}`, sx, sy + 8 - (fig ? fig.top + 12 : 66), a.pkUntil > this.world.tick ? '#ff5a4a' : '#9fd0ff', seen);
         // Spielerring in der Stadt = sicher
         if (this.world.safe.some((r) => a.x >= r.x && a.y >= r.y && a.x < r.x + r.w && a.y < r.y + r.h)) {

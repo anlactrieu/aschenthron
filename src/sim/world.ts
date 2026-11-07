@@ -4,7 +4,7 @@ import { itemReq, reqOfTemplate, itemAffixes, gemTemplateId, handsOf, weaponSpee
 import {
   ATTR_KEYS, ATTR_NAME, xpToNext, questXp, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, skillReq, skillRankOf, ACTIVE_POWER, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
   monsterKind, CALL_RANGE, CALL_COOLDOWN, FLEE_HP, FLEE_TICKS, npcKeyOf, isGiverOf, lootGroupOf, LOOT_GROUPS, KILL_GOALS, LEVEL_TITLES, type LootGroup, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, NAMED_SHARE, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
-  BEGINNER_ZONE, CHAIN_FIRST, FAMILY_RES, MELEE_SKILL_KRAFT_SCALE, MAX_RES, SLOW_FACTOR, STATUS_IDS, PASSIVE_CAP, DMG_NAME, type DmgType, type StatusId, type SkillDef, type PassiveKey,
+  BEGINNER_ZONE, CHAIN_FIRST, DANGER_PACK, GUARD, FAMILY_RES, MELEE_SKILL_KRAFT_SCALE, MAX_RES, SLOW_FACTOR, STATUS_IDS, PASSIVE_CAP, DMG_NAME, type DmgType, type StatusId, type SkillDef, type PassiveKey,
   ATTR_THRESHOLD, ATTR_THRESHOLD_2, ATTR_THRESHOLD_BONUS, LEVEL_MILESTONES, milestonePoints, WILL_RES_PER_2, WILL_STATUS_PER_POINT, WILL_STATUS_CAP, GEM_MIN_LEVEL, GEM_DROP, GEM_SOCKET_COST, WORLD_BOSS_LOOT, type QuestDef,
 } from './data';
 import { EFFECTS, cleanse, controlDr, dispel, mergeStatus } from './effects';
@@ -12,6 +12,7 @@ import { NAMED } from './named';
 import { CORPSE_OWNER_TICKS, deathRules, dropCount, droppable } from './death';
 import { LANDMARK_TOPICS } from './topicsData';
 import { closedMessage, isShop, rebaseNight, syncClock } from './night';
+import { ROUTE, routeDist, routePingPong } from './route';
 import { answerOf, canAsk, keywordLabel, learnedFrom } from './topics';
 
 export const TICK_RATE = 20;
@@ -98,7 +99,8 @@ export type Attrs = Record<AttrKey, number>;
 
 export interface Actor {
   id: number;
-  kind: 'player' | 'monster';
+  /** `guard`: Straßenwache (P5), kämpft für die Spieler gegen Monster und ist selbst kein Ziel */
+  kind: 'player' | 'monster' | 'guard';
   kindId?: string;
   name: string;
   x: number;
@@ -220,6 +222,8 @@ export interface Actor {
   attackedBy: { id: number; at: number } | null;
   /** Monster: Spieler, die Schaden verursacht haben (Tick des letzten Treffers) */
   damagers: Record<number, number>;
+  /** Wache: Weglänge auf der Hin-und-zurück-Strecke, Seitenversatz und ob ein Spieler in der Nähe ist */
+  patrol?: { s: number; s0: number; side: number; awake: boolean };
 }
 
 export interface GroundItem {
@@ -975,7 +979,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       break;
     case 'attack': {
       const t = getActor(w, cmd.targetId);
-      if (!t || !t.alive || t.id === a.id) return;
+      if (!t || !t.alive || t.id === a.id || t.kind === 'guard') return;
       if (t.kind === 'player' && !canPvp(w, a, t)) return fail(w, 'Hier ist kein Kampf gegen Spieler erlaubt.');
       if (Math.hypot(a.x - t.x, a.y - t.y) > MELEE_RANGE + 0.5 && !findPath(w.grid, { x: Math.round(a.x), y: Math.round(a.y) }, { x: Math.round(t.x), y: Math.round(t.y) }).length) return fail(w, 'Das Ziel ist nicht erreichbar.');
       a.stuck = 0;
@@ -1395,7 +1399,7 @@ function castHeal(w: World, a: Actor, s: SkillDef, rank: number, manaCost: numbe
 
 /** Alle Gegner, die ein Schadens-Skill trifft (Fläche um den Wirkenden oder das Ziel, Mehrfachziel nach Entfernung, sonst nur das Ziel). */
 function skillVictims(w: World, a: Actor, s: SkillDef, first: Actor | undefined): Actor[] {
-  const enemy = (x: Actor) => x.alive && x.id !== a.id && (x.kind !== a.kind || canPvp(w, a, x));
+  const enemy = (x: Actor) => x.alive && x.id !== a.id && x.kind !== 'guard' && (x.kind !== a.kind || canPvp(w, a, x));
   if (s.aoeSelf) return w.actors.filter((x) => enemy(x) && Math.hypot(x.x - a.x, x.y - a.y) <= s.aoe!);
   if (s.aoe) return w.actors.filter((x) => enemy(x) && Math.hypot(x.x - first!.x, x.y - first!.y) <= s.aoe!);
   if (s.targets) {
@@ -1443,7 +1447,7 @@ function castEffect(w: World, a: Actor, s: SkillDef, rank: number, manaCost: num
   if (!self) {
     if (a.kind === 'player' && inSafeZone(w, a.x, a.y)) return fail(w, 'In der Stadt ist Kämpfen verboten.');
     const first = getActor(w, targetId ?? a.targetId ?? -1);
-    if (!first || !first.alive || first.id === a.id) return fail(w, 'Kein Ziel.');
+    if (!first || !first.alive || first.id === a.id || first.kind === 'guard') return fail(w, 'Kein Ziel.');
     if (Math.hypot(a.x - first.x, a.y - first.y) > s.range) return fail(w, 'Ziel außer Reichweite.');
     if (first.kind === 'player' && !canPvp(w, a, first)) return fail(w, 'Hier ist kein Kampf gegen Spieler erlaubt.');
     t = first;
@@ -1503,7 +1507,7 @@ function useSkill(w: World, a: Actor, skillId: string, targetId?: number): void 
     if (a.equipment.offhand?.off !== 'arrows') return fail(w, 'Dafür brauchst du Pfeile in der Nebenhand.');
   }
   const first = getActor(w, targetId ?? a.targetId ?? -1);
-  if (!s.aoeSelf && (!first || !first.alive || first.id === a.id)) return fail(w, 'Kein Ziel.');
+  if (!s.aoeSelf && (!first || !first.alive || first.id === a.id || first.kind === 'guard')) return fail(w, 'Kein Ziel.');
   if (first && !s.aoeSelf && Math.hypot(a.x - first.x, a.y - first.y) > s.range) return fail(w, 'Ziel außer Reichweite.');
   if (first && first.kind === 'player' && !canPvp(w, a, first)) return fail(w, 'Hier ist kein Kampf gegen Spieler erlaubt.');
   const victims = skillVictims(w, a, s, first);
@@ -1728,11 +1732,11 @@ function dismissSummons(w: World, m: Actor): void {
 
 /** Liefert den verursachten Schaden, bei Fehlschlag oder wirkungslosem Treffer −1. */
 function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: boolean, skill?: string, noReflect = false, canMiss = false, dt: DmgType = 'physical'): number {
-  if (t.kind === 'player' && inSafeZone(w, t.x, t.y) && t.pkUntil <= w.tick) return -1;
+  if ((t.kind === 'player' && inSafeZone(w, t.x, t.y) && t.pkUntil <= w.tick) || (t.kind === 'guard' && inSafeZone(w, t.x, t.y))) return -1;
   if (canMiss && !noReflect && w.rng.next() > hitChance(a, t)) {
     t.lastHitAt = w.tick;
     t.resting = false;
-    if (t.kind === 'monster' && a.kind === 'player' && t.alive && t.targetId === null) {
+    if (t.kind === 'monster' && a.kind !== 'monster' && t.alive && t.targetId === null) {
       t.targetId = a.id;
       t.autoAttack = true;
       alertPack(w, t, a.id);
@@ -1793,7 +1797,7 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
   t.lastHitAt = w.tick;
   t.resting = false;
   // Wer angegriffen wird, wehrt sich (auch gegen Fernkämpfer außerhalb der Aggro-Reichweite)
-  if (t.kind === 'monster' && a.kind === 'player' && t.alive && t.targetId === null) {
+  if (t.kind === 'monster' && a.kind !== 'monster' && t.alive && t.targetId === null) {
     t.targetId = a.id;
     t.autoAttack = true;
     alertPack(w, t, a.id);
@@ -1859,7 +1863,7 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
   t.diedAt = w.tick;
   w.events.push({ type: 'died', id: t.id });
   if (t.kind === 'monster') onMonsterDeath(w, a, t);
-  else onPlayerDeath(w, t, a.kind === 'player');
+  else if (t.kind === 'player') onPlayerDeath(w, t, a.kind === 'player');
   return amount;
 }
 
@@ -1873,6 +1877,8 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
     const pl = getActor(w, Number(id));
     if (pl && pl.alive && w.tick - at <= TICK_RATE * 30 && Math.hypot(pl.x - m.x, pl.y - m.y) <= 25) credited.set(pl.id, pl);
   }
+  // Straßenwache (P5): erlegt sie allein, gibt es weder Beute noch Fortschritt; hat ein Spieler mitgekämpft, zählt sein Anteil
+  if (killer.kind === 'guard' && credited.size === 0) return;
   const camp = campClearedBy(w, m);
   for (const pl of credited.values()) {
     if (camp) {
@@ -1916,9 +1922,9 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
         questItemFound(w, pl, q, st);
       }
     }
-    gainXp(w, killer, Math.round(k.xp * (1 + powerOf(pl, 'xpBonus') / 100)));
+    gainXp(w, killer.kind === 'guard' ? pl : killer, Math.round(k.xp * (1 + powerOf(pl, 'xpBonus') / 100)));
     const mk = powerOf(pl, 'manaKill');
-    if (mk > 0) pl.mana = Math.min(maxManaOf(killer), pl.mana + mk);
+    if (mk > 0) pl.mana = Math.min(maxManaOf(pl), pl.mana + mk);
     const hk = powerOf(pl, 'healKill');
     if (hk > 0) pl.hp = Math.min(maxHpOf(pl), pl.hp + hk);
     const gold = Math.round(w.rng.int(k.gold[0], k.gold[1]) * m.rewardMult * (1 + powerOf(pl, 'goldBonus') / 100));
@@ -2224,9 +2230,15 @@ export function tick(w: World): void {
   if (w.npcWander) npcWanderStep(w, players);
   if (w.tick % 10 === 0) for (const pl of players) checkVisits(w, pl);
   if (w.tick % TICK_RATE === 0 && w.npcWander) for (const pl of players) wildEvents(w, pl);
+  // kämpfende Straßenwachen (P5) halten die Monster in ihrer Nähe wach, sonst kämpften sie gegen Schlafende
+  const wakers = w.actors.filter((x) => x.kind === 'guard' && x.alive && x.patrol?.awake && x.targetId !== null);
   for (const a of w.actors) {
+    if (a.kind === 'guard') {
+      guardStep(w, a, players);
+      continue;
+    }
     if (a.kind === 'monster' && a.alive && a.targetId === null && a.path.length === 0 && a.hp >= a.maxHp) {
-      if (!players.some((pl) => Math.abs(pl.x - a.x) < SLEEP_DIST && Math.abs(pl.y - a.y) < SLEEP_DIST)) continue;
+      if (!players.some((pl) => Math.abs(pl.x - a.x) < SLEEP_DIST && Math.abs(pl.y - a.y) < SLEEP_DIST) && !wakers.some((g) => Math.abs(g.x - a.x) < GUARD.help + 2 && Math.abs(g.y - a.y) < GUARD.help + 2)) continue;
     }
     if (!a.alive) {
       if (a.kind === 'monster' && w.tick - a.diedAt >= a.respawnTicks && a.home) reviveMonster(w, a);
@@ -2449,6 +2461,149 @@ function fleeStep(w: World, m: Actor): boolean {
     w.events.push({ type: 'flee', id: m.id });
   }
   return true;
+}
+
+/* ---------- Straßenwache (P5) ---------- */
+
+/** Wen die Wache überhaupt bekämpfen darf: keine Bosse, Unikate, Lagerbesatzungen, Beschworenen, nichts in Stadt oder Anfängerzone */
+function guardMayFight(w: World, m: Actor): boolean {
+  return m.kind === 'monster' && m.alive && !m.boss && !m.unique && !m.campId && !m.summonedBy && !inSafeZone(w, m.x, m.y) && !inBeginnerZone(w, m.x, m.y);
+}
+
+/** Nächstes Ziel der Wache: zuerst Monster, die einen Spieler in der Nähe jagen (oder die Wachen selbst), dann Monster am Streckenrand (kein Gefahrenort, kein Champion) */
+function guardPick(w: World, g: Actor): Actor | undefined {
+  let best: Actor | undefined;
+  let bs = Infinity;
+  for (const m of w.actors) {
+    if (m.kind !== 'monster' || !m.alive) continue;
+    const d = dist(g, m);
+    if (d > GUARD.help || !guardMayFight(w, m)) continue;
+    const t = m.targetId === null ? undefined : getActor(w, m.targetId);
+    const urgent = !!t && t.alive && (t.kind === 'guard' || (t.kind === 'player' && dist(g, t) <= GUARD.help));
+    if (!urgent && !(d <= GUARD.sight && m.packId < DANGER_PACK && !m.champ && routeDist(m.x, m.y) <= GUARD.reach)) continue;
+    const score = d - (urgent ? 20 : 0);
+    if (score < bs) {
+      bs = score;
+      best = m;
+    }
+  }
+  return best;
+}
+
+/** Ort der Wache auf der Streife (Seitenversatz, wenn begehbar) */
+function guardSpot(w: World, g: Actor): Pt {
+  const p = routePingPong(g.patrol!.s);
+  const x = p.x - p.dy * g.patrol!.side;
+  const y = p.y + p.dx * g.patrol!.side;
+  return isWalkable(w.grid, Math.round(x), Math.round(y)) ? { x, y } : { x: p.x, y: p.y };
+}
+
+/** Lebt auf, wenn die Wartezeit um ist: am Hafen, voll bei Kräften */
+function reviveGuard(w: World, g: Actor): void {
+  g.alive = true;
+  g.hp = g.maxHp;
+  g.targetId = null;
+  g.path = [];
+  g.patrol!.s = g.patrol!.s0;
+  const at = guardSpot(w, g);
+  g.x = at.x;
+  g.y = at.y;
+}
+
+/** Eine Wache pro Tick: tot → wartet; ohne Spieler in der Nähe nur weitergehen; sonst Ziel suchen, kämpfen oder auf die Strecke zurückkehren */
+function guardStep(w: World, g: Actor, players: Actor[]): void {
+  const pt = g.patrol!;
+  if (!g.alive) {
+    if (w.tick - g.diedAt >= GUARD.respawnTicks) reviveGuard(w, g);
+    return;
+  }
+  if (g.cooldownLeft > 0) g.cooldownLeft--;
+  pt.awake = players.some((pl) => Math.abs(pl.x - g.x) < GUARD.wake && Math.abs(pl.y - g.y) < GUARD.wake);
+  if (!pt.awake) {
+    // niemand sieht zu: Streife läuft weiter, Kämpfe ruhen
+    g.targetId = null;
+    g.path = [];
+    g.hp = g.maxHp;
+    pt.s += GUARD.walkSpeed;
+    const at = guardSpot(w, g);
+    g.x = at.x;
+    g.y = at.y;
+    return;
+  }
+  let t = g.targetId === null ? undefined : getActor(w, g.targetId);
+  if (t && (!t.alive || dist(g, t) > GUARD.help + 4 || routeDist(g.x, g.y) > GUARD.leash || !guardMayFight(w, t))) {
+    t = undefined;
+    g.targetId = null;
+    g.path = [];
+  }
+  if (!t && w.tick % 6 === g.id % 6) {
+    t = guardPick(w, g);
+    if (t) {
+      g.targetId = t.id;
+      g.path = [];
+      g.stuck = 0;
+    }
+  }
+  if (t) {
+    if (dist(g, t) <= MELEE_RANGE) {
+      g.path = [];
+      g.stuck = 0;
+      fight(w, g, t);
+      return;
+    }
+    const before = g.x + g.y;
+    chase(w, g, t);
+    g.stuck = g.x + g.y === before ? g.stuck + 1 : 0;
+    if (g.stuck > TICK_RATE * 2) {
+      g.targetId = null;
+      g.path = [];
+      g.stuck = 0;
+    }
+    return;
+  }
+  if (w.tick - g.lastHitAt > TICK_RATE * 4) g.hp = Math.min(g.maxHp, g.hp + g.maxHp * 0.002);
+  const at = guardSpot(w, g);
+  if (Math.hypot(at.x - g.x, at.y - g.y) <= 1.2) {
+    pt.s += GUARD.walkSpeed;
+    const nx = guardSpot(w, g);
+    g.x = nx.x;
+    g.y = nx.y;
+    g.path = [];
+    g.stuck = 0;
+    return;
+  }
+  // zurück zur Strecke (die Streife wartet an ihrem Punkt)
+  if (g.path.length === 0 || w.tick >= g.repathAt) {
+    g.repathAt = w.tick + 20;
+    g.path = findPath(w.grid, { x: Math.round(g.x), y: Math.round(g.y) }, { x: Math.round(at.x), y: Math.round(at.y) });
+  }
+  const before = g.x + g.y;
+  stepAlong(g, w.tick);
+  g.stuck = g.x + g.y === before ? g.stuck + 1 : 0;
+  if (g.stuck > TICK_RATE * 3) {
+    g.x = at.x;
+    g.y = at.y;
+    g.path = [];
+    g.stuck = 0;
+  }
+}
+
+/** Stellt die Wachpatrouille auf die Handelsstraße (nach den Spielern, damit deren Kennungen gleich bleiben). */
+export function spawnGuards(w: World): Actor[] {
+  const out: Actor[] = [];
+  for (let i = 0; i < GUARD.count; i++) {
+    const g = baseActor(w, 'guard', GUARD.name, ROUTE[0]![0], ROUTE[0]![1]);
+    const s0 = GUARD.startS - i * GUARD.gap;
+    Object.assign(g, {
+      level: GUARD.level, hp: GUARD.hp, maxHp: GUARD.hp, damage: GUARD.damage, speed: GUARD.runSpeed, attackCooldown: GUARD.attackCooldown,
+      aggroRange: GUARD.sight, respawnTicks: GUARD.respawnTicks, rewardMult: 0, patrol: { s: s0, s0, side: i % 2 === 0 ? 0 : 0.6, awake: false },
+    });
+    const at = guardSpot(w, g);
+    g.x = at.x;
+    g.y = at.y;
+    out.push(g);
+  }
+  return out;
 }
 
 /** Legt für jedes Rudel (Rudel-Id > 0, ohne Bosse und Mini-Bosse) 1–2 Wegpunkte im Umkreis des Rudelplatzes fest; Nutzt nur den Zufallsstrom `fx`. */

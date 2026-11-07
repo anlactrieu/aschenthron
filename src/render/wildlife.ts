@@ -13,6 +13,7 @@
  */
 import type Phaser from 'phaser';
 import { isWalkable, type Grid } from '../sim/path';
+import { ROUTE, routeAt, routeLength } from '../sim/route';
 import { TILE_H, TILE_W, toScreen } from './iso';
 import { walkFrame } from './figure';
 import { idleFrame } from './hero';
@@ -99,30 +100,7 @@ export function landmarksOf(map: TiledLike): Landmark[] {
   return out;
 }
 
-/** Handelsstraße: Aschenhafen (Osttor) → Moorlande-Kreuzung → Felsenwacht (Südtor); Mittellinie der dreibreiten Wege */
-export const ROUTE: readonly (readonly [number, number])[] = [[48, 141], [90, 141], [90, 106], [113, 106], [113, 82]];
-
-export function routeLength(route: typeof ROUTE = ROUTE): number {
-  let len = 0;
-  for (let i = 1; i < route.length; i++) len += Math.hypot(route[i]![0] - route[i - 1]![0], route[i]![1] - route[i - 1]![1]);
-  return len;
-}
-
-/** Punkt und Richtung (Einheitsvektor) bei Weglänge `s` ab dem Hafen */
-export function routeAt(s: number, route: typeof ROUTE = ROUTE): { x: number; y: number; dx: number; dy: number } {
-  let left = Math.max(0, s);
-  for (let i = 1; i < route.length; i++) {
-    const [ax, ay] = route[i - 1]!;
-    const [bx, by] = route[i]!;
-    const len = Math.hypot(bx - ax, by - ay);
-    if (left <= len || i === route.length - 1) {
-      const k = Math.min(1, left / len);
-      return { x: ax + (bx - ax) * k, y: ay + (by - ay) * k, dx: (bx - ax) / len, dy: (by - ay) / len };
-    }
-    left -= len;
-  }
-  return { x: route[0]![0], y: route[0]![1], dx: 1, dy: 0 };
-}
+export { ROUTE, routeLength, routeAt };
 
 interface TravelerDef {
   kind: 'cart' | 'pilgrim';

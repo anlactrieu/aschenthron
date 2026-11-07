@@ -1,7 +1,7 @@
 import type { Grid } from './path';
-import { BEGINNER_ZONE, CHAIN_FIRST, DANGER_OFFSETS, DANGER_SPOTS, FIRST_GIVER, QUESTS } from './data';
+import { BEGINNER_ZONE, CHAIN_FIRST, DANGER_OFFSETS, DANGER_PACK, DANGER_SPOTS, FIRST_GIVER, QUESTS } from './data';
 import { addNightNpcs, syncNpcPresence } from './night';
-import { CAMP_RESPAWN_TICKS, addNpc, createWorld, giveStarterKit, inBeginnerZone, inSafeZone, setupPatrols, spawnMonster, spawnPlayer, type NpcKind, type Rect, type TrainerField, type World } from './world';
+import { CAMP_RESPAWN_TICKS, addNpc, createWorld, giveStarterKit, inBeginnerZone, inSafeZone, setupPatrols, spawnGuards, spawnMonster, spawnPlayer, type NpcKind, type Rect, type TrainerField, type World } from './world';
 
 interface TiledProp {
   name: string;
@@ -108,7 +108,7 @@ export function buildWorld(seed: number, map: TiledMap, opts: { player?: boolean
   // Gefahrenorte (P4) erst nach den Patrouillen: eigene Rudel-Kennung, bleiben am Platz
   DANGER_SPOTS.forEach((d, i) => d.kinds.forEach((k, j) => {
     const [dx, dy] = DANGER_OFFSETS[j % DANGER_OFFSETS.length]!;
-    spawnMonster(world, d.x + dx, d.y + dy, k).packId = 200001 + i;
+    spawnMonster(world, d.x + dx, d.y + dy, k).packId = DANGER_PACK + i;
   }));
   // Erster Auftrag (Kette „Erste Schritte“) beim Hafenmeister am Startpunkt, vor seinen Kartenaufgaben
   const giver = world.npcs.find((n) => n.name === FIRST_GIVER);
@@ -116,8 +116,12 @@ export function buildWorld(seed: number, map: TiledMap, opts: { player?: boolean
   world.start = { x: start.x / ts, y: start.y / ts };
   addNightNpcs(world);
   syncNpcPresence(world);
-  if (opts.player === false) return { world, tiles, playerId: -1 };
+  if (opts.player === false) {
+    spawnGuards(world);
+    return { world, tiles, playerId: -1 };
+  }
   const player = spawnPlayer(world, start.x / ts, start.y / ts);
   giveStarterKit(world, player);
+  spawnGuards(world);
   return { world, tiles, playerId: player.id };
 }
