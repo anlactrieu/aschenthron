@@ -5,7 +5,6 @@
  * Reine Daten und Rechnung ohne DOM: läuft in Node (Kontaktbögen `scripts/bake-hero.ts`, Tests) und im Browser (`heroSheet`).
  */
 import type { Look } from './art';
-import { templateById } from '../sim/items';
 import { bakeFigure, cycleLength, gaitFoot, type FigAnim, type FigureSheet, type FigureSpec, type FigView, type Ramp } from './figure';
 import { PART, posed, type HeroGear, type RigPose } from './heroRig.js';
 
@@ -78,10 +77,9 @@ function weaponOf(look: Look): HeroWeapon {
   return 'sword';
 }
 
-/** Ein- oder zweihändig aus der Vorlage (wie `handsOf`); Bogen und Stab haben eigene Posen */
+/** Ein- oder zweihändig steht schon im Look (`lookOf` fragt die Sim: `handsOf`); Bogen und Stab haben eigene Posen */
 function twoHandOf(look: Look): boolean {
-  if (look.weapon < 0 || look.weaponKind !== 0 || !look.ids.weapon) return false;
-  return templateById(look.ids.weapon).hands === 2;
+  return !!look.twoHand && look.weapon >= 0 && look.weaponKind === 0;
 }
 
 export function heroLookOf(look: Look): HeroLook {

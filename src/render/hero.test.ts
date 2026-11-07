@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { Look } from './art';
 import { attackFrame, cycleLength, FIG_ANIMS, FIG_VIEWS, walkFrame } from './figure';
+import { lookKey, lookOf } from './art';
+import { generateItem } from '../sim/items';
+import { Rng } from '../sim/rng';
+import { createWorld, spawnPlayer } from '../sim/world';
+import type { Grid } from '../sim/path';
 import { bakeHero, HERO_ANIMS, HERO_CYCLE_PX, HERO_FRAME, HERO_STANCE, HERO_STRIDE, HERO_WIND_FRAMES, heroKey, heroLookOf, type HeroLook, type HeroWeapon } from './hero';
 
 const sum = (d: Uint8ClampedArray): number => {
@@ -9,6 +14,32 @@ const sum = (d: Uint8ClampedArray): number => {
   return h;
 };
 const KNIGHT: HeroLook = { armor: 'iron', robe: false, helm: 2, helmMat: 'iron', gloves: 2, legs: 2, weapon: 'sword', weaponTier: 1, shield: 2, cloak: 'wool', quiver: false, rar: [2, 1, 2] };
+
+describe('Händigkeit aus der Sim', () => {
+  const player = () => {
+    const grid: Grid = { w: 20, h: 20, walkable: new Array(400).fill(true) };
+    const w = createWorld(3, grid);
+    return { w, p: spawnPlayer(w, 5, 5) };
+  };
+
+  it('lookOf übernimmt handsOf: Vorlage und überschriebenes Item.hands', () => {
+    const { w, p } = player();
+    p.equipment.weapon = generateItem(new Rng(1), w.nextId++, 'rusty_sword', 'normal');
+    expect(lookOf(p).twoHand).toBe(false);
+    p.equipment.weapon = generateItem(new Rng(1), w.nextId++, 'battle_axe', 'normal');
+    expect(lookOf(p).twoHand).toBe(true);
+    // Fund mit eigenem `hands` (wie benannte Funde): die Sim zählt es, die Figur muss es auch
+    const found = generateItem(new Rng(1), w.nextId++, 'rusty_sword', 'normal');
+    found.hands = 2;
+    p.equipment.weapon = found;
+    const look = lookOf(p);
+    expect(look.twoHand).toBe(true);
+    expect(heroLookOf(look).twoHand).toBe(true);
+    expect(lookKey(look, 0, false)).not.toBe(lookKey({ ...look, twoHand: false }, 0, false));
+    p.equipment.weapon = generateItem(new Rng(1), w.nextId++, 'hunt_bow', 'normal');
+    expect(lookOf(p).twoHand).toBe(false);
+  });
+});
 
 describe('Skelett-Held', () => {
   it('backt alle Bilder je Ansicht und Animation', () => {
@@ -78,9 +109,8 @@ describe('Skelett-Held', () => {
     expect(heroLookOf({ ...look, ids: { ...ids, weapon: 'claymore' } }).weapon).toBe('greatsword');
     // Ein-/Zweihändigkeit kommt aus der Vorlage (handsOf) bis in die Figur
     expect(heroLookOf(look).twoHand).toBe(false);
-    expect(heroLookOf({ ...look, ids: { ...ids, weapon: 'battle_axe' } }).twoHand).toBe(true);
-    expect(heroLookOf({ ...look, ids: { ...ids, weapon: 'claymore' } }).twoHand).toBe(true);
-    expect(heroLookOf({ ...look, weaponKind: 1, ids: { ...ids, weapon: 'hunt_bow' } }).twoHand).toBe(false);
+    expect(heroLookOf({ ...look, twoHand: true, ids: { ...ids, weapon: 'battle_axe' } }).twoHand).toBe(true);
+    expect(heroLookOf({ ...look, twoHand: true, weaponKind: 1, ids: { ...ids, weapon: 'hunt_bow' } }).twoHand).toBe(false);
     expect(heroLookOf({ ...look, head: 3, ids: { ...ids, head: 'crown_helm' } }).helm).toBe(4);
     expect(heroLookOf({ ...look, shield: 1, ids: { ...ids, offhand: 'tower_shield' } }).shield).toBe(3);
     expect(heroLookOf({ ...look, robe: true, chest: 2, ids: { ...ids, chest: 'bone_robe', cloak: 'wolf_cloak' } })).toMatchObject({ armor: 'bone', robe: true, cloak: 'wolf' });

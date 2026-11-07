@@ -1,7 +1,7 @@
 import type Phaser from 'phaser';
 import type { MonsterFamily } from '../sim/data';
 import type { Actor } from '../sim/world';
-import { templateById } from '../sim/items';
+import { handsOf, templateById } from '../sim/items';
 import { sprite } from './sprites';
 import { CHEST_SPRITES, MONSTER_SPRITES, PLAYER_BASE, PLAYER_DEFAULTS, PLAYER_HAIR, PLAYER_LAYERS, SPRITE_SCALE, NPC_NAME_SPRITES, npcSpriteFile } from './spriteMap';
 
@@ -613,6 +613,8 @@ export interface Look {
   shield: number;
   /** Seltenheit (0 normal … 4 legendär) von Helm, Rumpf und Waffe: Federbusch/Akzentfarbe der Ninja-Figur */
   rar: { head: number; chest: number; weapon: number };
+  /** Nahkampfwaffe mit beiden Händen geführt (`handsOf` der Sim: `Item.hands` vor Vorlage, auch bei benannten Funden) */
+  twoHand?: boolean;
   /** Vorlagen-IDs der sichtbaren Ausrüstung (für die Sprite-Ebenen), leer = nichts angelegt */
   ids: { chest: string; legs: string; feet: string; hands: string; head: string; cloak: string; weapon: string; offhand: string };
 }
@@ -633,6 +635,7 @@ export function lookOf(a: Actor): Look {
     rar: { head: rr('head'), chest: rr('chest'), weapon: rr('weapon') },
     chest: t('chest'), head: t('head'), weapon: t('weapon'), hands: t('hands'),
     weaponKind: kind === 'bow' ? 1 : kind === 'staff' ? 2 : 0,
+    twoHand: !!a.equipment.weapon && !kind && handsOf(a.equipment.weapon) === 2,
     robe: !!a.equipment.chest && a.equipment.chest.templateId.includes('robe'),
     quiver: a.equipment.offhand?.off === 'arrows',
     shield: a.equipment.offhand?.off === 'shield' ? tierOf(templateById(a.equipment.offhand.templateId).minLevel) : -1,
@@ -647,7 +650,7 @@ export function lookOf(a: Actor): Look {
 /** Cache-/Texturschlüssel einer Spielerfigur (Aussehen + Bewegungsphase + Blickrichtung). */
 export function lookKey(look: Look, frame: number, back: boolean, profile = false): string {
   const i = look.ids;
-  return `pl_${look.chest}_${look.head}_${look.weapon}_${look.hands}_${look.weaponKind}_${look.robe ? 1 : 0}_${look.quiver ? 1 : 0}_${look.shield}_${look.rar.head}${look.rar.chest}${look.rar.weapon}_${i.chest}.${i.legs}.${i.feet}.${i.hands}.${i.head}.${i.cloak}.${i.weapon}.${i.offhand}_${frame}${back ? 'b' : ''}${profile ? 's' : ''}`;
+  return `pl_${look.chest}_${look.head}_${look.weapon}_${look.hands}_${look.weaponKind}_${look.robe ? 1 : 0}_${look.quiver ? 1 : 0}_${look.shield}_${look.twoHand ? 2 : 1}_${look.rar.head}${look.rar.chest}${look.rar.weapon}_${i.chest}.${i.legs}.${i.feet}.${i.hands}.${i.head}.${i.cloak}.${i.weapon}.${i.offhand}_${frame}${back ? 'b' : ''}${profile ? 's' : ''}`;
 }
 
 /** Spielerfigur aus DCSS-Ebenen (Körper, Beine, Stiefel, Rüstung, Umhang, Handschuhe, Kopf, Schild, Waffe). Null = Fallback. */

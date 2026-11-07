@@ -43,6 +43,13 @@ export const SPELL_THEMES = {
   lightning: { core: 0xffffff, glow: 0x8fb4ff, spark: [0xe8f0ff, 0xb0c8ff], smoke: 0x4a4e66, gravity: 0 },
 } satisfies Record<string, SpellTheme>;
 export type SpellElement = keyof typeof SPELL_THEMES;
+/** Zauber (Skill-ID) → Farbwelt; ein neuer Zauber trägt sich hier ein und läuft dann über charge/spell/flare */
+export const SPELL_ELEMENT: Record<string, SpellElement> = { ember_bolt: 'fire', fireball: 'fire', lightning: 'lightning' };
+/** Farbwelt eines Treffers: Schadenstyp (Frost/Gift/Feuer) gewinnt, sonst die Tabelle, sonst Feuer */
+export function spellElementOf(skill: string | undefined, dt: string | undefined): SpellElement {
+  if (dt === 'fire' || dt === 'frost' || dt === 'poison') return dt;
+  return (skill && SPELL_ELEMENT[skill]) || 'fire';
+}
 
 interface FloatText {
   t: Phaser.GameObjects.Text;

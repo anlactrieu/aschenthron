@@ -31,7 +31,7 @@ import { isTouch } from './touch';
 import { Atmosphere, isDungeon, LIGHT_DEPTH } from './atmosphere';
 import { hourOf, NEW_CHAR_HOUR } from '../sim/clock';
 import { syncNpcPresence } from '../sim/night';
-import { Fx, SPELL_THEMES, type SpellElement } from './fx';
+import { Fx, SPELL_ELEMENT, SPELL_THEMES, spellElementOf } from './fx';
 import { playPixelfx, registerPixelfx, type FxName } from './pixelfx';
 import { attackFrame, onceFrame, walkFrame, type FigView, type FigureSheet } from './figure';
 import { heroKey, heroLookOf, idleFrame } from './hero';
@@ -958,6 +958,7 @@ export class GameScene extends Phaser.Scene {
     switch (e.skill) {
       case 'lightning':
         if (!pfx('lightning', feetTo, { from: 0.8 })) this.fx.bolt(to.x, to.y + 10, 0x9fc0ff);
+        this.fx.flare(to.x, to.y, SPELL_THEMES[spellElementOf('lightning', undefined)], 1);
         this.cameras.main.shake(120, 0.004);
         break;
       case 'whirlwind':
@@ -1008,10 +1009,10 @@ export class GameScene extends Phaser.Scene {
           const fromPlayer = e.attackerId === this.playerId;
           const toPlayer = e.targetId === this.playerId;
           const arrowSkill = !!e.skill && ['quick_shot', 'multishot', 'poison_shot'].includes(e.skill);
-          const boltSkill = !!e.skill && ['ember_bolt', 'fireball'].includes(e.skill);
+          const boltSkill = !!e.skill && ['ember_bolt', 'fireball'].includes(e.skill) && e.skill in SPELL_ELEMENT;
           const projectile = arrowSkill || boltSkill;
           // Zauber-Farbwelt (Glutblitz kann Frost/Gift tragen): Aufladen, Flug und Einschlag zeichnet `Fx` je Farbwelt
-          const spellEl: SpellElement = e.dt === 'frost' ? 'frost' : e.dt === 'poison' ? 'poison' : 'fire';
+          const spellEl = spellElementOf(e.skill, e.dt);
           // Wirkung am Ziel: Zahl, Blitz, Rückstoß, Ton – bei Geschossen erst beim Einschlag
           const kill = fromPlayer && !!tg && !tg.alive;
           const power: 0 | 1 | 2 = kill ? 2 : e.crit ? 1 : 0;
@@ -1051,7 +1052,8 @@ export class GameScene extends Phaser.Scene {
             // Trefferstopp: Dauer 34 / 70 / 100 ms für normal / kritisch / Todesstoß, Bosse etwas länger
             if (fromPlayer && at && tg && e.amount > 0) this.hitFreeze([at.id, tg.id], (power === 0 ? 34 : power === 1 ? 70 : 100) + (tg.boss ? 20 : 0));
             if (power > 0 || (tg?.boss && fromPlayer)) this.cameras.main.shake(power === 0 ? 60 : 80, power === 2 ? 0.0045 : power === 1 ? 0.0035 : 0.0022);
-            else if (fromPlayer && e.amount > 0 && sk?.area !== 'Magie') this.cameras.main.shake(45, 0.0012);
+            // kleiner Ruck nur bei Fertigkeiten: Zauber etwas deutlicher, Nahkampf-Fertigkeiten wie bisher; Grundangriffe und Pfeile wackeln nicht (Dauerwackeln)
+            else if (fromPlayer && e.amount > 0 && sk && sk.area !== 'Fernkampf') this.cameras.main.shake(sk.area === 'Magie' ? 70 : 45, sk.area === 'Magie' ? 0.0018 : 0.0012);
             if (toPlayer) this.cameras.main.shake(60, 0.002);
             if (fromPlayer) {
               const wt = at?.equipment?.weapon?.templateId ?? '';
@@ -1079,7 +1081,7 @@ export class GameScene extends Phaser.Scene {
             }
             delay = SWING_MS * 0.4 * this.ts;
             // Zauber laden sichtbar auf: Glühen an Hand/Stab, dann erst fliegt das Geschoss
-            if (e.skill === 'ember_bolt') {
+            if (boltSkill) {
               delay += 90 * this.ts;
               const hand = this.bodyPos(at);
               if (hand) {
@@ -1112,7 +1114,9 @@ export class GameScene extends Phaser.Scene {
                   const primary = this.bodyPos(getActor(w, batch.target)) ?? this.bodyPos(tg);
                   const f2 = this.bodyPos(at);
                   if (!primary || !f2) return batch.impacts.forEach((fn) => fn());
-                  this.fx.projectile(f2.x, f2.y, primary.x, primary.y, 0xff5a1a, 240, () => {
+                  const k0 = Math.min(15, (Math.hypot(primary.x - f2.x, primary.y - f2.y) || 1) * 0.35) / (Math.hypot(primary.x - f2.x, primary.y - f2.y) || 1);
+                  this.fx.spell(f2.x + (primary.x - f2.x) * k0, f2.y - 3 + (primary.y - f2.y) * k0, primary.x, primary.y, SPELL_THEMES[spellEl], 240, () => {
+                    this.fx.flare(primary.x, primary.y, SPELL_THEMES[spellEl], 2);
                     this.fx.ring(primary.x, primary.y + 14, 130, 0xff6a2a, 420);
                     // pixelfx-Einschlag am Boden unter dem Hauptziel; der Rauch blendet zum Ende hin aus
                     const fb = playPixelfx(this, 'fire_burst', primary.x, primary.y + 18, { depth: OVERLAY_DEPTH - 1 });
@@ -1129,21 +1133,22 @@ export class GameScene extends Phaser.Scene {
                 const f = this.bodyPos(at);
                 const to = this.bodyPos(tg);
                 if (!f || !to) return impact();
-                const col = e.skill === 'ember_bolt' && e.dt === 'frost' ? 0x8fd0ff : e.skill === 'ember_bolt' && e.dt === 'poison' ? 0x7fe060 : { quick_shot: 0xe8d8a0, multishot: 0xe8d8a0, poison_shot: 0x7fe060, ember_bolt: 0xff8a2a }[e.skill as 'quick_shot'];
+                const col = { quick_shot: 0xe8d8a0, multishot: 0xe8d8a0, poison_shot: 0x7fe060 }[e.skill as 'quick_shot'] ?? 0xff8a2a;
                 if (arrowSkill) {
                   // Pfeil startet am vorgestreckten Bogen, nicht in der Körpermitte
                   const dl = Math.hypot(to.x - f.x, to.y - f.y) || 1;
                   const k0 = Math.min(16, dl * 0.4) / dl;
                   this.fx.arrow(f.x + (to.x - f.x) * k0, f.y + (to.y - f.y) * k0, to.x, to.y, col, 170, impact);
                 }
-                else if (e.skill === 'ember_bolt') {
+                else if (boltSkill) {
                   const th = SPELL_THEMES[spellEl];
                   // Start an der Zauberhand (vorgestreckt), Einschlag in Körpermitte des Ziels
                   const dl = Math.hypot(to.x - f.x, to.y - f.y) || 1;
                   const k0 = Math.min(15, dl * 0.35) / dl;
                   this.fx.spell(f.x + (to.x - f.x) * k0, f.y - 3 + (to.y - f.y) * k0, to.x, to.y, th, 230, () => {
                     this.fx.flare(to.x, to.y, th, power);
-                    if (spellEl === 'fire') {
+                    // Bodenstoß (pixelfx) nur bei Krit/Todesstoß, sonst reicht `flare` (kein doppelter Einschlag)
+                    if (spellEl === 'fire' && power > 0) {
                       const feet = this.feetPos(tg);
                       if (feet && e.amount > 0) playPixelfx(this, 'fire_burst', feet.x, feet.y + 4, { depth: OVERLAY_DEPTH - 1, scale: 1, alpha: 0.85 });
                     }
