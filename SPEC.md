@@ -756,11 +756,19 @@ Grundlage: Probe `scripts/bake-iso-probe.ts` mit `probe/iso/` (`vergleich.png`, 
 
 ### Regeln für alle Phasen
 - **Unberührt bleiben:** Sim, Server, Netz, Spielstände und die Karte (`gen_map.py`, JSON, `MAP_VERSION`). Das Raster bleibt, nur die Darstellung ändert sich. Die Golden-Snapshots bleiben in jeder Phase unverändert.
-- **Draufsicht bleibt heil:** Ohne `?ansicht=iso` sieht das Spiel vor P9.5 aus wie vorher, auch die Figuren-Sheets der Draufsicht. Das wird in jeder Abnahme kurz im Browser geprüft (Stadt, Feld, Dungeon).
+- **Draufsicht bleibt heil:** Ohne `?ansicht=iso` sieht das Spiel vor P9.5 aus wie vorher, auch die Figuren-Sheets der Draufsicht.
+  - **Automatische Prüfung:** `npx tsx scripts/bake-iso-probe.ts` vor und nach jeder Phase laufen lassen. `probe/iso/draufsicht.png` muss byte-gleich bleiben, weil die Probe über dieselben `ground.ts`, `houses.ts`, `props.ts`, `hero.ts`, `monster.ts` und `npc.ts` rendert.
+  - **Im Browser:** Stadt, Feld und Dungeon kurz ansehen.
+  - **P9.5:** hält die Probe kompilierbar oder legt sie bewusst still.
 - **Prüfung je Phase:** tsc, Lint, Tests und Build; Browser mit und ohne Schalter; Frame-Zeit mit 8 Gegnern (Median und Anteil der Frames über 33 ms), nicht neben Pace-Läufen messen.
 - **Branch und Commits:** Gearbeitet wird auf `neuer-look`, committet wird je verifiziertem Schritt. P9.0 muss committet sein, bevor P9.1 bis P9.3 starten. Parallele Sessions committen nur ihre eigenen Dateien. Sie wechseln keinen Branch und stashen nicht.
 - **`GameScene.ts` hat genau einen Besitzer zur Zeit:** zuerst P9.0, dann P9.4, danach P9.5. P9.1 bis P9.3 ändern die Datei nicht. Brauchen sie dort etwas, notieren sie es für P9.4.
-- **Modelle:** P9.0 ist Architektur und läuft mit Opus. Alle anderen Phasen laufen mit Sonnet (`model` setzen).
+- **`world/raster.ts` gehört nur P9.0.** Braucht P9.2 oder P9.3 einen Raster-Helfer, kommt er in eine neue eigene Datei.
+- **Typänderungen in P9.0:** P9.0 darf in `hero.ts`, `monster.ts`, `monsterRig.js` und `npc.ts` nur das ändern, was durch die neuen Werte `frontDiag`/`backDiag` in `FigView` nötig wird (vollständige `switch`-Fälle). P9.0 läuft allein, deshalb kollidiert das mit keiner anderen Session.
+- **Modelle:**
+  - P9.0 ist Architektur und läuft mit Opus, aber nur für den Vertrag: Helfer samt Tests, Schnittstellen von `isoGround.ts`/`isoHouses.ts`, Tiefen- und Ausblend-Regel.
+  - Danach wechselt dieselbe Session auf Sonnet und baut die 44 Stellen, die Platzhalter, das Culling und die Pfeiltasten um.
+  - Alle anderen Phasen laufen mit Sonnet (`model` setzen).
 - **Look-Fragen** (Wandhöhe, Türen auf verdeckten Seiten, Kontaktbögen der Figuren) entscheidet der Nutzer anhand eines Probe-Bilds, nicht die Session.
 - **Nachschlagen:** Vor d07794c war das Spiel schon iso 64×32 (`git show d07794c^:src/render/iso.ts`, dazu `GameScene.ts` und `minimap.ts` aus 340ec10). Das taugt zum Nachschlagen für Projektion, Tiefe und Picking, wird aber nicht zurückgespielt.
 
@@ -769,6 +777,9 @@ Grundlage: Probe `scripts/bake-iso-probe.ts` mit `probe/iso/` (`vergleich.png`, 
   - `ISO` wird beim Start aus `?ansicht=iso` gelesen und an den Figuren-Worker mitgegeben.
   - `TILE_W/TILE_H` gelten je Modus: Draufsicht 48/48, Iso 64/32 (Kunstraute 32×16 bei Maßstab 2). `art.ts` übernimmt die Werte aus `iso.ts` statt eigener Konstanten (`art.ts:23`).
   - Iso: `toScreen(x, y) = ((x − y)·W/2, (x + y)·H/2)`, `toTile` ist die exakte Umkehrung. Test: `toTile(toScreen(p)) = p`.
+- **Nutzer der Projektion:**
+  - `GameScene.ts` (44 Stellen), `wildlife.ts` (11), `townLife.ts` (6), `art.ts` (3) und `world/raster.ts` (1).
+  - `town.ts` ruft `toScreen`/`toTile` nicht mehr auf. Die Zahl 17 in Z. 341 stammt vom alten Stand. Die Datei hängt aber über die Tür-Texturen an der Draufsicht (`town.ts:67` nutzt `wallTile`), siehe P9.3.
 - **Neue Helfer:** Kein Aufrufer rechnet mehr selbst mit `TILE_W`/`TILE_H`.
   - `viewOf(dsx, dsy)` liefert `{ view, flip }` aus der **Bildschirm**-Richtung: 8 Sektoren auf 5 Ansichten, links wird gespiegelt.
 
@@ -802,7 +813,7 @@ Grundlage: Probe `scripts/bake-iso-probe.ts` mit `probe/iso/` (`vergleich.png`, 
 | P9.0 Grundgerüst | Opus | `iso.ts` + neu `iso.test.ts`, `GameScene.ts`, `art.ts`, `world/raster.ts` (Konstanten), `figure.ts` (nur Typ `FigView` + Ansichtsliste je Modus), `townLife.ts`/`wildlife.ts` (nur die mechanische Umstellung), neu `isoGround.ts` und `isoHouses.ts` (Schnittstelle + Platzhalter) | allein, zuerst |
 | P9.1 Figuren in 5 Ansichten | Sonnet | `figure.ts`, `hero.ts`, `heroRig.js`/`.d.ts`, `heroSheet.ts`, `monster.ts`, `monsterRig.js`/`.d.ts`, `monsterSheet.ts`, `npc.ts`, `figureWorker.ts`, `figureMap.ts`, `sheetUpload.ts`, Rückfall in `ninjaFigures.ts`/`spriteMap.ts`, Tests dazu, neu `scripts/bake-iso-figures.ts` | parallel zu P9.2/P9.3 |
 | P9.2 Boden und Wände | Sonnet | `isoGround.ts`, `world/ground.ts`, `world/details.ts`, neu `world/isoWalls.ts`, `groundLook.ts`, `groundLook.test.ts` (nicht `world/props.ts`) | parallel zu P9.1/P9.3 |
-| P9.3 Häuser, Props, Städte | Sonnet | `isoHouses.ts`, `houses.ts`, `town.ts`, `world/props.ts`, `ninjaProps.ts`, `townLife.ts`, `townLife.test.ts` | parallel zu P9.1/P9.2 |
+| P9.3 Häuser, Props, Städte | Sonnet | `isoHouses.ts`, `houses.ts`, `town.ts` (Tür-Texturen), `world/props.ts`, `ninjaProps.ts`, `townLife.ts`, `townLife.test.ts` | parallel zu P9.1/P9.2 |
 | P9.4 Zauber-FX, Minimap, Anker, Wildtiere | Sonnet | `fx.ts`, `pixelfx.ts`, `pixelfx.test.ts`, `minimap.ts`, `atmosphere.ts`, `atmosphere.test.ts`, `wildlife.ts`, `world/critters.ts`, `GameScene.ts` | nach P9.1 bis P9.3 |
 | P9.5 Iso wird Standard | Sonnet | alle oben genannten (Aufräumen) | zuletzt |
 
@@ -838,6 +849,7 @@ Reihenfolge: 4 Runden mit 6 Sessions. Erst P9.0, dann P9.1, P9.2 und P9.3 gleich
   - Im Iso-Modus backt jedes Sheet 5 Ansichten. Beim Menschen-Rig gilt `yaw = ±π/4` wie in der Probe (`heroPose` setzt heute ±π/2 für vorn/hinten, `hero.ts:273`). Das betrifft Held, NPCs, Wache und zweibeinige Monster über `humSpec` → `posed`.
   - **Tiere** (`beastPosed` in `monsterRig.js:281`) brauchen eigene Winkel je Typ, weil Vierbeiner geschert sind, Würmer gerade und Spinnen und Irrlichter ungeschert. Den Hub `REST_LIFT` gibt es je Ansicht.
   - Schattenrisse gibt es für alle 5 Ansichten.
+  - Die Sheet-Angaben `figTop`, `figW` und `figDir` sowie die Schattenriss-Maße (`silhouetteOf`) stimmen auch für die Schrägansichten. GameScene nutzt sie für Picking (`bodyBox`) und in P9.4 für die Zauberhöhe.
   - **Waffengriff:** `heroRig.js` ~392 unterscheidet nur, ob `yaw` gesetzt ist oder nicht (`S.q.yaw ? 0.8 : 1.7`). Für die Schräge braucht der Griff eigene Werte. Zu prüfen sind Einhand mit Schild (Schildhand aus 9d5f77f), Zweihand, Bogen, Stab, Köcher und Umhang.
 - **Backkosten:** etwa +66 % Backzeit und Speicher je Sheet. Gemessen werden der Held und 10 Monsterarten im Worker, jeweils vorher und nachher, dazu der Speicher des Figuren-Caches. Falls nötig, wird die Cache-Grenze so verkleinert, dass der Speicher nicht über den heutigen Stand wächst. Beim ersten Auftauchen einer Art darf kein Frame über 33 ms gehen.
 - **Abnahme:**
@@ -847,6 +859,7 @@ Reihenfolge: 4 Runden mit 6 Sessions. Erst P9.0, dann P9.1, P9.2 und P9.3 gleich
     - den Helden mit jeder Waffenart.
   - Der Nutzer schaut die Bögen an, besonders Ratten, Würmer und Spinnen, weil Vierbeiner schräg von vorn zum Punkt werden können.
   - Die Draufsicht-Sheets sind byte-gleich, ein Test vergleicht den Hash vorher und nachher.
+  - Ein Test prüft, dass `figTop`/`figW` und die Schattenrisse für jede der 5 Ansichten gesetzt sind.
 
 **P9.2 Boden und Wände (Sonnet)**
 - **Inhalt:**
@@ -870,6 +883,8 @@ Reihenfolge: 4 Runden mit 6 Sessions. Erst P9.0, dann P9.1, P9.2 und P9.3 gleich
 - **Inhalt:**
   - **Häuser:** Kästen aus der Probe (Fachwerk, Satteldach, Giebel, Schornstein), in `isoHouses.ts` und nach dem Spaltenschnitt aus P9.0. Dach und Vorderwände blenden aus, wenn man das Haus betritt oder dahinter steht. Nachts leuchten die Fenster, Türen bekommen ein Schild.
   - **Türen:** Sie liegen auf den Seiten N, S, E oder W (`houses.ts:26`). In Iso sind nur die S- und die O-Seite (+y, +x) zu sehen. Die Session zählt zuerst die N- und W-Türen. Für sie macht sie ein Probe-Bild mit einem Vorschlag: Schild und Lichtschein über der Dachkante, ein Weg auf dem Boden, und das Dach blendet aus, wenn man nah ist. Der Nutzer entscheidet. Türen auf der Karte zu verschieben geht nur mit seinem Okay, weil sich dann Karte und `MAP_VERSION` ändern.
+  - **Tür-Texturen:** `town.ts:67` baut die Tür-Texturen heute aus `wallTile('brick', 15, 0, 1)`. Für Iso bekommen sie eine eigene Grundlage, damit P9.5 `wallTile` löschen kann.
+  - **Krähe:** Sie wird in `townLife.ts` gezeichnet und bekommt hier die Laufrichtung über `viewOf`.
   - **Props:** Stehende Bilder (Fass, Brunnen, Laterne, Baum) werden übernommen. Zäune, Stände und Mauerstücke gibt es in zwei Richtungen, entlang x und entlang y. Flaches Dekor (`FLAT_DECOR` in `townLife.ts`) wird als Raute gezeichnet.
 - **Abnahme:**
   - Vergleichsbilder von Aschenhafen, Felsenwacht und Moosbrück.
@@ -883,10 +898,10 @@ Reihenfolge: 4 Runden mit 6 Sessions. Erst P9.0, dann P9.1, P9.2 und P9.3 gleich
   - **Bodenkreise** in `fx.ts` laufen über `groundEllipse`: `zone`, `ring`, `beamRing`, der Fuß von `column` und `burst` am Boden.
   - **`charge`, Aufladepunkt:** Heute liegt er bei `hand.x + (sxv/len)·15, hand.y − 3 + (syv/len)·8` (`GameScene.ts` ~1086). Die Handposition kommt künftig aus der aktuellen Ansicht der 5, und der Versatz in Blickrichtung wird auf Bildschirmrichtungen umgestellt. Das wird in allen 8 Richtungen nachgemessen.
   - **`spell`:** Der Flug startet an der Hand und läuft in Brusthöhe zum Ziel. Der Start bei `f.y − 3` (~1144) wird geprüft.
-  - **`flare`, Einschlag:** Er sitzt auf der Höhe der Mitte des `bodyBox` des Ziels statt mit festem Versatz. Das behebt auch den Ratten-Einschlag über dem Körper aus HANDOFF.
+  - **`flare`, Einschlag:** `bodyPos` (`GameScene.ts:911`) rechnet heute mit festen 18 bzw. 34 px über dem Fußpunkt. Künftig wird die Höhe aus der Körperhöhe der Figur genommen: `figTop` aus dem Sheet bzw. `bodyBox` (~2151), davon etwa die Hälfte. Das betrifft das Aufladen und den Einschlag gleichermaßen und behebt auch den Ratten-Einschlag über dem Körper aus HANDOFF.
   - **Zauber und Anzeigen:** Frostnova, Feuerball und Blitzschlag werden genauso geprüft. Ebenso Lichtstrahlen der Beute, Namensschilder, Quest-Marker, Schadenszahlen und Nachtlichter (`atmosphere.ts`).
   - **Minimap:** Die Basis-Leinwand wird mit derselben Projektion als Raute gezeichnet (2:1), Marker und Sichtfenster laufen über dieselbe Abbildung. Die Größenstufen bleiben.
-  - **Wildtiere:** Reh, Frosch, Fledermaus und Krähe bekommen die Laufrichtung über `viewOf`. Die Tiere in `critters.ts` blicken nach rechts, Schrägen brauchen sie nur, wenn es im Bild auffällt.
+  - **Wildtiere:** Reh, Frosch und Fledermaus bekommen die Laufrichtung über `viewOf`. Die Krähe macht P9.3 in `townLife.ts`. Die Tiere in `critters.ts` blicken nach rechts, Schrägen brauchen sie nur, wenn es im Bild auffällt.
 - **Abnahme:**
   - Glutblitz in 8 Richtungen gegen Ratte, Goblin und einen Boss als Bildfolge: Das Aufladen sitzt an der Hand, der Einschlag auf dem Körper.
   - Der Frostnova-Ring liegt flach auf dem Boden.
@@ -896,7 +911,7 @@ Reihenfolge: 4 Runden mit 6 Sessions. Erst P9.0, dann P9.1, P9.2 und P9.3 gleich
 **P9.5 Iso wird Standard (Sonnet)**
 - **Inhalt:**
   - Der Schalter fällt weg, ebenso die Zweige für 3 Ansichten und die Draufsicht.
-  - Gelöscht werden `wallTile` und die Draufsicht-Häuser aus `houses.ts`, die `art.ts`-Konstanten und die Draufsicht-Varianten der Tests.
+  - Gelöscht werden `wallTile` (erst nachdem `town.ts` es nicht mehr nutzt) und die Draufsicht-Häuser aus `houses.ts`, die `art.ts`-Konstanten und die Draufsicht-Varianten der Tests.
   - Die Probe `probe/iso/` bleibt als Beleg.
   - README und SPEC werden nachgezogen.
   - Mit Debug-Positionen wird die ganze Karte einmal durchlaufen: alle Städte, Gebiete und Dungeons.
