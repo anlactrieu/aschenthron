@@ -63,16 +63,29 @@ describe('benannte Funde (named.ts)', () => {
     }
   });
 
-  it.skipIf(NAMED.length < 66)('je Band und Slot genau ein Fund (66)', () => {
+  it('je Band und Slot zwei bis drei Funde, aus mehreren Gruppen, etwa ein Drittel selten', () => {
     for (const band of NAMED_BANDS) {
       for (const slot of SLOTS) {
         const hits = NAMED.filter((d) => d.band === band && templateById(d.base).slot === slot);
-        expect(hits.length, `Band ${band}, Slot ${slot}`).toBe(1);
+        expect(hits.length, `Band ${band}, Slot ${slot}`).toBeGreaterThanOrEqual(2);
+        expect(hits.length, `Band ${band}, Slot ${slot}`).toBeLessThanOrEqual(3);
+        expect(new Set(hits.map((d) => d.group)).size, `Band ${band}, Slot ${slot}: gleiche Gruppe`).toBeGreaterThanOrEqual(2);
+      }
+      const inBand = NAMED.filter((d) => d.band === band);
+      const rare = inBand.filter((d) => d.rarity === 'rare').length;
+      expect(rare / inBand.length, `Band ${band}: Anteil selten`).toBeGreaterThanOrEqual(0.25);
+      expect(rare / inBand.length, `Band ${band}: Anteil selten`).toBeLessThanOrEqual(0.45);
+    }
+  });
+
+  it('kein Fund-Wert liegt über dem Höchstwert der ersten 66 Funde seines Bands (+15 %), kein Ausreißer nach oben', () => {
+    const old = NAMED.slice(0, 66);
+    for (const d of NAMED.slice(66)) {
+      for (const a of d.affixes) {
+        const peers = old.filter((o) => o.band === d.band).flatMap((o) => o.affixes.filter((x) => x.stat === a.stat).map((x) => x.value));
+        if (!peers.length) continue;
+        expect(a.value, `${d.id} ${a.stat}`).toBeLessThanOrEqual(Math.ceil(Math.max(...peers) * 1.15));
       }
     }
-    // etwa ein Drittel selten
-    const rare = NAMED.filter((d) => d.rarity === 'rare').length;
-    expect(rare).toBeGreaterThanOrEqual(16);
-    expect(rare).toBeLessThanOrEqual(28);
   });
 });
