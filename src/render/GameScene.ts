@@ -13,7 +13,7 @@ import {
 import { isWalkable } from '../sim/path';
 import { arrowDirs, arrowStep, facingView, fallbackView, FOOT_DY, footprintColumns, FRONT_DY, gridStep, groundSize, ISO, mapBounds, mirrors, sheetView, standDepth, tileRange, toScreen, toTile, turn, type TileRange } from './iso';
 import { IsoChunkBaker, isoChunkOrigin, ISO_CHUNK_H, ISO_CHUNK_W, isoWall, type IsoGroundSrc } from './isoGround';
-import { isoHouseFade, isoHouseParts, type IsoFade } from './isoHouses';
+import { isoHouseFade, isoHouseParts, type IsoFade, type IsoHousePart } from './isoHouses';
 import { figureMode, ninjaNpcDef } from './figureMap';
 import { detectHouses, houseDoor, houseDecor, houseFacade, houseFence, houseGlow, houseRoof, houseSign, houseWallTile, lowerKind, WINDOW_LIGHT, type House, type RoofNotch } from './houses';
 import { buildZoneMap, Z } from './groundLook';
@@ -784,11 +784,26 @@ export class GameScene extends Phaser.Scene {
     }
     if (hit?.chest) return this.send({ type: 'openChest', chestId: hit.chest.id });
     if (hit?.actor) return this.send({ type: 'attack', targetId: hit.actor.id });
-    const loot = w.ground.find((g) => Math.hypot(g.x - t.x, g.y - t.y) < 0.8);
+    const loot = this.lootAt(ptr.worldX, ptr.worldY);
     if (loot) return this.send({ type: 'pickup', groundId: loot.id });
     const x = Math.floor(t.x + 0.5);
     const y = Math.floor(t.y + 0.5);
     if (isWalkable(w.grid, x, y)) this.send({ type: 'moveTo', x, y });
+  }
+
+  /**
+   * Beute unter dem Mauszeiger: Draufsicht wie bisher im Raster (0,8 Kacheln), Iso im Bildraum um das Beutebild (es liegt 8 px
+   * über der Rautenmitte, eine Rasterkachel ist dort nur 16 px hoch).
+   */
+  private lootAt(wx: number, wy: number): (typeof this.world.ground)[number] | undefined {
+    if (!ISO) {
+      const t = toTile(wx, wy);
+      return this.world.ground.find((g) => Math.hypot(g.x - t.x, g.y - t.y) < 0.8);
+    }
+    return this.world.ground.find((g) => {
+      const s = toScreen(g.x, g.y);
+      return Math.hypot(s.sx - wx, s.sy + FOOT_DY - 14 - wy) < 22;
+    });
   }
 
   /** Titelbild für neue Spiele: Prämisse, Endziel und Namenswahl. */
@@ -1609,8 +1624,7 @@ export class GameScene extends Phaser.Scene {
     else if (hit?.actor) cursor = 'crosshair';
     else if (hit?.npc || hit?.chest) cursor = 'pointer';
     else if (!this.armedSkill) {
-      const t = toTile(wp.x, wp.y);
-      if (this.world.ground.some((gi) => Math.hypot(gi.x - t.x, gi.y - t.y) < 0.8)) cursor = 'pointer';
+      if (this.lootAt(wp.x, wp.y)) cursor = 'pointer';
     }
     if (cursor !== this.cursor) {
       this.cursor = cursor;
@@ -2078,7 +2092,8 @@ export class GameScene extends Phaser.Scene {
       };
     };
     // Iso: Hausteile aus isoHouses.ts (Wände und Türen des Rings gehören dazu, Props gibt es dafür nicht)
-    if (ISO) for (const hs of this.houses) for (const pt of isoHouseParts(hs)) want({ key: pt.key, make: () => toCanvas(pt.make()) });
+    const isoParts = new Map(ISO ? this.houses.map((hs) => [hs, isoHouseParts(hs)] as const) : []);
+    if (ISO) for (const parts of isoParts.values()) for (const pt of parts) want({ key: pt.key, make: () => toCanvas(pt.make()) });
     else for (const hs of this.houses) for (const a of Object.values(shell(hs))) want(a);
     // Wand- und Türkacheln genau so, wie houseProp sie später anfragt
     if (!ISO) for (const [idx, hs] of this.houseAt) {
@@ -2093,7 +2108,7 @@ export class GameScene extends Phaser.Scene {
     this.packHouseArt(art);
     for (const hs of this.houses) {
       const sh = shell(hs);
-      if (ISO) this.placeIsoHouse(hs);
+      if (ISO) this.placeIsoHouse(hs, isoParts.get(hs)!);
       else {
         // Draufsicht: Bildecke = linke obere Ecke der Kachel (Kachelmitte minus halbe Kachel)
         const half = FRONT_DY;
@@ -2138,9 +2153,9 @@ export class GameScene extends Phaser.Scene {
    * Spalte mit der Tiefe der vorderen bzw. hinteren Bodenkante der Grundfläche darunter (`footprintColumns`); Dachüberstand und
    * Giebel jenseits der Grundfläche zählen zur Randspalte. Ausblendbare Teile kommen in `roofs` (siehe updateRoofs).
    */
-  private placeIsoHouse(hs: House): void {
+  private placeIsoHouse(hs: House, parts: IsoHousePart[]): void {
     const cols = footprintColumns(hs.x0, hs.y0, hs.w, hs.h);
-    isoHouseParts(hs).forEach((pt, k) => {
+    parts.forEach((pt, k) => {
       const [tex, frame] = this.houseTex(pt.key, () => toCanvas(pt.make()));
       const fr = this.textures.getFrame(tex, frame);
       cols.forEach((c, i) => {
