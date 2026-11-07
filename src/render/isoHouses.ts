@@ -234,3 +234,27 @@ class Quads {
     return r;
   }
 }
+
+/* ---------------------------------------------------------------- Stadtprops (Hook für P9.3) */
+
+/** Iso-Bild eines Stadtprops: Schlüssel (Textur muss registriert sein, z. B. in `registerTownArt`), Anker, flach = liegt am Boden */
+export interface IsoTownProp {
+  key: string;
+  /** Ursprung y (0..1) und Versatz unter der Kachelmitte in Bildschirm-Pixeln; fehlen sie, gelten die Werte der Draufsicht */
+  oy?: number;
+  dy?: number;
+  /** flach am Boden (Teppich, Heu, Raute): liegt unter allen Figuren */
+  flat?: boolean;
+}
+
+/**
+ * Stadtprop in Iso (Fass, Stand, Zaun, Laterne …): `key` ist der Draufsicht-Schlüssel aus GameScene `townProp`, `axis` die Richtung
+ * des Zugs aus gleichen Nachbarn ('x' = Nachbar links/rechts im Raster, sonst 'y'). P9.3 liefert hier eigene Iso-Bilder, etwa
+ * Zäune und Stände entlang x bzw. y; Platzhalter: das Draufsicht-Bild unverändert.
+ */
+export function isoTownProp(key: string, axis: 'x' | 'y', x: number, y: number): IsoTownProp {
+  void axis;
+  void x;
+  void y;
+  return { key };
+}

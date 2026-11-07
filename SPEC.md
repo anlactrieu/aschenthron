@@ -866,6 +866,17 @@ Reihenfolge: 4 Runden mit 6 Sessions. Erst P9.0, dann P9.1, P9.2 und P9.3 gleich
     - `isoHouseFade(hs, px, py)` liefert die Ziel-Deckkraft je Gruppe.
     - GameScene schneidet die Teile in Spalten (`footprintColumns`), legt sie in den Hausatlas und blendet weich.
     - Für Hausringe gibt es in Iso keine Props, die Teile zeichnen sie.
+- **Hooks für die Parallelphasen**, damit sie GameScene nicht anfassen:
+  - **`OCCLUDER_ALPHA`** in `isoGround.ts` (P9.2): Deckkraft der Verdecker vor dem Helden.
+  - **`isoTownProp(key, axis, x, y)`** in `isoHouses.ts` (P9.3) liefert `{ key, oy?, dy?, flat? }`. Damit bekommen Stadtprops eigene Iso-Bilder: Zäune und Stände entlang x oder y, flaches Dekor unter allen Figuren. Texturen registriert P9.3 in `town.ts`.
+  - **Hausteile mit `light: true`** laufen in GameScene über `nightLights`: Deckkraft = Nacht, sie folgen den Vorderwänden.
+  - **Nicht als Hook vorhanden, Wunsch an P9.4:** Zaunstücke und Fässer der Hausdeko (`houseDecor`), die GameScene setzt. Sie bleiben bis dahin Draufsicht-Bilder.
+- **Dateibesitz während P9.1–P9.3:**
+  - **Eingefroren** sind `iso.ts`, `iso.test.ts`, `GameScene.ts` und die exportierten Typen und Signaturen von `isoGround.ts` und `isoHouses.ts` (`IsoGroundSrc`, `IsoChunkBaker`, `isoChunkOrigin`, `ISO_CHUNK_W/H`, `IsoWallArt`, `isoWall`, `OCCLUDER_ALPHA`, `IsoHousePart`, `IsoFade`, `isoHouseParts`, `isoHouseFade`, `IsoTownProp`, `isoTownProp`).
+  - **Neue Helfer** kommen in eine neue Datei der Phase, wie bei `world/raster.ts`.
+  - **Schnittstelle ändern:** Wer eine Änderung braucht, notiert sie für P9.4.
+  - **Inhalt füllen:** Den Inhalt der Funktionen ändern P9.2 (`isoGround.ts`) und P9.3 (`isoHouses.ts`) frei, solange die Signaturen bleiben.
+  - **`figure.ts`** gehört ab jetzt P9.1. Die ersten 3 Einträge von `figViews` bleiben in ihrer Reihenfolge.
 - **Änderungen am Vertrag (begründet):**
   1. **`groundEllipse`** gilt nur in Iso. Die Draufsicht zeichnet gestauchte Ellipsen, keine Kreise. `groundSize(w, h)` behält sie dort unverändert und macht in Iso einen 2:1-Bodenkreis gleicher Breite daraus.
   2. **Spaltentiefe** ist die Vorderkante in der Spaltenmitte, nicht das Maximum der Spalte. Mit dem Maximum hätte eine Figur direkt vor dem Flügel dieselbe Tiefe wie die Wand. So bleiben in beide Richtungen mindestens 8 px Abstand (Test in `iso.test.ts`).

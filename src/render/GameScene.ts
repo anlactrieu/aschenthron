@@ -12,8 +12,8 @@ import {
 } from '../sim/world';
 import { isWalkable } from '../sim/path';
 import { arrowDirs, arrowStep, facingView, fallbackView, FOOT_DY, footprintColumns, FRONT_DY, gridStep, groundSize, ISO, mapBounds, mirrors, sheetView, standDepth, tileRange, toScreen, toTile, turn, type TileRange } from './iso';
-import { IsoChunkBaker, isoChunkOrigin, ISO_CHUNK_H, ISO_CHUNK_W, isoWall, type IsoGroundSrc } from './isoGround';
-import { isoHouseFade, isoHouseParts, type IsoFade, type IsoHousePart } from './isoHouses';
+import { IsoChunkBaker, isoChunkOrigin, ISO_CHUNK_H, ISO_CHUNK_W, isoWall, OCCLUDER_ALPHA, type IsoGroundSrc } from './isoGround';
+import { isoHouseFade, isoHouseParts, isoTownProp, type IsoFade, type IsoHousePart } from './isoHouses';
 import { figureMode, ninjaNpcDef } from './figureMap';
 import { detectHouses, houseDoor, houseDecor, houseFacade, houseFence, houseGlow, houseRoof, houseSign, houseWallTile, lowerKind, WINDOW_LIGHT, type House, type RoofNotch } from './houses';
 import { buildZoneMap, Z } from './groundLook';
@@ -2155,6 +2155,8 @@ export class GameScene extends Phaser.Scene {
    */
   private placeIsoHouse(hs: House, parts: IsoHousePart[]): void {
     const cols = footprintColumns(hs.x0, hs.y0, hs.w, hs.h);
+    let walls: Phaser.GameObjects.Image | undefined;
+    const lights: Phaser.GameObjects.Image[] = [];
     parts.forEach((pt, k) => {
       const [tex, frame] = this.houseTex(pt.key, () => toCanvas(pt.make()));
       const fr = this.textures.getFrame(tex, frame);
@@ -2166,10 +2168,13 @@ export class GameScene extends Phaser.Scene {
         if (x1 <= x0) return;
         // gleiche Spalte: später gelistete Teile (Dach) vor früheren (Wände)
         const img = this.add.image(pt.sx, pt.sy, tex, frame).setOrigin(0, 0).setCrop(x0, 0, x1 - x0, fr.height).setDepth((pt.layer === 'front' ? c.depth : c.back) + k * 0.01);
-        if (pt.light) img.setBlendMode(Phaser.BlendModes.ADD).setDepth(LIGHT_DEPTH);
-        if (pt.fade !== 'none') this.roofs.push({ img, house: hs, fade: pt.fade });
+        // Licht (Fenster nachts): additiv über allem, Deckkraft = Nacht, blendet mit den Vorderwänden aus (wie die Fassade der Draufsicht)
+        if (pt.light) lights.push(img.setBlendMode(Phaser.BlendModes.ADD).setDepth(LIGHT_DEPTH).setAlpha(0));
+        else if (pt.fade !== 'none') this.roofs.push({ img, house: hs, fade: pt.fade });
+        if (pt.fade === 'walls' && !pt.light) walls ??= img;
       });
     });
+    for (const img of lights) this.nightLights.push({ img, k: 1, follow: walls });
   }
 
   /**
@@ -2194,7 +2199,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
     for (const img of this.occluders) if (!fade.has(img)) img.setAlpha(1);
-    for (const img of fade) img.setAlpha(0.45);
+    for (const img of fade) img.setAlpha(OCCLUDER_ALPHA);
     this.occluders = fade;
   }
 
@@ -2319,8 +2324,16 @@ export class GameScene extends Phaser.Scene {
     else if (gid === 11) key = `rock_${this.rockStyle(x, y)}_${v % 3}`;
     else if (gid === 13) key = `grave_${v % 3}`;
     else if (gid >= TOWN_GID.wall && gid <= TOWN_GID.doorLast) {
-      const t = this.townProp(x, y, gid, v);
-      if (!WORLD_TOWN_KEYS.has(t.key)) return this.add.image(sx, sy + t.dy, t.key).setOrigin(0.5, t.oy).setDepth(standDepth(sy));
+      let t = this.townProp(x, y, gid, v);
+      let depth = standDepth(sy);
+      if (ISO) {
+        // Iso-Bild aus isoHouses.ts (P9.3): Zugrichtung aus gleichen Nachbarn, flaches Dekor liegt unter allen Figuren
+        const same = (gx: number, gy: number): boolean => this.gidAt(gx, gy) === gid;
+        const ip = isoTownProp(t.key, same(x - 1, y) || same(x + 1, y) ? 'x' : 'y', x, y);
+        t = { key: ip.key, oy: ip.oy ?? t.oy, dy: ip.dy ?? t.dy };
+        if (ip.flat) depth = -8e5;
+      }
+      if (!WORLD_TOWN_KEYS.has(t.key)) return this.add.image(sx, sy + t.dy, t.key).setOrigin(0.5, t.oy).setDepth(depth);
       key = t.key;
     } else key = 'pillar';
     // Code-Welt-Props stehen unten mittig; Fußpunkt (Unterkante samt Schatten) knapp über der Kachel-Vorderkante

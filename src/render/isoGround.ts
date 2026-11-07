@@ -14,6 +14,9 @@ import { stampDetail, stampWaterDetail } from './world/details';
 import type { WallStyle } from './world/props';
 import { ISO_ART_H, ISO_ART_W, project } from './iso';
 
+/** Deckkraft verdeckender Wandblöcke, Bäume und Props vor dem Helden (GameScene `updateOcclusion`); P9.2 entscheidet mit dem Nutzer (Ausblenden oder Schattenriss) */
+export const OCCLUDER_ALPHA = 0.45;
+
 /** Chunkgröße in Kacheln (gleich der Draufsicht, GameScene `CHUNK`) */
 export const ISO_CHUNK = 16;
 /** Kunstraster eines Chunks: Hülle der Raute aus 16x16 Kacheln (512 x 256 Kunstpixel, 1024 x 512 Bildschirm-Pixel) */
