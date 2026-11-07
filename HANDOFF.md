@@ -1,9 +1,7 @@
-# HANDOFF – Aschenthron
-
-## LÄUFT (2026-11-07): P5-Patrouille ∥ P3-Funde, danach P3 Titel + Kill-Auftrag
-- **Stand:** SPEC „Auftrag 2026-11-07“ (aa6c4a7). Zwei Sonnet-Sessions im geteilten Checkout auf `neuer-look`, kein Push: `p5-patrouille` (local_035a5c1c…; `world.ts`, `data.ts`, `wildlife.ts`, `GameScene.ts`) und `p3-funde` (local_6a756f5b…; nur `named.ts`, `items.ts`).
-- **Letzte 3 Entscheidungen:** (1) Nutzer: P3-Rest = Titel über dem Kopf, Kill-Ziel als Auftrag, mehr benannte Funde; keine Charaktererschaffung. (2) Nutzer: Wache kämpft echt in der Sim, keine Kulisse. (3) Titel + Kill-Auftrag erst nach P5, weil dieselben Dateien (`world.ts`, `GameScene.ts`).
-- **Offen:** Berichte prüfen, dann Session P3 Titel + Kill-Auftrag starten. Nutzer-Test online, `main` nur nach Okay.
+## LÄUFT (2026-11-07): P3 Titel + Kill-Auftrag (P5-Patrouille und P3-Funde fertig)
+- **Stand:** SPEC „Auftrag 2026-11-07“. Fertig auf `neuer-look`, kein Push: 777b926 P3-Funde (132 neue in `named.ts`, Test je Band/Slot; Übergabe `p3-funde-handoff.md` im Notizordner) und 641f8e8 P5-Patrouille (2 `Straßenwache` `kind: 'guard'`, Stufe 14, Route in `src/sim/route.ts`, Respawn 150 s, nur aktiv mit Spieler in 38 Feldern; 491 Tests grün; Übergabe `wache/wache-handoff.md`). Pace (8 Seeds, HEAD mit Funden): ohne Wache 20,9 h → mit Wache 22,1 h, Tode 416 → 378. Läuft: Session `p3-titel-kills` (local_d0d4e5c2…).
+- **Letzte 3 Entscheidungen:** (1) Nutzer: P3-Rest ohne Charaktererschaffung. (2) Nutzer: Wache kämpft echt in der Sim. (3) Titel + Kill-Auftrag erst nach P5 (gleiche Dateien).
+- **Offen:** Wachwerte nur geschätzt; Wache meidet Gefahrenorte; Tote Wache im Netz ungetestet. Pace-Basis fiel von 24,4 h (Einstieg-Handoff, Bot `neu`) auf 20,9 h – unklar, ob durch mehr Funde oder andere Messung, prüfen. Nutzer-Test online, `main` nur nach Okay.
 
 ## ERLEDIGT (2026-11-07): Einstieg für Neulinge – LIVE seit 2026-11-07 (main = 610af95, Pages grün), NÄCHSTER SCHRITT: Nutzer-Test
 - **Stand:** Commits 1f73d48, 1ee2c89, 5277696 (Rattenkönig jetzt 84,161, Räubernest 92,141, Auto-Start-Sperre nur für den ersten Auftrag) und 6b9d8e5 (Review-Reste) auf `neuer-look` (Session `Aschenthron: Einstieg für Neulinge`, local_906ac692…), kein Push auf `main`. tsc, Lint, 478 Tests (16 neu in `src/sim/newbie.test.ts`) und Build grün, Golden-Snapshots unverändert. Im Browser durchgespielt (Dev-Server, leerer Speicherplatz 3, danach gelöscht): Start 07:00 → Joren „!“ → Auftrag → Mirel „…“, Anliegen, 2 Tränke gekauft → nur Ratten und Wildhunde vor dem Tor, Raute auf der Minimap → 5 Ratten → Bericht bei Joren → Stufe 2, Auftrag „Im Lehrhaus“ (Varn). Screenshots: Notizordner `neulinge/`.
