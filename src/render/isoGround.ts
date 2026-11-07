@@ -5,12 +5,13 @@
  *   damit P9.2 nativ in Rauten malen kann, ohne GameScene zu ändern.
  * - Wände (gid 2) sind nicht Teil des Chunks: je Kachel ein stehendes Bild aus `isoWall` (wenige gemeinsame Texturen nach Stil,
  *   offenen Seiten und Variante), GameScene setzt es wie ein Prop (Anker = untere Rautenecke, Tiefe `standDepth`).
- * Platzhalter in P9.0: Boden = Draufsicht-Chunk affin in Rauten umgerechnet (wie die Probe), Wände = einfache Blöcke.
+ * Boden: nativ in Rauten gemalt (`world/ground.ts`, P9.2). Wände: Quader aus `world/isoWalls.ts`.
  * Ohne DOM nutzbar (reine Raster).
  */
-import { ART, Raster } from './world/raster';
-import { paintGround } from './world/ground';
-import { stampDetail, stampWaterDetail } from './world/details';
+import { Raster, h3 } from './world/raster';
+import { ISO_STRIP, IsoTiles, paintGroundIso } from './world/ground';
+import { stampDetailIso, stampWaterDetailIso } from './world/details';
+import { WALL_VARIANTS, WALL_IMG_H, WALL_W, wallBlock } from './world/isoWalls';
 import type { WallStyle } from './world/props';
 import { ISO_ART_H, ISO_ART_W, project } from './iso';
 
@@ -52,76 +53,50 @@ export interface IsoGroundSrc {
  * Backt einen Iso-Chunk in Etappen (je wenige ms): `step()` liefert true, wenn fertig. `out` ist ISO_CHUNK_W x ISO_CHUNK_H,
  * vorher geleert; Pixel außerhalb der Raute bleiben durchsichtig (Nachbar-Chunks füllen sie, ohne Überlappung: jede
  * Pixelmitte gehört genau einer Kachel, halboffen [k − 0,5, k + 0,5)).
+ * Der Boden wird nativ in Rauten gemalt (`paintGroundIso`): Etappe 0 sammelt die Kachelfragen, dann je eine Etappe je Streifen
+ * von `ISO_STRIP` Zeilen, zuletzt die Details (flach projiziert, stehend aufrecht).
  */
 export class IsoChunkBaker {
   private readonly x0: number;
   private readonly y0: number;
   private n = 0;
+  private tiles: IsoTiles | null = null;
   constructor(private readonly src: IsoGroundSrc, cx: number, cy: number, private readonly out: Raster) {
     this.x0 = cx * ISO_CHUNK;
     this.y0 = cy * ISO_CHUNK;
   }
   /** Anzahl Etappen (zum Planen) */
   get steps(): number {
-    return FLAT_STRIPS + 1 + RESAMPLE_STRIPS;
+    return 1 + STRIPS + 1;
   }
   step(): boolean {
-    const { src, x0, y0 } = this;
-    const flat = (FLAT_BUF ??= new Raster(ISO_CHUNK * ART, ISO_CHUNK * ART));
-    const strip = ISO_CHUNK / FLAT_STRIPS;
-    if (this.n === 0) flat.d.fill(0);
-    if (this.n < FLAT_STRIPS) {
-      paintGround(flat, x0, y0 + this.n * strip, ISO_CHUNK, strip, { mat: (x, y) => src.mat(x, y), waterDist: (x, y) => src.waterDist(x, y) }, (x, y) => src.outside(x, y), this.n * strip * ART);
-    } else if (this.n === FLAT_STRIPS) {
+    const { src, x0, y0, out } = this;
+    if (this.n === 0) {
+      this.tiles = new IsoTiles(x0, y0, {
+        mat: (x, y) => src.mat(x, y),
+        waterDist: (x, y) => src.waterDist(x, y),
+        outside: (x, y) => src.outside(x, y),
+        isWall: (x, y) => src.isWall(x, y),
+      });
+    } else if (this.n <= STRIPS) {
+      paintGroundIso(out, this.tiles!, (this.n - 1) * ISO_STRIP);
+    } else {
       for (let y = y0; y < y0 + ISO_CHUNK; y++) {
         for (let x = x0; x < x0 + ISO_CHUNK; x++) {
-          if (src.outside(x, y)) continue;
+          if (src.outside(x, y) || src.isWall(x, y)) continue;
           const d = src.detail(x, y);
-          const ox = (x - x0) * ART;
-          const oy = (y - y0) * ART;
-          if (d?.water) stampWaterDetail(flat, x, y, d.zone, d.dist, ox, oy);
-          else if (d) stampDetail(flat, x, y, d.ground, d.zone, ox, oy);
+          if (d?.water) stampWaterDetailIso(out, x, y, d.zone, d.dist, x0, y0);
+          else if (d) stampDetailIso(out, x, y, d.ground, d.zone, x0, y0);
         }
       }
-    } else {
-      // Platzhalter: Draufsicht-Raster per Nachschlagetabelle in die Raute umrechnen (Nachbarpixel)
-      const k = this.n - FLAT_STRIPS - 1;
-      const map = resampleMap();
-      const rows = ISO_CHUNK_H / RESAMPLE_STRIPS;
-      const { out } = this;
-      for (let i = k * rows * ISO_CHUNK_W, e = (k + 1) * rows * ISO_CHUNK_W; i < e; i++) {
-        const j = map[i]!;
-        if (j >= 0) out.d[i] = flat.d[j]!;
-      }
+      this.tiles = null;
     }
     this.n++;
     return this.n >= this.steps;
   }
 }
 
-const FLAT_STRIPS = 8;
-const RESAMPLE_STRIPS = 2;
-let FLAT_BUF: Raster | null = null;
-let MAP: Int32Array | null = null;
-
-/** Je Iso-Kunstpixel des Chunks der Index im Draufsicht-Raster des Chunks (−1 = außerhalb der Raute); für alle Chunks gleich */
-function resampleMap(): Int32Array {
-  if (MAP) return MAP;
-  const N = ISO_CHUNK * ART;
-  MAP = new Int32Array(ISO_CHUNK_W * ISO_CHUNK_H).fill(-1);
-  for (let v = 0; v < ISO_CHUNK_H; v++) {
-    for (let u = 0; u < ISO_CHUNK_W; u++) {
-      // Pixelmitte in Bildschirm-Pixeln ab der oberen Rautenecke, dann zurück ins Raster (Kacheln ab der Chunk-Ecke)
-      const a = ((u + 0.5) * 2 - ISO_CHUNK * 32) / 32;
-      const b = ((v + 0.5) * 2) / 16;
-      const lx = (a + b) / 2;
-      const ly = (b - a) / 2;
-      if (lx < 0 || ly < 0 || lx >= ISO_CHUNK || ly >= ISO_CHUNK) continue;
-      MAP[v * ISO_CHUNK_W + u] = Math.floor(ly * ART) * N + Math.floor(lx * ART);
-    }
-  }
-  return MAP;
-}
+const STRIPS = ISO_CHUNK_H / ISO_STRIP;
 
 /* ---------------------------------------------------------------- Wände */
 
@@ -135,53 +110,12 @@ export interface IsoWallArt {
   make: () => Raster;
 }
 
-/** Wandhöhe des Platzhalters in Kunstpixeln (eine Kachelhöhe; die echte Höhe entscheidet der Nutzer in P9.2) */
-const WALL_ART_H = 16;
-
-const WALL_TONES: Record<WallStyle, { top: number; left: number; right: number; edge: number }> = {
-  cliff: { top: 0x4a4a40, left: 0x3a3430, right: 0x262224, edge: 0x5c5a4c },
-  brick: { top: 0x4e4454, left: 0x3a3240, right: 0x28222a, edge: 0x665a6a },
-  dungeon: { top: 0x35313e, left: 0x27242e, right: 0x1a1820, edge: 0x48424f },
-};
-
 /**
  * Wandblock der Kachel (x, y). `open`: Bits wie `wallTile` (N=1, O=2, S=4, W=8 für Nachbarn, die keine Wand sind); sichtbar sind
- * in Iso nur die Süd- (+y, links unten) und die Ostseite (+x, rechts unten). Die Variante kommt über einen Hash der Kachel.
+ * in Iso nur die Süd- (+y, links unten) und die Ostseite (+x, rechts unten), Nord und West färben nur den Rand der Oberseite.
+ * Die Variante kommt über einen Hash der Kachel und steckt im Schlüssel, damit es wenige gemeinsame Texturen gibt.
  */
 export function isoWall(style: WallStyle, open: number, x: number, y: number): IsoWallArt {
-  void x;
-  void y;
-  const vis = open & 6;
-  const w = ISO_ART_W;
-  const h = ISO_ART_H + WALL_ART_H;
-  return { key: `iwall_${style}_${vis}`, w, h, ax: w / 2, ay: h, make: () => wallBlock(style, vis) };
-}
-
-function wallBlock(style: WallStyle, open: number): Raster {
-  const T = WALL_TONES[style];
-  const W = ISO_ART_W;
-  const HH = ISO_ART_H / 2;
-  const r = new Raster(W, ISO_ART_H + WALL_ART_H);
-  for (let y = 0; y < r.h; y++) {
-    for (let x = 0; x < W; x++) {
-      const dx = Math.abs(x + 0.5 - W / 2) / (W / 2);
-      // Oberseite: Raute um (16, 8)
-      const dt = dx + Math.abs(y + 0.5 - HH) / HH;
-      if (dt <= 1) {
-        r.set(x, y, dt > 0.86 ? T.edge : T.top);
-        continue;
-      }
-      // Seiten unter der unteren Kante der Oberseite
-      const edge = HH + (1 - dx) * HH;
-      if (y + 0.5 < edge || y + 0.5 > edge + WALL_ART_H) continue;
-      const left = x < W / 2;
-      if (left && !(open & 4)) continue;
-      if (!left && !(open & 2)) continue;
-      const base = left ? T.left : T.right;
-      // Fugen: waagrecht alle 5 px, dunkler Fuß
-      const yy = y + 0.5 - edge;
-      r.set(x, y, yy > WALL_ART_H - 2 ? 0x0c0a0e : Math.floor(yy) % 5 === 4 ? T.right : base);
-    }
-  }
-  return r;
+  const variant = Math.floor(h3(x, y, 77) * WALL_VARIANTS);
+  return { key: `iwall_${style}_${open & 15}_${variant}`, w: WALL_W, h: WALL_IMG_H, ax: WALL_W / 2, ay: WALL_IMG_H, make: () => wallBlock(style, open & 15, variant) };
 }

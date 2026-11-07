@@ -604,3 +604,264 @@ export function paintGround(out: Raster, tx0: number, ty0: number, ntx: number, 
     }
   }
 }
+
+/* ---------------------------------------------------------------- Iso-Boden (P9.2) */
+
+/** Mustertexel je Kachelkante im Iso-Boden (die Raute fasst 32x16 Kunstpixel, also gleich viele Pixel wie ein 16x16-Quadrat); 17 statt 16, damit sich das Muster nicht im Kachelraster wiederholt */
+const ISO_TEX = 17;
+/** Zeilen des Chunk-Rasters je Etappe */
+export const ISO_STRIP = 16;
+const ISO_N = 16; // Kacheln je Chunk-Kante
+const ISO_W = ISO_N * 32; // Breite des Chunk-Rasters in Kunstpixeln (Rautenhülle)
+const IM = 2; // Kachelrand um den Chunk (Verschiebung + Nachbarn)
+const IRIM = 3; // Pixelrand um die Etappe für Nachbarprüfungen
+
+export interface IsoGroundQuery extends GroundQuery {
+  outside(x: number, y: number): boolean;
+  /** Wandkachel: Boden darunter bleibt dunkel, Nachbarn bekommen Schatten */
+  isWall(x: number, y: number): boolean;
+}
+
+/** Kachelcache eines Chunks (Material, Landabstand, Randkacheln, Wandnachbarn); einmal je Chunk, die Etappen lesen ihn */
+export class IsoTiles {
+  readonly cw = ISO_N + IM * 2;
+  readonly tm: Int16Array;
+  readonly twd: Float32Array;
+  /** 1 = alle 8 Nachbarn gleich und kein Wasser */
+  readonly uni: Uint8Array;
+  /** 1 = im 5x5-Umfeld liegt ein anderes Material (Kanten, Schatten, Ufer rechnen) */
+  readonly bord: Uint8Array;
+  /** Wand im Norden (y−1) bzw. Westen (x−1) der Kachel, 1 = ja */
+  readonly wn: Uint8Array;
+  readonly ww: Uint8Array;
+  readonly wall: Uint8Array;
+  readonly out: Uint8Array;
+  constructor(readonly x0: number, readonly y0: number, q: IsoGroundQuery) {
+    const T = tables();
+    const cw = this.cw;
+    const n = cw * cw;
+    this.tm = new Int16Array(n);
+    this.twd = new Float32Array(n);
+    this.uni = new Uint8Array(n);
+    this.bord = new Uint8Array(n);
+    this.wn = new Uint8Array(n);
+    this.ww = new Uint8Array(n);
+    this.wall = new Uint8Array(n);
+    this.out = new Uint8Array(n);
+    for (let y = 0; y < cw; y++) {
+      for (let x = 0; x < cw; x++) {
+        const tx = x0 + x - IM;
+        const ty = y0 + y - IM;
+        const k = q.mat(tx, ty);
+        this.tm[y * cw + x] = k;
+        if (T.kind[k] === 1) this.twd[y * cw + x] = q.waterDist(tx, ty);
+        this.wn[y * cw + x] = q.isWall(tx, ty - 1) ? 1 : 0;
+        this.ww[y * cw + x] = q.isWall(tx - 1, ty) ? 1 : 0;
+        this.wall[y * cw + x] = q.isWall(tx, ty) ? 1 : 0;
+        this.out[y * cw + x] = q.outside(tx, ty) ? 1 : 0;
+      }
+    }
+    for (let y = 1; y < cw - 1; y++) {
+      for (let x = 1; x < cw - 1; x++) {
+        const k = this.tm[y * cw + x]!;
+        let same = 1;
+        for (let dy = -1; dy <= 1 && same; dy++) for (let dx = -1; dx <= 1; dx++) if (this.tm[(y + dy) * cw + x + dx] !== k) { same = 0; break; }
+        this.uni[y * cw + x] = same;
+      }
+    }
+    for (let y = 2; y < cw - 2; y++) {
+      for (let x = 2; x < cw - 2; x++) {
+        const k0 = this.tm[y * cw + x]!;
+        let b = 0;
+        for (let dy = -2; dy <= 2 && !b; dy++) for (let dx = -2; dx <= 2; dx++) if (this.tm[(y + dy) * cw + x + dx] !== k0) { b = 1; break; }
+        this.bord[y * cw + x] = b;
+      }
+    }
+  }
+}
+
+/** Abdunklung neben Wänden (Alpha 0..255 auf die Farbe 0x040306): Licht von oben links, Schatten fallen nach unten links (Kachel südlich der Wand) und unten rechts (östlich), rechts etwas kräftiger */
+const SHADE_N = [0, 44, 76, 108];
+const SHADE_W = [0, 52, 88, 124];
+const lev = (f: number): number => (f < 0.14 ? 3 : f < 0.28 ? 2 : f < 0.42 ? 1 : 0);
+
+/** Boden unter Wandkacheln: so dunkel, dass kleine Lücken zwischen Wandblöcken nicht aufblitzen */
+const WALL_FLOOR = abgr(0x0c0a0e);
+
+let IOWN: Int16Array | null = null;
+let ITONE: Int8Array | null = null;
+let ISHADE: Uint8Array | null = null;
+let IINS: Uint8Array | null = null;
+
+/** Farbe c (ABGR) mit der Schattenfarbe zu a/255 gemischt */
+function shaded(c: number, a: number): number {
+  const k = a / 255;
+  const r = (c & 255) + (4 - (c & 255)) * k;
+  const g = ((c >> 8) & 255) + (3 - ((c >> 8) & 255)) * k;
+  const b = ((c >> 16) & 255) + (6 - ((c >> 16) & 255)) * k;
+  return ((c & 0xff000000) | (Math.round(b) << 16) | (Math.round(g) << 8) | Math.round(r)) >>> 0;
+}
+
+/**
+ * Malt die Zeilen r0..r0+ISO_STRIP−1 des Iso-Chunk-Rasters `out` (512x256, Rautenhülle, Ecke oben bei der Kachelecke (x0−0,5, y0−0,5)).
+ * Jede Pixelmitte wird über die Umkehrung der Projektion auf Kachelkoordinaten zurückgerechnet und mit denselben Materialfunktionen
+ * wie `paintGround` gefärbt (Verschiebung, Übergänge, Kante, Schatten, Ufer). „Oben“ und „links“ heißen dabei auf dem Bildschirm
+ * oben und links, die Uferbank liegt also an der oberen Kante. Reine Funktion der Weltposition: Nachbar-Chunks stimmen überein.
+ * Geschrieben werden nur Pixel, deren Mitte in einer Kachel dieses Chunks liegt (halboffen), nie außerhalb der Raute.
+ */
+export function paintGroundIso(out: Raster, tc: IsoTiles, r0: number): void {
+  const T = tables();
+  const { col: C, pat: PT, prio: PR, kind: KD, group: GR, noise: NT, warpX: WX, warpY: WY } = T;
+  const { tm, twd, uni, bord, wn, ww, wall, cw, x0, y0 } = tc;
+  const pw = ISO_W + IRIM * 2;
+  const ph = ISO_STRIP + IRIM * 2;
+  const own = (IOWN ??= new Int16Array(pw * ph));
+  const tone = (ITONE ??= new Int8Array(pw * ph));
+  const shade = (ISHADE ??= new Uint8Array(pw * ph));
+  const ins = (IINS ??= new Uint8Array(pw * ph));
+  const cand = new Int16Array(4);
+  const wsum = new Float32Array(4);
+  const TEX = ISO_TEX;
+  const A = ART;
+
+  // Durchgang 1: Besitzer, Grundton, Schatten je Pixel (Etappe + Rand)
+  for (let j = 0; j < ph; j++) {
+    const v = r0 + j - IRIM;
+    const b = (v + 0.5) / 8;
+    for (let i = 0; i < pw; i++) {
+      const o = j * pw + i;
+      const u = i - IRIM;
+      const a = (u + 0.5 - ISO_W / 2) / 16;
+      const lx = (a + b) * 0.5;
+      const ly = (b - a) * 0.5;
+      ins[o] = 0;
+      shade[o] = 0;
+      if (lx < -0.3 || ly < -0.3 || lx > ISO_N + 0.3 || ly > ISO_N + 0.3) { own[o] = -1; continue; }
+      const X = x0 + lx;
+      const Y = y0 + ly;
+      const pix = Math.floor(X * TEX);
+      const piy = Math.floor(Y * TEX);
+      const ni = (piy & PM) * P + (pix & PM);
+      const utx = Math.floor(X);
+      const uty = Math.floor(Y);
+      const uci = (uty - y0 + IM) * cw + utx - x0 + IM;
+      const homeTile = lx >= 0 && ly >= 0 && lx < ISO_N && ly < ISO_N;
+      if (homeTile && !tc.out[uci]) {
+        ins[o] = wall[uci] ? 3 : bord[uci] ? 2 : 1;
+        if (!wall[uci]) {
+          const fu = X - utx;
+          const fv = Y - uty;
+          let s = 0;
+          if (wn[uci]) s = SHADE_N[lev(fv)]!;
+          if (ww[uci]) s = Math.max(s, SHADE_W[lev(fu)]!);
+          shade[o] = s;
+        }
+      }
+      const m0 = tm[uci]!;
+      if (uni[uci] && KD[m0] !== 1) {
+        own[o] = m0;
+        tone[o] = PT[m0]![ni]!;
+        continue;
+      }
+      // Verschobene Abtastung, Anteile der vier nächsten Kachelmitten
+      const Xw = X + WX[ni]! / A;
+      const Yw = Y + WY[ni]! / A;
+      const tx = Math.floor(Xw);
+      const ty = Math.floor(Yw);
+      const fx = Xw - tx - 0.5;
+      const fy = Yw - ty - 0.5;
+      const sx = fx < 0 ? -1 : 1;
+      const sy = fy < 0 ? -cw : cw;
+      const ax = sharp(fx < 0 ? -fx : fx);
+      const ay = sharp(fy < 0 ? -fy : fy);
+      const bi = (ty - y0 + IM) * cw + tx - x0 + IM;
+      const m00 = tm[bi]!;
+      const m10 = tm[bi + sx]!;
+      const m01 = tm[bi + sy]!;
+      const m11 = tm[bi + sy + sx]!;
+      let best = m00;
+      if (m10 !== m00 || m01 !== m00 || m11 !== m00) {
+        cand[0] = m00;
+        wsum[0] = (1 - ax) * (1 - ay);
+        let n = 1;
+        for (let s = 0; s < 3; s++) {
+          const k = s === 0 ? m10 : s === 1 ? m01 : m11;
+          const w = s === 0 ? ax * (1 - ay) : s === 1 ? (1 - ax) * ay : ax * ay;
+          let c = 0;
+          while (c < n && cand[c] !== k) c++;
+          if (c === n) { cand[n] = k; wsum[n++] = w; } else wsum[c]! += w;
+        }
+        let sameGroup = true;
+        for (let c = 1; c < n; c++) if (GR[cand[c]!] !== GR[cand[0]!]) sameGroup = false;
+        const amp = sameGroup ? 1.6 : 0.3;
+        let bestScore = -9;
+        for (let c = 0; c < n; c++) {
+          const k = cand[c]!;
+          const sc = wsum[c]! + (KD[k] ? 0.25 : PR[k]! * 0.022) + NT[((piy + k * 29) & PM) * P + ((pix + k * 41) & PM)]! * amp;
+          if (sc > bestScore) { bestScore = sc; best = k; }
+        }
+      }
+      let t = PT[best]![ni]!;
+      if (KD[best] === 1) {
+        // Tiefe: Landabstand bilinear zwischen den Kachelmitten (Land = 0), mit Rauschen geschwellt
+        const dd = (twd[bi]! * (1 - ax) + twd[bi + sx]! * ax) * (1 - ay) + (twd[bi + sy]! * (1 - ax) + twd[bi + sy + sx]! * ax) * ay + NT[((piy * 2) & PM) * P + ((pix * 2 + 17) & PM)]! * 0.5;
+        t += dd < 1.1 ? 1 : dd < 2.2 ? 0 : dd < 3.4 ? -1 : -2;
+        t = t < 0 ? 0 : t > 6 ? 6 : t;
+      }
+      own[o] = best;
+      tone[o] = t;
+    }
+  }
+
+  // Durchgang 2: Farben; an Randkacheln Kanten, Schatten, Ufer, Kruste (Nachbarn auf dem Bildschirm)
+  const ownAt = (i: number, j: number, k: number): number => {
+    const q = own[(j < 0 ? 0 : j >= ph ? ph - 1 : j) * pw + (i < 0 ? 0 : i >= pw ? pw - 1 : i)]!;
+    return q < 0 ? k : q;
+  };
+  for (let j = IRIM; j < IRIM + ISO_STRIP; j++) {
+    const row = (r0 + j - IRIM) * ISO_W;
+    for (let i = IRIM; i < IRIM + ISO_W; i++) {
+      const o = j * pw + i;
+      const f = ins[o]!;
+      if (!f) continue;
+      if (f === 3) { out.d[row + i - IRIM] = WALL_FLOOR; continue; }
+      const k = own[o]!;
+      let t = tone[o]!;
+      let c: number;
+      if (f === 1) c = C[k]![t]!;
+      else {
+        let colv = -1;
+        const kk = KD[k]!;
+        let done = false;
+        if (kk === 0) {
+          const up = ownAt(i, j - 1, k), dn = ownAt(i, j + 1, k), lf = ownAt(i - 1, j, k), rt = ownAt(i + 1, j, k);
+          if (up === k && dn === k && lf === k && rt === k && ownAt(i, j - 2, k) === k) done = true;
+          else if (lower(T, k, up) || lower(T, k, dn) || lower(T, k, lf) || lower(T, k, rt)) t = t < 1 ? t : 1; // dunkle Kante des höheren Materials
+          else if (higher(T, k, up) || higher(T, k, lf)) t = t < 1 ? t : 1; // Schatten unter/neben dem höheren Material
+          else if (higher(T, k, ownAt(i, j - 2, k))) t = t > 0 ? t - 1 : 0;
+        } else {
+          // Abstand zum Land (bis 3 px); Land direkt darüber = Uferbank
+          let near = 9;
+          for (let r = 1; r <= 3 && near > 3; r++) {
+            for (let dy = -r; dy <= r && near > r; dy++) {
+              for (let dx = -r; dx <= r; dx++) {
+                if ((dx < 0 ? -dx : dx) !== r && (dy < 0 ? -dy : dy) !== r) continue;
+                if (KD[ownAt(i + dx, j + dy, k)] === 0) { near = r; break; }
+              }
+            }
+          }
+          if (kk === 1) {
+            if (KD[ownAt(i, j - 1, k)] === 0) colv = BANK_HI;
+            else if (KD[ownAt(i, j - 2, k)] === 0) colv = BANK_LO;
+            else if (near === 1) t = 7;
+            else if (near <= 3) t = t < 6 ? t + 1 : 6;
+          } else if (near === 1) t = 7;
+          else if (near === 2) t = t < 1 ? t : 1;
+        }
+        c = done || colv < 0 ? C[k]![t]! : colv;
+      }
+      const s = shade[o]!;
+      out.d[row + i - IRIM] = s ? shaded(c, s) : c;
+    }
+  }
+}
