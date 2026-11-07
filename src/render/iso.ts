@@ -67,30 +67,33 @@ export const COLUMN_W = 32;
 export interface DepthColumn {
   /** linke Kante (Bildschirm-x, Vielfaches von 32) */
   sx: number;
-  /** Tiefe = Bildschirm-y der Vorderkante der Grundfläche in der Spaltenmitte */
+  /** Tiefe = Bildschirm-y der vorderen Bodenkante der Grundfläche in der Spaltenmitte (Vorderwände, Dach) */
   depth: number;
+  /** dasselbe für die hintere Bodenkante (Rückwände, die man nur von innen sieht) */
+  back: number;
 }
 
 /**
  * Spaltenschnitt einer Grundfläche (Kacheln x0..x0+w−1, y0..y0+h−1) in Iso: Spalten von 32 px, jede mit der Tiefe der vorderen
- * Bodenkante unter ihrer Mitte. Die Vorderkante läuft zwischen den Spaltengrenzen gerade (Ecken liegen auf Vielfachen von 32),
- * die Mitte liegt damit 8 px vor dem Hinterende und 8 px hinter dem Vorderende: eine Figur direkt vor der Wand (eine Kachel weiter)
- * hat mindestens 8 px mehr Tiefe, eine Figur dahinter mindestens 8 px weniger. Die Tiefen gelten nur für Iso.
+ * Bodenkante unter ihrer Mitte. Die Kante läuft zwischen den Spaltengrenzen gerade (Ecken liegen auf Vielfachen von 32), die
+ * Mitte liegt damit 8 px vor dem Hinterende und 8 px hinter dem Vorderende: eine Figur eine Kachel vor der Wand hat mindestens
+ * 8 px mehr Tiefe, eine Figur im Haus oder dahinter mindestens 8 px weniger. Gilt nur für Iso (Draufsicht-Tiefen bleiben, wie sie sind).
  */
 export function footprintColumns(x0: number, y0: number, w: number, h: number): DepthColumn[] {
-  const x1 = x0 + w - 0.5;
-  const y1 = y0 + h - 0.5;
   const xa = x0 - 0.5;
   const ya = y0 - 0.5;
-  // linke Ecke (xa, y1), vordere Ecke (x1, y1), rechte Ecke (x1, ya)
-  const left = project(true, xa, y1);
-  const front = project(true, x1, y1);
-  const right = project(true, x1, ya);
+  const xb = x0 + w - 0.5;
+  const yb = y0 + h - 0.5;
+  // Ecken: links (xa, yb), vorn (xb, yb), rechts (xb, ya), hinten (xa, ya)
+  const L = project(true, xa, yb);
+  const F = project(true, xb, yb);
+  const Rt = project(true, xb, ya);
+  const B = project(true, xa, ya);
+  const on = (a: { sx: number; sy: number }, b: { sx: number; sy: number }, x: number): number => a.sy + ((x - a.sx) * (b.sy - a.sy)) / (b.sx - a.sx || 1);
   const out: DepthColumn[] = [];
-  for (let sx = left.sx; sx < right.sx; sx += COLUMN_W) {
+  for (let sx = L.sx; sx < Rt.sx; sx += COLUMN_W) {
     const c = sx + COLUMN_W / 2;
-    const depth = c <= front.sx ? left.sy + ((c - left.sx) * (front.sy - left.sy)) / (front.sx - left.sx || 1) : front.sy + ((c - front.sx) * (right.sy - front.sy)) / (right.sx - front.sx || 1);
-    out.push({ sx, depth });
+    out.push({ sx, depth: c <= F.sx ? on(L, F, c) : on(F, Rt, c), back: c <= B.sx ? on(L, B, c) : on(B, Rt, c) });
   }
   return out;
 }
