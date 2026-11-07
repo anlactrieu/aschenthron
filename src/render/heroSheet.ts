@@ -6,13 +6,16 @@
  */
 import type Phaser from 'phaser';
 import type { Look } from './art';
-import { bakeFigure, type FigureSheet } from './figure';
-import { bakeHero, heroKey, heroLookOf, heroSpec } from './hero';
+import { bakeFigure, figViews, type FigureSheet } from './figure';
+import { ISO } from './iso';
+import { heroKey, heroLookOf, heroSpec } from './hero';
 import { bakeInWorker, uploadSheet } from './monsterSheet';
 import { cancelUpload, uploading } from './sheetUpload';
 
 /** Pixelmaßstab aller Skelett-Figuren in der Welt */
 export const FIG_SCALE = 2;
+/** Ansichten, die dieses Spiel bäckt (Draufsicht 3, Iso 5); der Worker bekommt sie mit, weil `ISO` dort immer `false` ist */
+export const SHEET_VIEWS = figViews(ISO);
 
 export type HeroMode = 'skelett' | 'dcss';
 let mode: HeroMode | undefined;
@@ -91,7 +94,7 @@ export function prefetchHero(look: Look): void {
 export function heroTexture(scene: Phaser.Scene, look: Look, inUse?: () => Set<string>, prev?: string): { key: string; sheet: FigureSheet } | null {
   const h = heroLookOf(look);
   let key = heroKey(h);
-  if (!sheets.has(key) && !bakeInWorker(key, { t: 'h', look: h }, (src) => sheets.set(heroKey(h), src))) sheets.set(key, pixelSource(bakeHero(h)));
+  if (!sheets.has(key) && !bakeInWorker(key, { t: 'h', look: h }, (src) => sheets.set(heroKey(h), src))) sheets.set(key, pixelSource(bakeFigure(heroSpec(h), SHEET_VIEWS)));
   const fresh = sheets.get(key);
   if (!fresh || !uploadSheet(scene, key, fresh)) {
     // noch im Worker oder Upload erst im nächsten Frame

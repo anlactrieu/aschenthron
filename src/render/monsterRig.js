@@ -271,6 +271,9 @@ function wisp(b, ph, M0) {
   return [1, -1].map((s) => P(add(c, [g * 0.85, g * 0.15, s * g * 0.35])));
 }
 
+/** Drehung der Iso-Schrägansichten je Bautyp (Bogenmaß; Seite 0,42, vorn/hinten Vierbeiner 1,05): Vierbeiner schräg von vorn nicht zum Punkt */
+const DIAG_YAW = { quad: 0.6, spider: 0.8, worm: 0.7, wisp: 0.8 };
+
 /** Versatz je Körperbau und Ansicht (schräge Draufsicht), siehe `beastPosed` */
 const REST_LIFT = new WeakMap();
 
@@ -280,12 +283,15 @@ const REST_LIFT = new WeakMap();
  */
 export function beastPosed(b, anim, view, i, n) {
   const ph = phaseOf(anim, i, n);
-  if (b.type === "worm" && view !== "side") ph.coil = view === "front" ? 1 : -1;
+  // Iso-Schrägen (frontDiag/backDiag): halbe Strecke zwischen Seite und vorn/hinten; Winkel je Bautyp (`DIAG_YAW`)
+  const diag = view === "frontDiag" || view === "backDiag";
+  const sgn = view === "front" || view === "frontDiag" ? 1 : -1;
+  if (b.type === "worm" && view !== "side") ph.coil = diag ? sgn * 0.6 : sgn;
   // Würmer zur Kamera / weg echt von vorn/hinten (Maul zur Kamera, Leib im seitlichen Bogen). Vierbeiner bleiben schräg (60°):
   // echt von vorn sind sie bei Spielgröße nur ein schmaler Strich (Ratten ein Punkt); dafür schräg von oben gesehen (Scherung wie
   // beim Helden: näher = tiefer im Bild), so steht der fernere Fuß höher und man sieht den Schritt. Spinnen/Irrlichter: schräg, ungeschert
   const straight = view !== "side" && b.type === "worm";
-  const yaw = view === "side" ? 0.42 : straight ? (view === "front" ? Math.PI / 2 : -Math.PI / 2) : view === "front" ? 1.05 : -1.05;
+  const yaw = view === "side" ? 0.42 : diag ? sgn * DIAG_YAW[b.type] : straight ? sgn * Math.PI / 2 : sgn * 1.05;
   const sheared = view !== "side" && (b.type === "worm" || b.type === "quad");
   const M = sheared ? mm([1, 0, 0, 0, 1, -BEAST_SHEAR, 0, 0, 1], rotY(-yaw)) : rotY(-yaw);
   const draw = (q) => () => (b.type === "quad" ? quad(b, q, M) : b.type === "spider" ? spider(b, q, M) : b.type === "worm" ? worm(b, q, M) : wisp(b, q, M));

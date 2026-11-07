@@ -8,7 +8,7 @@
  */
 import type Phaser from 'phaser';
 import { FigureBaker, type FigView, type FigureSheet, type FigureSpec } from './figure';
-import { addSheetTexture, FIG_SCALE, pixelSource, type FigSource } from './heroSheet';
+import { addSheetTexture, FIG_SCALE, pixelSource, SHEET_VIEWS, type FigSource } from './heroSheet';
 import { SHADE } from './heroRig.js';
 import { heroSpec, type HeroLook } from './hero';
 import { monsterSpec } from './monster';
@@ -17,6 +17,8 @@ import { npcSpec } from './npc';
 
 /** Was gebacken werden soll (für den Worker: nur Daten) */
 export type FigReq = { t: 'm'; id: string } | { t: 'n'; kind: string; name?: string } | { t: 'h'; look: HeroLook };
+/** Anfrage an den Worker: dazu die Ansichten des Sheets (3 Draufsicht, 5 Iso; `ISO` gilt im Worker nicht) */
+export type FigJob = { key: string; req: FigReq; views: FigView[] };
 /** Antwort des Workers (Pixel als übertragener Puffer) */
 export type FigReply = { key: string; sheet: FigureSheet | null };
 
@@ -54,7 +56,7 @@ function toLocal(jobs: Iterable<Job>): void {
   for (const j of jobs) {
     if (j.done) continue;
     const s = specOf(j.req);
-    if (s) local.set(j.key, new FigureBaker(s));
+    if (s) local.set(j.key, new FigureBaker(s, SHEET_VIEWS));
   }
 }
 
@@ -99,7 +101,7 @@ function feed(): void {
     const i = queue.findIndex((j) => j.urgent);
     const job = queue.splice(Math.max(0, i), 1)[0]!;
     running.set(job.key, job);
-    idle.pop()!.postMessage({ key: job.key, req: job.req });
+    idle.pop()!.postMessage({ key: job.key, req: job.req, views: SHEET_VIEWS });
   }
 }
 
@@ -154,7 +156,7 @@ export function figureTexture(scene: Phaser.Scene, key: string, req: FigReq): { 
     none.add(key);
     return null;
   }
-  local.set(key, new FigureBaker(s));
+  local.set(key, new FigureBaker(s, SHEET_VIEWS));
   return 'wait';
 }
 

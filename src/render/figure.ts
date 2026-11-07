@@ -10,9 +10,9 @@ import { SHADE, type Posed } from './heroRig.js';
 /** Ansichten: Draufsicht 3, Iso 5 (Schrägen nach unten bzw. oben, links jeweils gespiegelt), siehe `viewOf` in iso.ts */
 export type FigView = 'side' | 'front' | 'back' | 'frontDiag' | 'backDiag';
 export type FigAnim = 'idle' | 'walk' | 'attack' | 'hit' | 'die';
-/** Bildzeilen der Sheets, die heute gebacken werden (beide Modi, bis P9.1 die Rigs für die Schrägen erweitert) */
+/** Bildzeilen der Draufsicht-Sheets (3 Ansichten) und Vorgabe von `FigureBaker`/`bakeFigure` */
 export const FIG_VIEWS: FigView[] = ['side', 'front', 'back'];
-/** Ansichtsliste je Modus: Ziel für P9.1 (der Cache-Schlüssel muss sie dann enthalten); die ersten 3 bleiben in dieser Reihenfolge */
+/** Ansichtsliste je Modus: Iso backt 5 Zeilen; die ersten 3 bleiben in dieser Reihenfolge (Draufsicht-Sheets byte-gleich) */
 export const figViews = (iso: boolean): FigView[] => (iso ? ['side', 'front', 'back', 'frontDiag', 'backDiag'] : ['side', 'front', 'back']);
 export const FIG_ANIMS: FigAnim[] = ['idle', 'walk', 'attack', 'hit', 'die'];
 
@@ -61,6 +61,8 @@ export interface FigureSheet {
   cyclePx: number;
   wind: number;
   mirrorAll: boolean;
+  /** Ansichten in Zeilenreihenfolge (3 in der Draufsicht, 5 in Iso) */
+  views: FigView[];
 }
 
 const cols = (anims: Record<FigAnim, number>): number => FIG_ANIMS.reduce((n, a) => n + anims[a], 0);
@@ -79,12 +81,12 @@ export function pixelColor(spec: FigureSpec, sh: number, part: number, steel: nu
 export class FigureBaker {
   readonly sheet: FigureSheet;
   private jobs: { anim: FigAnim; view: FigView; i: number; ox: number; oy: number }[] = [];
-  constructor(private spec: FigureSpec) {
+  constructor(private spec: FigureSpec, views: FigView[] = FIG_VIEWS) {
     const { w: FW, h: FH } = spec.frame;
     const W = FW * cols(spec.anims);
-    const H = FH * FIG_VIEWS.length;
-    this.sheet = { key: spec.key, w: W, h: H, data: new Uint8ClampedArray(W * H * 4), frames: {}, frame: spec.frame, anims: spec.anims, top: 0, bodyW: 0, clipped: 0, cyclePx: spec.cyclePx, wind: spec.wind, mirrorAll: !!spec.mirrorAll };
-    FIG_VIEWS.forEach((view, row) => {
+    const H = FH * views.length;
+    this.sheet = { key: spec.key, w: W, h: H, data: new Uint8ClampedArray(W * H * 4), frames: {}, frame: spec.frame, anims: spec.anims, top: 0, bodyW: 0, clipped: 0, cyclePx: spec.cyclePx, wind: spec.wind, mirrorAll: !!spec.mirrorAll, views };
+    views.forEach((view, row) => {
       let col = 0;
       for (const anim of FIG_ANIMS) {
         for (let i = 0; i < spec.anims[anim]; i++, col++) {
@@ -133,8 +135,8 @@ export class FigureBaker {
   }
 }
 
-export function bakeFigure(spec: FigureSpec): FigureSheet {
-  const b = new FigureBaker(spec);
+export function bakeFigure(spec: FigureSpec, views: FigView[] = FIG_VIEWS): FigureSheet {
+  const b = new FigureBaker(spec, views);
   while (b.step()) { /* weiter */ }
   return b.sheet;
 }

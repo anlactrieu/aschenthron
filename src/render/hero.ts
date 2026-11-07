@@ -12,7 +12,6 @@ export type HeroView = FigView;
 export type HeroAnim = FigAnim;
 export type HeroWeapon = 'none' | 'sword' | 'axe' | 'mace' | 'dagger' | 'greatsword' | 'bow' | 'staff';
 
-export const HERO_VIEWS: HeroView[] = ['side', 'front', 'back'];
 /** Bilder je Animation */
 export const HERO_ANIMS: Record<HeroAnim, number> = { idle: 4, walk: 8, attack: 6, hit: 2, die: 5 };
 /** Bildgröße und Fußpunkt bei 1x (Pixelmaßstab im Spiel: 2x) */
@@ -133,6 +132,9 @@ export const SHEAR_REACH = SHEAR * 0.55;
 const SHEAR_LIE = 0.8;
 /** Strecke je Laufzyklus in Bildschirm-Pixeln bei Pixelmaßstab 2x: so gleiten die Füße nicht */
 export const HERO_CYCLE_PX = cycleLength(HERO_STRIDE, HERO_STANCE) * 2;
+
+/** Drehung der Iso-Schrägansichten (Blick nach rechts unten bzw. oben) */
+export const DIAG_YAW = Math.PI / 4;
 
 const melee = (w: HeroWeapon): boolean => w === 'sword' || w === 'axe' || w === 'mace' || w === 'dagger' || w === 'none';
 
@@ -268,7 +270,8 @@ export function heroPose(anim: HeroAnim, view: HeroView, i: number, h: HeroLook,
   if (view === 'side') pose.turn = base.turn ?? 0.34 + (anim === 'walk' ? Math.cos((i / HERO_ANIMS.walk) * Math.PI * 2) * 0.08 : 0);
   else {
     // zur Kamera / weg: ganze Figur gedreht; Schritte gehen in die Tiefe, darum Füße auseinander und Knie höher (walkPose)
-    pose.yaw = view === 'front' ? Math.PI / 2 : -Math.PI / 2;
+    // Iso-Schrägen: halbe Drehung (45°), Tiefe und Scherung wie bei vorn/hinten
+    pose.yaw = view === 'front' ? Math.PI / 2 : view === 'back' ? -Math.PI / 2 : view === 'frontDiag' ? DIAG_YAW : -DIAG_YAW;
     pose.turn = 0.05;
     pose.fzz = 3.3;
     pose.bzz = -3.3;
@@ -398,8 +401,8 @@ export function heroSpec(h: HeroLook): FigureSpec {
   };
 }
 
-export function bakeHero(h: HeroLook): HeroSheet {
-  return bakeFigure(heroSpec(h));
+export function bakeHero(h: HeroLook, views?: FigView[]): HeroSheet {
+  return bakeFigure(heroSpec(h), views);
 }
 
 /** Atembild im Stehen: ein Atemzug ca. 2,8 s (Aufrufer versetzt die Zeit je Figur) */
