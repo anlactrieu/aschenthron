@@ -727,3 +727,11 @@ Nacht an: L30 / Tode
 3. **Ein klarer erster Auftrag:** Ein NPC direkt am Startpunkt sagt genau, was zu tun ist, Schritt für Schritt mit Markierung auf Karte/Minimap: z. B. (a) beim Händler kleine Heiltränke holen, (b) vor der Stadt Ratten jagen, (c) zurückkommen, danach Hinweis auf Varn. Abgelehnt bzw. nicht gewählt: Varn schrittweise freischalten, Startpaket, Einblend-Hinweise (können später kommen, falls der erste Auftrag nicht reicht).
 
 **Prüfkriterium:** Ein Neuling, der nichts weiß und nur dem ersten Auftrag folgt, erreicht ohne Tod Stufe 3. Pace-Bot (`tools/pace-all.sh`, ≥ 8 Seeds) zeigt keine Tode auf Stufe 1–3 und L30-Median bleibt im Ziel 20–30 h.
+
+## Auftrag 2026-11-07: P3-Rest + P5-Patrouille
+Nutzerentscheidung (2026-11-07):
+- **P3-Rest, jetzt:** (1) Titel über dem Kopf der Spielfigur (Stufen-/Kill-Titel aus `LEVEL_TITLES`/`KILL_GOALS`), (2) Kill-Ziel als Auftrag (versteckter Auftrag über P2-Stichworte), (3) mehr benannte Funde je Slot und Stufenband in `named.ts`, Balance per Test/Pace prüfen.
+- **P3, nicht jetzt:** Charaktererschaffung über Fragen.
+- **P5-Patrouille:** Wachpatrouille auf der Handelsstraße kämpft sichtbar und echt in der Sim (eigene Trefferwerte, greift Monster in Reichweite an, hilft dem Spieler), statt nur Kulisse. Bisher sind Reisende nur Client-Kulisse (`travelerAt`, `ROUTE`, `src/render/wildlife.ts`).
+- **Reihenfolge:** P5-Patrouille ∥ P3-Funde (getrennte Dateien), danach P3 Titel + Kill-Auftrag (berührt wie P5 `world.ts`/`GameScene.ts`).
+- Pace (8 Seeds) darf sich nicht wesentlich verschieben, `main` nur nach Okay des Nutzers.
