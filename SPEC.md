@@ -735,3 +735,12 @@ Nutzerentscheidung (2026-11-07):
 - **P5-Patrouille:** Wachpatrouille auf der Handelsstraße kämpft sichtbar und echt in der Sim (eigene Trefferwerte, greift Monster in Reichweite an, hilft dem Spieler), statt nur Kulisse. Bisher sind Reisende nur Client-Kulisse (`travelerAt`, `ROUTE`, `src/render/wildlife.ts`).
 - **Reihenfolge:** P5-Patrouille ∥ P3-Funde (getrennte Dateien), danach P3 Titel + Kill-Auftrag (berührt wie P5 `world.ts`/`GameScene.ts`).
 - Pace (8 Seeds) darf sich nicht wesentlich verschieben, `main` nur nach Okay des Nutzers.
+
+## Auftrag 2026-11-07: Treffer-Juice (vor dem nächsten main-Push)
+Nutzer: Bei D4O hat man Schüsse und Schläge richtig gespürt, hier nicht. Außerdem sind es so viele Schüsse, dass sich der einzelne nicht besonders anfühlt.
+Entscheidungen (2026-11-07):
+- **Weniger, härtere Angriffe:** Grundangriffe (Nah- und Fernkampf) langsamer, dafür mehr Schaden je Treffer. Schaden pro Sekunde bleibt gleich, die Pace (L30-Median ~20,6 h, Bot `vess`) darf sich nicht wesentlich verschieben. Monster-Werte nur mit Begründung anpassen.
+- **Trefferstopp + leichtes Wackeln:** ja, kurz und stärker bei Kritischen und Kills. **Aber:** Gegner bleiben nur dann stehen (betäubt), wenn ein Skill oder Angriff das ausdrücklich verursacht (z. B. Betäubender Hieb). Normale Treffer unterbrechen Gegner spielerisch nicht.
+- **Gegner reagiert:** weißes Aufblitzen, kleiner sichtbarer Rückstoß bzw. Zucken nur in der Darstellung, ohne Folgen in der Sim.
+- **Kräftiger Sound:** satte Einschläge je Waffenart (Klinge, Wucht, Bogen, Magie), lauter bei Kritischen.
+- **Schadenszahlen:** größer, springend, Kritische deutlich hervorgehoben. Weniger, dafür lesbare Zahlen.
