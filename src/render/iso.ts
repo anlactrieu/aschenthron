@@ -145,6 +145,34 @@ export function sheetView(frames: Record<string, unknown>, v: FigView): FigView 
   return v === 'frontDiag' || v === 'backDiag' ? (frames[`idle_${v}_0`] ? v : fallbackView(v)) : v;
 }
 
+/**
+ * Blickrichtung einer Figur, wie GameScene, townLife und wildlife sie halten: `side`/`up`/`flip` wie bisher (die Draufsicht und
+ * alle 3-Ansichten-Figuren lesen nur sie), `iv` = Iso-Ansicht der 5 (nur im Iso-Modus gesetzt).
+ */
+export interface Facing {
+  flip: boolean;
+  up?: boolean;
+  side?: boolean;
+  iv?: FigView;
+}
+
+/** Ansicht nach einem Schritt (Bildschirmrichtung dsx, dsy) nachführen; Draufsicht genau wie bisher */
+export function turn(o: Facing, dsx: number, dsy: number): void {
+  const s = viewOf(dsx, dsy, { view: facingView(o), flip: o.flip, up: !!o.up });
+  o.flip = s.flip;
+  o.up = s.up;
+  o.side = s.view === 'side';
+  o.iv = ISO ? s.view : undefined;
+}
+
+/** Gewünschte Ansicht (vor dem Rückfall auf das, was das Sheet hat) */
+export function facingView(o: Facing): FigView {
+  return o.iv ?? (o.side ? 'side' : o.up ? 'back' : 'front');
+}
+
+/** Wird diese Ansicht nach Laufrichtung gespiegelt? Seite und Schrägen ja (links = gespiegelt), vorn/hinten nur bei `mirrorAll`. */
+export const mirrors = (v: FigView): boolean => v !== 'front' && v !== 'back';
+
 /* ---------------------------------------------------------------- Strecken und Kreise */
 
 /**

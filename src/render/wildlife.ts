@@ -14,7 +14,8 @@
 import type Phaser from 'phaser';
 import { isWalkable, type Grid } from '../sim/path';
 import { ROUTE, routeAt, routeLength } from '../sim/route';
-import { TILE_H, TILE_W, toScreen } from './iso';
+import { facingView, FOOT_DY, FRONT_DY, gridStep, groundSize, ISO, mirrors, sheetView, standDepth, toScreen, turn } from './iso';
+import type { FigView } from './figure';
 import { walkFrame } from './figure';
 import { idleFrame } from './hero';
 import { FIG_SCALE, originOf } from './heroSheet';
@@ -292,6 +293,8 @@ interface Traveler {
   flip: boolean;
   side: boolean;
   up: boolean;
+  /** Iso: Ansicht der 5 (iso.ts `turn`) */
+  iv?: FigView;
   movingUntil: number;
 }
 
@@ -326,7 +329,7 @@ export class Wildlife {
     }).setOrigin(0.5, 1).setDepth(OVERLAY + 6).setVisible(false);
     for (const lm of landmarks) {
       const { sx, sy } = toScreen(lm.x, lm.y);
-      const img = scene.add.image(sx, sy + TILE_H / 2 + 2, ATLAS, this.landmarkFrame(lm)).setOrigin(0.5, 1).setDepth(sy + TILE_H / 2).setVisible(false);
+      const img = scene.add.image(sx, sy + FRONT_DY + 2, ATLAS, this.landmarkFrame(lm)).setOrigin(0.5, 1).setDepth(standDepth(sy)).setVisible(false);
       this.lms.push({ lm, img });
     }
     for (const def of TRAVELERS) {
@@ -381,7 +384,8 @@ export class Wildlife {
       if (on) {
         // flacher Schatten unter dem Bild
         this.shadow.fillStyle(0x000000, 0.14);
-        this.shadow.fillEllipse(sx, sy + TILE_H / 2 + 1, lm.kind === 'ruin' ? 70 : 30, 9);
+        const sh = groundSize(lm.kind === 'ruin' ? 70 : 30, 9);
+        this.shadow.fillEllipse(sx, sy + FRONT_DY + 1, sh.w, sh.h);
       }
       if (lm.text && d < NOTE_NEAR && (!near || d < near.d)) near = { lm, d };
     }
@@ -438,11 +442,16 @@ export class Wildlife {
       const mdx = p.x - t.lastX;
       const mdy = p.y - t.lastY;
       if (Math.abs(mdx) + Math.abs(mdy) > 0.0005 && Math.abs(mdx) + Math.abs(mdy) < 1) {
-        t.dist += Math.hypot(mdx * TILE_W, mdy * TILE_H);
+        t.dist += gridStep(mdx, mdy);
         t.movingUntil = c.time + 160;
-        t.side = Math.abs(p.dx) > Math.abs(p.dy) * 0.8;
-        if (Math.abs(p.dx) > 0.01) t.flip = p.dx < 0;
-        t.up = p.dy < 0;
+        if (ISO) {
+          const sv = toScreen(p.dx, p.dy);
+          turn(t, sv.sx, sv.sy);
+        } else {
+          t.side = Math.abs(p.dx) > Math.abs(p.dy) * 0.8;
+          if (Math.abs(p.dx) > 0.01) t.flip = p.dx < 0;
+          t.up = p.dy < 0;
+        }
       }
       t.lastX = p.x;
       t.lastY = p.y;
@@ -452,9 +461,10 @@ export class Wildlife {
       if (t.cart) {
         const horiz = Math.abs(p.dx) > Math.abs(p.dy);
         const frame = horiz ? `cart_h${Math.floor(c.time / 260) % 2}` : p.dy > 0 ? 'cart_dn' : 'cart_up';
-        t.cart.setFrame(frame).setFlipX(horiz && p.dx < 0).setAlpha(p.fade).setVisible(true).setPosition(sx, sy + 14).setDepth(sy + 14);
+        t.cart.setFrame(frame).setFlipX(horiz && p.dx < 0).setAlpha(p.fade).setVisible(true).setPosition(sx, sy + FOOT_DY + 6).setDepth(sy + FOOT_DY + 6);
         this.shadow.fillStyle(0x000000, 0.18 * p.fade);
-        this.shadow.fillEllipse(sx, sy + 15, horiz ? 100 : 48, 12);
+        const cs = groundSize(horiz ? 100 : 48, 12);
+        this.shadow.fillEllipse(sx, sy + FOOT_DY + 7, cs.w, cs.h);
         fx = p.x + p.dx * 1.9 + (horiz ? 0 : 0.9);
         fy = p.y + p.dy * 1.9 + (horiz ? 0.55 : 0);
       }
@@ -470,14 +480,16 @@ export class Wildlife {
       return;
     }
     const sheet = got.sheet;
-    const v3 = t.side ? 'side' : t.up ? 'back' : 'front';
+    const v3 = sheetView(sheet.frames, facingView(t));
     const A = sheet.anims;
     const o = originOf(sheet);
     const moving = c.time < t.movingUntil;
     t.img.setTexture(got.key, moving ? `walk_${v3}_${walkFrame(t.dist, A.walk, sheet.cyclePx)}` : `idle_${v3}_${idleFrame(c.time + t.def.look.length * 977, A.idle)}`);
-    t.img.setOrigin(o.x, o.y).setScale(FIG_SCALE).setFlipX(t.side && t.flip).setAlpha(alpha).setVisible(true).setPosition(sx, sy + 8).setDepth(sy + 8);
+    const fy = sy + FOOT_DY;
+    t.img.setOrigin(o.x, o.y).setScale(FIG_SCALE).setFlipX(mirrors(v3) && t.flip).setAlpha(alpha).setVisible(true).setPosition(sx, fy).setDepth(fy);
     this.shadow.fillStyle(0x000000, 0.2 * alpha);
-    this.shadow.fillEllipse(sx, sy + 9, 26, 10);
+    const sh = groundSize(26, 10);
+    this.shadow.fillEllipse(sx, fy + 1, sh.w, sh.h);
   }
 
   /* ---------------------------------------------------------------------------- Tiere */
@@ -722,8 +734,10 @@ export class Wildlife {
         frame = airborne || a.state === 'fly' ? `crow_fly${Math.floor(t / 110 + a.phase) % 2}` : 'crow_0';
     }
     const lift = a.kind === 'bat' || (a.kind === 'crow' && airborne) ? Math.sin(t / 200 + a.phase) * 2 : 0;
-    a.img.setFrame(frame).setFlipX(a.flip).setAlpha(a.alpha).setVisible(true).setPosition(sx, sy + 9 - a.alt + lift).setDepth(sy + 9 + (airborne ? 400 : 0));
+    const fy = sy + FOOT_DY;
+    a.img.setFrame(frame).setFlipX(a.flip).setAlpha(a.alpha).setVisible(true).setPosition(sx, fy + 1 - a.alt + lift).setDepth(fy + 1 + (airborne ? 400 : 0));
     this.shadow.fillStyle(0x000000, (airborne ? 0.1 : 0.2) * a.alpha);
-    this.shadow.fillEllipse(sx, sy + 10, shw, 6);
+    const sh = groundSize(shw, 6);
+    this.shadow.fillEllipse(sx, fy + 2, sh.w, sh.h);
   }
 }

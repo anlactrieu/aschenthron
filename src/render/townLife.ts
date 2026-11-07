@@ -7,7 +7,8 @@
  */
 import type Phaser from 'phaser';
 import { isWalkable, type Grid } from '../sim/path';
-import { TILE_H, TILE_W, toScreen } from './iso';
+import { facingView, FOOT_DY, FRONT_DY, gridStep, groundSize, ISO, mirrors, sheetView, standDepth, toScreen, turn } from './iso';
+import type { FigView } from './figure';
 import { walkFrame } from './figure';
 import { idleFrame } from './hero';
 import { FIG_SCALE, originOf } from './heroSheet';
@@ -397,6 +398,8 @@ interface Resident {
   flip: boolean;
   side: boolean;
   up: boolean;
+  /** Iso: Ansicht der 5 (iso.ts `turn`) */
+  iv?: FigView;
   dist: number;
   movingUntil: number;
   shoutAt: number;
@@ -519,8 +522,8 @@ export class TownLife {
       const { sx, sy } = toScreen(d.x, d.y);
       const key = { banner: 'banner', board: 'board', cart: 'cart', hay: 'hay', sacks: 'sacks', baskets: 'baskets' }[d.kind];
       // Fußpunkt am unteren Rand der Kachel; Wandschmuck hängt vor die Mauer, daher knapp über dem Boden-Fuß der Kachel
-      const foot = sy + TILE_H / 2 - (FLAT_DECOR.has(d.kind) ? 6 : 0);
-      return this.scene.add.image(sx, foot, ATLAS, key).setOrigin(0.5, 1).setScale(2).setDepth(foot + 1).setVisible(false);
+      const foot = sy + FRONT_DY - (FLAT_DECOR.has(d.kind) ? 6 : 0);
+      return this.scene.add.image(sx, foot, ATLAS, key).setOrigin(0.5, 1).setScale(2).setDepth(ISO ? standDepth(sy) : foot + 1).setVisible(false);
     });
   }
 
@@ -613,10 +616,9 @@ export class TownLife {
         const nx = r.x + (dx / dist) * step - (dy / dist) * sway * step;
         const ny = r.y + (dy / dist) * step + (dx / dist) * sway * step;
         if (tileWalk(c.grid, nx, ny)) {
-          if (Math.abs(nx - r.x) > 0.0005) r.flip = nx < r.x;
-          r.side = Math.abs(nx - r.x) > Math.abs(ny - r.y) * 0.8;
-          if (Math.abs(ny - r.y) > 0.0005) r.up = ny < r.y;
-          r.dist += Math.hypot((nx - r.x) * TILE_W, (ny - r.y) * TILE_H);
+          const sv = toScreen(nx - r.x, ny - r.y);
+          turn(r, sv.sx, sv.sy);
+          r.dist += gridStep(nx - r.x, ny - r.y);
           r.x = nx;
           r.y = ny;
           r.movingUntil = c.time + 160;
@@ -680,20 +682,22 @@ export class TownLife {
       return;
     }
     const sheet = got.sheet;
-    const v3 = r.side ? 'side' : r.up ? 'back' : 'front';
+    const v3 = sheetView(sheet.frames, facingView(r));
     const A = sheet.anims;
     const o = originOf(sheet);
     const moving = c.time < r.movingUntil;
     r.img.setTexture(got.key, moving ? `walk_${v3}_${walkFrame(r.dist, A.walk, sheet.cyclePx)}` : `idle_${v3}_${idleFrame(c.time + r.def.role.length * 1231, A.idle)}`);
     r.top = sheet.top * FIG_SCALE;
-    r.img.setOrigin(o.x, o.y).setScale(FIG_SCALE).setFlipX(r.side && r.flip).setAlpha(r.alpha).setVisible(r.alpha > 0.02).setPosition(sx, sy + 8).setDepth(sy + 8);
+    const fy = sy + FOOT_DY;
+    r.img.setOrigin(o.x, o.y).setScale(FIG_SCALE).setFlipX(mirrors(v3) && r.flip).setAlpha(r.alpha).setVisible(r.alpha > 0.02).setPosition(sx, fy).setDepth(fy);
     this.shadow.fillStyle(0x000000, 0.2 * r.alpha);
-    this.shadow.fillEllipse(sx, sy + 9, r.def.look === 'res_child' || r.def.look === 'res_child2' ? 20 : 26, 10);
+    const sh = groundSize(r.def.look === 'res_child' || r.def.look === 'res_child2' ? 20 : 26, 10);
+    this.shadow.fillEllipse(sx, fy + 1, sh.w, sh.h);
     if (r.torch) {
       const hx = sx + (r.side ? (r.flip ? -14 : 14) : 13);
-      const hy = sy + 8 - r.top * 0.42;
+      const hy = fy - r.top * 0.42;
       const fl = r.torch.img;
-      fl.setFrame(Math.floor(c.time / 140) % 2 ? 'torch_1' : 'torch_0').setOrigin(0.5, 1).setPosition(hx, hy).setDepth(sy + 9).setVisible(r.alpha > 0.1);
+      fl.setFrame(Math.floor(c.time / 140) % 2 ? 'torch_1' : 'torch_0').setOrigin(0.5, 1).setPosition(hx, hy).setDepth(fy + 1).setVisible(r.alpha > 0.1);
       // Fackelschein nur nachts (tagsüber unsichtbar); flackert leicht
       r.torch.glow.setPosition(hx, hy - 8).setAlpha(c.night * r.alpha * (0.75 + 0.25 * Math.sin(c.time / 90 + r.def.role.length))).setVisible(c.night > 0.05);
     }
@@ -831,9 +835,11 @@ export class TownLife {
     else if (k === 'dog') frame = a.state === 'walk' ? `dog_${Math.floor(t / 130) % 2}` : 'dog_0';
     else frame = `${k}_0`;
     const lift = airborne ? Math.sin(t / 220 + a.phase) * 2 : 0;
-    a.img.setFrame(frame).setFlipX(a.flip).setVisible(true).setAlpha(1).setPosition(sx, sy + 8 - a.alt + lift).setDepth(sy + 8 + (airborne ? 400 : 0));
+    const fy = sy + FOOT_DY;
+    a.img.setFrame(frame).setFlipX(a.flip).setVisible(true).setAlpha(1).setPosition(sx, fy - a.alt + lift).setDepth(fy + (airborne ? 400 : 0));
     this.shadow.fillStyle(0x000000, airborne ? 0.12 : 0.2);
-    this.shadow.fillEllipse(sx, sy + 9, k === 'dog' ? 24 : k === 'chicken' ? 14 : airborne ? 12 : 16, k === 'dog' ? 8 : 6);
+    const sh = groundSize(k === 'dog' ? 24 : k === 'chicken' ? 14 : airborne ? 12 : 16, k === 'dog' ? 8 : 6);
+    this.shadow.fillEllipse(sx, fy + 1, sh.w, sh.h);
     // Tierlaute (leise, nur in Hörweite)
     const dist = Math.hypot(a.x - c.player.x, a.y - c.player.y);
     if (t > a.soundAt && dist < 14 && a.state !== 'away') {
