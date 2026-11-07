@@ -8,7 +8,8 @@
  */
 import type Phaser from 'phaser';
 import { FigureBaker, type FigView, type FigureSheet, type FigureSpec } from './figure';
-import { addSheetTexture, FIG_SCALE, pixelSource, SHEET_VIEWS, type FigSource } from './heroSheet';
+import { addSheetTexture, FIG_SCALE, pixelSource, type FigSource } from './heroSheet';
+import { SHEET_VIEWS } from './sheetViews';
 import { SHADE } from './heroRig.js';
 import { heroSpec, type HeroLook } from './hero';
 import { monsterSpec } from './monster';

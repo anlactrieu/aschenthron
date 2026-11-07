@@ -6,16 +6,14 @@
  */
 import type Phaser from 'phaser';
 import type { Look } from './art';
-import { bakeFigure, figViews, type FigureSheet } from './figure';
-import { ISO } from './iso';
+import { bakeFigure, type FigureSheet } from './figure';
+import { SHEET_VIEWS } from './sheetViews';
 import { heroKey, heroLookOf, heroSpec } from './hero';
 import { bakeInWorker, uploadSheet } from './monsterSheet';
 import { cancelUpload, uploading } from './sheetUpload';
 
 /** Pixelmaßstab aller Skelett-Figuren in der Welt */
 export const FIG_SCALE = 2;
-/** Ansichten, die dieses Spiel bäckt (Draufsicht 3, Iso 5); der Worker bekommt sie mit, weil `ISO` dort immer `false` ist */
-export const SHEET_VIEWS = figViews(ISO);
 
 export type HeroMode = 'skelett' | 'dcss';
 let mode: HeroMode | undefined;
