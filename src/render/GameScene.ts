@@ -13,6 +13,7 @@ import {
 import { isWalkable } from '../sim/path';
 import { arrowDirs, arrowStep, facingView, fallbackView, FOOT_DY, footprintColumns, FRONT_DY, gridStep, groundSize, ISO, mapBounds, mirrors, sheetView, standDepth, tileRange, toScreen, toTile, turn, type TileRange } from './iso';
 import { IsoChunkBaker, isoChunkOrigin, ISO_CHUNK_H, ISO_CHUNK_W, isoWall, OCCLUDER_ALPHA, type IsoGroundSrc } from './isoGround';
+import { isoPropKey, propAnchor } from './isoTownArt';
 import { isoHouseFade, isoHouseParts, isoTownProp, type IsoFade, type IsoHousePart } from './isoHouses';
 import { figureMode, ninjaNpcDef } from './figureMap';
 import { detectHouses, houseDoor, houseDecor, houseFacade, houseFence, houseGlow, houseRoof, houseSign, houseWallTile, lowerKind, WINDOW_LIGHT, type House, type RoofNotch } from './houses';
@@ -930,11 +931,28 @@ export class GameScene extends Phaser.Scene {
   /* ------------------------------------------------------------ Ereignisse */
 
   /** Bildschirmposition der Körpermitte eines Akteurs (für Effekte) */
-  private bodyPos(a: Actor | undefined): { x: number; y: number } | null {
+  private bodyPos(a: Actor | undefined): { x: number; y: number; foot: number } | null {
     if (!a) return null;
     const pos = this.dispPos(a);
     const { sx, sy } = toScreen(pos.x, pos.y);
-    return { x: sx, y: sy + FOOT_DY - (a.boss ? 42 : 26) };
+    return { x: sx, y: sy + FOOT_DY - this.bodyLift(a), foot: sy + FOOT_DY - 8 };
+  }
+
+  /** Bodenhöhe für Ringe und Säulen unter einer Körperposition: Draufsicht wie bisher `y + off` (Körpermitte + Versatz), Iso am Fuß (off 18 = Fuß − 8) */
+  private gy(p: { y: number; foot: number }, off: number): number {
+    return ISO ? p.foot + (off - 18) : p.y + off;
+  }
+
+  /**
+   * Höhe der Körpermitte über dem Fußpunkt. Draufsicht wie bisher fest (Boss 42, sonst 26). Iso: die Hälfte der Figurhöhe aus dem Sheet
+   * (`figTop`), damit Aufladen und Einschlag bei Ratten unten und bei Bossen oben sitzen. Figuren ohne Sheet-Maß (DCSS) behalten die festen Werte.
+   */
+  private bodyLift(a: Actor): number {
+    const fixed = a.boss ? 42 : 26;
+    if (!ISO) return fixed;
+    const img = this.actorViews.get(a.id)?.img;
+    const top = img ? this.figSize(img)?.top : undefined;
+    return top ? Math.max(8, Math.min(70, top * 0.55)) : fixed;
   }
 
   /** Bildschirmposition der Füße (Drehpunkt der Boden-Effekte aus pixelfx) */
@@ -985,7 +1003,7 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'whirlwind':
         if (once() && !pfx('whirl', feetFrom, { from: 0.05 })) {
-          this.fx.ring(from.x, from.y + 18, 150, 0xe8e8f0, 320);
+          this.fx.ring(from.x, this.gy(from, 18), 150, 0xe8e8f0, 320);
           this.fx.slash(from.x, from.y, 0xdadae8, 0);
           this.fx.slash(from.x, from.y, 0xdadae8, Math.PI);
         }
@@ -994,14 +1012,14 @@ export class GameScene extends Phaser.Scene {
       case 'glacial_burst':
         // pixelfx ist seitlich gezeichnet (flacher Bodenring): der runde Code-Ring zeigt zusätzlich die echte Wirkfläche
         if (once()) {
-          this.fx.ring(from.x, from.y + 18, 210, 0x7fd0ff, 460);
+          this.fx.ring(from.x, this.gy(from, 18), 210, 0x7fd0ff, 460);
           if (!pfx('frost_nova', feetFrom, { from: 0.4 })) this.fx.burst(from.x, from.y, 0xaee4ff, 520);
           if (e.skill === 'glacial_burst') this.cameras.main.shake(140, 0.005);
         }
         break;
       case 'shockwave':
         if (once()) {
-          this.fx.ring(from.x, from.y + 18, 170, 0xe0a060, 380);
+          this.fx.ring(from.x, this.gy(from, 18), 170, 0xe0a060, 380);
           pfx('slam', feetFrom);
           this.cameras.main.shake(160, 0.006);
         }
@@ -1011,7 +1029,7 @@ export class GameScene extends Phaser.Scene {
       case 'titan_blow':
       case 'execution':
         this.fx.slash(to.x, to.y, 0xff9a60, 0.3);
-        if (!pfx('slam', feetTo)) this.fx.ring(to.x, to.y + 14, 60, 0xff9a60, 300);
+        if (!pfx('slam', feetTo)) this.fx.ring(to.x, this.gy(to, 14), 60, 0xff9a60, 300);
         this.cameras.main.shake(130, e.skill === 'skull_split' ? 0.006 : 0.008);
         break;
       default: break;
@@ -1141,9 +1159,9 @@ export class GameScene extends Phaser.Scene {
                   const k0 = Math.min(15, (Math.hypot(primary.x - f2.x, primary.y - f2.y) || 1) * 0.35) / (Math.hypot(primary.x - f2.x, primary.y - f2.y) || 1);
                   this.fx.spell(f2.x + (primary.x - f2.x) * k0, f2.y - 3 + (primary.y - f2.y) * k0, primary.x, primary.y, SPELL_THEMES[spellEl], 240, () => {
                     this.fx.flare(primary.x, primary.y, SPELL_THEMES[spellEl], 2);
-                    this.fx.ring(primary.x, primary.y + 14, 130, 0xff6a2a, 420);
+                    this.fx.ring(primary.x, this.gy(primary, 14), 130, 0xff6a2a, 420);
                     // pixelfx-Einschlag am Boden unter dem Hauptziel; der Rauch blendet zum Ende hin aus
-                    const fb = playPixelfx(this, 'fire_burst', primary.x, primary.y + 18, { depth: OVERLAY_DEPTH - 1 });
+                    const fb = playPixelfx(this, 'fire_burst', primary.x, this.gy(primary, 18), { depth: OVERLAY_DEPTH - 1 });
                     if (fb) this.tweens.add({ targets: fb, alpha: 0, delay: 700 * this.ts, duration: 600 * this.ts });
                     else this.fx.burst(primary.x, primary.y, 0xffa040, 520);
                     this.cameras.main.shake(110, 0.004);
@@ -1199,7 +1217,7 @@ export class GameScene extends Phaser.Scene {
           const boss = getActor(w, e.id);
           const pos = this.bodyPos(boss);
           if (pos) {
-            this.fx.ring(pos.x, pos.y + 20, 160, 0xb060ff, 600);
+            this.fx.ring(pos.x, this.gy(pos, 20), 160, 0xb060ff, 600);
             this.fx.burst(pos.x, pos.y, 0xb060ff, 700);
           }
           if (boss?.boss) {
@@ -1216,7 +1234,7 @@ export class GameScene extends Phaser.Scene {
           if (pos) {
             const call = e.type === 'call';
             this.fx.floatText(pos.x, pos.y - 44, call ? 'Zu mir!' : 'Rückzug!', call ? '#ffb04a' : '#c8c8d8', 14, 1300);
-            if (call) this.fx.ring(pos.x, pos.y + 18, 120, 0xffb04a, 500);
+            if (call) this.fx.ring(pos.x, this.gy(pos, 18), 120, 0xffb04a, 500);
           }
           break;
         }
@@ -1224,7 +1242,7 @@ export class GameScene extends Phaser.Scene {
           const pos = this.bodyPos(getActor(w, e.targetId));
           if (pos) {
             this.fx.floatText(pos.x, pos.y - 26, `+${e.amount}`, '#7fe070', 13);
-            this.fx.ring(pos.x, pos.y + 14, 70, 0x7fe070, 400);
+            this.fx.ring(pos.x, this.gy(pos, 14), 70, 0x7fe070, 400);
           }
           break;
         }
@@ -1269,7 +1287,7 @@ export class GameScene extends Phaser.Scene {
             if (pos) {
               this.fx.burst(pos.x, pos.y, dead?.boss ? 0xffb040 : 0xd8d0c0, dead?.boss ? 900 : 420);
               if (dead?.boss) {
-                this.fx.ring(pos.x, pos.y + 20, 200, 0xffb040, 700);
+                this.fx.ring(pos.x, this.gy(pos, 20), 200, 0xffb040, 700);
                 this.cameras.main.shake(350, 0.008);
                 this.ui.banner(`${dead.name} ist gefallen!`, '#ffb040');
               }
@@ -1347,8 +1365,8 @@ export class GameScene extends Phaser.Scene {
           this.townLife.congratulate(e.level, { time: this.lastTime, player: this.player(), npcs: this.world.npcs });
           const pos = this.bodyPos(this.player());
           if (pos) {
-            if (!playPixelfx(this, 'levelup', pos.x, pos.y + 20, { depth: OVERLAY_DEPTH - 1 })) this.fx.column(pos.x, pos.y + 20, 0xfff0a0, 1400);
-            this.fx.ring(pos.x, pos.y + 20, 170, 0xfff0a0, 600);
+            if (!playPixelfx(this, 'levelup', pos.x, this.gy(pos, 20), { depth: OVERLAY_DEPTH - 1 })) this.fx.column(pos.x, this.gy(pos, 20), 0xfff0a0, 1400);
+            this.fx.ring(pos.x, this.gy(pos, 20), 170, 0xfff0a0, 600);
           }
           this.ui.banner(`Stufe ${e.level}!`, '#ffe45a');
           break;
@@ -1363,7 +1381,7 @@ export class GameScene extends Phaser.Scene {
             const rank = e.rank ?? 1;
             if (f && !playPixelfx(this, 'learn', f.x, f.y + 2, { depth: OVERLAY_DEPTH - 1, from: sk?.passive ? 1.0 : 0.5 })) {
               const pos = this.bodyPos(this.player());
-              if (pos) this.fx.ring(pos.x, pos.y + 20, 140, 0xb07ade, 600);
+              if (pos) this.fx.ring(pos.x, this.gy(pos, 20), 140, 0xb07ade, 600);
             }
             if (sk) this.ui.banner(sk.passive ? `${sk.name} – Rang ${rank}` : `Neue Fertigkeit: ${sk.name}`, '#c8a0f0');
             if (sk && !sk.passive) this.ui.pulseSkill(sk.id);
@@ -1383,7 +1401,7 @@ export class GameScene extends Phaser.Scene {
         case 'enraged': {
           const boss = getActor(w, e.id);
           const pos = this.bodyPos(boss);
-          if (pos) this.fx.ring(pos.x, pos.y + 20, 180, 0xff3a2a, 600);
+          if (pos) this.fx.ring(pos.x, this.gy(pos, 20), 180, 0xff3a2a, 600);
           this.cameras.main.shake(250, 0.006);
           say(`${boss?.name} wird wütend!`);
           this.sfx.boss();
@@ -1445,7 +1463,7 @@ export class GameScene extends Phaser.Scene {
               // Sichtweite: Effekt und Fanfare (Boss-Flag-Gegner haben Ring/Shake schon im 'died'-Ereignis)
               if (!wb?.boss) {
                 this.fx.burst(pos.x, pos.y, 0xffd23a, 900);
-                this.fx.ring(pos.x, pos.y + 20, 200, 0xffd23a, 700);
+                this.fx.ring(pos.x, this.gy(pos, 20), 200, 0xffd23a, 700);
                 this.cameras.main.shake(350, 0.008);
               }
               this.sfx.fanfare();
@@ -2131,7 +2149,10 @@ export class GameScene extends Phaser.Scene {
       };
       for (const dc of houseDecor(hs, free)) {
         const p = toScreen(dc.x, dc.y);
-        if (dc.kind === 'fence') {
+        if (dc.kind === 'fence' && ISO) {
+          // Iso (P9.3-Wunsch): Zaun entlang der Südwand als Iso-Bild (Zug entlang x), Anker auf der Kachelmitte
+          this.add.image(p.sx, p.sy, isoPropKey('fence', 'x')).setOrigin(0.5, propAnchor('fence').oy).setDepth(standDepth(p.sy));
+        } else if (dc.kind === 'fence') {
           this.add.image(p.sx, p.sy + 6, ...this.houseTex(sh.fence.key, sh.fence.make)).setOrigin(0.5, 1).setDepth(ISO ? standDepth(p.sy) : p.sy + 6);
         } else if (this.textures.exists(dc.kind === 'barrel' ? 'twn_barrel' : 'twn_crates')) {
           this.add.image(p.sx, p.sy + FRONT_DY - 2, dc.kind === 'barrel' ? 'twn_barrel' : 'twn_crates').setOrigin(0.5, 1).setDepth(standDepth(p.sy));
@@ -2685,7 +2706,10 @@ export class GameScene extends Phaser.Scene {
    */
   private prefetchNear(p: Actor): void {
     const R = VIEW + 14;
-    const near = (x: number, y: number): boolean => Math.abs(x - p.x) <= R && Math.abs(y - p.y) <= R;
+    // Iso: der Bildausschnitt ist bei Zoom 0,5 breiter als ±VIEW (Raute), darum statt des Quadrats der Kachelbereich der Kamera plus Rand
+    const vt = this.vt;
+    const near = (x: number, y: number): boolean =>
+      ISO ? x >= vt.x0 - 14 && x <= vt.x1 + 14 && y >= vt.y0 - 14 && y <= vt.y1 + 14 || (Math.abs(x - p.x) <= R && Math.abs(y - p.y) <= R) : Math.abs(x - p.x) <= R && Math.abs(y - p.y) <= R;
     // nächste zuerst: die Warteschlange arbeitet in Anfragereihenfolge
     const near2 = this.world.actors.filter((a) => a.kind === 'monster' && a.alive && near(a.x, a.y)).map((a) => ({ id: a.kindId!, d: (a.x - p.x) ** 2 + (a.y - p.y) ** 2 }));
     const ids = new Set(near2.sort((a, b) => a.d - b.d).map((a) => a.id));

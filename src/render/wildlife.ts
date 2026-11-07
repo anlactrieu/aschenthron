@@ -31,6 +31,9 @@ import { DEER_POSES, bat, deer, frog } from './world/critters';
 
 type Rng = () => number;
 export type FaunaKind = 'deer' | 'crow' | 'frog' | 'bat';
+/** Bildschirm-Richtung nach rechts/links (Vorzeichen) für einen Rasterschritt: Tiere blicken nach dem Bildschirm, nicht nach dem Raster. Draufsicht = dx. */
+const screenDx = (dx: number, dy: number): number => toScreen(dx, dy).sx / 48;
+
 /** Wie viele je Art höchstens gleichzeitig um den Helden sind */
 interface Fauna { kind: FaunaKind; cap: number }
 
@@ -568,7 +571,8 @@ export class Wildlife {
     if (!this.canStand(a, c, nx, ny)) return false;
     a.x = nx;
     a.y = ny;
-    if (Math.abs(Math.cos(ang)) > 0.2) a.flip = Math.cos(ang) < 0;
+    const sdx = screenDx(Math.cos(ang), Math.sin(ang));
+    if (Math.abs(sdx) > 0.2) a.flip = sdx < 0;
     return true;
   }
 
@@ -649,7 +653,7 @@ export class Wildlife {
           a.alt = Math.min(90, a.alt + dt * 0.12);
           a.x += Math.cos(a.ang) * 5.2 * sec;
           a.y += Math.sin(a.ang) * 5.2 * sec;
-          a.flip = Math.cos(a.ang) < 0;
+          a.flip = screenDx(Math.cos(a.ang), Math.sin(a.ang)) < 0;
           if (c.time > a.until && a.fade >= 0) a.fade = -1 / 600;
         } else if (c.time > a.soundAt) {
           a.soundAt = c.time + 9000 + this.rng() * 16000;
@@ -670,7 +674,7 @@ export class Wildlife {
           a.state = 'hop';
           a.since = c.time;
           a.until = c.time + 380;
-          a.flip = tx < a.x;
+          a.flip = screenDx(tx - a.x, ty - a.y) < 0;
         };
         if (a.state === 'hop') {
           const k = Math.min(1, (c.time - a.since) / 380);
@@ -698,7 +702,7 @@ export class Wildlife {
         }
         const nx = a.cx + Math.cos(t * 1.1) * 3.4 + Math.sin(t * 2.7) * 0.8;
         const ny = a.cy + Math.sin(t * 1.7) * 2.2 + Math.cos(t * 3.1) * 0.6;
-        a.flip = nx < a.x;
+        a.flip = screenDx(nx - a.x, ny - a.y) < 0;
         a.x = nx;
         a.y = ny;
         a.alt = 44 + Math.sin(t * 2.3) * 12;

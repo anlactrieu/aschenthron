@@ -3,6 +3,7 @@ import type { QuestMark } from '../sim/quests';
 import { uniqueDef } from '../sim/data';
 import { isTouch } from './touch';
 import { NINJA_BASE } from './ninja';
+import { ISO } from './iso';
 
 /** Farben je gid, aus der Palette der Code-Welt (world/ground.ts, props.ts, houses.ts), eine Stufe heller für die kleine Karte */
 const COLORS: Record<number, string> = {
@@ -26,21 +27,46 @@ export class Minimap {
   constructor(private w: World, tiles: number[]) {
     const { w: gw, h: gh } = w.grid;
     this.base = document.createElement('canvas');
-    this.base.width = gw;
-    this.base.height = gh;
-    const c = this.base.getContext('2d')!;
-    for (let y = 0; y < gh; y++) {
-      for (let x = 0; x < gw; x++) {
-        const gid = tiles[y * gw + x] ?? 0;
-        c.fillStyle = COLORS[gid] ?? '#000';
-        c.fillRect(x, y, 1, 1);
+    if (ISO) {
+      // Iso: Raute mit derselben Projektion wie das Spielfeld (x − y waagrecht, x + y senkrecht, 2:1). Erst in 4x1-Streifen je Kachel
+      // lückenlos gemalt (2·(w+h) x (w+h)), dann einmal geglättet auf Anzeigegröße verkleinert (≈ 440 px breit).
+      const n = gw + gh;
+      const big = document.createElement('canvas');
+      big.width = 2 * n;
+      big.height = n;
+      const c = big.getContext('2d')!;
+      for (let y = 0; y < gh; y++) {
+        for (let x = 0; x < gw; x++) {
+          c.fillStyle = COLORS[tiles[y * gw + x] ?? 0] ?? '#000';
+          c.fillRect((x - y + gh) * 2 - 2, x + y, 4, 1);
+        }
       }
+      this.view = document.createElement('canvas');
+      this.view.width = Math.min(2 * n, 440);
+      this.view.height = Math.round(this.view.width / 2);
+      this.base.width = this.view.width;
+      this.base.height = this.view.height;
+      const b = this.base.getContext('2d')!;
+      b.imageSmoothingEnabled = true;
+      b.imageSmoothingQuality = 'high';
+      b.drawImage(big, 0, 0, this.base.width, this.base.height);
+    } else {
+      this.base.width = gw;
+      this.base.height = gh;
+      const c = this.base.getContext('2d')!;
+      for (let y = 0; y < gh; y++) {
+        for (let x = 0; x < gw; x++) {
+          const gid = tiles[y * gw + x] ?? 0;
+          c.fillStyle = COLORS[gid] ?? '#000';
+          c.fillRect(x, y, 1, 1);
+        }
+      }
+      this.view = document.createElement('canvas');
+      // Größe wie bisher (≈ 340 px breit), auch wenn die Karte größer wird
+      const zoom = Math.min(1.4, 340 / gw);
+      this.view.width = gw * zoom;
+      this.view.height = gh * zoom;
     }
-    this.view = document.createElement('canvas');
-    // Größe wie bisher (≈ 340 px breit), auch wenn die Karte größer wird
-    const zoom = Math.min(1.4, 340 / gw);
-    this.view.width = gw * zoom;
-    this.view.height = gh * zoom;
     Object.assign(this.view.style, {
       position: 'fixed', right: '12px', top: '12px', border: '10px solid transparent', borderImage: `url("${NINJA_BASE}Ui/Theme/Theme%20Wood/nine_path_panel.png") 5 / 10px stretch`, background: '#0a1220', backgroundClip: 'padding-box',
       imageRendering: 'pixelated', opacity: '0.88', pointerEvents: 'none', zIndex: '3',
@@ -117,49 +143,55 @@ export class Minimap {
 
   draw(px: number, py: number, marks: QuestMark[] = []): void {
     if (!this.visible) return;
-    const k = this.view.width / this.base.width;
+    const { w: gw, h: gh } = this.w.grid;
+    const kd = this.view.width / this.base.width;
+    // Rasterkoordinate -> Kartenpixel: Draufsicht linear, Iso als Raute (Streifenmitte der Kachel)
+    const kx = this.view.width / (2 * (gw + gh));
+    const ky = this.view.height / (gw + gh);
+    const X = (x: number, y: number): number => (ISO ? (x - y + gh) * 2 * kx : x * kd);
+    const Y = (x: number, y: number): number => (ISO ? (x + y + 0.5) * ky : y * kd);
     const c = this.view.getContext('2d')!;
     c.imageSmoothingEnabled = false;
     c.drawImage(this.base, 0, 0, this.view.width, this.view.height);
     for (const t of this.w.towns) {
       c.fillStyle = '#e8c040';
-      c.fillRect(t.x * k - 2, t.y * k - 2, 5, 5);
+      c.fillRect(X(t.x, t.y) - 2, Y(t.x, t.y) - 2, 5, 5);
     }
     for (const ch of this.w.chests) {
       if (ch.opened) continue;
       c.fillStyle = ch.tier === 'gold' ? '#ffd84a' : ch.tier === 'iron' ? '#9fb4d8' : '#b88a50';
-      c.fillRect(ch.x * k - 1, ch.y * k - 1, 3, 3);
+      c.fillRect(X(ch.x, ch.y) - 1, Y(ch.x, ch.y) - 1, 3, 3);
     }
     for (const a of this.w.actors) {
       if (a.kind === 'guard' && a.alive) {
         c.fillStyle = '#6ab0ff';
-        c.fillRect(a.x * k - 1, a.y * k - 1, 3, 3);
+        c.fillRect(X(a.x, a.y) - 1, Y(a.x, a.y) - 1, 3, 3);
       }
       if (a.kind === 'monster' && a.unique && a.alive) {
         c.fillStyle = uniqueDef(a.unique)?.world ? '#c77fff' : '#ff9a2a';
-        c.fillRect(a.x * k - 2, a.y * k - 2, 4, 4);
+        c.fillRect(X(a.x, a.y) - 2, Y(a.x, a.y) - 2, 4, 4);
       }
       if (a.kind === 'monster' && a.boss && a.alive) {
         c.fillStyle = '#e04030';
-        c.fillRect(a.x * k - 2, a.y * k - 2, 4, 4);
+        c.fillRect(X(a.x, a.y) - 2, Y(a.x, a.y) - 2, 4, 4);
       }
     }
     // Aufgabenziele: gelbe Rauten (grün = abgeben)
     for (const m of marks) {
       c.fillStyle = m.done ? '#6fe08a' : '#ffe45a';
       c.beginPath();
-      c.moveTo(m.x * k, m.y * k - 5);
-      c.lineTo(m.x * k + 4, m.y * k);
-      c.lineTo(m.x * k, m.y * k + 5);
-      c.lineTo(m.x * k - 4, m.y * k);
+      c.moveTo(X(m.x, m.y), Y(m.x, m.y) - 5);
+      c.lineTo(X(m.x, m.y) + 4, Y(m.x, m.y));
+      c.lineTo(X(m.x, m.y), Y(m.x, m.y) + 5);
+      c.lineTo(X(m.x, m.y) - 4, Y(m.x, m.y));
       c.closePath();
       c.fill();
       c.strokeStyle = '#000';
       c.stroke();
     }
     c.fillStyle = '#ffffff';
-    c.fillRect(px * k - 2, py * k - 2, 5, 5);
+    c.fillRect(X(px, py) - 2, Y(px, py) - 2, 5, 5);
     c.strokeStyle = '#000';
-    c.strokeRect(px * k - 2.5, py * k - 2.5, 6, 6);
+    c.strokeRect(X(px, py) - 2.5, Y(px, py) - 2.5, 6, 6);
   }
 }
