@@ -3,7 +3,6 @@ import type { QuestMark } from '../sim/quests';
 import { uniqueDef } from '../sim/data';
 import { isTouch } from './touch';
 import { NINJA_BASE } from './ninja';
-import { ISO } from './iso';
 
 /** Farben je gid, aus der Palette der Code-Welt (world/ground.ts, props.ts, houses.ts), eine Stufe heller für die kleine Karte */
 const COLORS: Record<number, string> = {
@@ -27,46 +26,28 @@ export class Minimap {
   constructor(private w: World, tiles: number[]) {
     const { w: gw, h: gh } = w.grid;
     this.base = document.createElement('canvas');
-    if (ISO) {
-      // Iso: Raute mit derselben Projektion wie das Spielfeld (x − y waagrecht, x + y senkrecht, 2:1). Erst in 4x1-Streifen je Kachel
-      // lückenlos gemalt (2·(w+h) x (w+h)), dann einmal geglättet auf Anzeigegröße verkleinert (≈ 440 px breit).
-      const n = gw + gh;
-      const big = document.createElement('canvas');
-      big.width = 2 * n;
-      big.height = n;
-      const c = big.getContext('2d')!;
-      for (let y = 0; y < gh; y++) {
-        for (let x = 0; x < gw; x++) {
-          c.fillStyle = COLORS[tiles[y * gw + x] ?? 0] ?? '#000';
-          c.fillRect((x - y + gh) * 2 - 2, x + y, 4, 1);
-        }
+    // Raute mit derselben Projektion wie das Spielfeld (x − y waagrecht, x + y senkrecht, 2:1). Erst in 4x1-Streifen je Kachel
+    // lückenlos gemalt (2·(w+h) x (w+h)), dann einmal geglättet auf Anzeigegröße verkleinert (≈ 440 px breit).
+    const n = gw + gh;
+    const big = document.createElement('canvas');
+    big.width = 2 * n;
+    big.height = n;
+    const c = big.getContext('2d')!;
+    for (let y = 0; y < gh; y++) {
+      for (let x = 0; x < gw; x++) {
+        c.fillStyle = COLORS[tiles[y * gw + x] ?? 0] ?? '#000';
+        c.fillRect((x - y + gh) * 2 - 2, x + y, 4, 1);
       }
-      this.view = document.createElement('canvas');
-      this.view.width = Math.min(2 * n, 440);
-      this.view.height = Math.round(this.view.width / 2);
-      this.base.width = this.view.width;
-      this.base.height = this.view.height;
-      const b = this.base.getContext('2d')!;
-      b.imageSmoothingEnabled = true;
-      b.imageSmoothingQuality = 'high';
-      b.drawImage(big, 0, 0, this.base.width, this.base.height);
-    } else {
-      this.base.width = gw;
-      this.base.height = gh;
-      const c = this.base.getContext('2d')!;
-      for (let y = 0; y < gh; y++) {
-        for (let x = 0; x < gw; x++) {
-          const gid = tiles[y * gw + x] ?? 0;
-          c.fillStyle = COLORS[gid] ?? '#000';
-          c.fillRect(x, y, 1, 1);
-        }
-      }
-      this.view = document.createElement('canvas');
-      // Größe wie bisher (≈ 340 px breit), auch wenn die Karte größer wird
-      const zoom = Math.min(1.4, 340 / gw);
-      this.view.width = gw * zoom;
-      this.view.height = gh * zoom;
     }
+    this.view = document.createElement('canvas');
+    this.view.width = Math.min(2 * n, 440);
+    this.view.height = Math.round(this.view.width / 2);
+    this.base.width = this.view.width;
+    this.base.height = this.view.height;
+    const b = this.base.getContext('2d')!;
+    b.imageSmoothingEnabled = true;
+    b.imageSmoothingQuality = 'high';
+    b.drawImage(big, 0, 0, this.base.width, this.base.height);
     Object.assign(this.view.style, {
       position: 'fixed', right: '12px', top: '12px', border: '10px solid transparent', borderImage: `url("${NINJA_BASE}Ui/Theme/Theme%20Wood/nine_path_panel.png") 5 / 10px stretch`, background: '#0a1220', backgroundClip: 'padding-box',
       imageRendering: 'pixelated', opacity: '0.88', pointerEvents: 'none', zIndex: '3',
@@ -144,12 +125,11 @@ export class Minimap {
   draw(px: number, py: number, marks: QuestMark[] = []): void {
     if (!this.visible) return;
     const { w: gw, h: gh } = this.w.grid;
-    const kd = this.view.width / this.base.width;
-    // Rasterkoordinate -> Kartenpixel: Draufsicht linear, Iso als Raute (Streifenmitte der Kachel)
+    // Rasterkoordinate -> Kartenpixel als Raute (Streifenmitte der Kachel)
     const kx = this.view.width / (2 * (gw + gh));
     const ky = this.view.height / (gw + gh);
-    const X = (x: number, y: number): number => (ISO ? (x - y + gh) * 2 * kx : x * kd);
-    const Y = (x: number, y: number): number => (ISO ? (x + y + 0.5) * ky : y * kd);
+    const X = (x: number, y: number): number => (x - y + gh) * 2 * kx;
+    const Y = (x: number, y: number): number => (x + y + 0.5) * ky;
     const c = this.view.getContext('2d')!;
     c.imageSmoothingEnabled = false;
     c.drawImage(this.base, 0, 0, this.view.width, this.view.height);

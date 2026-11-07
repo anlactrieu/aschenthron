@@ -25,7 +25,7 @@ export const WALL_VARIANTS = 3;
 
 type Ramp5 = readonly [Rgb, Rgb, Rgb, Rgb, Rgb];
 interface Pal { top: Ramp5; face: Ramp5; mortar: Rgb }
-/** Paletten wie die Wandkacheln der Draufsicht (`WALLS` in `world/props.ts`), die Oberseite etwas heller, damit Kanten lesbar bleiben */
+/** Paletten der Wände, die Oberseite etwas heller, damit Kanten lesbar bleiben */
 const PAL: Record<WallKind, Pal> = {
   cliff: { top: [0x0e0e0e, 0x1c1c18, 0x2a2a24, 0x3a3a30, 0x6a6a56], face: [0x141216, 0x231f22, 0x332d30, 0x463e40, 0x5c5254], mortar: 0x0e0d10 },
   brick: { top: [0x0e0c10, 0x1c181f, 0x2a252e, 0x3a3340, 0x6e6474], face: [0x17141a, 0x28222a, 0x3a3240, 0x4e4454, 0x665a6a], mortar: 0x100c10 },

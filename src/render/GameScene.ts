@@ -11,17 +11,16 @@ import {
   applyCommand, carriedWeight, carryCapacity, drainEvents, getActor, maxHpOf, maxManaOf, regionAt, tick, TICK_RATE, type Actor, type Chest, type Command, type Npc, type World,
 } from '../sim/world';
 import { isWalkable } from '../sim/path';
-import { arrowDirs, arrowStep, facingView, fallbackView, FOOT_DY, footprintColumns, FRONT_DY, gridStep, groundSize, ISO, mapBounds, mirrors, sheetView, standDepth, tileRange, toScreen, toTile, turn, type TileRange } from './iso';
+import { ARROW_DIRS, arrowStep, facingView, fallbackView, FOOT_DY, footprintColumns, FRONT_DY, gridStep, groundSize, mapBounds, mirrors, sheetView, standDepth, tileRange, toScreen, toTile, turn, type TileRange } from './iso';
 import { IsoChunkBaker, isoChunkOrigin, ISO_CHUNK_H, ISO_CHUNK_W, isoWall, OCCLUDER_ALPHA, type IsoGroundSrc } from './isoGround';
 import { isoPropKey, propAnchor } from './isoTownArt';
 import { isoHouseFade, isoHouseParts, isoTownProp, type IsoFade, type IsoHousePart } from './isoHouses';
 import { figureMode, ninjaNpcDef } from './figureMap';
-import { detectHouses, houseDoor, houseDecor, houseFacade, houseFence, houseGlow, houseRoof, houseSign, houseWallTile, lowerKind, WINDOW_LIGHT, type House, type RoofNotch } from './houses';
+import { detectHouses, houseDecor, WINDOW_LIGHT, type House } from './houses';
 import { buildZoneMap, Z } from './groundLook';
-import { ART, ART_SCALE, Raster, bytes, toCanvas } from './world/raster';
-import { matOf, paintGround, warmGround } from './world/ground';
-import { stampDetail, stampWaterDetail } from './world/details';
-import { glow, wallTile, type WallStyle } from './world/props';
+import { ART_SCALE, Raster, bytes, toCanvas } from './world/raster';
+import { matOf, warmGround } from './world/ground';
+import { glow, type WallStyle } from './world/props';
 import { DOOR_ICONS, TOWN_GID, WATER_PROP_GIDS, WORLD_TOWN_KEYS, registerTownArt } from './town';
 import { Ui, describeItem, isUpgrade } from './ui';
 import { generateItem, type Item } from '../sim/items';
@@ -105,10 +104,6 @@ const ZOOM_MAX_I = ZOOM_STEPS.length - 1;
 const LIGHT_GAIN = 0.55;
 const ZOOM_KEY = 'aschenthron.zoom';
 const CHUNK = 16;
-/** Bodenstreifen je Chunk (Etappen beim Bauen, siehe stepChunk) */
-const CHUNK_STRIPS = 8;
-/** Pfeiltasten → Kachelrichtung, folgt dem Bildschirm (iso.ts `arrowDirs`) */
-const ARROW_DIRS = arrowDirs(ISO);
 
 /** Tippt der Spieler gerade in ein Eingabefeld (z. B. Spielstand-Code)? Dann bleiben die Pfeiltasten beim Feld. */
 function typingInField(e: KeyboardEvent): boolean {
@@ -150,7 +145,7 @@ interface ActorView {
   up?: boolean;
   /** läuft im Bild überwiegend seitlich: Seitenansicht */
   side?: boolean;
-  /** Iso: Ansicht der 5 (iso.ts `turn`); die Draufsicht nutzt nur side/up */
+  /** Ansicht der 5 (iso.ts `turn`); Figuren mit nur 3 Ansichten lesen side/up */
   iv?: FigView;
   /** zurückgelegte Strecke in Bildschirm-Pixeln (Laufbild des Skelett-Helden) */
   dist?: number;
@@ -167,7 +162,6 @@ export class GameScene extends Phaser.Scene {
   /** Erkannte Häuser der Stadt (Wandringe, gid 18) samt Dach-Bildern und Zuordnung Kachel -> Haus */
   private houses: House[] = [];
   private houseAt = new Map<number, House>();
-  private houseSigns = new Map<number, Phaser.GameObjects.Image>();
   /** Hausbilder im Atlas: Schlüssel -> [Textur, Bildname] (siehe initHouses) */
   private houseFrames = new Map<string, [string, string]>();
   private houseAtlasCount = 0;
@@ -258,7 +252,7 @@ export class GameScene extends Phaser.Scene {
   private chunkTexPool: string[] = [];
   private chunkTexCount = 0;
   private chunkRaster: Raster | null = null;
-  /** Iso: Chunk im Bau (isoGround.ts), Kachelfragen für den Boden, Kachelbereich im Bild (Culling), abgeblendete Verdecker */
+  /** Chunk im Bau (isoGround.ts), Kachelfragen für den Boden, Kachelbereich im Bild (Culling), abgeblendete Verdecker */
   private isoJob: { cx: number; cy: number; b: IsoChunkBaker; done: boolean } | null = null;
   private isoGround: IsoGroundSrc | null = null;
   private vt: TileRange = { x0: 0, y0: 0, x1: -1, y1: -1 };
@@ -369,11 +363,9 @@ export class GameScene extends Phaser.Scene {
       this.fpsText = this.add.text(0, 0, '', { fontSize: '14px', color: '#9fff9f', backgroundColor: '#000a' }).setScrollFactor(0).setDepth(OVERLAY_DEPTH + 5);
     }
     this.cameras.main.setBackgroundColor('#0b0a0d');
-    // Iso: Kamera bleibt in der Box um die 4 projizierten Kartenecken (außerhalb der Raute schwarz)
-    if (ISO) {
-      const b = mapBounds(true, this.world.grid.w, this.world.grid.h);
-      this.cameras.main.setBounds(b.x, b.y, b.width, b.height);
-    }
+    // Kamera bleibt in der Box um die 4 projizierten Kartenecken (außerhalb der Raute schwarz)
+    const mb = mapBounds(this.world.grid.w, this.world.grid.h);
+    this.cameras.main.setBounds(mb.x, mb.y, mb.width, mb.height);
     this.input.on('pointerdown', (ptr: Phaser.Input.Pointer) => this.onClick(ptr));
     // Kamera-Zoom per Mausrad (weiter heraus = mehr Welt sichtbar), Wert bleibt im Browser gespeichert
     this.setZoom(Number(safeStorage()?.getItem(ZOOM_KEY)) || ZOOM_DEFAULT);
@@ -451,7 +443,7 @@ export class GameScene extends Phaser.Scene {
     this.lastArrowMove = time;
     const p = this.player();
     if (!p.alive) return;
-    const [dx, dy] = arrowStep(ISO, this.arrows);
+    const [dx, dy] = arrowStep(this.arrows);
     if (!dx && !dy) return;
     const ox = Math.round(p.x);
     const oy = Math.round(p.y);
@@ -792,15 +784,8 @@ export class GameScene extends Phaser.Scene {
     if (isWalkable(w.grid, x, y)) this.send({ type: 'moveTo', x, y });
   }
 
-  /**
-   * Beute unter dem Mauszeiger: Draufsicht wie bisher im Raster (0,8 Kacheln), Iso im Bildraum um das Beutebild (es liegt 8 px
-   * über der Rautenmitte, eine Rasterkachel ist dort nur 16 px hoch).
-   */
+  /** Beute unter dem Mauszeiger: im Bildraum um das Beutebild (es liegt 8 px über der Rautenmitte, eine Rasterkachel ist dort nur 16 px hoch). */
   private lootAt(wx: number, wy: number): (typeof this.world.ground)[number] | undefined {
-    if (!ISO) {
-      const t = toTile(wx, wy);
-      return this.world.ground.find((g) => Math.hypot(g.x - t.x, g.y - t.y) < 0.8);
-    }
     return this.world.ground.find((g) => {
       const s = toScreen(g.x, g.y);
       return Math.hypot(s.sx - wx, s.sy + FOOT_DY - 14 - wy) < 22;
@@ -938,18 +923,17 @@ export class GameScene extends Phaser.Scene {
     return { x: sx, y: sy + FOOT_DY - this.bodyLift(a), foot: sy + FOOT_DY - 8 };
   }
 
-  /** Bodenhöhe für Ringe und Säulen unter einer Körperposition: Draufsicht wie bisher `y + off` (Körpermitte + Versatz), Iso am Fuß (off 18 = Fuß − 8) */
-  private gy(p: { y: number; foot: number }, off: number): number {
-    return ISO ? p.foot + (off - 18) : p.y + off;
+  /** Bodenhöhe für Ringe und Säulen unter einer Körperposition: am Fuß (off 18 = Fuß − 8) */
+  private gy(p: { foot: number }, off: number): number {
+    return p.foot + (off - 18);
   }
 
   /**
-   * Höhe der Körpermitte über dem Fußpunkt. Draufsicht wie bisher fest (Boss 42, sonst 26). Iso: die Hälfte der Figurhöhe aus dem Sheet
+   * Höhe der Körpermitte über dem Fußpunkt. fest (Boss 42, sonst 26) als Rückfall. Sonst die Hälfte der Figurhöhe aus dem Sheet
    * (`figTop`), damit Aufladen und Einschlag bei Ratten unten und bei Bossen oben sitzen. Figuren ohne Sheet-Maß (DCSS) behalten die festen Werte.
    */
   private bodyLift(a: Actor): number {
     const fixed = a.boss ? 42 : 26;
-    if (!ISO) return fixed;
     const img = this.actorViews.get(a.id)?.img;
     const top = img ? this.figSize(img)?.top : undefined;
     return top ? Math.max(8, Math.min(70, top * 0.55)) : fixed;
@@ -1113,13 +1097,7 @@ export class GameScene extends Phaser.Scene {
             if (v) {
               v.swingStart = this.now;
               v.swingUntil = this.now + SWING_MS * this.ts;
-              if (ISO) turn(v, sxv, syv);
-              else {
-                v.flip = sxv < 0;
-                v.up = syv < 0;
-                // Skelett-Held: Ansicht nach Schlagrichtung (sonst bliebe nach seitlichem Laufen die Seitenansicht beim Hieb nach oben)
-                if (this.figSize(v.img)?.dir) v.side = Math.abs(sxv) > Math.abs(syv) * 0.8;
-              }
+              turn(v, sxv, syv);
             }
             delay = SWING_MS * 0.4 * this.ts;
             // Zauber laden sichtbar auf: Glühen an Hand/Stab, dann erst fliegt das Geschoss
@@ -1526,19 +1504,19 @@ export class GameScene extends Phaser.Scene {
     if (this.frame % 3 === 0) this.updateHover();
     const px = Math.round(p.x);
     const py = Math.round(p.y);
-    if (ISO) this.vt = tileRange(this.viewRect(px, py), 2);
+    this.vt = tileRange(this.viewRect(px, py), 2);
     this.updateChunks(px, py);
-    this.updateProps(px, py);
+    this.updateProps();
     this.updateRoofs(px, py);
     this.updateNpcs(time);
     this.updateTownLife(time, p);
     this.updateWildlife(time, p);
-    this.updateChests(time, px, py);
+    this.updateChests(time);
     this.updateLoot(time, g);
     this.updateActors(time, p, g);
-    if (ISO) this.updateOcclusion(p);
+    this.updateOcclusion(p);
     for (const r of this.world.safe) this.outline(g, r.x, r.y, r.w, r.h);
-    this.shimmer(time, px, py);
+    this.shimmer(time);
     const dtFrame = Math.min(time - this.lastTime, 100);
     this.atmo.update(dtFrame);
     this.ambientKind = this.atmo.ambientKind();
@@ -1598,14 +1576,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Glitzern auf Wasser und pulsierende Lava (nur Darstellung, unter Props und Akteuren). */
-  private shimmer(time: number, px: number, py: number): void {
+  private shimmer(time: number): void {
     if (time - this.lastShimmer < 120) return;
     this.lastShimmer = time;
     const g = this.gfxShimmer;
     g.clear();
     const { w } = this.world.grid;
     const view = this.cameras.main.worldView;
-    const lt = this.loopTiles(px, py);
+    const lt = this.loopTiles();
     for (let y = lt.y0; y < lt.y1; y++) {
       for (let x = lt.x0; x < lt.x1; x++) {
         const gid = this.tiles[y * w + x];
@@ -1743,71 +1721,6 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /**
-   * Boden-Chunks im Sichtbereich bauen: nächstgelegener fehlender Chunk zuerst, in Etappen (Bodenstreifen, Details und
-   * Wände, Upload), pro Bild nur so viele Etappen, wie in ~6 ms passen. Beim Start erst der Bildausschnitt, in Etappen zu
-   * ~15 ms hinter dem Vorhang (früher alles in einem Frame, 450-900 ms); er hebt sich, sobald der Ausschnitt steht.
-   */
-  private updateChunks(px: number, py: number): void {
-    if (ISO) return this.updateIsoChunks(px, py);
-    const { w, h } = this.world.grid;
-    const cx0 = Math.max(0, Math.floor((px - VIEW) / CHUNK));
-    const cx1 = Math.min(Math.floor((w - 1) / CHUNK), Math.floor((px + VIEW) / CHUNK));
-    const cy0 = Math.max(0, Math.floor((py - VIEW) / CHUNK));
-    const cy1 = Math.min(Math.floor((h - 1) / CHUNK), Math.floor((py + VIEW) / CHUNK));
-    // Bildausschnitt in Kacheln (Draufsicht: eine Kachel = toScreen(1, 1) Bildpunkte), eine Kachel Rand
-    const zoom = this.cameras.main.zoom;
-    const tile = toScreen(1, 1);
-    const hw = this.scale.width / zoom / 2 / tile.sx + 1;
-    const hh = this.scale.height / zoom / 2 / tile.sy + 1;
-    const onScreen = (cx: number, cy: number): boolean =>
-      (cx + 1) * CHUNK > px - hw && cx * CHUNK < px + hw && (cy + 1) * CHUNK > py - hh && cy * CHUNK < py + hh;
-    const t0 = performance.now();
-    const starting = !!this.curtain;
-    const budget = starting ? 15 : 6;
-    while (performance.now() - t0 < budget) {
-      if (!this.chunkJob) {
-        let best: [number, number] | null = null;
-        let bestD = Infinity;
-        for (let cy = cy0; cy <= cy1; cy++) {
-          for (let cx = cx0; cx <= cx1; cx++) {
-            if (this.chunks.has(`${cx}_${cy}`)) continue;
-            // beim Start der Bildausschnitt vor dem Rand
-            const d = Math.hypot((cx + 0.5) * CHUNK - px, (cy + 0.5) * CHUNK - py) + (starting && !onScreen(cx, cy) ? 1e6 : 0);
-            if (d < bestD) { bestD = d; best = [cx, cy]; }
-          }
-        }
-        if (!best) break;
-        // ein Raster für alle Chunks: nach dem Upload ist es frei (Kacheln außerhalb der Karte bleiben leer)
-        this.chunkRaster ??= new Raster(CHUNK * ART, CHUNK * ART);
-        this.chunkRaster.d.fill(0);
-        this.chunkJob = { cx: best[0], cy: best[1], r: this.chunkRaster, step: 0 };
-      }
-      if (this.stepChunk(this.chunkJob)) this.chunkJob = null;
-    }
-    if (starting) {
-      let ready = true;
-      for (let cy = cy0; cy <= cy1 && ready; cy++) for (let cx = cx0; cx <= cx1; cx++) if (onScreen(cx, cy) && !this.chunks.has(`${cx}_${cy}`)) { ready = false; break; }
-      // spätestens nach 3 s (z. B. ohne Frames im Hintergrund-Tab)
-      if (ready || performance.now() - this.curtainAt > 3000) {
-        const c = this.curtain!;
-        this.curtain = null;
-        c.style.opacity = '0';
-        window.setTimeout(() => c.remove(), 400);
-      }
-    }
-    if (this.frame % 30 === 0) {
-      for (const [key, img] of this.chunks) {
-        const [cx, cy] = key.split('_').map(Number) as [number, number];
-        if (cx < cx0 - 2 || cx > cx1 + 2 || cy < cy0 - 2 || cy > cy1 + 2) {
-          this.chunkTexPool.push(img.texture.key);
-          img.destroy();
-          this.chunks.delete(key);
-        }
-      }
-    }
-  }
-
   /** Bildausschnitt (Weltpixel) um den Helden, wie die Kamera ihn gleich zeigt (worldView hinkt ein Bild hinterher) */
   private viewRect(px: number, py: number): { x: number; y: number; width: number; height: number } {
     const zoom = this.cameras.main.zoom;
@@ -1817,22 +1730,20 @@ export class GameScene extends Phaser.Scene {
     return { x: sx - width / 2, y: sy + FOOT_DY - 22 - height / 2, width, height };
   }
 
-  /** Kacheln für Schleifen (x1/y1 ausschließlich): Draufsicht das Quadrat ±VIEW um den Helden wie bisher, Iso der Bildausschnitt */
-  private loopTiles(px: number, py: number): TileRange {
+  /** Kacheln für Schleifen (x1/y1 ausschließlich): der Bildausschnitt */
+  private loopTiles(): TileRange {
     const { w, h } = this.world.grid;
-    if (!ISO) return { x0: Math.max(0, px - VIEW), y0: Math.max(0, py - VIEW), x1: Math.min(w, px + VIEW), y1: Math.min(h, py + VIEW) };
     const r = this.vt;
     return { x0: Math.max(0, r.x0), y0: Math.max(0, r.y0), x1: Math.min(w, r.x1 + 1), y1: Math.min(h, r.y1 + 1) };
   }
 
-  /** Steht die Kachel im gezeigten Bereich? Draufsicht ±VIEW um (px, py), Iso im Bildausschnitt (plus `pad` Kacheln) */
-  private inView(x: number, y: number, px: number, py: number, pad = 0): boolean {
-    if (!ISO) return Math.abs(x - px) <= VIEW + pad && Math.abs(y - py) <= VIEW + pad;
+  /** Steht die Kachel im Bildausschnitt (plus `pad` Kacheln)? */
+  private inView(x: number, y: number, pad = 0): boolean {
     const r = this.vt;
     return x >= r.x0 - pad && x <= r.x1 + pad && y >= r.y0 - pad && y <= r.y1 + pad;
   }
 
-  /** Kachelfragen für den Iso-Boden (isoGround.ts): dieselben wie Bodenstreifen und `chunkDecor` der Draufsicht, ohne Wände */
+  /** Kachelfragen für den Boden (isoGround.ts), ohne Wände */
   private isoSrc(): IsoGroundSrc {
     if (this.isoGround) return this.isoGround;
     const { w, h } = this.world.grid;
@@ -1858,10 +1769,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Iso-Boden: Chunks (16x16 Kacheln als Raute, isoGround.ts) im Bildausschnitt, nächster zuerst, in Etappen wie die Draufsicht.
-   * Welche Chunks fehlen, sagt die Rautenhülle gegen den Ausschnitt (`tileRange` liefert nur die grobe Kachelbox der 4 Ecken).
+   * Boden-Chunks (16x16 Kacheln als Raute, isoGround.ts) im Bildausschnitt bauen: nächster fehlender zuerst, in Etappen, pro Bild
+   * nur so viele, wie in ~6 ms passen. Beim Start erst der Bildausschnitt, in Etappen zu ~15 ms hinter dem Vorhang; er hebt sich,
+   * sobald der Ausschnitt steht. Welche Chunks fehlen, sagt die Rautenhülle gegen den Ausschnitt (`tileRange` liefert nur die
+   * grobe Kachelbox der 4 Ecken).
    */
-  private updateIsoChunks(px: number, py: number): void {
+  private updateChunks(px: number, py: number): void {
     const { w, h } = this.world.grid;
     const view = this.viewRect(px, py);
     const r = tileRange(view, 1);
@@ -1985,77 +1898,17 @@ export class GameScene extends Phaser.Scene {
     return m;
   }
 
-  /**
-   * Eine Etappe am Bodenchunk (Kunstraster, 24 px je Kachel, angezeigt mit Maßstab 2): Bodenstreifen zu je zwei
-   * Kachelreihen (CHUNK_STRIPS Stück, je 2–6 ms), dann Details und Wände, dann Upload in eine Pool-Textur. Liefert true, wenn fertig.
-   */
-  private stepChunk(job: { cx: number; cy: number; r: Raster; step: number }): boolean {
-    const { w, h } = this.world.grid;
-    const { cx, cy, r } = job;
-    const x0 = cx * CHUNK;
-    const y0 = cy * CHUNK;
-    const strip = CHUNK / CHUNK_STRIPS;
-    if (job.step < CHUNK_STRIPS) {
-      const ys = y0 + job.step * strip;
-      paintGround(r, x0, ys, CHUNK, strip, { mat: (x, y) => this.matAt(x, y), waterDist: (x, y) => this.landDistance(x, y) }, (x, y) => x >= w || y >= h, job.step * strip * ART);
-    } else if (job.step === CHUNK_STRIPS) {
-      this.chunkDecor(r, x0, y0);
-    } else {
-      // Textur aus dem Pool wiederverwenden (neue GL-Texturen und Leinwände je Chunk kosteten Spitzen bis 900 ms)
-      let key = this.chunkTexPool.pop();
-      if (!key) {
-        key = `chunktex_${this.chunkTexCount++}`;
-        this.textures.createCanvas(key, CHUNK * ART, CHUNK * ART);
-      }
-      const tex = this.textures.get(key) as Phaser.Textures.CanvasTexture;
-      tex.context.putImageData(new ImageData(bytes(r) as Uint8ClampedArray<ArrayBuffer>, r.w, r.h), 0, 0);
-      tex.refresh();
-      const o = toScreen(x0 - 0.5, y0 - 0.5);
-      this.chunks.set(`${cx}_${cy}`, this.add.image(o.sx, o.sy, key).setOrigin(0, 0).setScale(ART_SCALE).setDepth(-1e6));
-      return true;
-    }
-    job.step++;
-    return false;
-  }
-
-  /** Bodendetails, Wände und Klippen (Oberseite + Front zur offenen Südseite, Schatten auf den Boden darunter) in den Chunk */
-  private chunkDecor(r: Raster, x0: number, y0: number): void {
-    const { w, h } = this.world.grid;
-    const zones = this.zones();
-    const isWall = (x: number, y: number): boolean => x < 0 || y < 0 || x >= w || y >= h || this.tiles[y * w + x] === 2;
-    for (let y = y0; y < Math.min(y0 + CHUNK, h); y++) {
-      for (let x = x0; x < Math.min(x0 + CHUNK, w); x++) {
-        const gid = this.tiles[y * w + x] ?? 0;
-        if (!gid) continue;
-        const ox = (x - x0) * ART;
-        const oy = (y - y0) * ART;
-        if (gid === 2) {
-          const open = (isWall(x, y - 1) ? 0 : 1) | (isWall(x + 1, y) ? 0 : 2) | (isWall(x, y + 1) ? 0 : 4) | (isWall(x - 1, y) ? 0 : 8);
-          const style = this.scanFor(x, y, 2, 5) ? 'dungeon' : this.scanFor(x, y, 2, 1) ? 'brick' : 'cliff';
-          r.blit(wallTile(style, open, x, y), ox, oy);
-          continue;
-        }
-        const zone = zones[y * w + x] ?? 0;
-        const ground = this.groundGid(x, y);
-        if (ground === 6) stampWaterDetail(r, x, y, zone, this.landDistance(x, y), ox, oy);
-        else if (ground !== 12 && !PROP_GIDS.has(gid) && !this.houseAt.has(y * w + x) && !this.nearDoor(x, y)) stampDetail(r, x, y, ground, zone, ox, oy);
-        // Schatten der Wandfront auf die Kachel darunter (auch über die Chunkgrenze)
-        if (y > 0 && this.tiles[(y - 1) * w + x] === 2) for (let k = 0; k < 3; k++) for (let u = 0; u < ART; u++) r.blend(ox + u, oy + k, 0x040306, 0.45 - k * 0.13);
-      }
-    }
-  }
-
-  private updateProps(px: number, py: number): void {
+  private updateProps(): void {
     const { w } = this.world.grid;
     const view = this.cameras.main.worldView;
-    const lt = this.loopTiles(px, py);
+    const lt = this.loopTiles();
     for (let y = lt.y0; y < lt.y1; y++) {
       for (let x = lt.x0; x < lt.x1; x++) {
         const gid = this.tiles[y * w + x] ?? 0;
-        // Wände (gid 2) malt in der Draufsicht der Boden-Chunk selbst, in Iso sind es Wandblöcke; Hausringe zeichnet in Iso isoHouses
-        if (!PROP_GIDS.has(gid) || (gid === 2 && !ISO)) continue;
+        // Wände (gid 2) sind Wandblöcke; Hausringe zeichnet isoHouses
+        if (!PROP_GIDS.has(gid)) continue;
         const idx = y * w + x;
-        if (this.props.has(idx) || (ISO && this.houseAt.has(idx))) continue;
+        if (this.props.has(idx) || this.houseAt.has(idx)) continue;
         const { sx, sy } = toScreen(x, y);
         if (sx < view.left - 160 || sx > view.right + 160 || sy < view.top - 160 || sy > view.bottom + 160) continue;
         this.props.set(idx, this.makeProp(x, y, gid, sx, sy));
@@ -2065,7 +1918,7 @@ export class GameScene extends Phaser.Scene {
       for (const [idx, img] of this.props) {
         const x = idx % w;
         const y = Math.floor(idx / w);
-        if (!this.inView(x, y, px, py, 4)) {
+        if (!this.inView(x, y, 4)) {
           this.occluders.delete(img);
           img.destroy();
           this.props.delete(idx);
@@ -2085,7 +1938,7 @@ export class GameScene extends Phaser.Scene {
     this.houseFrames.clear();
     this.roofs = [];
     this.nightLights = [];
-    if (!houseRoof(8, 6, 0)) return;
+    if (typeof document === 'undefined') return;
     const { w, h } = this.world.grid;
     this.houses = detectHouses(this.tiles, w, h);
     for (const hs of this.houses) {
@@ -2099,49 +1952,12 @@ export class GameScene extends Phaser.Scene {
     const want = (a: HouseArt | undefined): void => {
       if (a && !art.has(a.key)) art.set(a.key, a.make());
     };
-    // je Haus Dach, Fassade, Licht, Zaun (zu große bleiben außerhalb des Atlas und werden eigene Texturen)
-    const shell = (hs: House): Record<'roof' | 'fac' | 'glow' | 'fence', HouseArt> => {
-      const seed = hs.x0 * 31 + hs.y0 * 17;
-      return {
-        roof: { key: `nh_roof_${hs.x0}_${hs.y0}`, make: () => houseRoof(hs.w, hs.h - 1, hs.variant, seed, this.roofNotch(hs))! },
-        fac: { key: `nh_fac_${hs.x0}_${hs.y0}`, make: () => houseFacade(hs.w, hs.variant, seed)! },
-        glow: { key: `nh_glow_${hs.x0}_${hs.y0}`, make: () => houseGlow(hs)! },
-        fence: { key: `nh_fence_${hs.variant % 2}`, make: () => houseFence(hs.variant)! },
-      };
-    };
-    // Iso: Hausteile aus isoHouses.ts (Wände und Türen des Rings gehören dazu, Props gibt es dafür nicht)
-    const isoParts = new Map(ISO ? this.houses.map((hs) => [hs, isoHouseParts(hs)] as const) : []);
-    if (ISO) for (const parts of isoParts.values()) for (const pt of parts) want({ key: pt.key, make: () => toCanvas(pt.make()) });
-    else for (const hs of this.houses) for (const a of Object.values(shell(hs))) want(a);
-    // Wand- und Türkacheln genau so, wie houseProp sie später anfragt
-    if (!ISO) for (const [idx, hs] of this.houseAt) {
-      const x = idx % w;
-      const y = Math.floor(idx / w);
-      const gid = this.tiles[idx] ?? 0;
-      if (!PROP_GIDS.has(gid) || gid === 2) continue;
-      const t = this.houseTileArt(x, y, gid, hs);
-      want(t);
-      want(t.sign);
-    }
+    // Hausteile aus isoHouses.ts (Wände und Türen des Rings gehören dazu, Props gibt es dafür nicht)
+    const isoParts = new Map(this.houses.map((hs) => [hs, isoHouseParts(hs)] as const));
+    for (const parts of isoParts.values()) for (const pt of parts) want({ key: pt.key, make: () => toCanvas(pt.make()) });
     this.packHouseArt(art);
     for (const hs of this.houses) {
-      const sh = shell(hs);
-      if (ISO) this.placeIsoHouse(hs, isoParts.get(hs)!);
-      else {
-        // Draufsicht: Bildecke = linke obere Ecke der Kachel (Kachelmitte minus halbe Kachel)
-        const half = FRONT_DY;
-        const { sx, sy } = toScreen(hs.x0, hs.y0 - 1);
-        const roof = this.add.image(sx - half, sy - half, ...this.houseTex(sh.roof.key, sh.roof.make)).setOrigin(0, 0).setDepth(this.roofDepth(hs));
-        this.roofs.push({ img: roof, house: hs });
-        const f = toScreen(hs.x0, hs.y0 + hs.h - 2);
-        const fac = this.add.image(f.sx - half, f.sy - half, ...this.houseTex(sh.fac.key, sh.fac.make)).setOrigin(0, 0).setDepth(this.roofDepth(hs) + 1);
-        this.roofs.push({ img: fac, house: hs });
-        // Fensterlicht (nachts, additiv über Ober- und Erdgeschoss der Vorderwand)
-        const gimg = this.add.image(f.sx - half, f.sy - half, ...this.houseTex(sh.glow.key, sh.glow.make)).setOrigin(0, 0).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0)
-          .setDepth(LIGHT_DEPTH);
-        // blendet mit der Fassade aus, wenn der Spieler im Haus steht
-        this.nightLights.push({ img: gimg, k: 1, follow: fac });
-      }
+      this.placeIsoHouse(hs, isoParts.get(hs)!);
       // Kleine Außendeko (reine Optik: keine Kollision, kein Sim-Einfluss)
       const free = (x: number, y: number): boolean => {
         const g = this.tiles[y * w + x] ?? 0;
@@ -2149,11 +1965,9 @@ export class GameScene extends Phaser.Scene {
       };
       for (const dc of houseDecor(hs, free)) {
         const p = toScreen(dc.x, dc.y);
-        if (dc.kind === 'fence' && ISO) {
-          // Iso (P9.3-Wunsch): Zaun entlang der Südwand als Iso-Bild (Zug entlang x), Anker auf der Kachelmitte
+        if (dc.kind === 'fence') {
+          // Zaun entlang der Südwand als Iso-Bild (Zug entlang x), Anker auf der Kachelmitte
           this.add.image(p.sx, p.sy, isoPropKey('fence', 'x')).setOrigin(0.5, propAnchor('fence').oy).setDepth(standDepth(p.sy));
-        } else if (dc.kind === 'fence') {
-          this.add.image(p.sx, p.sy + 6, ...this.houseTex(sh.fence.key, sh.fence.make)).setOrigin(0.5, 1).setDepth(ISO ? standDepth(p.sy) : p.sy + 6);
         } else if (this.textures.exists(dc.kind === 'barrel' ? 'twn_barrel' : 'twn_crates')) {
           this.add.image(p.sx, p.sy + FRONT_DY - 2, dc.kind === 'barrel' ? 'twn_barrel' : 'twn_crates').setOrigin(0.5, 1).setDepth(standDepth(p.sy));
         }
@@ -2189,7 +2003,7 @@ export class GameScene extends Phaser.Scene {
         if (x1 <= x0) return;
         // gleiche Spalte: später gelistete Teile (Dach) vor früheren (Wände)
         const img = this.add.image(pt.sx, pt.sy, tex, frame).setOrigin(0, 0).setCrop(x0, 0, x1 - x0, fr.height).setDepth((pt.layer === 'front' ? c.depth : c.back) + k * 0.01);
-        // Licht (Fenster nachts): additiv über allem, Deckkraft = Nacht, blendet mit den Vorderwänden aus (wie die Fassade der Draufsicht)
+        // Licht (Fenster nachts): additiv über allem, Deckkraft = Nacht, blendet mit den Vorderwänden aus
         if (pt.light) lights.push(img.setBlendMode(Phaser.BlendModes.ADD).setDepth(LIGHT_DEPTH).setAlpha(0));
         else if (pt.fade !== 'none') this.roofs.push({ img, house: hs, fade: pt.fade });
         if (pt.fade === 'walls' && !pt.light) walls ??= img;
@@ -2199,7 +2013,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Iso: stehende Bilder vor dem Helden (größeres x + y, höhere Tiefe), die seinen Körper überdecken (Wandblöcke, Bäume, Stadtprops),
+   * Stehende Bilder vor dem Helden (größeres x + y, höhere Tiefe), die seinen Körper überdecken (Wandblöcke, Bäume, Stadtprops),
    * werden halb durchsichtig; Häuser blenden über `isoHouseFade` aus. Geprüft wird nur ein kleines Fenster vor ihm.
    */
   private updateOcclusion(p: Actor): void {
@@ -2224,25 +2038,12 @@ export class GameScene extends Phaser.Scene {
     this.occluders = fade;
   }
 
-  /** Kerbe im Dach an der Türseite (N, O, W); Süd-Türen sitzen in der Vorderwand und brauchen keine. Zeilen zählen ab Dachkopf (Kachelzeile y0 - 1). */
-  private roofNotch(hs: House): RoofNotch | null {
-    const d = hs.door;
-    if (!d || d.side === 'S') return null;
-    if (d.side === 'N') return { col: d.x - hs.x0, row: 0, rows: 2 };
-    return { col: d.side === 'W' ? 0 : hs.w - 1, row: d.y - hs.y0, rows: 2 };
-  }
-
-  /** Tiefe des Daches (nur Draufsicht): über allen Figuren im Haus (Grundlinie der oberen Vorderwand), Figuren in der Türreihe stehen davor */
-  private roofDepth(hs: House): number {
-    return toScreen(0, hs.y0 + hs.h - 1).sy - 25;
-  }
-
   /** Dach blendet auf 20 % aus, solange der Spieler im Haus (oder unter dem Dachüberstand im Norden) steht, auf 50 % vor der Tür. */
   private updateRoofs(px: number, py: number): void {
     // Fenster und Laternen leuchten nach Tageszeit (Nacht-Faktor nur alle paar Bilder neu), Fenster folgen dem Ausblenden der Fassade
     if (this.frame % 10 === 0) this.night = this.atmo.night();
     for (const l of this.nightLights) l.img.setAlpha(this.night * l.k * LIGHT_GAIN * (l.follow?.alpha ?? 1));
-    // Iso: Ausblenden nach der gezeigten Heldposition (isoHouses.ts), einmal je Haus und Bild
+    // Ausblenden nach der gezeigten Heldposition (isoHouses.ts), einmal je Haus und Bild
     const hp = this.camPos ?? { x: px, y: py };
     const isoFade = new Map<House, Record<IsoFade, number>>();
     for (const { img, house: hs, fade } of this.roofs) {
@@ -2256,29 +2057,6 @@ export class GameScene extends Phaser.Scene {
       if (Math.abs(img.alpha - target) > 0.01) img.setAlpha(img.alpha + (target - img.alpha) * 0.2);
       else img.setAlpha(target);
     }
-  }
-
-  /** Bild einer Haus-Kachel (Wandring oder Tür): Südreihe als Vorderwand mit Fenstern, übrige Wand schlicht, Nordtür mit Schild */
-  private houseTileArt(x: number, y: number, gid: number, hs: House): HouseArt & { sign?: HouseArt } {
-    const seed = hs.x0 * 31 + hs.y0 * 17;
-    if (gid >= TOWN_GID.doorFirst && hs.door) {
-      const { icon, side } = hs.door;
-      const tall = side !== 'N';
-      const door = { key: `nh_door_${icon}_${hs.variant}_${tall ? 't' : 's'}`, make: () => houseDoor(icon, hs.variant, tall, seed)! };
-      return tall ? door : { ...door, sign: { key: `nh_sign_${icon}`, make: () => houseSign(icon)! } };
-    }
-    const kind = y === hs.y0 + hs.h - 1 ? lowerKind(x - hs.x0, hs.w) : 'brace';
-    return { key: `nh_lo_${kind}_${hs.variant}_${seed}`, make: () => houseWallTile('lower', kind, hs.variant, seed + x)! };
-  }
-
-  /** Haus-Kachel als Prop; die Nordtür hängt ihr Schild in den Vorhof (Reihe davor), hinter die Figur, die davor steht */
-  private houseProp(x: number, y: number, gid: number, hs: House, sx: number, sy: number): Phaser.GameObjects.Image {
-    const t = this.houseTileArt(x, y, gid, hs);
-    if (t.sign) {
-      const idx = y * this.world.grid.w + x;
-      if (!this.houseSigns.has(idx)) this.houseSigns.set(idx, this.add.image(sx, sy - FRONT_DY, ...this.houseTex(t.sign.key, t.sign.make)).setOrigin(0.5, 1).setDepth(sy - 2 * FRONT_DY + 6));
-    }
-    return this.add.image(sx, sy + FRONT_DY, ...this.houseTex(t.key, t.make)).setOrigin(0.5, 1).setDepth(standDepth(sy));
   }
 
   /** Textur und Bildname eines Hausbildes: aus dem Atlas, sonst (nicht vorab erkannt) als eigene Textur */
@@ -2337,8 +2115,6 @@ export class GameScene extends Phaser.Scene {
 
   private makeProp(x: number, y: number, gid: number, sx: number, sy: number): Phaser.GameObjects.Image {
     if (gid === 2) return this.isoWallProp(x, y, sx, sy);
-    const hs = this.houseAt.get(y * this.world.grid.w + x);
-    if (hs) return this.houseProp(x, y, gid, hs, sx, sy);
     const v = hash(x, y);
     let key: string;
     if (gid === 10) key = `tree_${this.treeStyle(x, y, v)}_${v % 3}`;
@@ -2347,13 +2123,11 @@ export class GameScene extends Phaser.Scene {
     else if (gid >= TOWN_GID.wall && gid <= TOWN_GID.doorLast) {
       let t = this.townProp(x, y, gid, v);
       let depth = standDepth(sy);
-      if (ISO) {
-        // Iso-Bild aus isoHouses.ts (P9.3): Zugrichtung aus gleichen Nachbarn, flaches Dekor liegt unter allen Figuren
-        const same = (gx: number, gy: number): boolean => this.gidAt(gx, gy) === gid;
-        const ip = isoTownProp(t.key, same(x - 1, y) || same(x + 1, y) ? 'x' : 'y', x, y);
-        t = { key: ip.key, oy: ip.oy ?? t.oy, dy: ip.dy ?? t.dy };
-        if (ip.flat) depth = -8e5;
-      }
+      // Bild aus isoHouses.ts: Zugrichtung aus gleichen Nachbarn, flaches Dekor liegt unter allen Figuren
+      const same = (gx: number, gy: number): boolean => this.gidAt(gx, gy) === gid;
+      const ip = isoTownProp(t.key, same(x - 1, y) || same(x + 1, y) ? 'x' : 'y', x, y);
+      t = { key: ip.key, oy: ip.oy ?? t.oy, dy: ip.dy ?? t.dy };
+      if (ip.flat) depth = -8e5;
       if (!WORLD_TOWN_KEYS.has(t.key)) return this.add.image(sx, sy + t.dy, t.key).setOrigin(0.5, t.oy).setDepth(depth);
       key = t.key;
     } else key = 'pillar';
@@ -2362,7 +2136,7 @@ export class GameScene extends Phaser.Scene {
     return this.add.image(sx, sy + FRONT_DY - lift, key).setOrigin(0.5, 1).setDepth(standDepth(sy));
   }
 
-  /** Iso-Wandblock (isoGround.ts) als Prop: Anker = untere Rautenecke, Stil und offene Seiten wie die Wandkachel der Draufsicht */
+  /** Wandblock (isoGround.ts) als Prop: Anker = untere Rautenecke */
   private isoWallProp(x: number, y: number, sx: number, sy: number): Phaser.GameObjects.Image {
     const { w, h } = this.world.grid;
     const isWall = (gx: number, gy: number): boolean => gx < 0 || gy < 0 || gx >= w || gy >= h || this.tiles[gy * w + gx] === 2;
@@ -2466,7 +2240,7 @@ export class GameScene extends Phaser.Scene {
       const nSkel = nGot === 'wait' ? null : nGot;
       const chestLike = n.kind === 'stash' && !nj && !nHasSkel;
       this.gfxGround.fillStyle(0x000000, 0.2);
-      const nsh = groundSize(chestLike ? 34 : 26, chestLike ? 13 : 10);
+      const nsh = groundSize(chestLike ? 34 : 26);
       this.gfxGround.fillEllipse(sx, fy + 1, nsh.w, nsh.h);
       let dir = this.npcDir.get(n.id);
       if (!dir) {
@@ -2520,12 +2294,12 @@ export class GameScene extends Phaser.Scene {
     this.cleanLabels(seen, ['n', 'm']);
   }
 
-  private updateChests(time: number, px: number, py: number): void {
+  private updateChests(time: number): void {
     const seen = new Set<string>();
     const me = this.player();
     for (const c of this.world.chests) {
       let img = this.chestViews.get(c.id);
-      if (!this.inView(c.x, c.y, px, py)) {
+      if (!this.inView(c.x, c.y)) {
         img?.setVisible(false);
         continue;
       }
@@ -2538,7 +2312,7 @@ export class GameScene extends Phaser.Scene {
       }
       img.setTexture(key).setVisible(true).setPosition(sx, fy).setDepth(fy);
       this.gfxGround.fillStyle(0x000000, 0.22);
-      const csh = groundSize(36, 13);
+      const csh = groundSize(36);
       this.gfxGround.fillEllipse(sx, fy + 1, csh.w, csh.h);
       if (!c.opened) {
         const col = { wood: 0xc89860, iron: 0x9fb4d8, gold: 0xffd84a }[c.tier];
@@ -2551,7 +2325,7 @@ export class GameScene extends Phaser.Scene {
     if (this.frame % 40 === 0) {
       for (const f of this.world.finds) {
         const st = me.quests[f.quest];
-        if (st?.state !== 'active' || st.found?.includes(f.id) || !this.inView(f.x, f.y, px, py)) continue;
+        if (st?.state !== 'active' || st.found?.includes(f.id) || !this.inView(f.x, f.y)) continue;
         const { sx, sy } = toScreen(f.x, f.y);
         this.fx.sparkle(sx, sy, 0xffe9a0, 1200);
       }
@@ -2616,7 +2390,7 @@ export class GameScene extends Phaser.Scene {
       const arc = -Math.sin(k * Math.PI) * 30;
       const slide = (1 - k) * born.dx;
       this.gfxGround.fillStyle(0x000000, 0.28);
-      const lsh = groundSize(18 - Math.abs(arc) * 0.2, 6);
+      const lsh = groundSize(18 - Math.abs(arc) * 0.2);
       this.gfxGround.fillEllipse(sx + slide, sy + 6, lsh.w, lsh.h);
       img.setPosition(sx + slide, sy + 2 + arc).setDepth(sy + 4);
       const r = gi.item.rarity;
@@ -2650,7 +2424,7 @@ export class GameScene extends Phaser.Scene {
       }
       if (hov) {
         g.lineStyle(2, col, 0.9);
-        const lr = groundSize(30, 14);
+        const lr = groundSize(30);
         g.strokeEllipse(sx, sy + 4, lr.w, lr.h);
       }
     }
@@ -2706,10 +2480,10 @@ export class GameScene extends Phaser.Scene {
    */
   private prefetchNear(p: Actor): void {
     const R = VIEW + 14;
-    // Iso: der Bildausschnitt ist bei Zoom 0,5 breiter als ±VIEW (Raute), darum statt des Quadrats der Kachelbereich der Kamera plus Rand
+    // Der Bildausschnitt ist bei Zoom 0,5 breiter als ±VIEW (Raute), darum zusätzlich der Kachelbereich der Kamera plus Rand
     const vt = this.vt;
     const near = (x: number, y: number): boolean =>
-      ISO ? x >= vt.x0 - 14 && x <= vt.x1 + 14 && y >= vt.y0 - 14 && y <= vt.y1 + 14 || (Math.abs(x - p.x) <= R && Math.abs(y - p.y) <= R) : Math.abs(x - p.x) <= R && Math.abs(y - p.y) <= R;
+      (x >= vt.x0 - 14 && x <= vt.x1 + 14 && y >= vt.y0 - 14 && y <= vt.y1 + 14) || (Math.abs(x - p.x) <= R && Math.abs(y - p.y) <= R);
     // nächste zuerst: die Warteschlange arbeitet in Anfragereihenfolge
     const near2 = this.world.actors.filter((a) => a.kind === 'monster' && a.alive && near(a.x, a.y)).map((a) => ({ id: a.kindId!, d: (a.x - p.x) ** 2 + (a.y - p.y) ** 2 }));
     const ids = new Set(near2.sort((a, b) => a.d - b.d).map((a) => a.id));
@@ -2761,7 +2535,7 @@ export class GameScene extends Phaser.Scene {
     const active = new Set<number>();
     for (const a of this.world.actors) {
       let view = this.actorViews.get(a.id);
-      const near = ISO ? this.inView(a.x, a.y, p.x, p.y) : Math.abs(a.x - p.x) <= VIEW && Math.abs(a.y - p.y) <= VIEW;
+      const near = this.inView(a.x, a.y);
       if (!near || (!a.alive && a.kind !== 'player' && this.world.tick - a.diedAt > TICK_RATE * 4)) {
         view?.img.setVisible(false);
         continue;
@@ -2857,8 +2631,8 @@ export class GameScene extends Phaser.Scene {
       const fig = this.figSize(img);
       if (a.alive) {
         const wide = fig ? Math.max(16, Math.min(56, fig.w * 0.55)) : a.boss ? 46 : a.kind === 'monster' && (monsterKind(a.kindId!).family === 'beast' || monsterKind(a.kindId!).family === 'spider') ? 30 : a.kind === 'monster' && monsterKind(a.kindId!).family === 'golem' ? 34 : 22;
-        const s1 = groundSize(wide * 1.25, wide * 0.5);
-        const s2 = groundSize(wide * 0.85, wide * 0.34);
+        const s1 = groundSize(wide * 1.25);
+        const s2 = groundSize(wide * 0.85);
         this.gfxGround.fillStyle(0x000000, 0.18);
         this.gfxGround.fillEllipse(sx + ox, fy + 1 + oy, s1.w, s1.h);
         this.gfxGround.fillStyle(0x000000, 0.22);
@@ -2927,16 +2701,16 @@ export class GameScene extends Phaser.Scene {
         const col = a.unique ? 0xff9a2a : ({ swift: 0x6fe0ff, armored: 0xa0b0d0, fiery: 0xff7a2a, vampiric: 0xe03a4a, thorned: 0x7fe070 } as Record<string, number>)[a.champ!] ?? 0xffe45a;
         const pulse = 0.5 + 0.5 * Math.sin(time / 260 + a.id);
         g.lineStyle(2, col, 0.5 + 0.4 * pulse);
-        const c1 = groundSize((a.boss ? 60 : 44) + pulse * 6, (a.boss ? 26 : 19) + pulse * 3);
+        const c1 = groundSize((a.boss ? 60 : 44) + pulse * 6);
         g.strokeEllipse(sx, fy, c1.w, c1.h);
         g.fillStyle(col, 0.12 + 0.1 * pulse);
-        const c2 = groundSize(a.boss ? 54 : 40, a.boss ? 24 : 17);
+        const c2 = groundSize(a.boss ? 54 : 40);
         g.fillEllipse(sx, fy, c2.w, c2.h);
         if (this.frame % 30 === a.id % 30) this.fx.sparkle(sx, fy - 28, col, 700);
       }
       if (hovered) {
         g.lineStyle(2, 0xffffff, 0.75);
-        const hr = groundSize(a.boss ? 70 : 40, a.boss ? 30 : 18);
+        const hr = groundSize(a.boss ? 70 : 40);
         g.strokeEllipse(sx, fy - 2, hr.w, hr.h);
       }
       if (a.kind === 'monster') {
@@ -2977,13 +2751,13 @@ export class GameScene extends Phaser.Scene {
         // Spielerring in der Stadt = sicher
         if (this.world.safe.some((r) => a.x >= r.x && a.y >= r.y && a.x < r.x + r.w && a.y < r.y + r.h)) {
           g.lineStyle(1, 0xd8a24a, 0.7);
-          const sr = groundSize(36, 16);
+          const sr = groundSize(36);
           g.strokeEllipse(sx, fy - 2, sr.w, sr.h);
         }
       }
       if (a.id === p.targetId && a.kind === 'monster') {
         g.lineStyle(2, 0xff6a4a, 0.9);
-        const tr = groundSize(a.boss ? 64 : 38, a.boss ? 28 : 17);
+        const tr = groundSize(a.boss ? 64 : 38);
         g.strokeEllipse(sx, fy - 2, tr.w, tr.h);
       }
     }

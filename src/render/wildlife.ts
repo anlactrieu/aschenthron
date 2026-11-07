@@ -14,7 +14,7 @@
 import type Phaser from 'phaser';
 import { isWalkable, type Grid } from '../sim/path';
 import { ROUTE, routeAt, routeLength } from '../sim/route';
-import { facingView, FOOT_DY, FRONT_DY, gridStep, groundSize, ISO, mirrors, sheetView, standDepth, toScreen, turn } from './iso';
+import { facingView, FOOT_DY, FRONT_DY, gridStep, groundSize, mirrors, sheetView, standDepth, toScreen, turn } from './iso';
 import type { FigView } from './figure';
 import { walkFrame } from './figure';
 import { idleFrame } from './hero';
@@ -31,7 +31,7 @@ import { DEER_POSES, bat, deer, frog } from './world/critters';
 
 type Rng = () => number;
 export type FaunaKind = 'deer' | 'crow' | 'frog' | 'bat';
-/** Bildschirm-Richtung nach rechts/links (Vorzeichen) für einen Rasterschritt: Tiere blicken nach dem Bildschirm, nicht nach dem Raster. Draufsicht = dx. */
+/** Bildschirm-Richtung nach rechts/links (Vorzeichen) für einen Rasterschritt: Tiere blicken nach dem Bildschirm, nicht nach dem Raster. */
 const screenDx = (dx: number, dy: number): number => toScreen(dx, dy).sx / 48;
 
 /** Wie viele je Art höchstens gleichzeitig um den Helden sind */
@@ -296,7 +296,7 @@ interface Traveler {
   flip: boolean;
   side: boolean;
   up: boolean;
-  /** Iso: Ansicht der 5 (iso.ts `turn`) */
+  /** Ansicht der 5 (iso.ts `turn`) */
   iv?: FigView;
   movingUntil: number;
 }
@@ -387,7 +387,7 @@ export class Wildlife {
       if (on) {
         // flacher Schatten unter dem Bild
         this.shadow.fillStyle(0x000000, 0.14);
-        const sh = groundSize(lm.kind === 'ruin' ? 70 : 30, 9);
+        const sh = groundSize(lm.kind === 'ruin' ? 70 : 30);
         this.shadow.fillEllipse(sx, sy + FRONT_DY + 1, sh.w, sh.h);
       }
       if (lm.text && d < NOTE_NEAR && (!near || d < near.d)) near = { lm, d };
@@ -447,14 +447,8 @@ export class Wildlife {
       if (Math.abs(mdx) + Math.abs(mdy) > 0.0005 && Math.abs(mdx) + Math.abs(mdy) < 1) {
         t.dist += gridStep(mdx, mdy);
         t.movingUntil = c.time + 160;
-        if (ISO) {
-          const sv = toScreen(p.dx, p.dy);
-          turn(t, sv.sx, sv.sy);
-        } else {
-          t.side = Math.abs(p.dx) > Math.abs(p.dy) * 0.8;
-          if (Math.abs(p.dx) > 0.01) t.flip = p.dx < 0;
-          t.up = p.dy < 0;
-        }
+        const sv = toScreen(p.dx, p.dy);
+        turn(t, sv.sx, sv.sy);
       }
       t.lastX = p.x;
       t.lastY = p.y;
@@ -466,7 +460,7 @@ export class Wildlife {
         const frame = horiz ? `cart_h${Math.floor(c.time / 260) % 2}` : p.dy > 0 ? 'cart_dn' : 'cart_up';
         t.cart.setFrame(frame).setFlipX(horiz && p.dx < 0).setAlpha(p.fade).setVisible(true).setPosition(sx, sy + FOOT_DY + 6).setDepth(sy + FOOT_DY + 6);
         this.shadow.fillStyle(0x000000, 0.18 * p.fade);
-        const cs = groundSize(horiz ? 100 : 48, 12);
+        const cs = groundSize(horiz ? 100 : 48);
         this.shadow.fillEllipse(sx, sy + FOOT_DY + 7, cs.w, cs.h);
         fx = p.x + p.dx * 1.9 + (horiz ? 0 : 0.9);
         fy = p.y + p.dy * 1.9 + (horiz ? 0.55 : 0);
@@ -491,7 +485,7 @@ export class Wildlife {
     const fy = sy + FOOT_DY;
     t.img.setOrigin(o.x, o.y).setScale(FIG_SCALE).setFlipX(mirrors(v3) && t.flip).setAlpha(alpha).setVisible(true).setPosition(sx, fy).setDepth(fy);
     this.shadow.fillStyle(0x000000, 0.2 * alpha);
-    const sh = groundSize(26, 10);
+    const sh = groundSize(26);
     this.shadow.fillEllipse(sx, fy + 1, sh.w, sh.h);
   }
 
@@ -741,7 +735,7 @@ export class Wildlife {
     const fy = sy + FOOT_DY;
     a.img.setFrame(frame).setFlipX(a.flip).setAlpha(a.alpha).setVisible(true).setPosition(sx, fy + 1 - a.alt + lift).setDepth(fy + 1 + (airborne ? 400 : 0));
     this.shadow.fillStyle(0x000000, (airborne ? 0.1 : 0.2) * a.alpha);
-    const sh = groundSize(shw, 6);
+    const sh = groundSize(shw);
     this.shadow.fillEllipse(sx, fy + 2, sh.w, sh.h);
   }
 }

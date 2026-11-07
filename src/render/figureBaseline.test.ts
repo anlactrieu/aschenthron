@@ -8,8 +8,8 @@ import { MONSTER_DEFS, monsterSpec } from './monster';
 import { NPC_FIG_NAMES, npcSpec, RESIDENT_KINDS } from './npc';
 
 /**
- * Die Draufsicht-Sheets (3 Ansichten) dürfen sich durch den Iso-Umbau nicht ändern: Hash aller Pixel je Figur gegen
- * `figureBaseline.json` (vom Stand vor P9.1). Neu erzeugen nur bewusst: `UPDATE_FIGURE_BASELINE=1 npx vitest run src/render/figureBaseline.test.ts`.
+ * Die Figuren-Sheets (5 Ansichten) dürfen sich nicht unbemerkt ändern: Hash aller Pixel je Figur gegen
+ * `figureBaseline.json` (Stand P9.5). Neu erzeugen nur bewusst: `UPDATE_FIGURE_BASELINE=1 npx vitest run src/render/figureBaseline.test.ts`.
  */
 const FILE = join(dirname(fileURLToPath(import.meta.url)), 'figureBaseline.json');
 
@@ -36,8 +36,8 @@ function current(): Record<string, string> {
   return out;
 }
 
-describe('Draufsicht-Sheets bleiben byte-gleich', () => {
-  it('Pixel-Hash aller Helden, Monster und NPCs wie vor dem Iso-Umbau', () => {
+describe('Figuren-Sheets bleiben byte-gleich', () => {
+  it('Pixel-Hash aller Helden, Monster und NPCs wie in der Baseline', () => {
     const now = current();
     if (process.env.UPDATE_FIGURE_BASELINE) writeFileSync(FILE, JSON.stringify(now, null, 1) + '\n');
     expect(now).toEqual(JSON.parse(readFileSync(FILE, 'utf8')));

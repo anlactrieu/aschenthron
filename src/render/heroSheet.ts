@@ -6,8 +6,7 @@
  */
 import type Phaser from 'phaser';
 import type { Look } from './art';
-import { bakeFigure, type FigureSheet } from './figure';
-import { SHEET_VIEWS } from './sheetViews';
+import { bakeFigure, FIG_VIEWS, type FigureSheet } from './figure';
 import { heroKey, heroLookOf, heroSpec } from './hero';
 import { bakeInWorker, uploadSheet } from './monsterSheet';
 import { cancelUpload, uploading } from './sheetUpload';
@@ -74,8 +73,8 @@ export const originOf = (sheet: FigureSheet): { x: number; y: number } => ({ x: 
 
 const sheets = new Map<string, FigSource>();
 
-/** So viele Looks bleiben gebacken (je ca. 1,2 MB als 1x-Canvas, in Iso 2 MB); ältere werden samt Textur verworfen */
-const KEEP = Math.floor((8 * 3) / SHEET_VIEWS.length);
+/** So viele Looks bleiben gebacken (je ca. 1,2 MB als 1x-Canvas, mit 5 Ansichten 2 MB); ältere werden samt Textur verworfen */
+const KEEP = Math.floor((8 * 3) / FIG_VIEWS.length);
 
 /** Look schon im Worker backen lassen, bevor er zu sehen ist (Spielstart); ohne Worker nichts */
 export function prefetchHero(look: Look): void {
@@ -92,7 +91,7 @@ export function prefetchHero(look: Look): void {
 export function heroTexture(scene: Phaser.Scene, look: Look, inUse?: () => Set<string>, prev?: string): { key: string; sheet: FigureSheet } | null {
   const h = heroLookOf(look);
   let key = heroKey(h);
-  if (!sheets.has(key) && !bakeInWorker(key, { t: 'h', look: h }, (src) => sheets.set(heroKey(h), src))) sheets.set(key, pixelSource(bakeFigure(heroSpec(h), SHEET_VIEWS)));
+  if (!sheets.has(key) && !bakeInWorker(key, { t: 'h', look: h }, (src) => sheets.set(heroKey(h), src))) sheets.set(key, pixelSource(bakeFigure(heroSpec(h), FIG_VIEWS)));
   const fresh = sheets.get(key);
   if (!fresh || !uploadSheet(scene, key, fresh)) {
     // noch im Worker oder Upload erst im nächsten Frame

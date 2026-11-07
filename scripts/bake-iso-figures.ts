@@ -9,7 +9,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { bakeFigure, FIG_ANIMS, figViews, type FigAnim, type FigureSheet, type FigView } from '../src/render/figure';
+import { bakeFigure, FIG_ANIMS, FIG_VIEWS, type FigAnim, type FigureSheet, type FigView } from '../src/render/figure';
 import { heroSpec, type HeroLook, type HeroWeapon } from '../src/render/hero';
 import { MONSTER_DEFS, monsterSpec } from '../src/render/monster';
 import { NPC_FIG_NAMES, npcSpec, RESIDENT_KINDS } from '../src/render/npc';
@@ -27,7 +27,7 @@ const only = opt('--ids')?.split(',');
 const OUT = join(ROOT, opt('--out') ?? 'probe/iso/figuren');
 const what = argv[0] ?? 'alle';
 
-const ISO_VIEWS = figViews(true);
+const ISO_VIEWS = FIG_VIEWS;
 const GRADE = [0.66, 0.64, 0.74];
 const GROUNDS = [[86, 78, 92], [58, 74, 46]];
 
@@ -173,7 +173,7 @@ function timing(): void {
       const s = bakeFigure(spec!, v);
       return { ms: med(ts), bytes: s.data.byteLength };
     };
-    const a = run(figViews(false));
+    const a = run(FIG_VIEWS.slice(0, 3));
     const b = run(ISO_VIEWS);
     t3 += a.ms;
     t5 += b.ms;

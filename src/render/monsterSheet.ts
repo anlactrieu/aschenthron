@@ -7,9 +7,8 @@
  * (halb so teuer wie ein Canvas). Fertige Sheets liegen im Cache (älteste ungenutzte fliegen raus).
  */
 import type Phaser from 'phaser';
-import { FigureBaker, type FigView, type FigureSheet, type FigureSpec } from './figure';
+import { FigureBaker, FIG_VIEWS, type FigView, type FigureSheet, type FigureSpec } from './figure';
 import { addSheetTexture, FIG_SCALE, pixelSource, type FigSource } from './heroSheet';
-import { SHEET_VIEWS } from './sheetViews';
 import { SHADE } from './heroRig.js';
 import { heroSpec, type HeroLook } from './hero';
 import { monsterSpec } from './monster';
@@ -18,13 +17,13 @@ import { npcSpec } from './npc';
 
 /** Was gebacken werden soll (für den Worker: nur Daten) */
 export type FigReq = { t: 'm'; id: string } | { t: 'n'; kind: string; name?: string } | { t: 'h'; look: HeroLook };
-/** Anfrage an den Worker: dazu die Ansichten des Sheets (3 Draufsicht, 5 Iso; `ISO` gilt im Worker nicht) */
+/** Anfrage an den Worker: dazu die Ansichten des Sheets (`FIG_VIEWS`) */
 export type FigJob = { key: string; req: FigReq; views: FigView[] };
 /** Antwort des Workers (Pixel als übertragener Puffer) */
 export type FigReply = { key: string; sheet: FigureSheet | null };
 
-/** So viele fertige Sheets bleiben im Cache (je ca. 0,5-2,5 MB, in Iso mit 5 statt 3 Ansichten +67 %: darum weniger, der Speicher bleibt gleich) */
-const KEEP = Math.floor((40 * 3) / SHEET_VIEWS.length);
+/** So viele fertige Sheets bleiben im Cache (je ca. 0,5-2,5 MB, 5 statt 3 Ansichten kosten +67 %: darum weniger, der Speicher bleibt wie früher) */
+const KEEP = Math.floor((40 * 3) / FIG_VIEWS.length);
 /** Backzeit je Spielframe in ms (nur ohne Worker) */
 const BUDGET_MS = 5;
 /** Worker: zwei Kerne bleiben dem Spiel und dem Browser, höchstens drei (jeder lädt die Figurenmodule) */
@@ -57,7 +56,7 @@ function toLocal(jobs: Iterable<Job>): void {
   for (const j of jobs) {
     if (j.done) continue;
     const s = specOf(j.req);
-    if (s) local.set(j.key, new FigureBaker(s, SHEET_VIEWS));
+    if (s) local.set(j.key, new FigureBaker(s, FIG_VIEWS));
   }
 }
 
@@ -102,7 +101,7 @@ function feed(): void {
     const i = queue.findIndex((j) => j.urgent);
     const job = queue.splice(Math.max(0, i), 1)[0]!;
     running.set(job.key, job);
-    idle.pop()!.postMessage({ key: job.key, req: job.req, views: SHEET_VIEWS });
+    idle.pop()!.postMessage({ key: job.key, req: job.req, views: FIG_VIEWS });
   }
 }
 
@@ -157,7 +156,7 @@ export function figureTexture(scene: Phaser.Scene, key: string, req: FigReq): { 
     none.add(key);
     return null;
   }
-  local.set(key, new FigureBaker(s, SHEET_VIEWS));
+  local.set(key, new FigureBaker(s, FIG_VIEWS));
   return 'wait';
 }
 

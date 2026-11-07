@@ -7,7 +7,7 @@
  */
 import type Phaser from 'phaser';
 import { isWalkable, type Grid } from '../sim/path';
-import { facingView, FOOT_DY, FRONT_DY, gridStep, groundSize, ISO, mirrors, project, sheetView, standDepth, toScreen, turn } from './iso';
+import { facingView, FOOT_DY, FRONT_DY, gridStep, groundSize, mirrors, project, sheetView, standDepth, toScreen, turn } from './iso';
 import type { FigView } from './figure';
 import { walkFrame } from './figure';
 import { idleFrame } from './hero';
@@ -63,12 +63,11 @@ export type DecorKind = 'banner' | 'board' | 'cart' | 'hay' | 'sacks' | 'baskets
 export const FLAT_DECOR: ReadonlySet<DecorKind> = new Set(['hay', 'sacks', 'baskets']);
 
 /**
- * Blickt ein Tier nach links? Maßgebend ist der Bildschirm: in der Draufsicht das Rasterdelta, in Iso `(dx − dy)·32`. Läuft es auf dem
- * Bildschirm senkrecht (Iso, dx = dy), bleibt `prev`.
+ * Blickt ein Tier nach links? Maßgebend ist der Bildschirm: `(dx − dy)·32`. Läuft es auf dem Bildschirm senkrecht (dx = dy),
+ * bleibt `prev`.
  */
-export function leftward(iso: boolean, dx: number, dy: number, prev: boolean): boolean {
-  if (!iso) return dx < 0;
-  const sx = project(true, dx, dy).sx;
+export function leftward(dx: number, dy: number, prev: boolean): boolean {
+  const sx = project(dx, dy).sx;
   return Math.abs(sx) < 1e-9 ? prev : sx < 0;
 }
 
@@ -339,8 +338,8 @@ export function initTownAtlas(scene: Phaser.Scene): void {
       }
     });
   }
-  // Iso: flaches Dekor als Raute
-  if (ISO) {
+  // flaches Dekor als Raute
+  {
     for (const kind of FLAT_DECOR) {
       const rows = diamondRows(SPRITES[kind]!);
       const b = place(`${kind}_iso`, DIAMOND_W, DIAMOND_H);
@@ -367,7 +366,7 @@ export function initTownAtlas(scene: Phaser.Scene): void {
   for (const [name, b] of frames) tex.add(name, 0, b.x, b.y, b.w, b.h);
 }
 
-/** Raute (Iso) für flaches Dekor: Breite und Höhe in Kunstpixeln (Maßstab 2 ergibt die Kachel 64×32) */
+/** Raute für flaches Dekor: Breite und Höhe in Kunstpixeln (Maßstab 2 ergibt die Kachel 64×32) */
 export const DIAMOND_W = 32;
 export const DIAMOND_H = 16;
 
@@ -454,7 +453,7 @@ interface Resident {
   flip: boolean;
   side: boolean;
   up: boolean;
-  /** Iso: Ansicht der 5 (iso.ts `turn`) */
+  /** Ansicht der 5 (iso.ts `turn`) */
   iv?: FigView;
   dist: number;
   movingUntil: number;
@@ -577,11 +576,11 @@ export class TownLife {
     return def.decor.map((d) => {
       const { sx, sy } = toScreen(d.x, d.y);
       const key = { banner: 'banner', board: 'board', cart: 'cart', hay: 'hay', sacks: 'sacks', baskets: 'baskets' }[d.kind];
-      // Iso: flaches Dekor liegt als Raute auf der Kachel, unter allen Figuren (Boden −1e6)
-      if (ISO && FLAT_DECOR.has(d.kind)) return this.scene.add.image(sx, sy, ATLAS, `${key}_iso`).setOrigin(0.5, 0.5).setScale(2).setDepth(-8e5).setVisible(false);
+      // Flaches Dekor liegt als Raute auf der Kachel, unter allen Figuren (Boden −1e6)
+      if (FLAT_DECOR.has(d.kind)) return this.scene.add.image(sx, sy, ATLAS, `${key}_iso`).setOrigin(0.5, 0.5).setScale(2).setDepth(-8e5).setVisible(false);
       // Fußpunkt am unteren Rand der Kachel; Wandschmuck hängt vor die Mauer, daher knapp über dem Boden-Fuß der Kachel
       const foot = sy + FRONT_DY - (FLAT_DECOR.has(d.kind) ? 6 : 0);
-      return this.scene.add.image(sx, foot, ATLAS, key).setOrigin(0.5, 1).setScale(2).setDepth(ISO ? standDepth(sy) : foot + 1).setVisible(false);
+      return this.scene.add.image(sx, foot, ATLAS, key).setOrigin(0.5, 1).setScale(2).setDepth(standDepth(sy)).setVisible(false);
     });
   }
 
@@ -749,7 +748,7 @@ export class TownLife {
     const fy = sy + FOOT_DY;
     r.img.setOrigin(o.x, o.y).setScale(FIG_SCALE).setFlipX(mirrors(v3) && r.flip).setAlpha(r.alpha).setVisible(r.alpha > 0.02).setPosition(sx, fy).setDepth(fy);
     this.shadow.fillStyle(0x000000, 0.2 * r.alpha);
-    const sh = groundSize(r.def.look === 'res_child' || r.def.look === 'res_child2' ? 20 : 26, 10);
+    const sh = groundSize(r.def.look === 'res_child' || r.def.look === 'res_child2' ? 20 : 26);
     this.shadow.fillEllipse(sx, fy + 1, sh.w, sh.h);
     if (r.torch) {
       const hx = sx + (r.side ? (r.flip ? -14 : 14) : 13);
@@ -801,7 +800,7 @@ export class TownLife {
       const sp = 4.2 * (dt / 1000);
       a.x += (dx / d) * sp;
       a.y += (dy / d) * sp;
-      a.flip = leftward(ISO, dx, dy, a.flip);
+      a.flip = leftward(dx, dy, a.flip);
       a.alt = Math.min(70, a.alt + dt * 0.12);
       if (c.time > a.until) {
         a.state = 'away';
@@ -815,7 +814,7 @@ export class TownLife {
         a.x = (mid[0] + mid[2]) / 2 + Math.cos(t) * 7;
         a.y = (mid[1] + mid[3]) / 2 + Math.sin(t) * 3 - 2;
         a.alt = 96;
-        a.flip = leftward(ISO, -Math.sin(t) * 7, Math.cos(t) * 3, a.flip);
+        a.flip = leftward(-Math.sin(t) * 7, Math.cos(t) * 3, a.flip);
       } else a.alt = 0;
       if (c.time > a.until) {
         const p = this.fresh(a, a.def.zones, c);
@@ -842,7 +841,7 @@ export class TownLife {
         a.alt = Math.max(0, a.alt - dt * 0.07);
         a.x += (dx / (d || 1)) * 3 * (dt / 1000);
         a.y += (dy / (d || 1)) * 3 * (dt / 1000);
-        a.flip = leftward(ISO, dx, dy, a.flip);
+        a.flip = leftward(dx, dy, a.flip);
         if (a.alt <= 0) {
           a.state = 'idle';
           a.until = c.time + 2000 + this.rng() * 5000;
@@ -858,7 +857,7 @@ export class TownLife {
         if (tileWalk(c.grid, nx, ny)) {
           a.x = nx;
           a.y = ny;
-          a.flip = leftward(ISO, dx, dy, a.flip);
+          a.flip = leftward(dx, dy, a.flip);
         } else {
           a.state = 'idle';
           a.until = c.time + 800;
@@ -896,7 +895,7 @@ export class TownLife {
     const fy = sy + FOOT_DY;
     a.img.setFrame(frame).setFlipX(a.flip).setVisible(true).setAlpha(1).setPosition(sx, fy - a.alt + lift).setDepth(fy + (airborne ? 400 : 0));
     this.shadow.fillStyle(0x000000, airborne ? 0.12 : 0.2);
-    const sh = groundSize(k === 'dog' ? 24 : k === 'chicken' ? 14 : airborne ? 12 : 16, k === 'dog' ? 8 : 6);
+    const sh = groundSize(k === 'dog' ? 24 : k === 'chicken' ? 14 : airborne ? 12 : 16);
     this.shadow.fillEllipse(sx, fy + 1, sh.w, sh.h);
     // Tierlaute (leise, nur in Hörweite)
     const dist = Math.hypot(a.x - c.player.x, a.y - c.player.y);

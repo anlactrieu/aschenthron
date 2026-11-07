@@ -7,13 +7,11 @@
  */
 import { SHADE, type Posed } from './heroRig.js';
 
-/** Ansichten: Draufsicht 3, Iso 5 (Schrägen nach unten bzw. oben, links jeweils gespiegelt), siehe `viewOf` in iso.ts */
+/** Ansichten: 5 (Schrägen nach unten bzw. oben, links jeweils gespiegelt), siehe `viewOf` in iso.ts */
 export type FigView = 'side' | 'front' | 'back' | 'frontDiag' | 'backDiag';
 export type FigAnim = 'idle' | 'walk' | 'attack' | 'hit' | 'die';
-/** Bildzeilen der Draufsicht-Sheets (3 Ansichten) und Vorgabe von `FigureBaker`/`bakeFigure` */
-export const FIG_VIEWS: FigView[] = ['side', 'front', 'back'];
-/** Ansichtsliste je Modus: Iso backt 5 Zeilen; die ersten 3 bleiben in dieser Reihenfolge (Draufsicht-Sheets byte-gleich) */
-export const figViews = (iso: boolean): FigView[] => (iso ? ['side', 'front', 'back', 'frontDiag', 'backDiag'] : ['side', 'front', 'back']);
+/** Bildzeilen der Sheets und Vorgabe von `FigureBaker`/`bakeFigure`; der Worker bekommt sie mit */
+export const FIG_VIEWS: FigView[] = ['side', 'front', 'back', 'frontDiag', 'backDiag'];
 export const FIG_ANIMS: FigAnim[] = ['idle', 'walk', 'attack', 'hit', 'die'];
 
 /** Farbverlauf hell -> dunkel, 5. Wert = Naht */
@@ -61,7 +59,7 @@ export interface FigureSheet {
   cyclePx: number;
   wind: number;
   mirrorAll: boolean;
-  /** Ansichten in Zeilenreihenfolge (3 in der Draufsicht, 5 in Iso) */
+  /** Ansichten in Zeilenreihenfolge (`FIG_VIEWS`) */
   views: FigView[];
 }
 

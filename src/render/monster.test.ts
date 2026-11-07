@@ -31,9 +31,9 @@ describe('Skelett-Monster', () => {
       expect(s.top, m.id).toBeGreaterThan(6);
       expect(s.cyclePx, m.id).toBeGreaterThan(8);
     }
-    // in Node ca. 3-4 s für alle 63 Arten; im Spiel backen Worker sie einzeln im Hintergrund
-    expect(performance.now() - t0).toBeLessThan(20000);
-  }, 30000);
+    // in Node ca. 7 s für alle 63 Arten in 5 Ansichten (bei vollem Testlauf bis 22 s); im Spiel backen Worker sie einzeln im Hintergrund
+    expect(performance.now() - t0).toBeLessThan(40000);
+  }, 60000);
 });
 
 describe('Skelett-NPCs', () => {

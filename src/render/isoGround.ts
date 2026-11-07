@@ -1,8 +1,7 @@
 /**
- * Iso-Boden und Wandblöcke (P9 Iso). Schnittstelle für GameScene, Inhalt gehört P9.2.
+ * Iso-Boden und Wandblöcke (P9 Iso).
  * - Boden: ein Chunk (16x16 Kacheln) wird als Raute in ein Kunstraster gebacken (`IsoChunkBaker`, in Etappen), GameScene legt
- *   es bei `isoChunkOrigin` mit Maßstab 2 ab. Die Quelle (`IsoGroundSrc`) liefert dieselben Kachelfragen wie die Draufsicht,
- *   damit P9.2 nativ in Rauten malen kann, ohne GameScene zu ändern.
+ *   es bei `isoChunkOrigin` mit Maßstab 2 ab. Die Quelle (`IsoGroundSrc`) liefert die Kachelfragen (Material, Landabstand, Details).
  * - Wände (gid 2) sind nicht Teil des Chunks: je Kachel ein stehendes Bild aus `isoWall` (wenige gemeinsame Texturen nach Stil,
  *   offenen Seiten und Variante), GameScene setzt es wie ein Prop (Anker = untere Rautenecke, Tiefe `standDepth`).
  * Boden: nativ in Rauten gemalt (`world/ground.ts`, P9.2). Wände: Quader aus `world/isoWalls.ts`.
@@ -18,7 +17,7 @@ import { ISO_ART_H, ISO_ART_W, project } from './iso';
 /** Deckkraft verdeckender Wandblöcke, Bäume und Props vor dem Helden (GameScene `updateOcclusion`); P9.2 entscheidet mit dem Nutzer (Ausblenden oder Schattenriss) */
 export const OCCLUDER_ALPHA = 0.45;
 
-/** Chunkgröße in Kacheln (gleich der Draufsicht, GameScene `CHUNK`) */
+/** Chunkgröße in Kacheln (GameScene `CHUNK`) */
 export const ISO_CHUNK = 16;
 /** Kunstraster eines Chunks: Hülle der Raute aus 16x16 Kacheln (512 x 256 Kunstpixel, 1024 x 512 Bildschirm-Pixel) */
 export const ISO_CHUNK_W = ISO_CHUNK * ISO_ART_W;
@@ -26,7 +25,7 @@ export const ISO_CHUNK_H = ISO_CHUNK * ISO_ART_H;
 
 /** Bildschirmposition (links oben) des Chunk-Bildes (cx, cy): obere Rautenecke minus halbe Breite */
 export function isoChunkOrigin(cx: number, cy: number): { sx: number; sy: number } {
-  const top = project(true, cx * ISO_CHUNK - 0.5, cy * ISO_CHUNK - 0.5);
+  const top = project(cx * ISO_CHUNK - 0.5, cy * ISO_CHUNK - 0.5);
   return { sx: top.sx - ISO_CHUNK * 32, sy: top.sy };
 }
 
@@ -41,7 +40,7 @@ export interface IsoGroundSrc {
   /** außerhalb der Karte: bleibt leer (schwarz) */
   outside(x: number, y: number): boolean;
   /**
-   * Bodendetail der Kachel wie in der Draufsicht (`chunkDecor`): Wasserdetail mit Landabstand, Landdetail mit Bodenart und Zone,
+   * Bodendetail der Kachel: Wasserdetail mit Landabstand, Landdetail mit Bodenart und Zone,
    * oder keins (Wand, Haus, Tür, Lava, Props).
    */
   detail(x: number, y: number): { water: true; zone: number; dist: number } | { water: false; ground: number; zone: number } | null;

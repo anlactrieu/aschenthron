@@ -1,65 +1,48 @@
 /**
- * Projektion Raster -> Bildschirm (P9 Iso, Vertrag siehe SPEC „Umsetzungsplan P9 Iso“).
- * Zwei Modi: Draufsicht (48x48, achsenparallel) und Iso 2:1 wie T4C (Raute 64x32). Der Bau-Schalter `?ansicht=iso` wählt beim
- * Start einmal; ohne ihn bleibt alles wie vorher. Ganze Rasterkoordinaten sind Kachelmitten (Kachel k reicht von k − 0,5 bis k + 0,5).
- * Die Funktionen mit `iso`-Parameter sind rein und in beiden Modi testbar; die Kurzformen darunter binden den aktiven Modus.
+ * Projektion Raster -> Bildschirm (Iso 2:1 wie T4C, Raute 64x32; Vertrag siehe SPEC „Umsetzungsplan P9 Iso“).
+ * Ganze Rasterkoordinaten sind Kachelmitten (Kachel k reicht von k − 0,5 bis k + 0,5).
  * Kein Aufrufer rechnet selbst mit TILE_W/TILE_H: Bodenkreise, Laufrichtung, Schrittlänge, Sichtbereich und Tiefe laufen hier.
  */
 import type { FigView } from './figure';
 
-/** Iso-Ansicht aktiv (`?ansicht=iso`); in Node (Tests, Kontaktbögen) und im Figuren-Worker ohne Suchtext immer aus */
-export const ISO: boolean = typeof location !== 'undefined' && new URLSearchParams(location.search).get('ansicht') === 'iso';
-
-export const tileW = (iso: boolean): number => (iso ? 64 : 48);
-export const tileH = (iso: boolean): number => (iso ? 32 : 48);
-export const TILE_W = tileW(ISO);
-export const TILE_H = tileH(ISO);
+export const TILE_W = 64;
+export const TILE_H = 32;
 
 /** Raute in Kunstpixeln (Maßstab 2): 32x16 */
 export const ISO_ART_W = 32;
 export const ISO_ART_H = 16;
 
-export function project(iso: boolean, x: number, y: number): { sx: number; sy: number } {
-  if (!iso) return { sx: x * 48, sy: y * 48 };
+export function project(x: number, y: number): { sx: number; sy: number } {
   return { sx: (x - y) * 32, sy: (x + y) * 16 };
 }
 
-export function unproject(iso: boolean, sx: number, sy: number): { x: number; y: number } {
-  if (!iso) return { x: sx / 48, y: sy / 48 };
+export function unproject(sx: number, sy: number): { x: number; y: number } {
   const a = sx / 32;
   const b = sy / 16;
   return { x: (a + b) / 2, y: (b - a) / 2 };
 }
 
 /** Kachelmitte -> Bildschirm. Linear ohne Versatz: `toScreen(dx, dy)` ist zugleich der Bildschirmschritt eines Rasterschritts. */
-export function toScreen(x: number, y: number): { sx: number; sy: number } {
-  return project(ISO, x, y);
-}
-
-export function toTile(sx: number, sy: number): { x: number; y: number } {
-  return unproject(ISO, sx, sy);
-}
+export const toScreen = project;
+export const toTile = unproject;
 
 /* ---------------------------------------------------------------- Fußpunkt und Tiefe */
 
 /**
- * Fußpunkt der Figuren unter der Kachelmitte (Bildschirm-Pixel). Draufsicht 8 wie bisher, Iso 0: die Figur steht genau auf der
- * Rautenmitte (wie in der Probe). Alle figurbezogenen Versätze (Schatten, Namen, Balken, Körpermitte) zählen ab diesem Punkt.
+ * Fußpunkt der Figuren unter der Kachelmitte (Bildschirm-Pixel): 0, die Figur steht genau auf der Rautenmitte (wie in der Probe).
+ * Alle figurbezogenen Versätze (Schatten, Namen, Balken, Körpermitte) zählen ab diesem Punkt.
  */
-export const footDy = (iso: boolean): number => (iso ? 0 : 8);
-export const FOOT_DY = footDy(ISO);
+export const FOOT_DY = 0;
 
 /**
- * Tiefe eines stehenden Objekts auf einer Kachel (Baum, Fass, Wandblock), aus der Bildschirm-y der Kachelmitte.
- * Draufsicht: Fuß der Kachel (+24, Figuren derselben Reihe stehen dahinter). Iso: Spaltenregel für eine Raute (+8 = Vorderkante
- * in der Spaltenmitte, siehe `footprintColumns`): Figuren mit größerem x + y stehen davor, gleiche Summe dahinter.
+ * Tiefe eines stehenden Objekts auf einer Kachel (Baum, Fass, Wandblock), aus der Bildschirm-y der Kachelmitte: Spaltenregel für
+ * eine Raute (+8 = Vorderkante in der Spaltenmitte, siehe `footprintColumns`): Figuren mit größerem x + y stehen davor, gleiche
+ * Summe dahinter.
  */
-export const standDy = (iso: boolean): number => (iso ? 8 : 24);
-export const standDepth = (sy: number): number => sy + standDy(ISO);
+export const standDepth = (sy: number): number => sy + 8;
 
-/** Bildschirm-y der Kachel-Vorderkante unter der Mitte (Draufsicht: Fuß der Kachel 24, Iso: untere Rautenecke 16). Bodenversatz für Bild-Unterkanten. */
-export const frontDy = (iso: boolean): number => tileH(iso) / 2;
-export const FRONT_DY = frontDy(ISO);
+/** Bildschirm-y der Kachel-Vorderkante unter der Mitte (untere Rautenecke, 16). Bodenversatz für Bild-Unterkanten. */
+export const FRONT_DY = TILE_H / 2;
 
 /** Breite einer Tiefen-Spalte großer Objekte (halbe Raute) */
 export const COLUMN_W = 32;
@@ -77,7 +60,7 @@ export interface DepthColumn {
  * Spaltenschnitt einer Grundfläche (Kacheln x0..x0+w−1, y0..y0+h−1) in Iso: Spalten von 32 px, jede mit der Tiefe der vorderen
  * Bodenkante unter ihrer Mitte. Die Kante läuft zwischen den Spaltengrenzen gerade (Ecken liegen auf Vielfachen von 32), die
  * Mitte liegt damit 8 px vor dem Hinterende und 8 px hinter dem Vorderende: eine Figur eine Kachel vor der Wand hat mindestens
- * 8 px mehr Tiefe, eine Figur im Haus oder dahinter mindestens 8 px weniger. Gilt nur für Iso (Draufsicht-Tiefen bleiben, wie sie sind).
+ * 8 px mehr Tiefe, eine Figur im Haus oder dahinter mindestens 8 px weniger.
  */
 export function footprintColumns(x0: number, y0: number, w: number, h: number): DepthColumn[] {
   const xa = x0 - 0.5;
@@ -85,10 +68,10 @@ export function footprintColumns(x0: number, y0: number, w: number, h: number): 
   const xb = x0 + w - 0.5;
   const yb = y0 + h - 0.5;
   // Ecken: links (xa, yb), vorn (xb, yb), rechts (xb, ya), hinten (xa, ya)
-  const L = project(true, xa, yb);
-  const F = project(true, xb, yb);
-  const Rt = project(true, xb, ya);
-  const B = project(true, xa, ya);
+  const L = project(xa, yb);
+  const F = project(xb, yb);
+  const Rt = project(xb, ya);
+  const B = project(xa, ya);
   const on = (a: { sx: number; sy: number }, b: { sx: number; sy: number }, x: number): number => a.sy + ((x - a.sx) * (b.sy - a.sy)) / (b.sx - a.sx || 1);
   const out: DepthColumn[] = [];
   for (let sx = L.sx; sx < Rt.sx; sx += COLUMN_W) {
@@ -100,7 +83,7 @@ export function footprintColumns(x0: number, y0: number, w: number, h: number): 
 
 /* ---------------------------------------------------------------- Laufrichtung */
 
-/** Ansicht einer Figur: Bildzeile und Spiegelung; `up` = blickte zuletzt nach oben (Draufsicht hält es über Seitwärtsschritte) */
+/** Ansicht einer Figur: Bildzeile und Spiegelung; `up` = blickte zuletzt nach oben */
 export interface ViewState {
   view: FigView;
   flip: boolean;
@@ -111,20 +94,10 @@ export const VIEW0: ViewState = { view: 'front', flip: false, up: false };
 
 /**
  * Ansicht aus der Bildschirm-Richtung eines Schritts (dsx, dsy in Bildschirm-Pixeln, z. B. `toScreen(dx, dy)`).
- * Iso: 8 Sektoren zu 45° auf 5 Ansichten, links gespiegelt (runter front, hoch back, seitlich side, unten schräg frontDiag,
+ * 8 Sektoren zu 45° auf 5 Ansichten, links gespiegelt (runter front, hoch back, seitlich side, unten schräg frontDiag,
  * oben schräg backDiag). Rein senkrecht behält die Spiegelung den letzten Wert.
- * Draufsicht wie bisher: Seite, wenn |dx| > 0,8·|dy|; Spiegelung und oben/unten ändern sich nur ab 0,0005 Kachel (Werte in
- * Kacheln, Bildschirm = Raster), also nur 3 Ansichten.
  */
-export function viewFrom(iso: boolean, dsx: number, dsy: number, prev: ViewState = VIEW0): ViewState {
-  if (!iso) {
-    const dx = dsx / 48;
-    const dy = dsy / 48;
-    const flip = Math.abs(dx) > 0.0005 ? dx < 0 : prev.flip;
-    const up = Math.abs(dy) > 0.0005 ? dy < 0 : prev.up;
-    const side = Math.abs(dx) > Math.abs(dy) * 0.8;
-    return { view: side ? 'side' : up ? 'back' : 'front', flip, up };
-  }
+export function viewOf(dsx: number, dsy: number, prev: ViewState = VIEW0): ViewState {
   if (!dsx && !dsy) return prev;
   // Sektor 0 = rechts, im Uhrzeigersinn (Bildschirm-y zeigt nach unten)
   const s = ((Math.round(Math.atan2(dsy, dsx) / (Math.PI / 4)) % 8) + 8) % 8;
@@ -132,8 +105,6 @@ export function viewFrom(iso: boolean, dsx: number, dsy: number, prev: ViewState
   const flip = s === 2 || s === 6 ? prev.flip : s >= 3 && s <= 5;
   return { view, flip, up: s >= 5 };
 }
-
-export const viewOf = (dsx: number, dsy: number, prev?: ViewState): ViewState => viewFrom(ISO, dsx, dsy, prev);
 
 /** Rückfall für Sheets ohne Schrägansicht (DCSS, Ninja, Schattenrisse, Sheets vor P9.1) */
 export function fallbackView(v: FigView): 'side' | 'front' | 'back' {
@@ -146,8 +117,8 @@ export function sheetView(frames: Record<string, unknown>, v: FigView): FigView 
 }
 
 /**
- * Blickrichtung einer Figur, wie GameScene, townLife und wildlife sie halten: `side`/`up`/`flip` wie bisher (die Draufsicht und
- * alle 3-Ansichten-Figuren lesen nur sie), `iv` = Iso-Ansicht der 5 (nur im Iso-Modus gesetzt).
+ * Blickrichtung einer Figur, wie GameScene, townLife und wildlife sie halten: `side`/`up`/`flip` (alle 3-Ansichten-Figuren lesen
+ * nur sie), `iv` = Ansicht der 5.
  */
 export interface Facing {
   flip: boolean;
@@ -156,13 +127,13 @@ export interface Facing {
   iv?: FigView;
 }
 
-/** Ansicht nach einem Schritt (Bildschirmrichtung dsx, dsy) nachführen; Draufsicht genau wie bisher */
+/** Ansicht nach einem Schritt (Bildschirmrichtung dsx, dsy) nachführen */
 export function turn(o: Facing, dsx: number, dsy: number): void {
   const s = viewOf(dsx, dsy, { view: facingView(o), flip: o.flip, up: !!o.up });
   o.flip = s.flip;
   o.up = s.up;
   o.side = s.view === 'side';
-  o.iv = ISO ? s.view : undefined;
+  o.iv = s.view;
 }
 
 /** Gewünschte Ansicht (vor dem Rückfall auf das, was das Sheet hat) */
@@ -177,29 +148,18 @@ export const mirrors = (v: FigView): boolean => v !== 'front' && v !== 'back';
 
 /**
  * Strecke eines Rasterschritts für den Laufzyklus (Bildschirm-Pixel der Figur), unabhängig von der Richtung, damit die Füße
- * nicht gleiten. Draufsicht wie bisher 48 px je Kachel; Iso 64/√2 ≈ 45 px (so weit wandert die Figur bei waagrechtem Lauf).
+ * nicht gleiten: 64/√2 ≈ 45 px je Kachel (so weit wandert die Figur bei waagrechtem Lauf).
  */
-export function stepLength(iso: boolean, dx: number, dy: number): number {
-  return iso ? Math.hypot(dx, dy) * (64 / Math.SQRT2) : Math.hypot(dx * 48, dy * 48);
-}
-export const gridStep = (dx: number, dy: number): number => stepLength(ISO, dx, dy);
+export const gridStep = (dx: number, dy: number): number => Math.hypot(dx, dy) * (64 / Math.SQRT2);
 
-/** Halbachsen eines Bodenkreises mit Radius r Kacheln. Iso: rx = r·W/√2, ry = r·H/√2. Draufsicht: rx = ry = r·W. */
-export function ellipseOf(iso: boolean, r: number): { rx: number; ry: number } {
-  return iso ? { rx: (r * 64) / Math.SQRT2, ry: (r * 32) / Math.SQRT2 } : { rx: r * 48, ry: r * 48 };
-}
-export const groundEllipse = (r: number): { rx: number; ry: number } => ellipseOf(ISO, r);
+/** Halbachsen eines Bodenkreises mit Radius r Kacheln: rx = r·W/√2, ry = r·H/√2. */
+export const groundEllipse = (r: number): { rx: number; ry: number } => ({ rx: (r * 64) / Math.SQRT2, ry: (r * 32) / Math.SQRT2 });
 
-/**
- * Bodenring/-schatten, der in der Draufsicht als w x h (Pixel) gezeichnet wird: dort bleibt er genau so (die Draufsicht hat
- * gestauchte Ellipsen, keine Kreise), in Iso wird er ein Bodenkreis gleicher Breite über `groundEllipse` (2:1).
- */
-export function flatSize(iso: boolean, w: number, h: number): { w: number; h: number } {
-  if (!iso) return { w, h };
-  const e = ellipseOf(true, w / 2 / (64 / Math.SQRT2));
+/** Bodenring/-schatten der Breite w (Pixel): ein Bodenkreis über `groundEllipse` (2:1) */
+export function groundSize(w: number): { w: number; h: number } {
+  const e = groundEllipse(w / 2 / (64 / Math.SQRT2));
   return { w: e.rx * 2, h: e.ry * 2 };
 }
-export const groundSize = (w: number, h: number): { w: number; h: number } => flatSize(ISO, w, h);
 
 /* ---------------------------------------------------------------- Sichtbereich */
 
@@ -211,8 +171,8 @@ export interface TileRange {
 }
 
 /** Kachelbereich (einschließlich, nicht auf die Karte beschnitten), der ein Bildschirm-Rechteck berührt: alle 4 Ecken projiziert. */
-export function rangeOf(iso: boolean, v: { x: number; y: number; width: number; height: number }, margin = 0): TileRange {
-  const cs = [unproject(iso, v.x, v.y), unproject(iso, v.x + v.width, v.y), unproject(iso, v.x, v.y + v.height), unproject(iso, v.x + v.width, v.y + v.height)];
+export function tileRange(v: { x: number; y: number; width: number; height: number }, margin = 0): TileRange {
+  const cs = [unproject(v.x, v.y), unproject(v.x + v.width, v.y), unproject(v.x, v.y + v.height), unproject(v.x + v.width, v.y + v.height)];
   const xs = cs.map((c) => c.x);
   const ys = cs.map((c) => c.y);
   return {
@@ -222,17 +182,16 @@ export function rangeOf(iso: boolean, v: { x: number; y: number; width: number; 
     y1: Math.floor(Math.max(...ys) + 0.5) + margin,
   };
 }
-export const tileRange = (v: { x: number; y: number; width: number; height: number }, margin = 0): TileRange => rangeOf(ISO, v, margin);
 
-/** Liegt die Kachel (Mitte) im Bildschirm-Rechteck samt Rand (px)? Für Culling im Iso-Modus, wo der Kachelbereich nur eine grobe Hülle ist. */
+/** Liegt die Kachel (Mitte) im Bildschirm-Rechteck samt Rand (px)? Für Culling, wo der Kachelbereich nur eine grobe Hülle ist. */
 export function tileOnScreen(x: number, y: number, v: { x: number; y: number; width: number; height: number }, pad: number): boolean {
   const { sx, sy } = toScreen(x, y);
   return sx > v.x - pad && sx < v.x + v.width + pad && sy > v.y - pad && sy < v.y + v.height + pad;
 }
 
-/** Bildschirm-Hülle der Karte (w x h Kacheln): Box um die 4 projizierten Kartenecken (Iso 300x240: 17 280 x 8 640 px) */
-export function mapBounds(iso: boolean, w: number, h: number): { x: number; y: number; width: number; height: number } {
-  const cs = [project(iso, -0.5, -0.5), project(iso, w - 0.5, -0.5), project(iso, -0.5, h - 0.5), project(iso, w - 0.5, h - 0.5)];
+/** Bildschirm-Hülle der Karte (w x h Kacheln): Box um die 4 projizierten Kartenecken (300x240: 17 280 x 8 640 px) */
+export function mapBounds(w: number, h: number): { x: number; y: number; width: number; height: number } {
+  const cs = [project(-0.5, -0.5), project(w - 0.5, -0.5), project(-0.5, h - 0.5), project(w - 0.5, h - 0.5)];
   const xs = cs.map((c) => c.sx);
   const ys = cs.map((c) => c.sy);
   const x = Math.min(...xs);
@@ -243,22 +202,17 @@ export function mapBounds(iso: boolean, w: number, h: number): { x: number; y: n
 /* ---------------------------------------------------------------- Eingabe */
 
 /**
- * Pfeiltasten -> Rasterrichtung: sie folgen dem Bildschirm. Draufsicht: oben = −y, rechts = +x. Iso: oben = (−1,−1),
- * rechts = (+1,−1), unten = (+1,+1), links = (−1,+1); zwei Tasten zusammen ergeben eine Rasterachse (oben + rechts = (0,−1)).
+ * Pfeiltasten -> Rasterrichtung: sie folgen dem Bildschirm. Oben = (−1,−1), rechts = (+1,−1), unten = (+1,+1), links = (−1,+1);
+ * zwei Tasten zusammen ergeben eine Rasterachse (oben + rechts = (0,−1)).
  */
-export function arrowDirs(iso: boolean): Record<string, [number, number]> {
-  return iso
-    ? { ArrowUp: [-1, -1], ArrowDown: [1, 1], ArrowLeft: [-1, 1], ArrowRight: [1, -1] }
-    : { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
-}
+export const ARROW_DIRS: Record<string, [number, number]> = { ArrowUp: [-1, -1], ArrowDown: [1, 1], ArrowLeft: [-1, 1], ArrowRight: [1, -1] };
 
 /** Summe gedrückter Pfeiltasten als Rasterschritt (je Achse −1/0/1; Gegenrichtungen heben sich auf) */
-export function arrowStep(iso: boolean, keys: Iterable<string>): [number, number] {
-  const dirs = arrowDirs(iso);
+export function arrowStep(keys: Iterable<string>): [number, number] {
   let dx = 0;
   let dy = 0;
   for (const k of keys) {
-    const d = dirs[k];
+    const d = ARROW_DIRS[k];
     if (!d) continue;
     dx += d[0];
     dy += d[1];

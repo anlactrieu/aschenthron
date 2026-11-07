@@ -21,7 +21,6 @@ import { grave, pillar, rock, tree } from './world/props';
 import { heroMode, heroPortraitCanvas } from './heroSheet';
 
 import { TILE_H, TILE_W } from './iso';
-export { TILE_H, TILE_W };
 
 function mkCanvas(w: number, h: number): HTMLCanvasElement {
   const c = document.createElement('canvas');

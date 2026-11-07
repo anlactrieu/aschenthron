@@ -1,12 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { buildZoneMap, Z } from './groundLook';
+import { matOf } from './world/ground';
+import { Raster } from './world/raster';
 import { IsoChunkBaker, ISO_CHUNK_H, ISO_CHUNK_W, isoWall, type IsoGroundSrc } from './isoGround';
-import { matOf, paintGround } from './world/ground';
-import { ART, Raster } from './world/raster';
-
-/** Hash des Bildes, gemessen vor P9.2 (paintGround unverändert) */
-const HASH = 1502964640;
-
 const region = (name: string, x: number, y: number, w: number, h: number) => ({ name, x, y, w, h });
 
 describe('Zonenkarte', () => {
@@ -116,15 +112,5 @@ describe('Iso-Boden (P9.2)', () => {
     expect(r.filled(4, a.h - 12)).toBe(true);
     expect(r.filled(28, a.h - 12)).toBe(false);
     expect(isoWall('dungeon', 6, 3, 4).key).not.toBe(a.key);
-  });
-});
-
-describe('Draufsicht-Boden (Beweis, dass P9.2 ihn nicht ändert)', () => {
-  it('paintGround liefert für eine feste Szene immer dasselbe Bild', () => {
-    const r = new Raster(6 * ART, 6 * ART);
-    paintGround(r, 10, 20, 6, 6, { mat: (x, y) => (x + 2 * y > 50 ? matOf(6, 0) : x > 13 ? matOf(7, 1) : matOf(4, 1)), waterDist: () => 2 }, () => false);
-    let h = 0;
-    for (let i = 0; i < r.d.length; i++) h = (Math.imul(h, 31) + r.d[i]!) | 0;
-    expect(h).toBe(HASH);
   });
 });

@@ -126,21 +126,17 @@ describe('Stadtleben: Bilder', () => {
   });
 });
 
-describe('Stadtleben: Tiere und flaches Dekor in Iso', () => {
+describe('Stadtleben: Tiere und flaches Dekor ', () => {
   it('Blickrichtung richtet sich nach dem Bildschirm', () => {
-    // Draufsicht: Rasterdelta
-    expect(leftward(false, -1, 0, false)).toBe(true);
-    expect(leftward(false, 1, 3, true)).toBe(false);
-    expect(leftward(false, 0, 2, true)).toBe(false);
-    // Iso: (dx − dy) entscheidet; x−1 und y+1 laufen nach links, y−1 nach rechts (obwohl dx = 0 bzw. dx > 0)
-    expect(leftward(true, -1, 0, false)).toBe(true);
-    expect(leftward(true, 0, 1, false)).toBe(true);
-    expect(leftward(true, 0, -1, true)).toBe(false);
-    expect(leftward(true, 2, 1, true)).toBe(false);
-    expect(leftward(true, 1, 2, false)).toBe(true);
+    // (dx − dy) entscheidet; x−1 und y+1 laufen nach links, y−1 nach rechts (obwohl dx = 0 bzw. dx > 0)
+    expect(leftward(-1, 0, false)).toBe(true);
+    expect(leftward(0, 1, false)).toBe(true);
+    expect(leftward(0, -1, true)).toBe(false);
+    expect(leftward(2, 1, true)).toBe(false);
+    expect(leftward(1, 2, false)).toBe(true);
     // senkrecht auf dem Bildschirm (dx = dy): bleibt
-    expect(leftward(true, 1, 1, true)).toBe(true);
-    expect(leftward(true, -1, -1, false)).toBe(false);
+    expect(leftward(1, 1, true)).toBe(true);
+    expect(leftward(-1, -1, false)).toBe(false);
   });
   it('flaches Dekor wird zur Raute: nichts außerhalb, Mitte gefüllt, nur bekannte Farben', () => {
     for (const kind of FLAT_DECOR) {

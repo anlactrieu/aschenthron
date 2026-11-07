@@ -1,5 +1,5 @@
 /**
- * Zeichnung der Iso-Häuser (P9.3), Vorlage `iso()` in `scripts/bake-iso-probe.ts`: Fachwerkwände mit Steinsockel, Fenstern und Tür,
+ * Zeichnung der Iso-Häuser (P9.3), Vorlage `iso()` der Probe (Git-Stand 229f3f1: `scripts/bake-iso-probe.ts`): Fachwerkwände mit Steinsockel, Fenstern und Tür,
  * Satteldach mit Schornstein, Ostgiebel mit Fachwerk, Berufsschild, Fensterlicht. Gezeichnet wird in Hauskoordinaten (Haus mit der
  * Ecke oben links auf Kachel 0/0); die Bilder hängen nur an `HouseShape`, nicht an der Lage im Land, deshalb teilen sich Häuser
  * gleicher Bauart und Tür ein Bild. Ohne DOM nutzbar.

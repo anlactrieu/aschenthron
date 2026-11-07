@@ -359,9 +359,6 @@ export function matColor(i: number): Rgb {
 
 /* ---------------------------------------------------------------- Chunk-Maler */
 
-/** Kachelgröße als lokale Konstante (importierte Bindungen sind in Node-Skripten Getter, in der heißen Schleife teuer) */
-const A_ = ART;
-
 export interface GroundQuery {
   /** Materialindex der Kachel (außerhalb der Karte: beliebig, z. B. Wasser) */
   mat(x: number, y: number): number;
@@ -423,7 +420,6 @@ const WARP = 3.5;
 const sharp = (a: number): number => (a < 0.2 ? 0 : (a - 0.2) * (0.5 / 0.3));
 const BANK_HI = abgr(0x2a1f19);
 const BANK_LO = abgr(0x18120f);
-const RIM = 4; // Rand um den Chunk für Nachbarprüfungen (Kunstpixel)
 
 /** n ist ein Material niedrigeren Rangs aus anderer Gruppe als k (k bekommt dort eine dunkle Kante) */
 function lower(T: Tables, k: number, n: number): boolean {
@@ -432,177 +428,6 @@ function lower(T: Tables, k: number, n: number): boolean {
 /** n ist Land höheren Rangs aus anderer Gruppe (wirft Schatten auf k) */
 function higher(T: Tables, k: number, n: number): boolean {
   return n !== k && T.group[n] !== T.group[k] && T.prio[n]! > T.prio[k]! && T.kind[n] === 0;
-}
-
-/**
- * Zeichnet die Kacheln (tx0..tx0+ntx-1, ty0..ty0+nty-1) in `out` (Breite ntx*24 Kunstpixel), ab Pixelzeile `outRow`
- * (so lässt sich ein Chunk in Streifen über mehrere Bilder malen). Kacheln, für die `skip` true liefert, bleiben leer.
- */
-export function paintGround(out: Raster, tx0: number, ty0: number, ntx: number, nty: number, q: GroundQuery, skip?: (x: number, y: number) => boolean, outRow = 0): void {
-  const T = tables();
-  const { col: C, pat: PT, prio: PR, kind: KD, group: GR, noise: NT, warpX: WX, warpY: WY } = T;
-  // Kachelcache mit 2 Kacheln Rand (Verschiebung + Nachbarn): Material und (Wasser) Landabstand
-  const M = 2;
-  const cw = ntx + M * 2;
-  const ch = nty + M * 2;
-  const tm = new Int16Array(cw * ch);
-  const twd = new Float32Array(cw * ch);
-  for (let y = 0; y < ch; y++) {
-    for (let x = 0; x < cw; x++) {
-      const k = q.mat(tx0 + x - M, ty0 + y - M);
-      tm[y * cw + x] = k;
-      twd[y * cw + x] = KD[k] === 1 ? q.waterDist(tx0 + x - M, ty0 + y - M) : 0;
-    }
-  }
-  // Kachel gleichförmig (alle 8 Nachbarn gleich)?
-  const uni = new Uint8Array(cw * ch);
-  for (let y = 1; y < ch - 1; y++) {
-    for (let x = 1; x < cw - 1; x++) {
-      const k = tm[y * cw + x]!;
-      let same = 1;
-      for (let dy = -1; dy <= 1 && same; dy++) for (let dx = -1; dx <= 1; dx++) if (tm[(y + dy) * cw + x + dx] !== k) { same = 0; break; }
-      uni[y * cw + x] = same;
-    }
-  }
-
-  // Durchgang 1: Besitzer und Grundton je Pixel (Chunk + RIM), kachelweise
-  const pw = ntx * A_ + RIM * 2;
-  const ph = nty * A_ + RIM * 2;
-  const own = new Int16Array(pw * ph);
-  const tone = new Int8Array(pw * ph);
-  const px0 = tx0 * A_ - RIM;
-  const py0 = ty0 * A_ - RIM;
-  const cand = new Int16Array(4);
-  const wsum = new Float32Array(4);
-  for (let cty = Math.floor(py0 / A_); cty * A_ < py0 + ph; cty++) {
-    const j0 = Math.max(0, cty * A_ - py0);
-    const j1 = Math.min(ph, (cty + 1) * A_ - py0);
-    for (let ctx = Math.floor(px0 / A_); ctx * A_ < px0 + pw; ctx++) {
-      const i0 = Math.max(0, ctx * A_ - px0);
-      const i1 = Math.min(pw, (ctx + 1) * A_ - px0);
-      const ci = (cty - ty0 + M) * cw + ctx - tx0 + M;
-      const m0 = tm[ci]!;
-      if (uni[ci] && KD[m0] !== 1) {
-        // gleichförmig: nur das Muster kopieren
-        const pt = PT[m0]!;
-        for (let j = j0; j < j1; j++) {
-          const prow = ((py0 + j) & PM) * P;
-          for (let i = i0; i < i1; i++) {
-            own[j * pw + i] = m0;
-            tone[j * pw + i] = pt[prow + ((px0 + i) & PM)]!;
-          }
-        }
-        continue;
-      }
-      for (let j = j0; j < j1; j++) {
-        const wy = py0 + j;
-        for (let i = i0; i < i1; i++) {
-          const wx = px0 + i;
-          // Verschobene Abtastung, Anteile der vier nächsten Kachelmitten
-          const ni = (wy & PM) * P + (wx & PM);
-          const fxw = wx + WX[ni]!;
-          const fyw = wy + WY[ni]!;
-          const tx = Math.floor(fxw / A_);
-          const ty = Math.floor(fyw / A_);
-          const fx = (fxw - tx * A_ + 0.5) / A_ - 0.5;
-          const fy = (fyw - ty * A_ + 0.5) / A_ - 0.5;
-          const sx = fx < 0 ? -1 : 1;
-          const sy = fy < 0 ? -cw : cw;
-          // Übergang nur im äußeren Teil der Halbkachel: Kacheln bleiben voll, Ecken runden mit ~7 px statt zur Raute
-          const ax = sharp(fx < 0 ? -fx : fx);
-          const ay = sharp(fy < 0 ? -fy : fy);
-          const b = (ty - ty0 + M) * cw + tx - tx0 + M;
-          const m00 = tm[b]!;
-          const m10 = tm[b + sx]!;
-          const m01 = tm[b + sy]!;
-          const m11 = tm[b + sy + sx]!;
-          let best = m00;
-          if (m10 !== m00 || m01 !== m00 || m11 !== m00) {
-            cand[0] = m00;
-            wsum[0] = (1 - ax) * (1 - ay);
-            let n = 1;
-            for (let s = 0; s < 3; s++) {
-              const k = s === 0 ? m10 : s === 1 ? m01 : m11;
-              const w = s === 0 ? ax * (1 - ay) : s === 1 ? (1 - ax) * ay : ax * ay;
-              let c = 0;
-              while (c < n && cand[c] !== k) c++;
-              if (c === n) { cand[n] = k; wsum[n++] = w; } else wsum[c]! += w;
-            }
-            let sameGroup = true;
-            for (let c = 1; c < n; c++) if (GR[cand[c]!] !== GR[cand[0]!]) sameGroup = false;
-            const amp = sameGroup ? 1.6 : 0.3;
-            let bestScore = -9;
-            for (let c = 0; c < n; c++) {
-              const k = cand[c]!;
-              const sc = wsum[c]! + (KD[k] ? 0.25 : PR[k]! * 0.022) + NT[((wy + k * 29) & PM) * P + ((wx + k * 41) & PM)]! * amp;
-              if (sc > bestScore) { bestScore = sc; best = k; }
-            }
-          }
-          let t = PT[best]![ni]!;
-          if (KD[best] === 1) {
-            // Tiefe: Landabstand bilinear zwischen den Kachelmitten (Land = 0), mit Rauschen geschwellt
-            const dd = (twd[b]! * (1 - ax) + twd[b + sx]! * ax) * (1 - ay) + (twd[b + sy]! * (1 - ax) + twd[b + sy + sx]! * ax) * ay + NT[((wy * 2) & PM) * P + ((wx * 2 + 17) & PM)]! * 0.5;
-            t += dd < 1.1 ? 1 : dd < 2.2 ? 0 : dd < 3.4 ? -1 : -2;
-            t = t < 0 ? 0 : t > 6 ? 6 : t;
-          }
-          own[j * pw + i] = best;
-          tone[j * pw + i] = t;
-        }
-      }
-    }
-  }
-
-  // Durchgang 2: Farben; an Randkacheln Kanten, Schatten, Ufer, Kruste
-  const W = ntx * A_;
-  const O = (i: number, j: number): number => own[(j < 0 ? 0 : j >= ph ? ph - 1 : j) * pw + (i < 0 ? 0 : i >= pw ? pw - 1 : i)]!;
-  for (let ty = ty0; ty < ty0 + nty; ty++) {
-    for (let tx = tx0; tx < tx0 + ntx; tx++) {
-      if (skip?.(tx, ty)) continue;
-      const ci = (ty - ty0 + M) * cw + tx - tx0 + M;
-      // Randkachel, wenn im 5x5-Umfeld (Verschiebung reicht bis in die Nachbarkachel) ein anderes Material liegt
-      let border = false;
-      const k0 = tm[ci]!;
-      for (let dy = -2; dy <= 2 && !border; dy++) for (let dx = -2; dx <= 2; dx++) if (tm[ci + dy * cw + dx] !== k0) { border = true; break; }
-      for (let v = 0; v < A_; v++) {
-        const j = (ty - ty0) * A_ + v + RIM;
-        const row = (j - RIM + outRow) * W;
-        for (let u = 0; u < A_; u++) {
-          const i = (tx - tx0) * A_ + u + RIM;
-          const k = own[j * pw + i]!;
-          let t = tone[j * pw + i]!;
-          if (!border) { out.d[row + i - RIM] = C[k]![t]!; continue; }
-          let colv = -1;
-          const kk = KD[k]!;
-          if (kk === 0) {
-            const up = O(i, j - 1), dn = O(i, j + 1), lf = O(i - 1, j), rt = O(i + 1, j);
-            if (up === k && dn === k && lf === k && rt === k && O(i, j - 2) === k) { out.d[row + i - RIM] = C[k]![t]!; continue; }
-            if (lower(T, k, up) || lower(T, k, dn) || lower(T, k, lf) || lower(T, k, rt)) t = t < 1 ? t : 1; // dunkle Kante des höheren Materials
-            else if (higher(T, k, up) || higher(T, k, lf)) t = t < 1 ? t : 1; // Schatten unter/neben dem höheren Material
-            else if (higher(T, k, O(i, j - 2))) t = t > 0 ? t - 1 : 0;
-          } else {
-            // Abstand zum Land (bis 3 px); Land direkt darüber = Uferbank
-            let near = 9;
-            for (let r = 1; r <= 3 && near > 3; r++) {
-              for (let dy = -r; dy <= r && near > r; dy++) {
-                for (let dx = -r; dx <= r; dx++) {
-                  if ((dx < 0 ? -dx : dx) !== r && (dy < 0 ? -dy : dy) !== r) continue;
-                  if (KD[O(i + dx, j + dy)] === 0) { near = r; break; }
-                }
-              }
-            }
-            if (kk === 1) {
-              if (KD[O(i, j - 1)] === 0) colv = BANK_HI;
-              else if (KD[O(i, j - 2)] === 0) colv = BANK_LO;
-              else if (near === 1) t = 7;
-              else if (near <= 3) t = t < 6 ? t + 1 : 6;
-            } else if (near === 1) t = 7;
-            else if (near === 2) t = t < 1 ? t : 1;
-          }
-          out.d[row + i - RIM] = colv >= 0 ? colv : C[k]![t]!;
-        }
-      }
-    }
-  }
 }
 
 /* ---------------------------------------------------------------- Iso-Boden (P9.2) */

@@ -1,6 +1,6 @@
 /**
  * Zeichenhelfer für Iso-Gebäude und -Props (P9.3): Flächen im Raum mit Z-Puffer in ein Kunstraster, Umriss am Rand (wie die Probe
- * `scripts/bake-iso-probe.ts`). Koordinaten sind Rasterkoordinaten (Kachelmitten ganzzahlig) plus Höhe z in Einheiten zu 16
+ * `scripts/bake-iso-probe.ts` im Git-Stand 229f3f1). Koordinaten sind Rasterkoordinaten (Kachelmitten ganzzahlig) plus Höhe z in Einheiten zu 16
  * Kunstpixeln; ein Kunstpixel wird mit Maßstab 2 gezeigt. Ohne DOM nutzbar.
  */
 import { INK, Raster, mix, type Rgb } from './world/raster';
@@ -17,7 +17,7 @@ export interface Frame { sx: number; sy: number; w: number; h: number }
 /** Hülle aller Raumpunkte [x, y, z] plus Rand `pad` Kunstpixel; ausgerichtet auf Vielfache von 2 Bildschirm-Pixeln */
 export function frameOf(pts: readonly (readonly [number, number, number])[], pad = 2): Frame {
   const p = pts.map(([x, y, z]) => {
-    const q = project(true, x, y);
+    const q = project(x, y);
     return { sx: q.sx, sy: q.sy - z * UZ * 2 };
   });
   const x0 = Math.floor(Math.min(...p.map((q) => q.sx)) / 2) * 2 - pad * 2;
@@ -37,7 +37,7 @@ export class Quads {
 
   /** Raumpunkt → Kunstpixel im Raster */
   proj(x: number, y: number, z: number): [number, number] {
-    const p = project(true, x, y);
+    const p = project(x, y);
     return [(p.sx - this.f.sx) / 2, (p.sy - this.f.sy) / 2 - z * UZ];
   }
 

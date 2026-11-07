@@ -1,11 +1,11 @@
 /**
- * Iso-Häuser (P9 Iso). Schnittstelle für GameScene, Inhalt gehört P9.3.
+ * Iso-Häuser (P9 Iso).
  * Ein Haus (aus `detectHouses`, Wandring samt Tür) wird zu wenigen Bildern (`IsoHousePart`). GameScene legt jedes Teil an seiner
  * Bildschirmposition ab (Maßstab 2, Ursprung links oben), schneidet es in Spalten von 32 px und gibt jeder Spalte die Tiefe der
  * vorderen bzw. hinteren Bodenkante der Grundfläche (`footprintColumns`, Feld `layer`). Ausblenden: `isoHouseFade` liefert die
  * Ziel-Deckkraft je Gruppe (`fade`), GameScene blendet weich dorthin. Die Wand- und Türkacheln des Rings zeichnet in Iso nur
  * dieses Modul (GameScene legt dafür keine Props an); der Boden darunter (Dielen) kommt wie bisher aus dem Boden-Chunk.
- * P9.3: Fachwerkhaus mit Satteldach, Ostgiebel, Schornstein und Fensterlicht nach der Vorlage `iso()` in `scripts/bake-iso-probe.ts`.
+ * P9.3: Fachwerkhaus mit Satteldach, Ostgiebel, Schornstein und Fensterlicht nach der Vorlage `iso()` der Probe (Git-Stand 229f3f1: `scripts/bake-iso-probe.ts`).
  * Türen gibt es auf allen vier Seiten. Süd und Ost sieht man von außen (Schild über der Tür); Nord und West liegen hinter dem Haus,
  * dort hängt das Schild auf einer Stange über der Dachkante (mit Lampenschein), die Tür selbst zeigt die Innenseite bei ausgeblendetem Dach.
  * Texturen hängen nur an Bauart, Tür und Variante, nicht an der Lage: Häuser gleicher Art teilen sich ein Bild.
@@ -60,7 +60,7 @@ const roofs = new Map<string, Raster>();
 export function isoHouseParts(hs: House): IsoHousePart[] {
   const sh = shapeOf(hs);
   const f = houseFrame(sh);
-  const at = project(true, hs.x0, hs.y0);
+  const at = project(hs.x0, hs.y0);
   const id = shapeKey(sh);
   const roof = (): Raster => {
     let r = roofs.get(id);
@@ -81,8 +81,7 @@ export function isoHouseParts(hs: House): IsoHousePart[] {
 /**
  * Ziel-Deckkraft je Ausblend-Gruppe, wenn der Held auf (px, py) steht (Rasterkoordinaten, auch Zwischenwerte): im Haus Dach und
  * Vorderwände fast weg, die Rückwände bleiben; verdeckt (Fuß hinter der Vorderkante und unter der Dachspitze, im Bild also vom
- * Haus überdeckt, auch hinter Nord- oder Westwand) alles halb durchsichtig; vor der Tür das Dach halb. Werte wie das Dach der
- * Draufsicht (0,2 / 0,5).
+ * Haus überdeckt, auch hinter Nord- oder Westwand) alles halb durchsichtig; vor der Tür das Dach halb. Werte 0,2 / 0,5.
  */
 export function isoHouseFade(hs: House, px: number, py: number): Record<IsoFade, number> {
   const inside = px >= hs.x0 - 0.5 && px <= hs.x0 + hs.w - 0.5 && py >= hs.y0 - 0.5 && py <= hs.y0 + hs.h - 0.5;
@@ -96,11 +95,11 @@ export function isoHouseFade(hs: House, px: number, py: number): Record<IsoFade,
 /** Liegt eine Figur auf (px, py) im Bild hinter dem Haus? Bildschirm-x innerhalb der Grundfläche, Fuß über der Vorderkante, Kopf unter der Dachspitze */
 function covers(hs: House, px: number, py: number): boolean {
   const { xa, ya, xb, yb } = absBox(hs);
-  const f = project(true, px, py);
-  const L = project(true, xa, yb);
-  const F = project(true, xb, yb);
-  const Rt = project(true, xb, ya);
-  const B = project(true, xa, ya);
+  const f = project(px, py);
+  const L = project(xa, yb);
+  const F = project(xb, yb);
+  const Rt = project(xb, ya);
+  const B = project(xa, ya);
   if (f.sx <= L.sx + 8 || f.sx >= Rt.sx - 8) return false;
   const on = (a: { sx: number; sy: number }, b: { sx: number; sy: number }): number => a.sy + ((f.sx - a.sx) * (b.sy - a.sy)) / (b.sx - a.sx || 1);
   const front = f.sx <= F.sx ? on(L, F) : on(F, Rt);
@@ -114,7 +113,7 @@ function covers(hs: House, px: number, py: number): boolean {
 /** Iso-Bild eines Stadtprops: Schlüssel (Textur muss registriert sein, z. B. in `registerTownArt`), Anker, flach = liegt am Boden */
 export interface IsoTownProp {
   key: string;
-  /** Ursprung y (0..1) und Versatz unter der Kachelmitte in Bildschirm-Pixeln; fehlen sie, gelten die Werte der Draufsicht */
+  /** Ursprung y (0..1) und Versatz unter der Kachelmitte in Bildschirm-Pixeln; fehlen sie, gelten die Werte aus `townProp` */
   oy?: number;
   dy?: number;
   /** flach am Boden (Teppich, Heu, Raute): liegt unter allen Figuren */
@@ -122,7 +121,7 @@ export interface IsoTownProp {
 }
 
 /**
- * Stadtprop in Iso: `key` ist der Draufsicht-Schlüssel aus GameScene `townProp`, `axis` die Richtung des Zugs aus gleichen
+ * Stadtprop in Iso: `key` ist der Schlüssel aus GameScene `townProp`, `axis` die Richtung des Zugs aus gleichen
  * Nachbarn ('x' = Nachbar links/rechts im Raster, sonst 'y'). Stände und Blumenkästen gibt es in beiden Richtungen als Iso-Bild
  * (`isoTownArt.ts`, registriert in `registerTownArt`), alle übrigen (Fass, Kisten, Brunnen, Laterne, Pfahl, Boot, Schiff) bleiben
  * die stehenden Bilder der Code-Welt. Das Bild steht auf der Kachelmitte (`dy` 0).

@@ -3,7 +3,7 @@
  * Kunstraster, die der Chunk-Maler einmalig in den Boden stempelt. Streuung je Biom in Gruppen (grober 4x4-Hash), wie
  * vorher in `groundLook.ts`. Kleine Objekte bekommen einen weichen Umriss, flache Dinge (Risse, Moos) keinen.
  */
-import { ART, INK, Raster, abgr, h3, mix, rgbOf, rng, type Rgb } from './raster';
+import { INK, Raster, abgr, h3, mix, rgbOf, rng, type Rgb } from './raster';
 import { Z } from '../groundLook';
 
 type Pal = Record<string, Rgb>;
@@ -264,26 +264,6 @@ function pickDetail(x: number, y: number, gid: number, zone: number): { id: stri
   const id = cl.ids[Math.floor(h3(x, y, 3) * cl.ids.length)]!;
   const spr = detail(id);
   return spr ? { id, spr } : null;
-}
-
-/** Streut höchstens ein Detail auf die Kachel (x, y) und stempelt es an (ox, oy) in `out`; Gruppen über einen 4x4-Hash. */
-export function stampDetail(out: Raster, x: number, y: number, gid: number, zone: number, ox: number, oy: number): void {
-  const d = pickDetail(x, y, gid, zone);
-  if (!d || d.spr.w > ART || d.spr.h > ART) return;
-  const spr = d.spr;
-  out.blit(spr, ox + Math.floor(h3(x, y, 4) * (ART - spr.w)), oy + Math.floor(h3(x, y, 5) * (ART - spr.h)), h3(x, y, 6) < 0.5);
-}
-
-/** Wasserdetails: Seerosen am Ufer (im Moor häufiger), Wellenstriche im Tiefen */
-export function stampWaterDetail(out: Raster, x: number, y: number, zone: number, dist: number, ox: number, oy: number): void {
-  const swamp = zone === Z.swamp || zone === Z.gruft;
-  const r = h3(x, y, 21);
-  let id: string | null = null;
-  if (dist <= 2 && r < (swamp ? 0.26 : 0.06)) id = h3(x, y, 22) < 0.3 ? 'lily_flower' : 'lily';
-  else if (dist >= 3 && r > 0.85) id = h3(x, y, 23) < 0.5 ? 'ripple' : 'ripple_b';
-  if (!id) return;
-  const spr = detail(id)!;
-  out.blit(spr, ox + 2 + Math.floor(h3(x, y, 24) * (ART - 4 - spr.w)), oy + 2 + Math.floor(h3(x, y, 25) * (ART - 4 - spr.h)));
 }
 
 /* ---------------------------------------------------------------- Iso (P9.2) */
