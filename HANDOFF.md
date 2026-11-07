@@ -1,3 +1,9 @@
+## LÄUFT (2026-11-07): Treffer-Juice, danach main-Push nach Okay
+- **Stand:** SPEC „Auftrag 2026-11-07: Treffer-Juice“ (3a7f36b). Session `treffer-juice` (local_f2612a25…, Sonnet, geteilter Checkout `neuer-look`, kein Push). Alles darunter (P3, P5, Review-Fixes 86a6fb5) ist fertig, aber nicht live.
+- **Letzte 3 Entscheidungen:** (1) Nutzer: weniger, härtere Grundangriffe bei gleichem Schaden pro Sekunde (Pace stabil). (2) Nutzer: Trefferstopp/Wackeln ja, aber Gegner stehen nur bei ausdrücklicher Betäubung (Skill) still. (3) Nutzer: Juice vor dem nächsten `main`-Push.
+- **Offen:** Bericht von `treffer-juice` prüfen (tsc/Lint/Tests/Build, Pace gegen 20,6 h, Browser), `HANDOFF.md` nachtragen, dann Nutzer fragen: `neuer-look` → `main` pushen. Die Hauptsession ist voll (~170K): Prüfung und Push in frischer Session machen, Einstieg ist dieser Abschnitt.
+- **Learnings:** Hook-Kontrollpunkte füllen den Kontext der Hauptsession; Koordination über viele Sessions passt kaum in eine Hauptsession, rechtzeitig übergeben.
+
 ## ERLEDIGT (2026-11-07): P3-Rest + P5-Patrouille + Review-Fixes – NÄCHSTER SCHRITT: Nutzer-Test, main nach Okay
 - **Stand:** Auf `neuer-look`, kein Push: 777b926 P3-Funde (132 neue in `named.ts`), 641f8e8 P5-Wache (2 `Straßenwache` `kind: 'guard'`, Route `src/sim/route.ts`, Respawn 150 s, aktiv nur mit Spieler in 38 Feldern), 8037034 Titel über dem Kopf (`ActorLite.title` im Netz) + Kopfgelder (Quest-Art `goal`, 11 Gruppen × 100/500 Kills, versteckt über Stichworte, `src/sim/killGoals.ts`). Hauptsession geprüft: tsc, Lint, 498 Tests, Build grün. Pace (8 Seeds): 20,9 h ohne Wache → 22,1 h mit Wache und Kopfgeldern, Tode 416 → 378. Übergaben im Notizordner: `p3-funde-handoff.md`, `wache/wache-handoff.md`, `p3-rest-handoff.md` (+ Screenshots `wache/`, `p3-rest/`).
 - **Letzte 3 Entscheidungen:** (1) Nutzer: P3-Rest ohne Charaktererschaffung. (2) Nutzer: Wache kämpft echt in der Sim. (3) Titel + Kopfgelder nach P5, weil dieselben Dateien.
