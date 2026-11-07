@@ -412,7 +412,8 @@ export class Ui {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const a = actionFor(e.key);
       if (!a) return;
-      if (e.repeat && (a === 'quicksave' || a === 'quickload')) {
+      // Gehaltene Taste: kein Dauer-Speichern, kein Kettentrinken (Tränke haben keine Abklingzeit)
+      if (e.repeat && (a === 'quicksave' || a === 'quickload' || a === 'heal' || a === 'mana')) {
         e.preventDefault();
         return;
       }

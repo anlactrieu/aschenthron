@@ -3,7 +3,7 @@ import { findPath, isWalkable, type Grid, type Pt } from './path';
 import { itemReq, reqOfTemplate, itemAffixes, gemTemplateId, handsOf, weaponSpeedOf, rollGem, rollUniqueSpecial, rollWorldDrop, rollWorldSpecial, rollPotion, rollSpecial, templateById, generateItem, generateNamed, rollNamed, rollBase, rollLoot, rerollAffixes, extendAffixes, SETS, type GemInfo, type Item, type PowerId, type SetBonus, type EquipSlot, type Stat } from './items';
 import {
   ATTR_KEYS, ATTR_NAME, xpToNext, questXp, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, skillReq, skillRankOf, ACTIVE_POWER, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
-  monsterKind, CALL_RANGE, CALL_COOLDOWN, FLEE_HP, FLEE_TICKS, npcKeyOf, isGiverOf, lootGroupOf, LOOT_GROUPS, KILL_GOALS, LEVEL_TITLES, type LootGroup, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, NAMED_SHARE, POTION_DROP_CHANCE, POTION_COOLDOWN_TICKS, type AttrKey,
+  monsterKind, CALL_RANGE, CALL_COOLDOWN, FLEE_HP, FLEE_TICKS, npcKeyOf, isGiverOf, lootGroupOf, LOOT_GROUPS, KILL_GOALS, LEVEL_TITLES, type LootGroup, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, NAMED_SHARE, POTION_DROP_CHANCE, type AttrKey,
   BEGINNER_ZONE, CHAIN_FIRST, DANGER_PACK, GUARD, FAMILY_RES, MELEE_SKILL_KRAFT_SCALE, MAX_RES, SLOW_FACTOR, STATUS_IDS, PASSIVE_CAP, DMG_NAME, type DmgType, type StatusId, type SkillDef, type PassiveKey,
   ATTR_THRESHOLD, ATTR_THRESHOLD_2, ATTR_THRESHOLD_BONUS, LEVEL_MILESTONES, milestonePoints, WILL_RES_PER_2, WILL_STATUS_PER_POINT, WILL_STATUS_CAP, GEM_MIN_LEVEL, GEM_DROP, GEM_SOCKET_COST, WORLD_BOSS_LOOT, type QuestDef,
 } from './data';
@@ -129,7 +129,6 @@ export interface Actor {
   skillRanks: Record<string, number>;
   skillPoints: number;
   skillCd: Record<string, number>;
-  potionCd: number;
   quests: Record<string, { state: 'active' | 'done' | 'turned'; progress: number; found?: string[] }>;
   inventory: Item[];
   equipment: Partial<Record<EquipSlot, Item>>;
@@ -412,7 +411,7 @@ function baseActor(w: World, kind: Actor['kind'], name: string, x: number, y: nu
     id: w.nextId++, kind, name, x, y, hp: 100, maxHp: 100, damage: [1, 2], speed: 0.1, attackCooldown: 20,
     cooldownLeft: 0, path: [], targetId: null, aggroRange: 0, alive: true, level: 1, xp: 0, statPoints: 0,
     attrs: { kraft: 10, gewandtheit: 10, ausdauer: 10, verstand: 10, willenskraft: 10 },
-    mana: 20, gold: 0, skills: [], skillRanks: {}, skillPoints: 0, skillCd: {}, potionCd: 0, quests: {}, inventory: [], equipment: {}, stash: [], pickupId: null, chestId: null, resting: false, stuck: 0,
+    mana: 20, gold: 0, skills: [], skillRanks: {}, skillPoints: 0, skillCd: {}, quests: {}, inventory: [], equipment: {}, stash: [], pickupId: null, chestId: null, resting: false, stuck: 0,
     diedAt: -1, boss: false, enraged: false, autoAttack: true, repathAt: 0, dot: null, status: {}, burn: null, dmgType: 'physical', healAt: 0, raiseAt: 0, lastHitAt: -9999, packId: 0, abilities: [], abilityAt: 0, chargeAt: 0, chargeUntil: 0, summoned: false, respawnTicks: MONSTER_RESPAWN_TICKS, rewardMult: 1, pkUntil: 0, attackedBy: null, damagers: {},
   };
   w.actors.push(a);
@@ -1086,14 +1085,12 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
         note(w, a, `Du liest die Schriftrolle (${TELEPORT_TICKS / TICK_RATE} s) – nicht bewegen, nicht kämpfen.`);
         break;
       }
-      if (a.potionCd > 0) return fail(w, 'Du musst kurz warten.');
       const needHp = it.heal !== undefined && a.hp < maxHpOf(a);
       const needMana = it.mana !== undefined && a.mana < maxManaOf(a);
       if (!needHp && !needMana) return fail(w, 'Das brauchst du gerade nicht.');
       if (it.heal) a.hp = Math.min(maxHpOf(a), a.hp + it.heal);
       if (it.mana) a.mana = Math.min(maxManaOf(a), a.mana + it.mana);
       a.inventory = a.inventory.filter((i) => i.id !== it.id);
-      a.potionCd = POTION_COOLDOWN_TICKS;
       w.events.push({ type: 'potion', item: it, to: a.id });
       break;
     }
@@ -2288,7 +2285,6 @@ export function tick(w: World): void {
       continue;
     }
     if (a.cooldownLeft > 0) a.cooldownLeft--; // darf knapp unter 0 fallen (Rest, s. startCooldown)
-    if (a.potionCd > 0) a.potionCd--;
     if (a.tele) updateTeleport(w, a);
     if (a.dot) {
       if (w.tick % TICK_RATE === 0) {

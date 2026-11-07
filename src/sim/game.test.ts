@@ -315,7 +315,7 @@ describe('Safe-Zone und Sortiment', () => {
 describe('Tränke', () => {
   const potion = (w: World, id: string) => generateItem(w.rng, w.nextId++, id, 'normal');
 
-  it('Heiltrank heilt, Manatrank stellt Mana her, Cooldown und Ablehnung bei vollen Werten', () => {
+  it('Heiltrank heilt, Manatrank stellt Mana her, ohne Abklingzeit, Ablehnung bei vollen Werten', () => {
     const { w, p } = fresh();
     const h = potion(w, 'heal_small');
     const m = potion(w, 'mana_small');
@@ -328,11 +328,7 @@ describe('Tränke', () => {
     expect(p.inventory).toHaveLength(1);
     p.mana = 0;
     applyCommand(w, p.id, { type: 'usePotion', itemId: m.id });
-    expect(p.mana).toBe(0); // Cooldown läuft
-    run(w, 101);
-    p.mana = 0;
-    applyCommand(w, p.id, { type: 'usePotion', itemId: m.id });
-    expect(p.mana).toBe(20); // auf Maximum begrenzt
+    expect(p.mana).toBe(20); // direkt nach dem Heiltrank, keine Abklingzeit; auf Maximum begrenzt
     expect(p.inventory).toHaveLength(0);
   });
 

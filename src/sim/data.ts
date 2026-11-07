@@ -694,7 +694,6 @@ export const GEAR_DROP_FACTOR = 0.35;
 /** Anteil benannter Funde an der Ausrüstungsbeute normaler Monster (P3; Rest: Grundgegenstände) */
 export const NAMED_SHARE = 0.3;
 export const POTION_DROP_CHANCE = 0.3;
-export const POTION_COOLDOWN_TICKS = 100;
 
 /** Rüstungs-Formel: Schaden * K / (K + Rüstung) */
 export const ARMOR_K = 30;
