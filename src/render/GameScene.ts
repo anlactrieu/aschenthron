@@ -2507,6 +2507,12 @@ export class GameScene extends Phaser.Scene {
       } else if (waiting) {
         // leere Textur, denn die vorige kann schon aus dem Cache geflogen sein
         img.setTexture('__DEFAULT');
+      } else if (a.kind === 'guard') {
+        // außerhalb des Skelett-Modus: die NPC-Figur der Wache statt des nackten Helden
+        const nk = npcTextureKey(GUARD_LOOK);
+        const gside = !!view.side;
+        const gf = frame === FRAME_WIND || frame === FRAME_STRIKE ? 0 : frame;
+        img.setTexture(ensureTexture(this, gside ? `${nk}_${gf}s` : gf ? `${nk}_${gf}` : nk, () => (gside ? npcCanvas(GUARD_LOOK, undefined, gf, true) : npcCanvas(GUARD_LOOK, undefined, gf)))).setOrigin(0.5, FEET_ORIGIN_Y);
       } else if (a.kind !== 'monster') {
         const look = lookOf(a);
         img.setTexture(ensureTexture(this, lookKey(look, frame, !!view.up && !view.side, !!view.side), () => playerCanvas(look, frame, !!view.up && !view.side, !!view.side)));

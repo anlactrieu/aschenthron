@@ -100,7 +100,6 @@ export function landmarksOf(map: TiledLike): Landmark[] {
   return out;
 }
 
-export { ROUTE, routeLength, routeAt };
 
 interface TravelerDef {
   kind: 'cart' | 'pilgrim';

@@ -1884,6 +1884,14 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
   return amount;
 }
 
+/** Kopfgeld-Aufträge (Art `goal`) je Beute-Gruppe, einmal gebaut */
+const GOAL_QUESTS = new Map<LootGroup, QuestDef[]>();
+for (const q of QUESTS) {
+  if (q.kind !== 'goal' || !q.group) continue;
+  const grp = q.group as LootGroup;
+  GOAL_QUESTS.set(grp, [...(GOAL_QUESTS.get(grp) ?? []), q]);
+}
+
 function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
   if (m.rewardMult <= 0) return;
   const k = monsterKind(m.kindId!);
@@ -1897,6 +1905,8 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
   // Straßenwache (P5): erlegt sie allein, gibt es weder Beute noch Fortschritt; hat ein Spieler mitgekämpft, zählt sein Anteil
   if (killer.kind === 'guard' && credited.size === 0) return;
   const camp = campClearedBy(w, m);
+  const group = lootGroupOf(k.id);
+  const goals = m.kindId && !m.summoned && group ? GOAL_QUESTS.get(group) : undefined;
   for (const pl of credited.values()) {
     if (camp) {
       note(w, pl, `Lager „${camp.name}“ gesäubert – die Lagertruhe ist offen.`);
@@ -1923,7 +1933,7 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
     }
     if (m.kindId && !m.summoned) for (const b of pl.bounties ?? []) if (b.target === m.kindId && b.progress < b.count) b.progress++;
     if (m.kindId && !m.summoned && pl.kind === 'player') countKill(w, pl, m.kindId);
-    if (m.kindId && !m.summoned && pl.kind === 'player') for (const q of QUESTS) if (q.kind === 'goal' && q.group === lootGroupOf(m.kindId)) syncGoal(w, pl, q);
+    if (goals && pl.kind === 'player') for (const q of goals) syncGoal(w, pl, q);
     for (const q of QUESTS) {
       const st = pl.quests[q.id];
       if (st?.state !== 'active') continue;
@@ -1940,7 +1950,7 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
         questItemFound(w, pl, q, st);
       }
     }
-    gainXp(w, killer.kind === 'guard' ? pl : killer, Math.round(k.xp * (1 + powerOf(pl, 'xpBonus') / 100)));
+    gainXp(w, pl, Math.round(k.xp * (1 + powerOf(pl, 'xpBonus') / 100)));
     const mk = powerOf(pl, 'manaKill');
     if (mk > 0) pl.mana = Math.min(maxManaOf(pl), pl.mana + mk);
     const hk = powerOf(pl, 'healKill');
@@ -1957,7 +1967,6 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
   };
   // P3: Beute ist fest – Grundgegenstände und benannte Funde der Beute-Gruppe; Zufallsaffixe nur noch bei Weltbossen
   const lid = () => w.nextId++;
-  const group = lootGroupOf(k.id);
   if (k.boss || w.rng.next() <= k.dropChance * GEAR_DROP_FACTOR) {
     drop(k.boss ? (rollNamed(w.rng, lid, k.level, group, true) ?? rollBase(w.rng, lid, k.level, 0.6)) : rollLoot(w.rng, lid, k.level, group, NAMED_SHARE, WEAPON_SHARE_MONSTER));
   }
@@ -2483,9 +2492,9 @@ function fleeStep(w: World, m: Actor): boolean {
 
 /* ---------- Straßenwache (P5) ---------- */
 
-/** Wen die Wache überhaupt bekämpfen darf: keine Bosse, Unikate, Lagerbesatzungen, Beschworenen, nichts in Stadt oder Anfängerzone */
-function guardMayFight(w: World, m: Actor): boolean {
-  return m.kind === 'monster' && m.alive && !m.boss && !m.unique && !m.campId && !m.summonedBy && !inSafeZone(w, m.x, m.y) && !inBeginnerZone(w, m.x, m.y);
+/** Wen die Wache überhaupt bekämpfen darf: keine Bosse, Unikate, Lagerbesatzungen, Beschworenen, nichts in der Stadt; in der Anfängerzone nur, wer sie selbst angreift */
+function guardMayFight(w: World, m: Actor, g: Actor): boolean {
+  return m.kind === 'monster' && m.alive && !m.boss && !m.unique && !m.campId && !m.summonedBy && !inSafeZone(w, m.x, m.y) && (m.targetId === g.id || !inBeginnerZone(w, m.x, m.y));
 }
 
 /** Nächstes Ziel der Wache: zuerst Monster, die einen Spieler in der Nähe jagen (oder die Wachen selbst), dann Monster am Streckenrand (kein Gefahrenort, kein Champion) */
@@ -2495,7 +2504,7 @@ function guardPick(w: World, g: Actor): Actor | undefined {
   for (const m of w.actors) {
     if (m.kind !== 'monster' || !m.alive) continue;
     const d = dist(g, m);
-    if (d > GUARD.help || !guardMayFight(w, m)) continue;
+    if (d > GUARD.help || !guardMayFight(w, m, g)) continue;
     const t = m.targetId === null ? undefined : getActor(w, m.targetId);
     const urgent = !!t && t.alive && (t.kind === 'guard' || (t.kind === 'player' && dist(g, t) <= GUARD.help));
     if (!urgent && !(d <= GUARD.sight && m.packId < DANGER_PACK && !m.champ && routeDist(m.x, m.y) <= GUARD.reach)) continue;
@@ -2549,7 +2558,7 @@ function guardStep(w: World, g: Actor, players: Actor[]): void {
     return;
   }
   let t = g.targetId === null ? undefined : getActor(w, g.targetId);
-  if (t && (!t.alive || dist(g, t) > GUARD.help + 4 || routeDist(g.x, g.y) > GUARD.leash || !guardMayFight(w, t))) {
+  if (t && (!t.alive || dist(g, t) > GUARD.help + 4 || routeDist(g.x, g.y) > GUARD.leash || !guardMayFight(w, t, g))) {
     t = undefined;
     g.targetId = null;
     g.path = [];
@@ -2569,9 +2578,10 @@ function guardStep(w: World, g: Actor, players: Actor[]): void {
       fight(w, g, t);
       return;
     }
-    const before = g.x + g.y;
+    const bx = g.x;
+    const by = g.y;
     chase(w, g, t);
-    g.stuck = g.x + g.y === before ? g.stuck + 1 : 0;
+    g.stuck = g.x === bx && g.y === by ? g.stuck + 1 : 0;
     if (g.stuck > TICK_RATE * 2) {
       g.targetId = null;
       g.path = [];
@@ -2595,9 +2605,10 @@ function guardStep(w: World, g: Actor, players: Actor[]): void {
     g.repathAt = w.tick + 20;
     g.path = findPath(w.grid, { x: Math.round(g.x), y: Math.round(g.y) }, { x: Math.round(at.x), y: Math.round(at.y) });
   }
-  const before = g.x + g.y;
+  const bx = g.x;
+  const by = g.y;
   stepAlong(g, w.tick);
-  g.stuck = g.x + g.y === before ? g.stuck + 1 : 0;
+  g.stuck = g.x === bx && g.y === by ? g.stuck + 1 : 0;
   if (g.stuck > TICK_RATE * 3) {
     g.x = at.x;
     g.y = at.y;

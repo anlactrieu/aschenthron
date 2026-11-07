@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import mapJson from '../data/aschenthron.json';
 import { buildWorld, type TiledMap } from './tiled';
-import { BEGINNER_ZONE, DANGER_PACK, GUARD } from './data';
+import { BEGINNER_ZONE, DANGER_PACK, GUARD, monsterKind } from './data';
 import { ROUTE, routeDist, routeLength, routePingPong } from './route';
 import { isWalkable } from './path';
-import { applyCommand, getActor, inBeginnerZone, spawnMonster, tick, TICK_RATE, type Actor, type World } from './world';
+import { addPlayer, applyCommand, getActor, inBeginnerZone, spawnMonster, tick, TICK_RATE, type Actor, type World } from './world';
 import { makeSnapshot } from './net';
 
 /** Kämpfende Wachpatrouille (P5): zwei Straßenwachen auf der Handelsstraße, echte Wesen der Sim. */
@@ -159,6 +159,42 @@ describe('Straßenwache', () => {
     expect(shared.alive).toBe(false);
     expect(p.xp).toBeGreaterThan(xp0);
     expect(g.xp).toBe(0);
+  });
+
+  it('geteilter Kill: jeder beteiligte Spieler bekommt seine eigene XP genau einmal', () => {
+    const { w, p, guards } = build();
+    place(guards, FIELD_S);
+    const g = guards[0]!;
+    const p2 = addPlayer(w, 'Zweiter');
+    Object.assign(p2, { maxHp: 1e6, hp: 1e6 });
+    at(p, g.x - 4, g.y - 3);
+    at(p2, g.x - 4, g.y - 2);
+    const m = mon(w, g, 4, 0, 'goblin');
+    m.hp = 1;
+    m.damagers[p.id] = w.tick;
+    m.damagers[p2.id] = w.tick;
+    const x1 = p.xp;
+    const x2 = p2.xp;
+    run(w, TICK_RATE * 15);
+    expect(m.alive).toBe(false);
+    const gain = monsterKind('goblin').xp;
+    expect(p.xp - x1).toBe(gain);
+    expect(p2.xp - x2).toBe(gain);
+  });
+
+  it('wehrt sich in der Anfängerzone gegen ein Monster, das sie angreift, greift dort aber nichts von sich aus an', () => {
+    const { w, p, guards } = build();
+    place(guards, 20);
+    const g = guards[0]!;
+    expect(inBeginnerZone(w, g.x, g.y)).toBe(true);
+    at(p, g.x - 6, g.y);
+    const rat = mon(w, g, 1, 0, 'field_rat');
+    rat.maxHp = rat.hp = 1e5;
+    rat.targetId = g.id;
+    rat.autoAttack = true;
+    run(w, TICK_RATE * 6);
+    expect(rat.hp).toBeLessThan(rat.maxHp);
+    expect(g.targetId).toBe(rat.id);
   });
 
   it('fällt, wartet und kehrt am Hafen zurück', () => {
