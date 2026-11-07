@@ -226,6 +226,38 @@ export class Sfx {
     this.tone(260, 0.1, 'square', 0.22, 90);
     this.tone(1200, 0.08, 'triangle', 0.14, 600, 0.02);
   }
+  /**
+   * Einschlag eines Spielertreffers je Waffenart: Klinge (Schnitt + Metall), Wucht (dumpfer Schlag), Bogen (Holz-Klack), Magie (Zischen + Knall).
+   * `power`: 0 normal, 1 kritisch (lauter, länger, zusätzlicher heller Schlag), 2 Todesstoß (zusätzlicher Tiefton). Alles prozedural.
+   */
+  impact(kind: 'blade' | 'blunt' | 'bow' | 'magic', power: 0 | 1 | 2 = 0): void {
+    if (!this.gate(`impact-${kind}`, 45)) return;
+    const v = power === 0 ? 1 : power === 1 ? 1.45 : 1.25;
+    const L = power === 0 ? 1 : 1.35;
+    if (kind === 'blade') {
+      this.noise(0.08 * L, 0.55 * v, 6200);
+      this.tone(980, 0.09 * L, 'triangle', 0.13 * v, 520);
+      this.tone(170, 0.14 * L, 'sine', 0.3 * v, 60);
+    } else if (kind === 'blunt') {
+      this.tone(120, 0.22 * L, 'sine', 0.42 * v, 38);
+      this.noise(0.13 * L, 0.55 * v, 1100);
+      this.tone(260, 0.07, 'square', 0.12 * v, 110);
+    } else if (kind === 'bow') {
+      this.noise(0.05, 0.4 * v, 3400);
+      this.tone(330, 0.1 * L, 'triangle', 0.28 * v, 110);
+      this.tone(90, 0.12 * L, 'sine', 0.26 * v, 50);
+    } else {
+      this.noise(0.16 * L, 0.38 * v, 4200);
+      this.tone(760, 0.2 * L, 'sawtooth', 0.12 * v, 180);
+      this.tone(140, 0.2 * L, 'sine', 0.32 * v, 45);
+    }
+    if (power === 1) {
+      this.tone(1500, 0.1, 'triangle', 0.16, 800, 0.015);
+      this.tone(2100, 0.07, 'sine', 0.09, 1200, 0.03);
+    } else if (power === 2) {
+      this.tone(70, 0.3, 'sine', 0.36, 32, 0.03);
+    }
+  }
   rare(): void {
     if (!this.gate('rare', 400)) return;
     [523, 659, 784].forEach((f, i) => this.tone(f, 0.3, 'triangle', 0.16, undefined, i * 0.07));

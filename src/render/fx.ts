@@ -28,6 +28,10 @@ interface FloatText {
   y: number;
   vy: number;
   grow: number;
+  /** Aufpoppen zu Beginn (Startfaktor der Größe, 1 = keins) */
+  pop: number;
+  /** seitliche Drift in Pixel über die Lebensdauer */
+  dx: number;
   active: boolean;
 }
 
@@ -66,12 +70,14 @@ export class Fx {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   }
 
-  floatText(x: number, y: number, text: string, color: string, size = 14, dur = 950): void {
+  floatText(x: number, y: number, text: string, color: string, size = 14, dur = 950, pop = 1): void {
     dur *= this.timeScale;
     let f = this.floats.find((q) => !q.active);
+    // Zahlenflut deckeln: kleine Texte entfallen, wenn schon viele laufen (große, wichtige bleiben)
+    if (!f && this.floats.length >= 26 && size < 16) return;
     if (!f) {
       const t = this.scene.add.text(0, 0, '', { fontSize: '14px', fontStyle: 'bold', stroke: '#000', strokeThickness: 3 }).setOrigin(0.5).setDepth(DEPTH);
-      f = { t, start: 0, dur: 0, x: 0, y: 0, vy: 0, grow: 1, active: false };
+      f = { t, start: 0, dur: 0, x: 0, y: 0, vy: 0, grow: 1, pop: 1, dx: 0, active: false };
       this.floats.push(f);
     }
     const jitter = (this.seed() % 17) - 8;
@@ -82,7 +88,9 @@ export class Fx {
     f.y = y;
     f.vy = -38;
     f.grow = size > 16 ? 1.25 : 1;
-    f.t.setText(text).setColor(color).setFontSize(size).setVisible(true).setAlpha(1).setPosition(f.x, f.y);
+    f.pop = pop;
+    f.dx = pop > 1 ? (jitter < 0 ? -1 : 1) * (10 + (this.seed() % 9)) : 0;
+    f.t.setText(text).setColor(color).setFontSize(size).setStroke('#000', size >= 20 ? 5 : 3).setVisible(true).setAlpha(1).setPosition(f.x, f.y);
   }
 
   private add(e: Omit<Effect, 'start' | 'seed'>): void {
@@ -167,8 +175,13 @@ export class Fx {
         continue;
       }
       const ease = 1 - (1 - k) * (1 - k);
-      f.t.setPosition(f.x, f.y + f.vy * ease * 1.6).setAlpha(k < 0.65 ? 1 : 1 - (k - 0.65) / 0.35);
-      f.t.setScale(f.grow > 1 && k < 0.15 ? 1 + (1 - k / 0.15) * 0.5 : 1);
+      // Sprung: schneller Satz nach oben, kurzer Rückfall, dann sanftes Steigen (nur bei aufpoppenden Zahlen)
+      const hop = f.pop > 1 ? -Math.sin(Math.min(1, k / 0.22) * Math.PI) * 9 * f.pop : 0;
+      f.t.setPosition(f.x + f.dx * ease, f.y + f.vy * ease * 1.6 + hop).setAlpha(k < 0.65 ? 1 : 1 - (k - 0.65) / 0.35);
+      // Aufpoppen mit Überschwingen; ohne `pop` das alte kurze Anwachsen großer Zahlen
+      const pk = Math.min(1, k / 0.2);
+      const sc = f.pop > 1 ? 1 + (f.pop - 1) * (1 - pk) * (1 - pk) * (1 + 0.6 * Math.cos(pk * Math.PI * 2)) : f.grow > 1 && k < 0.15 ? 1 + (1 - k / 0.15) * 0.5 : 1;
+      f.t.setScale(Math.max(0.1, sc));
     }
     // Umgebung
     for (const p of this.ambient) {

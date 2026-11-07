@@ -4,7 +4,7 @@ import { NAMED } from '../sim/named';
 import { Rng } from '../sim/rng';
 import { LEGENDARIES, POWER_TEXT, TEMPLATES, SETS, TIER_COLOR, GEM_COLOR, affixRange, generateLegendary, generateNamed, gemAffix, gemName, handsOf, itemAffixes, itemReq, reqOfTemplate, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
 import {
-  NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyBlock, buyPrice, carriedWeight, carryCapacity, damageRange,
+  NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyBlock, buyPrice, carriedWeight, carryCapacity, hitDamageRange,
   bulkSellable, sellPrice, critChance, attrBonus, equipSlotFor, socketCost, maxHpOf, maxManaOf, missingReq, nearNpc, shopNear, trainerTeaches, powerOf, resistOf, type Actor, type Command, type Npc, type World,
   gearStat, parryChance, passiveSum, questRewardChoices, missingSkillReq, groupKills, merchantNamed, namedPrice,
 } from '../sim/world';
@@ -1194,7 +1194,7 @@ export class Ui {
     body.append(doll);
 
     // Werte-Kurzfassung
-    const [lo, hi] = damageRange(p);
+    const [lo, hi] = hitDamageRange(p);
     const sum = el('div', 'a-row');
     sum.style.justifyContent = 'center';
     sum.style.gap = '16px';
@@ -1285,7 +1285,7 @@ export class Ui {
   }
 
   private renderChar(body: HTMLElement, p: Actor): void {
-    const [lo, hi] = damageRange(p);
+    const [lo, hi] = hitDamageRange(p);
     body.append(el('div', 'a-sec', `Attribute${p.statPoints ? ` – ${p.statPoints} Punkte zu verteilen` : ''}`));
     const help: Record<string, string> = {
       kraft: 'mehr Schaden, mehr Tragkraft', gewandtheit: 'schnellere Hiebe, Fernkampf', ausdauer: 'mehr Leben und Regeneration',

@@ -667,6 +667,19 @@ function startCooldown(a: Actor): void {
   a.cooldownLeft = attackCooldownOf(a) + Math.min(0, a.cooldownLeft);
 }
 
+/**
+ * Grundangriff des Spielers: weniger, dafür härtere Hiebe/Schüsse. Takt und Schaden je Treffer wachsen um denselben Faktor, der Schaden pro Sekunde
+ * bleibt gleich. Gilt zentral für Nah- und Fernkampf; Fertigkeiten haben eigene Abklingzeiten, Monster und Wachen behalten ihre Werte.
+ */
+export const BASIC_TEMPO = 1.5;
+
+/** Schaden eines Grundangriffs (Spieler: um `BASIC_TEMPO` erhöht, sonst wie `damageRange`) */
+export function hitDamageRange(a: Actor): [number, number] {
+  const [lo, hi] = damageRange(a);
+  const k = a.kind === 'player' ? BASIC_TEMPO : 1;
+  return k === 1 ? [lo, hi] : [Math.max(1, Math.round(lo * k)), Math.max(1, Math.round(hi * k))];
+}
+
 export function attackCooldownOf(a: Actor): number {
   const base = a.attackCooldown - Math.floor((a.attrs.gewandtheit - 10) / 2);
   // Eile (Affix, Edelsteine): bis zu 40 % schneller, Untergrenze 6 Ticks
@@ -676,8 +689,9 @@ export function attackCooldownOf(a: Actor): number {
   const wpn = a.equipment.weapon;
   const wSpeed = wpn ? weaponSpeedOf(wpn) : 1;
   const tempo = attrBonus(a, 'gewandtheit');
-  const frac = wSpeed !== 1 || tempo > 0;
-  if (frac) cd = Math.max(4, (cd * wSpeed) / (1 + tempo / 100));
+  const basic = a.kind === 'player' ? BASIC_TEMPO : 1;
+  const frac = wSpeed !== 1 || tempo > 0 || basic !== 1;
+  if (frac) cd = Math.max(4 * basic, (cd * wSpeed * basic) / (1 + tempo / 100));
   if (a.status.slow) cd /= SLOW_FACTOR;
   return frac ? cd : Math.round(cd);
 }
@@ -1650,8 +1664,8 @@ function bowAi(w: World, a: Actor, t: Actor): boolean {
   startCooldown(a);
   const bonus = affixSum(a, 'damage') + Math.floor((a.attrs.gewandtheit - 10) / 2) + (a.equipment.offhand.arrowBonus ?? 0);
   const [wlo, whi] = wpn.damage ?? [0, 0];
-  const lo = Math.max(1, a.damage[0] + wlo + bonus);
-  const hi = Math.max(1, a.damage[1] + whi + bonus);
+  const lo = Math.max(1, Math.round((a.damage[0] + wlo + bonus) * BASIC_TEMPO));
+  const hi = Math.max(1, Math.round((a.damage[1] + whi + bonus) * BASIC_TEMPO));
   dealDamage(w, a, t, w.rng.int(lo, hi), false, 'quick_shot', false, true);
   return true;
 }
@@ -1666,7 +1680,7 @@ function fight(w: World, a: Actor, t: Actor): void {
   }
   if (a.cooldownLeft > 0) return;
   startCooldown(a);
-  const [lo, hi] = damageRange(a);
+  const [lo, hi] = hitDamageRange(a);
   dealDamage(w, a, t, w.rng.int(lo, hi), false, undefined, false, true, a.dmgType);
 }
 
@@ -1772,8 +1786,10 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
   let raw = rawIn;
   // Passive Treffer-Procs (nur Nahkampf des Spielers); eigener Zufallsstrom `fx`, damit der Kampfwurf-Strom unverändert bleibt
   const meleeProc = a.kind === 'player' && t.kind === 'monster' && !noReflect && dt === 'physical' && a.equipment.weapon?.kind !== 'bow' && a.equipment.weapon?.kind !== 'staff';
+  // Grundangriffe kommen seltener: Proc-Chancen wachsen mit, damit die Wirkung pro Sekunde gleich bleibt
+  const procK = !skill && a.kind === 'player' ? BASIC_TEMPO : 1;
   if (meleeProc) {
-    const might = passiveSum(a, 'mightProc');
+    const might = passiveSum(a, 'mightProc') * procK;
     if (might > 0 && w.fx.next() * 100 < might) {
       raw *= 1.75;
       note(w, a, 'Mächtiger Hieb!');
@@ -1844,16 +1860,16 @@ function dealDamage(w: World, a: Actor, t: Actor, rawIn: number, ignoreArmor: bo
   }
   // Brand-/Frosttreffer: eigener Zufallsstrom `fx` und nur mit passender Power, damit der Kampfwurf-Strom unverändert bleibt
   if (meleeProc && t.hp > 0 && amount > 0) {
-    const st = passiveSum(a, 'stunProc');
+    const st = passiveSum(a, 'stunProc') * procK;
     if (st > 0 && w.fx.next() * 100 < st) {
       applyStatus(w, t, 'stun', ctrlSeconds(a, 'stun', 1), 'physical');
       note(w, a, `Betäubender Hieb: ${t.name} ist betäubt.`);
     }
   }
   if (a.kind === 'player' && t.kind === 'monster' && t.hp > 0 && !noReflect && amount > 0) {
-    const bh = powerOf(a, 'burnHit') + affixSum(a, 'procBurn');
+    const bh = (powerOf(a, 'burnHit') + affixSum(a, 'procBurn')) * procK;
     if (bh > 0 && w.fx.next() * 100 < bh) applyStatus(w, t, 'burn', 3, 'fire', { perSec: Math.max(2, Math.round(2 + a.level * 0.5)), srcId: a.id });
-    const fh = powerOf(a, 'frostHit') + affixSum(a, 'procFrost');
+    const fh = (powerOf(a, 'frostHit') + affixSum(a, 'procFrost')) * procK;
     if (fh > 0 && w.fx.next() * 100 < fh) applyStatus(w, t, 'slow', 3, 'frost');
   }
   if (a.kind === 'player' && a.alive && !noReflect) {

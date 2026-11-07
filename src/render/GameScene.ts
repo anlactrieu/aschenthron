@@ -189,7 +189,13 @@ export class GameScene extends Phaser.Scene {
   private zoneMood: Mood = 'town';
   private achv = new AchievementTracker();
   /** Hit-Stop: so viele ms bleibt die Simulation stehen (nur Einzelspieler), gibt Treffern Wucht */
-  private hitStop = 0;
+  /** Trefferstopp (reine Darstellung): Angreifer und Ziel stehen kurz still, die Sim läuft weiter; danach gleiten sie ohne Sprung nach */
+  private freezeUntil = 0;
+  private frozen = new Map<number, { x: number; y: number }>();
+  private lag = new Map<number, { x: number; y: number }>();
+  private shown = new Map<number, { x: number; y: number }>();
+  private squash = new Map<number, { at: number; k: number }>();
+  private frameDt = 16.7;
   private autosave = 0;
   private lastSavedHint = 0;
   /** Letzter Zeitpunkt, an dem der Spieler lief oder kämpfte (für Erinnerungen bei Leerlauf) */
@@ -843,8 +849,7 @@ export class GameScene extends Phaser.Scene {
         this.ui.say('Verbindung zum Server verloren. Seite neu laden.');
       }
     } else {
-      if (this.hitStop > 0) this.hitStop -= dt;
-      else this.acc += Math.min(dt, 250);
+      this.acc += Math.min(dt, 250);
       const step = 1000 / TICK_RATE;
       while (this.acc >= step) {
         this.acc -= step;
@@ -853,6 +858,8 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.now = time;
+    this.frameDt = Math.min(100, Math.max(1, dt));
+    this.stepFreeze();
     this.idleHint(time);
     if (this.remote && time - this.lastBoard > 15000) {
       this.lastBoard = time;
@@ -1005,8 +1012,11 @@ export class GameScene extends Phaser.Scene {
           const boltSkill = !!e.skill && ['ember_bolt', 'fireball'].includes(e.skill);
           const projectile = arrowSkill || boltSkill;
           // Wirkung am Ziel: Zahl, Blitz, Rückstoß, Ton – bei Geschossen erst beim Einschlag
+          const kill = fromPlayer && !!tg && !tg.alive;
+          const power: 0 | 1 | 2 = kill ? 2 : e.crit ? 1 : 0;
           const impact = () => {
-            this.flash.set(e.targetId, this.now + 120 * this.ts);
+            this.flash.set(e.targetId, this.now + (power === 0 ? 90 : power === 1 ? 140 : 170) * this.ts);
+            if (e.amount > 0 && tg?.kind === 'monster') this.squash.set(e.targetId, { at: this.now, k: power === 0 ? 0.1 : power === 1 ? 0.17 : 0.22 });
             const pos = this.bodyPos(tg);
             if (pos) {
               const poison = e.skill === 'dot' && !e.crit;
@@ -1014,9 +1024,13 @@ export class GameScene extends Phaser.Scene {
               const dcol = e.dt ? DMG_COLOR[e.dt] : undefined;
               if (!settings().dmgNumbers) {
                 /* Schadenszahlen aus */
-              } else if (toPlayer) this.fx.floatText(pos.x, pos.y - 30, txt, dcol ?? '#ff6a5a', 18);
-              else if (fromPlayer) this.fx.floatText(pos.x, pos.y - 26, txt, e.crit ? '#ffe45a' : poison ? '#8fe070' : dcol ?? '#ffffff', e.crit ? 22 : 15);
-              else this.fx.floatText(pos.x, pos.y - 26, txt, dcol ?? '#cfcfcf', 12);
+              } else if (toPlayer) this.fx.floatText(pos.x, pos.y - 30, txt, dcol ?? '#ff6a5a', 20, 950, 1.35);
+              else if (fromPlayer) {
+                // eigene Treffer: Grundgröße 18, Kritische 32 und aufpoppend, Todesstoß etwas größer; Gift/Brand klein
+                if (e.crit) this.fx.floatText(pos.x, pos.y - 30, txt, '#ffd23a', kill ? 36 : 32, 1250, 2.1);
+                else if (poison || e.skill === 'burn') this.fx.floatText(pos.x, pos.y - 26, txt, poison ? '#8fe070' : dcol ?? '#ffa050', 13);
+                else this.fx.floatText(pos.x, pos.y - 26, txt, dcol ?? '#ffffff', kill ? 22 : 18, 1000, 1.45);
+              } else this.fx.floatText(pos.x, pos.y - 26, txt, dcol ?? '#cfcfcf', 12);
               const away = at && tg && at.id !== tg.id ? this.dispPos(tg).x - this.dispPos(at).x - (this.dispPos(tg).y - this.dispPos(at).y) : 0;
               // pixelfx: Funken in Schlagrichtung (nach rechts gebacken, bei Schlag von rechts gespiegelt); ohne Sheet der alte Funkenkranz
               if (e.amount > 0 && !playPixelfx(this, e.crit ? 'crit' : 'hit', pos.x, pos.y, { depth: OVERLAY_DEPTH - 1, flip: away < 0 })) {
@@ -1029,15 +1043,19 @@ export class GameScene extends Phaser.Scene {
               const sxv = (t.x - a.x - (t.y - a.y)) * 32;
               const syv = (t.x - a.x + (t.y - a.y)) * 16;
               const len = Math.hypot(sxv, syv) || 1;
-              this.kick(tg.id, (sxv / len) * 5, (syv / len) * 5);
+              // Rückstoß nur in der Darstellung: Kritische und Todesstoß schieben das Ziel deutlich weiter
+              const push = power === 0 ? 7 : power === 1 ? 13 : 16;
+              this.kick(tg.id, (sxv / len) * push, (syv / len) * push);
             }
-            if (fromPlayer && !this.remote && (e.crit || tg?.boss)) this.hitStop = Math.max(this.hitStop, e.crit ? 55 : 30);
-            if (e.crit || (tg?.boss && fromPlayer)) this.cameras.main.shake(70, e.crit ? 0.004 : 0.0025);
+            // Trefferstopp: Dauer 34 / 70 / 100 ms für normal / kritisch / Todesstoß, Bosse etwas länger
+            if (fromPlayer && at && tg && e.amount > 0) this.hitFreeze([at.id, tg.id], (power === 0 ? 34 : power === 1 ? 70 : 100) + (tg.boss ? 20 : 0));
+            if (power > 0 || (tg?.boss && fromPlayer)) this.cameras.main.shake(power === 0 ? 60 : 80, power === 2 ? 0.0045 : power === 1 ? 0.0035 : 0.0022);
+            else if (fromPlayer && e.amount > 0) this.cameras.main.shake(45, 0.0012);
             if (toPlayer) this.cameras.main.shake(60, 0.002);
             if (fromPlayer) {
-              if (sk) this.sfx.cast(sk.area);
-              else if (e.crit) this.sfx.crit();
-              else this.sfx.hit();
+              const wt = at?.equipment?.weapon?.templateId ?? '';
+              const kind = sk?.area === 'Magie' ? 'magic' : sk?.area === 'Fernkampf' || at?.equipment?.weapon?.kind === 'bow' ? 'bow' : /hammer|club|axe/.test(wt) ? 'blunt' : 'blade';
+              this.sfx.impact(kind, power);
             } else if (toPlayer) this.sfx.hurt();
           };
           // Der Angreifer holt sichtbar aus (Ausholen → Schlag/Wurf), erst dann trifft es; Gift/Brand/Bodenschlag nicht
@@ -2528,8 +2546,9 @@ export class GameScene extends Phaser.Scene {
       if (kk) {
         ox = kk.x;
         oy = kk.y;
-        kk.x *= 0.78;
-        kk.y *= 0.78;
+        const decay = Math.pow(0.78, this.frameDt / 16.7);
+        kk.x *= decay;
+        kk.y *= decay;
         if (Math.abs(kk.x) + Math.abs(kk.y) < 0.2) this.kicks.delete(a.id);
       }
       // Schritt-Wippen beim Gehen, Bodenschatten bleibt fest unter den Füßen
@@ -2571,7 +2590,20 @@ export class GameScene extends Phaser.Scene {
       // Schattenriss halb durchsichtig, das fertige Sheet blendet danach kurz ein
       const fade = sil ? 0.75 : view.fadeAt !== undefined ? Math.min(1, 0.4 + (time - view.fadeAt) / 300) : 1;
       if (fade >= 1) view.fadeAt = undefined;
-      img.setAngle(0).setAlpha(fade).setScale((skel ? FIG_SCALE : 1) / breath ** 0.5, (skel ? FIG_SCALE : 1) * breath);
+      // Treffer-Zucken: kurz gestaucht und breiter, federt in ~150 ms zurück (nur Darstellung)
+      const sq = this.squash.get(a.id);
+      let sqx = 1;
+      let sqy = 1;
+      if (sq) {
+        const u = (time - sq.at) / (150 * this.ts);
+        if (u >= 1 || !a.alive) this.squash.delete(a.id);
+        else if (u >= 0) {
+          const e = (1 - u) * (1 - u) * Math.cos(u * Math.PI * 1.5);
+          sqx = 1 + sq.k * e;
+          sqy = 1 - sq.k * 0.8 * e;
+        }
+      }
+      img.setAngle(0).setAlpha(fade).setScale(((skel ? FIG_SCALE : 1) / breath ** 0.5) * sqx, (skel ? FIG_SCALE : 1) * breath * sqy);
       // Treffer-Blitz: Phaser-Tint multipliziert (Weiß = unsichtbar) → echter Blitz über den Füllmodus; sonst Modus immer zurücksetzen
       const flashing = (this.flash.get(a.id) ?? 0) > time;
       if (flashing) img.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
@@ -2679,8 +2711,51 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** Anzeigeposition: lokal zwischen letztem und aktuellem Simulationsschritt interpoliert, online geglättet zwischen den 10-Hz-Schnappschüssen. */
+  /** Trefferstopp: die Figuren stehen `ms` still (nur Anzeige); die Differenz zur Sim wird danach über `lag` abgebaut. */
+  private hitFreeze(ids: number[], ms: number): void {
+    const until = this.now + ms;
+    if (until > this.freezeUntil) this.freezeUntil = until;
+    for (const id of ids) {
+      if (this.frozen.has(id)) continue;
+      const cur = this.dispPosRaw({ id, x: 0, y: 0, ...(getActor(this.world, id) ?? {}) });
+      this.frozen.set(id, { x: cur.x, y: cur.y });
+    }
+  }
+
+  /** Anzeigeposition inkl. Trefferstopp: während des Stopps festgehalten, danach gleitet der Rückstand ab (kein Sprung). */
   private dispPos(a: { id: number; x: number; y: number }): { x: number; y: number } {
+    const raw = this.dispPosRaw(a);
+    const f = this.frozen.get(a.id);
+    if (f && this.now < this.freezeUntil) {
+      this.lag.set(a.id, { x: f.x - raw.x, y: f.y - raw.y });
+      return f;
+    }
+    const lg = this.lag.get(a.id);
+    if (!lg) return raw;
+    let o = this.shown.get(a.id);
+    if (!o) this.shown.set(a.id, (o = { x: 0, y: 0 }));
+    o.x = raw.x + lg.x;
+    o.y = raw.y + lg.y;
+    return o;
+  }
+
+  /** je Bild: Rückstand nach dem Trefferstopp abbauen, Stopp beenden */
+  private stepFreeze(): void {
+    if (this.now < this.freezeUntil) return;
+    if (this.frozen.size) this.frozen.clear();
+    const keep = Math.pow(0.7, this.frameDt / 16.7);
+    for (const [id, lg] of this.lag) {
+      lg.x *= keep;
+      lg.y *= keep;
+      if (Math.abs(lg.x) + Math.abs(lg.y) < 0.01) {
+        this.lag.delete(id);
+        this.shown.delete(id);
+      }
+    }
+  }
+
+  /** Anzeigeposition: lokal zwischen letztem und aktuellem Simulationsschritt interpoliert, online geglättet zwischen den 10-Hz-Schnappschüssen. */
+  private dispPosRaw(a: { id: number; x: number; y: number }): { x: number; y: number } {
     if (!this.remote) {
       const v = this.prevPos.get(a.id);
       if (!v) return a;
