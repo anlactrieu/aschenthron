@@ -13,7 +13,7 @@ import {
 import { isWalkable } from '../sim/path';
 import { arrowDirs, arrowStep, facingView, fallbackView, FOOT_DY, footprintColumns, FRONT_DY, gridStep, groundSize, ISO, mapBounds, mirrors, sheetView, standDepth, tileRange, toScreen, toTile, turn, type TileRange } from './iso';
 import { IsoChunkBaker, isoChunkOrigin, ISO_CHUNK_H, ISO_CHUNK_W, isoWall, type IsoGroundSrc } from './isoGround';
-import { isoHouseFade, isoHouseParts } from './isoHouses';
+import { isoHouseFade, isoHouseParts, type IsoFade } from './isoHouses';
 import { figureMode, ninjaNpcDef } from './figureMap';
 import { detectHouses, houseDoor, houseDecor, houseFacade, houseFence, houseGlow, houseRoof, houseSign, houseWallTile, lowerKind, WINDOW_LIGHT, type House, type RoofNotch } from './houses';
 import { buildZoneMap, Z } from './groundLook';
@@ -170,7 +170,7 @@ export class GameScene extends Phaser.Scene {
   /** Hausbilder im Atlas: Schlüssel -> [Textur, Bildname] (siehe initHouses) */
   private houseFrames = new Map<string, [string, string]>();
   private houseAtlasCount = 0;
-  private roofs: { img: Phaser.GameObjects.Image; house: House; fade?: 'roof' | 'walls' }[] = [];
+  private roofs: { img: Phaser.GameObjects.Image; house: House; fade?: IsoFade }[] = [];
   /** Fenster- und Laternenlicht, Deckkraft = Nacht-Faktor der Atmosphäre */
   private nightLights: { img: Phaser.GameObjects.Image; k: number; follow?: Phaser.GameObjects.Image }[] = [];
   private night = 0;
@@ -2201,12 +2201,17 @@ export class GameScene extends Phaser.Scene {
     // Fenster und Laternen leuchten nach Tageszeit (Nacht-Faktor nur alle paar Bilder neu), Fenster folgen dem Ausblenden der Fassade
     if (this.frame % 10 === 0) this.night = this.atmo.night();
     for (const l of this.nightLights) l.img.setAlpha(this.night * l.k * LIGHT_GAIN * (l.follow?.alpha ?? 1));
+    // Iso: Ausblenden nach der gezeigten Heldposition (isoHouses.ts), einmal je Haus und Bild
+    const hp = this.camPos ?? { x: px, y: py };
+    const isoFade = new Map<House, Record<IsoFade, number>>();
     for (const { img, house: hs, fade } of this.roofs) {
       const inside = px >= hs.x0 && px <= hs.x0 + hs.w - 1 && py >= hs.y0 - 1 && py <= hs.y0 + hs.h - 1;
       // Vor der Tür (bis 2 Kacheln) wird das Dach halb durchsichtig, damit man die Leute im Haus sieht
       const d = hs.door;
       const near = !!d && Math.abs(px - d.x) <= 2 && Math.abs(py - d.y) <= 2;
-      const target = fade ? isoHouseFade(hs, px, py)[fade] : inside ? 0.2 : near ? 0.5 : 1;
+      let f = fade ? isoFade.get(hs) : undefined;
+      if (fade && !f) isoFade.set(hs, (f = isoHouseFade(hs, hp.x, hp.y)));
+      const target = fade ? f![fade] : inside ? 0.2 : near ? 0.5 : 1;
       if (Math.abs(img.alpha - target) > 0.01) img.setAlpha(img.alpha + (target - img.alpha) * 0.2);
       else img.setAlpha(target);
     }

@@ -12,6 +12,9 @@ import type { House } from './houses';
 import { INK, Raster, h3, mix, type Rgb } from './world/raster';
 import { project } from './iso';
 
+/** Ausblend-Gruppen eines Hauses: Dach, Vorderwände, Rückwände (Innenseiten von Nord- und Westwand) */
+export type IsoFade = 'roof' | 'walls' | 'back';
+
 export interface IsoHousePart {
   /** Textur-Schlüssel (eindeutig je Haus und Teil) */
   key: string;
@@ -21,8 +24,8 @@ export interface IsoHousePart {
   sy: number;
   /** Tiefe aus der vorderen (Vorderwände, Dach) oder hinteren Bodenkante (Rückwände, von innen gesehen) */
   layer: 'front' | 'back';
-  /** Ausblend-Gruppe; 'none' bleibt immer deckend */
-  fade: 'roof' | 'walls' | 'none';
+  /** Ausblend-Gruppe (Ziel-Deckkraft aus `isoHouseFade`); 'none' bleibt immer deckend */
+  fade: IsoFade | 'none';
   /** additiv über allem (Fensterlicht nachts, Deckkraft = Nacht); P9.3 */
   light?: boolean;
 }
@@ -68,7 +71,7 @@ export function isoHouseParts(hs: House): IsoHousePart[] {
   const door = hs.door;
   return [
     // Innenseiten der Nord- und Westwand (nur zu sehen, wenn die Vorderwände ausgeblendet sind)
-    part('back', 'back', 'none', (q) => {
+    part('back', 'back', 'back', (q) => {
       q.quad([xa, ya, 0], [hs.w, 0, 0], [0, 0, WH], wallShade(plaster, hs.w, -0.6, -1, seed));
       q.quad([xa, yb, 0], [0, -hs.h, 0], [0, 0, WH], wallShade(plaster, hs.h, -1.1, -1, seed + 1));
     }),
@@ -93,19 +96,34 @@ export function isoHouseParts(hs: House): IsoHousePart[] {
 }
 
 /**
- * Ziel-Deckkraft je Ausblend-Gruppe, wenn der Held auf Kachel (px, py) steht: im Haus Dach und Vorderwände fast weg, hinter dem
- * Haus (verdeckt) halb durchsichtig, vor der Tür das Dach halb. Gleiche Werte wie das Dach der Draufsicht (0,2 / 0,5).
+ * Ziel-Deckkraft je Ausblend-Gruppe, wenn der Held auf (px, py) steht (Rasterkoordinaten, auch Zwischenwerte): im Haus Dach und
+ * Vorderwände fast weg, die Rückwände bleiben; verdeckt (Fuß hinter der Vorderkante und unter der Dachspitze, im Bild also vom
+ * Haus überdeckt, auch hinter Nord- oder Westwand) alles halb durchsichtig; vor der Tür das Dach halb. Werte wie das Dach der
+ * Draufsicht (0,2 / 0,5).
  */
-export function isoHouseFade(hs: House, px: number, py: number): { roof: number; walls: number } {
-  const inside = px >= hs.x0 && px <= hs.x0 + hs.w - 1 && py >= hs.y0 && py <= hs.y0 + hs.h - 1;
-  if (inside) return { roof: 0.2, walls: 0.2 };
-  // dahinter: nördlich oder westlich, innerhalb der Bildschirmbreite des Hauses und nicht weiter als die Haushöhe
-  const behind = px <= hs.x0 + hs.w - 1 && py <= hs.y0 + hs.h - 1 && px + py < hs.x0 + hs.y0 + hs.w + hs.h - 2 && px + py >= hs.x0 + hs.y0 - 6
-    && px - py > hs.x0 - (hs.y0 + hs.h - 1) - 2 && px - py < hs.x0 + hs.w - 1 - hs.y0 + 2;
-  if (behind) return { roof: 0.4, walls: 0.4 };
+export function isoHouseFade(hs: House, px: number, py: number): Record<IsoFade, number> {
+  const inside = px >= hs.x0 - 0.5 && px <= hs.x0 + hs.w - 0.5 && py >= hs.y0 - 0.5 && py <= hs.y0 + hs.h - 0.5;
+  if (inside) return { roof: 0.2, walls: 0.2, back: 1 };
+  if (covers(hs, px, py)) return { roof: 0.4, walls: 0.4, back: 0.4 };
   const d = hs.door;
   const near = !!d && Math.abs(px - d.x) <= 2 && Math.abs(py - d.y) <= 2;
-  return { roof: near ? 0.5 : 1, walls: 1 };
+  return { roof: near ? 0.5 : 1, walls: 1, back: 1 };
+}
+
+/** Liegt eine Figur auf (px, py) im Bild hinter dem Haus? Bildschirm-x innerhalb der Grundfläche, Fuß über der Vorderkante, Kopf unter der Dachspitze */
+function covers(hs: House, px: number, py: number): boolean {
+  const { xa, ya, xb, yb } = box(hs);
+  const f = project(true, px, py);
+  const L = project(true, xa, yb);
+  const F = project(true, xb, yb);
+  const Rt = project(true, xb, ya);
+  const B = project(true, xa, ya);
+  if (f.sx <= L.sx + 8 || f.sx >= Rt.sx - 8) return false;
+  const on = (a: { sx: number; sy: number }, b: { sx: number; sy: number }): number => a.sy + ((f.sx - a.sx) * (b.sy - a.sy)) / (b.sx - a.sx || 1);
+  const front = f.sx <= F.sx ? on(L, F) : on(F, Rt);
+  const back = f.sx <= B.sx ? on(L, B) : on(B, Rt);
+  // Kopf etwa 56 px über dem Fuß; das Haus reicht bis (Wand + Dach) über die hintere Kante
+  return f.sy < front && f.sy - 40 > back - (WH + ROOF) * UZ * 2;
 }
 
 /* ---------------------------------------------------------------- Platzhalter-Zeichnung */
