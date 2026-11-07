@@ -76,8 +76,8 @@ export const originOf = (sheet: FigureSheet): { x: number; y: number } => ({ x: 
 
 const sheets = new Map<string, FigSource>();
 
-/** So viele Looks bleiben gebacken (je ca. 1,2 MB als 1x-Canvas); ältere werden samt Textur verworfen */
-const KEEP = 8;
+/** So viele Looks bleiben gebacken (je ca. 1,2 MB als 1x-Canvas, in Iso 2 MB); ältere werden samt Textur verworfen */
+const KEEP = Math.floor((8 * 3) / SHEET_VIEWS.length);
 
 /** Look schon im Worker backen lassen, bevor er zu sehen ist (Spielstart); ohne Worker nichts */
 export function prefetchHero(look: Look): void {

@@ -22,8 +22,8 @@ export type FigJob = { key: string; req: FigReq; views: FigView[] };
 /** Antwort des Workers (Pixel als übertragener Puffer) */
 export type FigReply = { key: string; sheet: FigureSheet | null };
 
-/** So viele fertige Sheets bleiben im Cache (je ca. 0,5-2,5 MB) */
-const KEEP = 40;
+/** So viele fertige Sheets bleiben im Cache (je ca. 0,5-2,5 MB, in Iso mit 5 statt 3 Ansichten +67 %: darum weniger, der Speicher bleibt gleich) */
+const KEEP = Math.floor((40 * 3) / SHEET_VIEWS.length);
 /** Backzeit je Spielframe in ms (nur ohne Worker) */
 const BUDGET_MS = 5;
 /** Worker: zwei Kerne bleiben dem Spiel und dem Browser, höchstens drei (jeder lädt die Figurenmodule) */

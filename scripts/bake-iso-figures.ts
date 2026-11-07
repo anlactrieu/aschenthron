@@ -155,7 +155,7 @@ function timing(): void {
   const med = (a: number[]): number => [...a].sort((x, y) => x - y)[a.length >> 1]!;
   const list: [string, ReturnType<typeof monsterSpec>][] = [
     ['Held', heroSpec({ ...BASE, ...HEROES.schwert })],
-    ...['rat', 'wolf', 'goblin', 'skeleton', 'ghoul', 'spider', 'giant_worm', 'troll', 'stone_golem', 'ash_king'].filter((id) => MONSTER_DEFS[id]).map((id): [string, ReturnType<typeof monsterSpec>] => [id, monsterSpec(id)]),
+    ...['field_rat', 'wolf', 'goblin', 'skeleton', 'bog_ghoul', 'forest_spider', 'pit_worm', 'hill_troll', 'stone_golem', 'cinder_wisp', 'ash_king'].filter((id) => MONSTER_DEFS[id]).map((id): [string, ReturnType<typeof monsterSpec>] => [id, monsterSpec(id)]),
   ];
   let t3 = 0;
   let t5 = 0;
