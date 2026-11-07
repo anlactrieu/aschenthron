@@ -66,7 +66,7 @@
 
 
 ## Welt per Code (eigene Arbeit, 2026-11-04)
-- Boden (Muster, Übergänge, Ufer, Lava), Bodendetails, Wände/Klippen, Bäume, Felsen, Gräber, Stadt-Props, Häuser und Fensterlicht sind im Code gezeichnet: `src/render/world/raster.ts`, `ground.ts`, `details.ts`, `props.ts`, `src/render/houses.ts`. Keine fremden Grafiken; Arbeitsweise (Rampen, harte Tonstufen, Licht oben links, Rendern und Ansehen) nach dem pixelfx-Skill. Kontaktbögen: `npx tsx scripts/bake-world.ts`.
+- Boden (Muster, Übergänge, Ufer, Lava), Bodendetails, Wände/Klippen, Bäume, Felsen, Gräber, Stadt-Props, Häuser und Fensterlicht sind im Code gezeichnet: `src/render/world/raster.ts`, `ground.ts`, `details.ts`, `props.ts`, `src/render/houses.ts`. Keine fremden Grafiken; Arbeitsweise (Rampen, harte Tonstufen, Licht oben links, Rendern und Ansehen) nach dem pixelfx-Skill. Kontaktbögen der Iso-Teile: `npx tsx scripts/bake-iso-houses.ts` und `scripts/bake-iso-figures.ts`.
 
 ## pixelfx (patch-gg, MIT)
 - **Quelle:** https://github.com/patch-gg/pixelfx (flacher Klon, Stand Commit `a84159688af3`, 2026-11-03) unter `tools/pixelfx` (ohne `.git`), Projekt-Skill unter `.claude/skills/pixelfx`. Vorher mit skill-inspector geprüft: APPROVE, Score 0 (nur Node, kein Netzwerk).

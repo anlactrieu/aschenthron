@@ -746,7 +746,7 @@ Entscheidungen (2026-11-07):
 - **Schadenszahlen:** größer, springend, Kritische deutlich hervorgehoben. Weniger, dafür lesbare Zahlen.
 
 ## Umsetzungsplan P9 Iso (Plan 2026-11-07, P9.0 bis P9.5 umgesetzt, siehe „Umsetzungsstand P9.0“ bis „P9.5“)
-Grundlage: Probe `scripts/bake-iso-probe.ts` mit `probe/iso/` (`vergleich.png`, `held-richtungen.png`), Aufwandstabelle unter „Ansicht: Probe Draufsicht gegen Iso“.
+Grundlage: Probe `scripts/bake-iso-probe.ts` (seit P9.5 gelöscht, Git-Stand 229f3f1) mit `probe/iso/` (`vergleich.png`, `held-richtungen.png`), Aufwandstabelle unter „Ansicht: Probe Draufsicht gegen Iso“.
 
 **Entscheidungen des Nutzers (2026-11-07):**
 1. **Ansicht:** Iso 2:1 wie T4C mit Rauten, wie im rechten Bild von `probe/iso/vergleich.png`. Die Vorgabe „schräge Draufsicht, achsenparallel“ vom 2026-10-09 (Abschnitt „Neuer Look“, Kamerawinkel) ist damit ganz ersetzt.
@@ -756,7 +756,7 @@ Grundlage: Probe `scripts/bake-iso-probe.ts` mit `probe/iso/` (`vergleich.png`, 
 
 ### Regeln für alle Phasen
 - **Unberührt bleiben:** Sim, Server, Netz, Spielstände und die Karte (`gen_map.py`, JSON, `MAP_VERSION`). Das Raster bleibt, nur die Darstellung ändert sich. Die Golden-Snapshots bleiben in jeder Phase unverändert.
-- **Draufsicht bleibt heil:** Ohne `?ansicht=iso` sieht das Spiel vor P9.5 aus wie vorher, auch die Figuren-Sheets der Draufsicht.
+- **Draufsicht bleibt heil (galt bis P9.4):** Ohne `?ansicht=iso` sieht das Spiel vor P9.5 aus wie vorher, auch die Figuren-Sheets der Draufsicht.
   - **Automatische Prüfung:** `npx tsx scripts/bake-iso-probe.ts` am Anfang der Phase laufen lassen und den Hash von `probe/iso/draufsicht.png` notieren. Am Ende muss das Bild byte-gleich sein, weil die Probe über dieselben `ground.ts`, `houses.ts`, `props.ts`, `hero.ts`, `monster.ts` und `npc.ts` rendert.
     - Die Probe liefert bei jedem Lauf dasselbe Bild (am 2026-11-07 zweimal geprüft). Die committete PNG ist aber älter als der Code. Verglichen wird darum mit dem eigenen Lauf vom Phasenanfang, nicht mit der Datei im Repo.
     - Die neu erzeugten PNGs nicht committen (`git checkout -- probe/iso`).
