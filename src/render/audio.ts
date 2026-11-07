@@ -230,7 +230,7 @@ export class Sfx {
    * Einschlag eines Spielertreffers je Waffenart: Klinge (Schnitt + Metall), Wucht (dumpfer Schlag), Bogen (Holz-Klack), Magie (Zischen + Knall).
    * `power`: 0 normal, 1 kritisch (lauter, länger, zusätzlicher heller Schlag), 2 Todesstoß (zusätzlicher Tiefton). Alles prozedural.
    */
-  impact(kind: 'blade' | 'blunt' | 'bow' | 'magic', power: 0 | 1 | 2 = 0): void {
+  impact(kind: 'blade' | 'blunt' | 'bow' | 'magic', power: 0 | 1 | 2 = 0, element?: 'fire' | 'frost' | 'poison' | 'lightning'): void {
     if (!this.gate(`impact-${kind}`, 45)) return;
     const v = power === 0 ? 1 : power === 1 ? 1.45 : 1.25;
     const L = power === 0 ? 1 : 1.35;
@@ -250,6 +250,13 @@ export class Sfx {
       this.noise(0.16 * L, 0.38 * v, 4200);
       this.tone(760, 0.2 * L, 'sawtooth', 0.12 * v, 180);
       this.tone(140, 0.2 * L, 'sine', 0.32 * v, 45);
+      if (element === 'fire') {
+        // Feuerstoß: dumpfes Wuuff, prasselnde Glut und ein Zischen nach dem Knall
+        this.tone(95, 0.3 * L, 'sine', 0.38 * v, 36);
+        this.noise(0.34 * L, 0.3 * v, 2400, 0.02);
+        for (let i = 0; i < 4; i++) this.noise(0.03, 0.16 * v, 5200, 0.07 + i * 0.045 + Math.random() * 0.02);
+        this.noise(0.4, 0.14 * v, 7000, 0.12);
+      }
     }
     if (power === 1) {
       this.tone(1500, 0.1, 'triangle', 0.16, 800, 0.015);
@@ -299,6 +306,14 @@ export class Sfx {
       this.tone(140, 0.2, 'sawtooth', 0.2, 60);
       this.noise(0.14, 0.4, 1200);
     }
+  }
+  /** Zauber laden auf: aufsteigendes Surren mit Zischen (kurz, vor dem Wurf) */
+  spellCast(element: 'fire' | 'frost' | 'poison' | 'lightning' = 'fire'): void {
+    if (!this.gate('spellcast', 80)) return;
+    const base = element === 'frost' ? 620 : element === 'lightning' ? 520 : 330;
+    this.tone(base, 0.2, 'sawtooth', 0.09, base * 2.6);
+    this.tone(base * 1.5, 0.16, 'triangle', 0.07, base * 3.4, 0.04);
+    this.noise(0.22, element === 'fire' ? 0.2 : 0.12, 2800);
   }
   levelUp(): void {
     if (!this.gate('levelup', 500)) return;

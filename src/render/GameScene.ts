@@ -31,7 +31,7 @@ import { isTouch } from './touch';
 import { Atmosphere, isDungeon, LIGHT_DEPTH } from './atmosphere';
 import { hourOf, NEW_CHAR_HOUR } from '../sim/clock';
 import { syncNpcPresence } from '../sim/night';
-import { Fx } from './fx';
+import { Fx, SPELL_THEMES, type SpellElement } from './fx';
 import { playPixelfx, registerPixelfx, type FxName } from './pixelfx';
 import { attackFrame, onceFrame, walkFrame, type FigView, type FigureSheet } from './figure';
 import { heroKey, heroLookOf, idleFrame } from './hero';
@@ -1010,6 +1010,8 @@ export class GameScene extends Phaser.Scene {
           const arrowSkill = !!e.skill && ['quick_shot', 'multishot', 'poison_shot'].includes(e.skill);
           const boltSkill = !!e.skill && ['ember_bolt', 'fireball'].includes(e.skill);
           const projectile = arrowSkill || boltSkill;
+          // Zauber-Farbwelt (Glutblitz kann Frost/Gift tragen): Aufladen, Flug und Einschlag zeichnet `Fx` je Farbwelt
+          const spellEl: SpellElement = e.dt === 'frost' ? 'frost' : e.dt === 'poison' ? 'poison' : 'fire';
           // Wirkung am Ziel: Zahl, Blitz, Rückstoß, Ton – bei Geschossen erst beim Einschlag
           const kill = fromPlayer && !!tg && !tg.alive;
           const power: 0 | 1 | 2 = kill ? 2 : e.crit ? 1 : 0;
@@ -1049,12 +1051,12 @@ export class GameScene extends Phaser.Scene {
             // Trefferstopp: Dauer 34 / 70 / 100 ms für normal / kritisch / Todesstoß, Bosse etwas länger
             if (fromPlayer && at && tg && e.amount > 0) this.hitFreeze([at.id, tg.id], (power === 0 ? 34 : power === 1 ? 70 : 100) + (tg.boss ? 20 : 0));
             if (power > 0 || (tg?.boss && fromPlayer)) this.cameras.main.shake(power === 0 ? 60 : 80, power === 2 ? 0.0045 : power === 1 ? 0.0035 : 0.0022);
-            else if (fromPlayer && e.amount > 0) this.cameras.main.shake(45, 0.0012);
+            else if (fromPlayer && e.amount > 0 && sk?.area !== 'Magie') this.cameras.main.shake(45, 0.0012);
             if (toPlayer) this.cameras.main.shake(60, 0.002);
             if (fromPlayer) {
               const wt = at?.equipment?.weapon?.templateId ?? '';
               const kind = sk?.area === 'Magie' ? 'magic' : sk?.area === 'Fernkampf' || at?.equipment?.weapon?.kind === 'bow' ? 'bow' : /hammer|club|axe|mace|flail|maul/.test(wt) ? 'blunt' : 'blade';
-              this.sfx.impact(kind, power);
+              this.sfx.impact(kind, power, boltSkill ? spellEl : undefined);
             } else if (toPlayer) this.sfx.hurt();
           };
           // Der Angreifer holt sichtbar aus (Ausholen → Schlag/Wurf), erst dann trifft es; Gift/Brand/Bodenschlag nicht
@@ -1076,6 +1078,15 @@ export class GameScene extends Phaser.Scene {
               if (this.figSize(v.img)?.dir) v.side = Math.abs(sxv) > Math.abs(syv) * 0.8;
             }
             delay = SWING_MS * 0.4 * this.ts;
+            // Zauber laden sichtbar auf: Glühen an Hand/Stab, dann erst fliegt das Geschoss
+            if (e.skill === 'ember_bolt') {
+              delay += 90 * this.ts;
+              const hand = this.bodyPos(at);
+              if (hand) {
+                this.fx.charge(hand.x + (sxv / len) * 15, hand.y - 3 + (syv / len) * 8, SPELL_THEMES[spellEl], delay);
+                if (fromPlayer) this.sfx.spellCast(spellEl);
+              }
+            }
             this.later(delay, () => this.kick(at.id, (sxv / len) * (projectile ? -1 : 10), (syv / len) * (projectile ? -0.5 : 10)));
           }
           const from = this.bodyPos(at);
@@ -1125,7 +1136,20 @@ export class GameScene extends Phaser.Scene {
                   const k0 = Math.min(16, dl * 0.4) / dl;
                   this.fx.arrow(f.x + (to.x - f.x) * k0, f.y + (to.y - f.y) * k0, to.x, to.y, col, 170, impact);
                 }
-                else this.fx.projectile(f.x, f.y, to.x, to.y, col, 200, impact);
+                else if (e.skill === 'ember_bolt') {
+                  const th = SPELL_THEMES[spellEl];
+                  // Start an der Zauberhand (vorgestreckt), Einschlag in Körpermitte des Ziels
+                  const dl = Math.hypot(to.x - f.x, to.y - f.y) || 1;
+                  const k0 = Math.min(15, dl * 0.35) / dl;
+                  this.fx.spell(f.x + (to.x - f.x) * k0, f.y - 3 + (to.y - f.y) * k0, to.x, to.y, th, 230, () => {
+                    this.fx.flare(to.x, to.y, th, power);
+                    if (spellEl === 'fire') {
+                      const feet = this.feetPos(tg);
+                      if (feet && e.amount > 0) playPixelfx(this, 'fire_burst', feet.x, feet.y + 4, { depth: OVERLAY_DEPTH - 1, scale: 1, alpha: 0.85 });
+                    }
+                    impact();
+                  });
+                } else this.fx.projectile(f.x, f.y, to.x, to.y, col, 200, impact);
               });
             }
           } else {

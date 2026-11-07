@@ -6,7 +6,7 @@ import Phaser from 'phaser';
  */
 
 interface Effect {
-  kind: 'zone' | 'swing' | 'projectile' | 'arrow' | 'ring' | 'bolt' | 'slash' | 'sparkle' | 'column' | 'burst' | 'beamRing';
+  kind: 'zone' | 'swing' | 'projectile' | 'arrow' | 'ring' | 'bolt' | 'slash' | 'sparkle' | 'column' | 'burst' | 'beamRing' | 'charge' | 'spell' | 'flare';
   start: number;
   dur: number;
   x: number;
@@ -18,7 +18,31 @@ interface Effect {
   seed: number;
   onArrive?: () => void;
   arrived?: boolean;
+  /** Zauber-Farbwelt (charge/spell/flare) */
+  theme?: SpellTheme;
+  /** Wucht des Einschlags: 0 normal, 1 kritisch, 2 Todesstoß */
+  power?: 0 | 1 | 2;
 }
+
+/**
+ * Farbwelt eines Zaubers: Kern (hell), Glut/Leuchten, Funken (zwei Töne), Rauch. Baustein für Glutblitz, Feuerball, Frostnova, Blitzschlag:
+ * ein Zauber wählt nur eine Farbwelt, Aufladen, Flug und Einschlag zeichnet `Fx` (charge / spell / flare).
+ */
+export interface SpellTheme {
+  core: number;
+  glow: number;
+  spark: [number, number];
+  smoke: number;
+  /** Funken fallen (Glut) oder steigen (Frost/Blitz bleiben leicht) */
+  gravity: number;
+}
+export const SPELL_THEMES = {
+  fire: { core: 0xfff2c0, glow: 0xff7a1a, spark: [0xffc860, 0xff5a1a], smoke: 0x3a3430, gravity: 1 },
+  frost: { core: 0xf0fbff, glow: 0x6fc8ff, spark: [0xd8f4ff, 0x8fd0ff], smoke: 0x7a8c9a, gravity: 0.3 },
+  poison: { core: 0xeaffd8, glow: 0x6fd050, spark: [0xb8f090, 0x7fe060], smoke: 0x2c4028, gravity: 0.5 },
+  lightning: { core: 0xffffff, glow: 0x8fb4ff, spark: [0xe8f0ff, 0xb0c8ff], smoke: 0x4a4e66, gravity: 0 },
+} satisfies Record<string, SpellTheme>;
+export type SpellElement = keyof typeof SPELL_THEMES;
 
 interface FloatText {
   t: Phaser.GameObjects.Text;
@@ -131,6 +155,18 @@ export class Fx {
   burst(x: number, y: number, color: number, dur = 420): void {
     this.add({ kind: 'burst', x, y, dur, color });
   }
+  /** Zauber aufladen: Glühen an Hand/Stab wächst, Funken ziehen hinein. */
+  charge(x: number, y: number, theme: SpellTheme, dur = 160): void {
+    this.add({ kind: 'charge', x, y, dur, color: theme.glow, theme });
+  }
+  /** Zaubergeschoss: leuchtender Kopf, flackernder Schweif, Funken- bzw. Glutspur; ruft `onArrive` beim Einschlag. */
+  spell(x: number, y: number, x2: number, y2: number, theme: SpellTheme, dur = 220, onArrive?: () => void): void {
+    this.add({ kind: 'spell', x, y, x2, y2, dur, color: theme.glow, theme, onArrive });
+  }
+  /** Einschlag: Lichtblitz, Feuer-/Energiestoß, wegsprühende Funken, Rauch. */
+  flare(x: number, y: number, theme: SpellTheme, power: 0 | 1 | 2 = 0): void {
+    this.add({ kind: 'flare', x, y, dur: 900, color: theme.glow, theme, power });
+  }
 
   /** Umgebungspartikel (Glut, Nebel) im Sichtfeld der Kamera; kind null = keine. */
   setAmbient(kind: 'embers' | 'mist' | null, view: Phaser.Geom.Rectangle, dt: number): void {
@@ -195,12 +231,12 @@ export class Fx {
       const e = this.effects[i]!;
       const k = (now - e.start) / e.dur;
       if (k >= 1) {
-        if ((e.kind === 'projectile' || e.kind === 'arrow') && !e.arrived) e.onArrive?.();
+        if ((e.kind === 'projectile' || e.kind === 'arrow' || e.kind === 'spell') && !e.arrived) e.onArrive?.();
         this.effects.splice(i, 1);
         continue;
       }
       this.drawEffect(g, e, k);
-      if ((e.kind === 'projectile' || e.kind === 'arrow') && k > 0.92 && !e.arrived) {
+      if ((e.kind === 'projectile' || e.kind === 'arrow' || e.kind === 'spell') && k > 0.92 && !e.arrived) {
         e.arrived = true;
         e.onArrive?.();
       }
@@ -341,6 +377,127 @@ export class Fx {
           const d = (6 + this.rnd(e.seed, i + 10) * 26) * (1 - fade * fade);
           g.fillStyle(i % 2 ? e.color : 0xffffff, fade);
           g.fillRect(e.x + Math.cos(a) * d, e.y - 12 + Math.sin(a) * d * 0.6 - k * 8, 3, 3);
+        }
+        break;
+      }
+      case 'charge': {
+        const th = e.theme!;
+        const grow = k * k;
+        const pulse = 0.85 + 0.15 * Math.sin(k * 40);
+        g.fillStyle(th.glow, 0.18 * pulse);
+        g.fillCircle(e.x, e.y, 5 + 11 * grow);
+        g.fillStyle(th.glow, 0.45);
+        g.fillCircle(e.x, e.y, 3 + 5 * grow);
+        g.fillStyle(th.core, 0.95);
+        g.fillCircle(e.x, e.y, 1.5 + 2.5 * grow);
+        // Funken ziehen ins Zentrum, kreisend
+        for (let i = 0; i < 7; i++) {
+          const a = this.rnd(e.seed, i) * Math.PI * 2 + k * 5;
+          const rr = (22 + this.rnd(e.seed, i + 9) * 14) * (1 - k);
+          g.fillStyle(i % 2 ? th.spark[0] : th.spark[1], 0.4 + 0.6 * k);
+          g.fillRect(e.x + Math.cos(a) * rr, e.y + Math.sin(a) * rr * 0.7, 2, 2);
+        }
+        break;
+      }
+      case 'spell': {
+        const th = e.theme!;
+        const dx = e.x2! - e.x;
+        const dy = e.y2! - e.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const ux = dx / len;
+        const uy = dy / len;
+        // leichter Bogen, damit das Geschoss nicht wie eine Linie wirkt
+        const arc = (kk: number) => -Math.sin(kk * Math.PI) * Math.min(14, len * 0.08);
+        const at = (kk: number): [number, number] => [e.x + dx * kk, e.y + dy * kk + arc(kk)];
+        const [hx, hy] = at(k);
+        // Schweif: Flammenzunge aus abnehmenden Kreisen, flackernd
+        for (let t = 9; t >= 1; t--) {
+          const kk = Math.max(0, k - t * 0.035);
+          const [tx, ty] = at(kk);
+          const fl = (this.rnd(e.seed + Math.floor(k * 30), t) - 0.5) * 3.2;
+          g.fillStyle(t > 5 ? th.spark[1] : th.glow, 0.5 - t * 0.045);
+          g.fillCircle(tx - uy * fl, ty + ux * fl, Math.max(1.2, 6.2 - t * 0.55));
+        }
+        // Funken-/Glutspur: lösen sich vom Weg, fallen (je Farbwelt) ab
+        for (let i = 0; i < 12; i++) {
+          const born = this.rnd(e.seed, i) * k;
+          const age = k - born;
+          if (age > 0.4) continue;
+          const [sx, sy] = at(born);
+          const side = (this.rnd(e.seed, i + 30) - 0.5) * 16 * age * 5;
+          const fall = age * age * 60 * th.gravity * (this.rnd(e.seed, i + 60) + 0.4);
+          g.fillStyle(i % 3 === 0 ? th.core : (i % 2 ? th.spark[1] : th.spark[0]), 1 - age / 0.4);
+          g.fillRect(sx - uy * side, sy + ux * side + fall, 2, 2);
+        }
+        // Kopf: Leuchten, Glut, heller Kern
+        g.fillStyle(th.glow, 0.18);
+        g.fillCircle(hx, hy, 13);
+        g.fillStyle(th.glow, 0.5);
+        g.fillCircle(hx, hy, 7.5);
+        g.fillStyle(th.spark[0], 0.95);
+        g.fillCircle(hx, hy, 5);
+        g.fillStyle(th.core, 1);
+        g.fillCircle(hx + ux, hy + uy, 2.6);
+        break;
+      }
+      case 'flare': {
+        const th = e.theme!;
+        const pw = e.power ?? 0;
+        const size = pw === 0 ? 1 : pw === 1 ? 1.25 : 1.5;
+        // Lichtblitz: erste ~12 % der Zeit, hell und rund
+        if (k < 0.14) {
+          const f = 1 - k / 0.14;
+          g.fillStyle(th.core, 0.55 * f);
+          g.fillCircle(e.x, e.y, 34 * size * (0.5 + 0.5 * (1 - f)));
+          g.fillStyle(0xffffff, 0.9 * f);
+          g.fillCircle(e.x, e.y, 14 * size);
+        }
+        // Feuerstoß: wächst schnell, glüht aus
+        const grow = Math.min(1, k / 0.3);
+        const burn = Math.max(0, 1 - k / 0.55);
+        if (burn > 0) {
+          const r = (8 + 20 * (1 - (1 - grow) * (1 - grow))) * size;
+          g.fillStyle(th.glow, 0.35 * burn);
+          g.fillEllipse(e.x, e.y + 4, r * 2.4, r * 1.7);
+          g.fillStyle(th.spark[1], 0.55 * burn);
+          g.fillEllipse(e.x, e.y + 2, r * 1.6, r * 1.2);
+          g.fillStyle(th.spark[0], 0.8 * burn);
+          g.fillEllipse(e.x, e.y, r, r * 0.8);
+          g.fillStyle(th.core, 0.9 * burn);
+          g.fillCircle(e.x, e.y, r * 0.25);
+        }
+        // Bodenglut: bleibt kurz leuchten (Brandfleck)
+        if (k > 0.1 && k < 0.8) {
+          const sk = 1 - (k - 0.1) / 0.7;
+          g.fillStyle(th.smoke, 0.22 * sk);
+          g.fillEllipse(e.x, e.y + 12, 34 * size, 12 * size);
+          g.fillStyle(th.glow, 0.25 * sk * sk);
+          g.fillEllipse(e.x, e.y + 12, 20 * size, 7 * size);
+        }
+        // Funken: sprühen in alle Richtungen, fallen mit Schwerkraft
+        const n = 14 + pw * 6;
+        for (let i = 0; i < n; i++) {
+          const a = this.rnd(e.seed, i) * Math.PI * 2;
+          const sp = (30 + this.rnd(e.seed, i + 20) * 46) * size;
+          const life = 0.45 + this.rnd(e.seed, i + 40) * 0.4;
+          if (k > life) continue;
+          const t = k / life;
+          const d = sp * (1 - (1 - t) * (1 - t));
+          const x = e.x + Math.cos(a) * d;
+          const y = e.y - 4 + Math.sin(a) * d * 0.55 + t * t * 30 * th.gravity - (th.gravity === 0 ? 0 : 6 * Math.sin(t * Math.PI));
+          g.fillStyle(i % 3 === 0 ? th.core : (i % 2 ? th.spark[1] : th.spark[0]), 1 - t * t);
+          const sz = i % 4 === 0 ? 3 : 2;
+          g.fillRect(x, y, sz, sz);
+        }
+        // Rauch (Brandgeruch): graue Schwaden steigen auf, nach dem Stoß
+        if (k > 0.18) {
+          const sk = (k - 0.18) / 0.82;
+          for (let i = 0; i < 4 + pw; i++) {
+            const ox = (this.rnd(e.seed, i + 80) - 0.5) * 22 * size;
+            const rise = sk * (22 + this.rnd(e.seed, i + 90) * 20);
+            g.fillStyle(th.smoke, 0.32 * (1 - sk) * Math.min(1, sk * 6));
+            g.fillEllipse(e.x + ox + sk * 6 * (i % 2 ? 1 : -1), e.y - 6 - rise, (9 + sk * 12) * size, (7 + sk * 8) * size);
+          }
         }
         break;
       }
