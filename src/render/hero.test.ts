@@ -43,6 +43,8 @@ describe('Skelett-Held', () => {
     expect(sum(bakeHero(KNIGHT).data)).toBe(a);
     expect(sum(bakeHero({ ...KNIGHT, armor: 'leather', helm: 1, gloves: 1 }).data)).not.toBe(a);
     expect(sum(bakeHero({ ...KNIGHT, shield: 0 }).data)).not.toBe(a);
+    expect(heroKey({ ...KNIGHT, weapon: 'axe', twoHand: true })).not.toBe(heroKey({ ...KNIGHT, weapon: 'axe' }));
+    expect(sum(bakeHero({ ...KNIGHT, weapon: 'axe', twoHand: true, shield: 0 }).data)).not.toBe(sum(bakeHero({ ...KNIGHT, weapon: 'axe', shield: 0 }).data));
     for (const d of [{ armor: 'leather' }, { shield: 0 }, { cloak: '' }, { rar: [0, 0, 0] }, { helm: 3 }, { quiver: true }, { robe: true }] as Partial<HeroLook>[]) {
       expect(heroKey({ ...KNIGHT, ...d })).not.toBe(heroKey(KNIGHT));
     }
@@ -74,6 +76,11 @@ describe('Skelett-Held', () => {
     expect(heroLookOf({ ...look, weapon: -1 }).weapon).toBe('none');
     expect(heroLookOf({ ...look, ids: { ...ids, weapon: 'battle_axe' } }).weapon).toBe('axe');
     expect(heroLookOf({ ...look, ids: { ...ids, weapon: 'claymore' } }).weapon).toBe('greatsword');
+    // Ein-/Zweihändigkeit kommt aus der Vorlage (handsOf) bis in die Figur
+    expect(heroLookOf(look).twoHand).toBe(false);
+    expect(heroLookOf({ ...look, ids: { ...ids, weapon: 'battle_axe' } }).twoHand).toBe(true);
+    expect(heroLookOf({ ...look, ids: { ...ids, weapon: 'claymore' } }).twoHand).toBe(true);
+    expect(heroLookOf({ ...look, weaponKind: 1, ids: { ...ids, weapon: 'hunt_bow' } }).twoHand).toBe(false);
     expect(heroLookOf({ ...look, head: 3, ids: { ...ids, head: 'crown_helm' } }).helm).toBe(4);
     expect(heroLookOf({ ...look, shield: 1, ids: { ...ids, offhand: 'tower_shield' } }).shield).toBe(3);
     expect(heroLookOf({ ...look, robe: true, chest: 2, ids: { ...ids, chest: 'bone_robe', cloak: 'wolf_cloak' } })).toMatchObject({ armor: 'bone', robe: true, cloak: 'wolf' });

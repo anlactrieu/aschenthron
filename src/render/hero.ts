@@ -5,6 +5,7 @@
  * Reine Daten und Rechnung ohne DOM: läuft in Node (Kontaktbögen `scripts/bake-hero.ts`, Tests) und im Browser (`heroSheet`).
  */
 import type { Look } from './art';
+import { templateById } from '../sim/items';
 import { bakeFigure, cycleLength, gaitFoot, type FigAnim, type FigureSheet, type FigureSpec, type FigView, type Ramp } from './figure';
 import { PART, posed, type HeroGear, type RigPose } from './heroRig.js';
 
@@ -35,6 +36,8 @@ export interface HeroLook {
   /** Schienbeine/Stiefel: 0 Stoff, 1 Leder, 2 Eisen */
   legs: number;
   weapon: HeroWeapon;
+  /** Zweihändige Nahkampfwaffe (`handsOf` der Sim): beide Hände am Griff; sonst hält nur die Waffenhand */
+  twoHand?: boolean;
   /** Stufe der Waffe (Kugelfarbe beim Stab) */
   weaponTier: number;
   /** 0 keins, 1 rund (Holz), 2 Kite (Eisen), 3 Turm */
@@ -75,6 +78,12 @@ function weaponOf(look: Look): HeroWeapon {
   return 'sword';
 }
 
+/** Ein- oder zweihändig aus der Vorlage (wie `handsOf`); Bogen und Stab haben eigene Posen */
+function twoHandOf(look: Look): boolean {
+  if (look.weapon < 0 || look.weaponKind !== 0 || !look.ids.weapon) return false;
+  return templateById(look.ids.weapon).hands === 2;
+}
+
 export function heroLookOf(look: Look): HeroLook {
   const i = look.ids;
   const chest = i.chest;
@@ -97,6 +106,7 @@ export function heroLookOf(look: Look): HeroLook {
     gloves: grade(i.hands, look.hands, /gauntlet|fists/, /glove/),
     legs: /greaves|steel_boots|chain|dread_legs|ash_legs|bone_legs/.test(i.feet + ' ' + i.legs) ? 2 : /leather|boots|treads/.test(i.feet + ' ' + i.legs) ? 1 : 0,
     weapon: weaponOf(look),
+    twoHand: twoHandOf(look),
     weaponTier: Math.max(0, look.weapon),
     shield: look.shield < 0 ? 0 : /tower|bulwark/.test(shieldId) ? 3 : /wood/.test(shieldId) ? 1 : 2,
     cloak: i.cloak ? i.cloak.replace(/_cloak$/, '') : '',
@@ -106,7 +116,7 @@ export function heroLookOf(look: Look): HeroLook {
 }
 
 export function heroKey(h: HeroLook): string {
-  return `hero_${h.armor}${h.robe ? 'R' : ''}_${h.helm}${h.helmMat}_${h.gloves}${h.legs}_${h.weapon}${h.weapon === 'staff' ? h.weaponTier : ''}_${h.shield}${h.cloak}${h.quiver ? 'Q' : ''}_${h.rar.join('')}`;
+  return `hero_${h.armor}${h.robe ? 'R' : ''}_${h.helm}${h.helmMat}_${h.gloves}${h.legs}_${h.weapon}${h.twoHand && h.weapon !== 'greatsword' ? '2' : ''}${h.weapon === 'staff' ? h.weaponTier : ''}_${h.shield}${h.cloak}${h.quiver ? 'Q' : ''}_${h.rar.join('')}`;
 }
 
 /* ------------------------------------------------ Posen (Bildschirm-Pixel bei 1x, y negativ = oben, Blick nach rechts) */
@@ -128,9 +138,13 @@ export const HERO_CYCLE_PX = cycleLength(HERO_STRIDE, HERO_STANCE) * 2;
 
 const melee = (w: HeroWeapon): boolean => w === 'sword' || w === 'axe' || w === 'mace' || w === 'dagger' || w === 'none';
 
+/** Schildhand (Fernarm): hinten vor dem Rumpf, nicht in der Waffenhand (fx 4), sonst wächst das Schwert aus dem Schild */
+const SHIELD = { bx: 4, by: -16, bz: 3 };
+
 /** Haltung der Waffenhand im Stehen/Gehen je Waffe */
-function carry(weapon: HeroWeapon): RigPose {
+function carry(weapon: HeroWeapon, twoHand = false): RigPose {
   if (weapon === 'greatsword') return { fx: 4, fy: -11.5, sa: 1.0, two: true, wscale: 0.62 };
+  if (twoHand && (weapon === 'sword' || weapon === 'axe' || weapon === 'mace')) return { fx: 4, fy: -12, sa: 1.0, two: true };
   if (melee(weapon) && weapon !== 'none') return { fx: 4, fy: -12.5, sa: 0.75 };
   if (weapon === 'staff') return { fx: 3.5, fy: -13.5, sa: -1.45 };
   if (weapon === 'bow') return { fx: 3.5, fy: -13, sa: 0.15 }; // quer gehaltene Waffe: sa 0 = Bogen senkrecht
@@ -139,9 +153,9 @@ function carry(weapon: HeroWeapon): RigPose {
 
 function idlePose(i: number, h: HeroLook): RigPose {
   const b = Math.sin((i / HERO_ANIMS.idle) * Math.PI * 2); // Atmen: Brust hebt und senkt sich
-  const c = carry(h.weapon);
+  const c = carry(h.weapon, h.twoHand);
   // mit Schild: Schildarm vor dem Körper
-  const off = h.shield ? { bx: 6, by: -13 + b * 0.4, bz: 2.5 } : { bx: -1.5, by: -11.6 + b * 0.4 };
+  const off = h.shield ? { bx: SHIELD.bx, by: SHIELD.by + b * 0.4, bz: SHIELD.bz } : { bx: -1.5, by: -11.6 + b * 0.4 };
   return { ...c, crouch: 0.9 - b * 0.45, lean: 0.6, fy: (c.fy ?? -12) + b * 0.4, ...off, ffx: 3, ffy: -4, fbx: -3.2, fby: -4, hy: 0.2, sway: b * 0.3 };
 }
 
@@ -162,11 +176,11 @@ function walkPose(i: number, h: HeroLook, view: HeroView, g: Gait): RigPose {
   const swing = Math.cos(p * Math.PI * 2);
   // Laufschritt: tief beim Aufsetzen, oben in der Flugphase
   const crouch = (g.stance < 0.45 ? 1.3 : 0.9) + (g.stance < 0.45 ? 0.9 : 0.5) * Math.cos((p - 0.12) * Math.PI * 4);
-  const c = carry(h.weapon);
+  const c = carry(h.weapon, h.twoHand);
   const hold = h.weapon !== 'none';
   // von vorn/hinten geht der Armschwung in die Tiefe: kräftiger, und am Umkehrpunkt etwas nach außen, damit man ihn sieht
   const armK = side ? 1 : 1.6, out = side ? 0 : Math.abs(swing) * 1.4;
-  const off = h.shield ? { bx: 6 + swing * 0.8, by: -13, bz: 2.5 } : { bx: 1 + swing * ARM * 1.2 * armK, by: -11.8 + Math.abs(swing) * 0.6 };
+  const off = h.shield ? { bx: SHIELD.bx + swing * 0.8, by: SHIELD.by, bz: SHIELD.bz } : { bx: 1 + swing * ARM * 1.2 * armK, by: -11.8 + Math.abs(swing) * 0.6 };
   return {
     ...c, crouch, lean: 1.6,
     ffx: n.x, ffy: n.y - 4, toeF: n.toe, fbx: f.x, fby: f.y - 4, toeB: f.toe,
@@ -207,26 +221,29 @@ const STAFF: RigPose[] = [
   { fx: 4.5, fy: -14, sa: -1.3, bx: -0.5, by: -12.5, crouch: 1.2, lean: 0.8, ffx: 4, fbx: -3.5 },
 ];
 /** Zweihänder: beidhändiger Hieb */
-const GREAT: RigPose[] = SWING.map((k0, j) => {
-  const k: RigPose = { ...k0, two: true, wscale: 0.62, crouch: (k0.crouch ?? 0) + (j === 3 ? 0.6 : 0) };
+const twoHandSwing = (wscale?: number): RigPose[] => SWING.map((k0, j) => {
+  const k: RigPose = { ...k0, two: true, ...(wscale ? { wscale } : {}), crouch: (k0.crouch ?? 0) + (j === 3 ? 0.6 : 0) };
   delete k.bx;
   delete k.by;
   return k;
 });
+const GREAT = twoHandSwing(0.62);
+const TWO_HAND = twoHandSwing();
 
 function attackPose(i: number, h: HeroLook): RigPose {
   const at = (keys: RigPose[]): RigPose => keys[Math.min(keys.length - 1, i)]!;
   if (h.weapon === 'bow') return at(BOW);
   if (h.weapon === 'staff') return at(STAFF);
   if (h.weapon === 'greatsword') return at(GREAT);
+  if (h.twoHand && (h.weapon === 'sword' || h.weapon === 'axe' || h.weapon === 'mace')) return at(TWO_HAND);
   const k = at(SWING);
   // Schild bleibt beim Hieb vorn (Fernarm deckt), statt nach hinten auszuschwingen
-  return h.shield ? { ...k, bx: 6.5, by: -14, bz: 2.5, armsFront: false } : k;
+  return h.shield ? { ...k, bx: SHIELD.bx + 0.5, by: SHIELD.by - 1, bz: SHIELD.bz, armsFront: false } : k;
 }
 
 /** Getroffen: Oberkörper zuckt zurück, Kopf nach hinten, Arme öffnen sich */
 function hitPose(i: number, h: HeroLook): RigPose {
-  const c = carry(h.weapon);
+  const c = carry(h.weapon, h.twoHand);
   const k = i === 0 ? 1 : 0.55;
   return { ...c, fx: (c.fx ?? 1) - 2 * k, fy: (c.fy ?? -12) - 1.5 * k, bx: -4 * k, by: -14, crouch: 1.6 * k, lean: -3.2 * k, hy: -1.4 * k, ffx: 3.5, ffy: -4, fbx: -4, fby: -4, sway: -1 };
 }
@@ -259,7 +276,7 @@ export function heroPose(anim: HeroAnim, view: HeroView, i: number, h: HeroLook,
     pose.bzz = -3.3;
     // schräge Draufsicht: was näher zur Kamera ist, steht tiefer im Bild (Füße, Knie, Hände), so sieht man Schritt und Armschwung
     // (beim Hieb und mit dem Zweihänder weniger, sonst fährt die Klinge zur Kamera unter den Bildrand; liegend keine)
-    pose.shear = anim === 'die' ? SHEAR + (SHEAR_LIE - SHEAR) * Math.min(1, i / 3) : anim === 'attack' || h.weapon === 'greatsword' ? SHEAR_REACH : SHEAR;
+    pose.shear = anim === 'die' ? SHEAR + (SHEAR_LIE - SHEAR) * Math.min(1, i / 3) : anim === 'attack' || h.weapon === 'greatsword' || h.twoHand ? SHEAR_REACH : SHEAR;
     if (anim === 'walk') {
       const p = i / HERO_ANIMS.walk;
       // Hüfte kippt zum Spielbein, Schultern drehen gegen die Beine
