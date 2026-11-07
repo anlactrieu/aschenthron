@@ -6,6 +6,8 @@
  * (Spalte „versteckt“) gibt es nur, wenn das Stichwort schon aus einem anderen Gespräch bekannt ist.
  * Antworten mit `quest` schalten beim ersten Fragen einen versteckten Auftrag frei (Definition in data.ts, `hidden`).
  */
+import { KILL_GOAL_SPECS, killGoalKey, killGoalQuestId } from './killGoals';
+
 export interface TopicAnswer {
   text: string[];
   /** Darunter weicht der NPC aus (`tooLow`), nichts wird freigeschaltet */
@@ -309,6 +311,20 @@ export const NPC_TOPICS: Record<string, NpcTopics> = {
     },
   },
 };
+
+// P3: Kill-Ziele als Aufträge. `a` nennt das Stichwort frei (Einstiegszeile), `b` gibt Kopfgeld 1, danach gibt `a` Kopfgeld 2 (killGoals.ts).
+for (const sp of KILL_GOAL_SPECS) {
+  const k1 = killGoalKey(sp.group, 1);
+  const k2 = killGoalKey(sp.group, 2);
+  const a = NPC_TOPICS[sp.a]!;
+  const b = NPC_TOPICS[sp.b]!;
+  a.open += ` Man hört auch von: [[${k1}|${sp.label1}]].`;
+  a.topics[k1] = { text: [sp.rumor] };
+  const low = (who: string) => `${who} winkt ab. „Dafür bist du noch zu unerfahren. Komm später wieder.“`;
+  b.topics[k1] = { text: [sp.bid1], minLevel: sp.lv, tooLow: low(sp.b), quest: killGoalQuestId(sp.group, 1) };
+  a.topics[k2] = { text: [`${sp.bid2} Man nennt es: [[${k2}|${sp.label2}]].`], minLevel: sp.lv, tooLow: low(sp.a), quest: killGoalQuestId(sp.group, 2) };
+}
+
 
 /**
  * Notizen der Landmarken (P5) hängen an Stichworten (P2): wer die Notiz liest, notiert das Stichwort.

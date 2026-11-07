@@ -2628,6 +2628,8 @@ export class GameScene extends Phaser.Scene {
           g.fillRect(sx - 14, sy + 8 - (fig ? fig.top + 2 : 56), 28 * Math.max(0, a.hp / a.maxHp), 5);
         }
         if (a.id !== p.id) this.label(`a${a.id}`, `${a.name} (Lv ${a.level})${a.pkUntil > this.world.tick ? ' ☠' : ''}`, sx, sy + 8 - (fig ? fig.top + 12 : 66), a.pkUntil > this.world.tick ? '#ff5a4a' : '#9fd0ff', seen);
+        // P3: gewählter Titel über dem Namen (bei der eigenen Figur allein über dem Kopf)
+        if (a.kind === 'player' && a.title) this.label(`t${a.id}`, `„${a.title}“`, sx, sy + 8 - (fig ? fig.top + 12 : 66) - (a.id === p.id ? 0 : 13), '#e8c872', seen, 11);
         // Spielerring in der Stadt = sicher
         if (this.world.safe.some((r) => a.x >= r.x && a.y >= r.y && a.x < r.x + r.w && a.y < r.y + r.h)) {
           g.lineStyle(1, 0xd8a24a, 0.7);
@@ -2655,7 +2657,7 @@ export class GameScene extends Phaser.Scene {
         this.flash.delete(id);
       }
     }
-    this.cleanLabels(seen, ['a']);
+    this.cleanLabels(seen, ['a', 't']);
     uploadAhead(this);
     pumpLootIcons(this);
   }

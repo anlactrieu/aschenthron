@@ -1,3 +1,4 @@
+import { KILL_GOAL_SPECS, killGoalKey, killGoalQuestId } from './killGoals';
 export type AttrKey = 'kraft' | 'gewandtheit' | 'ausdauer' | 'verstand' | 'willenskraft';
 export const ATTR_KEYS: AttrKey[] = ['kraft', 'gewandtheit', 'ausdauer', 'verstand', 'willenskraft'];
 export const ATTR_NAME: Record<AttrKey, string> = {
@@ -698,8 +699,8 @@ export const POTION_COOLDOWN_TICKS = 100;
 /** Rüstungs-Formel: Schaden * K / (K + Rüstung) */
 export const ARMOR_K = 30;
 
-/** buy: `count` Stück der Vorlage `target` beim Händler kaufen (oder geschenkt bekommen); kill: Monsterart; chest: Truhen; champion/unique: Champions bzw. Mini-Bosse (unique mit `target`: ein bestimmter); visit: Region betreten; bring: Gegenstand von Monstern/Truhen sammeln; talk: mit einem NPC sprechen */
-export type QuestKind = 'kill' | 'chest' | 'champion' | 'unique' | 'visit' | 'bring' | 'talk' | 'camp' | 'find' | 'buy';
+/** goal: Kill-Zähler einer Beute-Gruppe (versteckter Auftrag „Kopfgeld“); buy: `count` Stück der Vorlage `target` beim Händler kaufen (oder geschenkt bekommen); kill: Monsterart; chest: Truhen; champion/unique: Champions bzw. Mini-Bosse (unique mit `target`: ein bestimmter); visit: Region betreten; bring: Gegenstand von Monstern/Truhen sammeln; talk: mit einem NPC sprechen */
+export type QuestKind = 'kill' | 'chest' | 'champion' | 'unique' | 'visit' | 'bring' | 'talk' | 'camp' | 'find' | 'buy' | 'goal';
 
 export interface QuestDef {
   id: string;
@@ -738,6 +739,8 @@ export interface QuestDef {
   teaches?: string[];
   /** P2: Name der versteckten Kette (nur für die Anzeige) */
   thread?: string;
+  /** goal (Kill-Ziel): Beute-Gruppe, deren Kill-Zähler (Bestiarium) `count` erreichen muss */
+  group?: string;
   /** Nach der Abgabe beginnt sofort diese Aufgabe (erster Auftrag: Schritt für Schritt ohne Rückweg zum Auftraggeber) */
   next?: string;
   /** Töte-Aufgabe gilt beim letzten Kill sofort als abgegeben (Kaufaufgaben immer) */
@@ -1015,6 +1018,25 @@ export const NPC_LORE: Record<string, string[]> = {
     'Der Aschenkönig fiel, doch hinter ihm liegt eine Pforte im Aschengrund. Morvath wacht dort. Was er behütet, will ich nicht aussprechen.',
   ],
 };
+
+
+// P3: Kill-Ziele als versteckte Aufträge („Kopfgeld“): 100 Kills (b), danach 500 Kills (a). Wege und Texte in killGoals.ts, Themen in topicsData.ts.
+for (const sp of KILL_GOAL_SPECS) {
+  const g = LOOT_GROUPS.find((x) => x.id === sp.group)!;
+  ([1, 2] as const).forEach((stage) => {
+    const count = KILL_GOALS[stage - 1]!;
+    const mult = stage === 1 ? 10 : 20;
+    QUESTS.push({
+      id: killGoalQuestId(sp.group, stage), kind: 'goal', group: sp.group, target: '', count, hidden: true, thread: `Kopfgeld: ${g.name}`,
+      name: `${stage === 1 ? 'Kopfgeld' : 'Großes Kopfgeld'}: ${g.name}`,
+      text: `${stage === 1 ? sp.b : sp.a} zahlt für ${count} erlegte ${g.name}. Dein Kill-Zähler im Bestiarium (Taste L) zählt: Was du schon erlegt hast, ist angerechnet.`,
+      minLevel: sp.lv, giver: stage === 1 ? sp.b : sp.a, ...(stage === 1 ? { teaches: [killGoalKey(sp.group, 2)] } : { reward: 'rare' as const }),
+      requires: stage === 2 ? killGoalQuestId(sp.group, 1) : undefined,
+      xp: Math.round(SCALE.xp(sp.lv + 1) * mult), gold: Math.round((sp.lv * 3 + 3) * mult),
+      outro: stage === 1 ? sp.out1 : sp.out2,
+    });
+  });
+}
 
 export { NPC_TOPICS } from './topicsData';
 

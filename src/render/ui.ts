@@ -1641,6 +1641,7 @@ export class Ui {
       case 'find': return `Suche ${def.item} (${prog}) – achte auf Funkeln am Boden`;
       case 'chest': return `Öffne Truhen (${prog})`;
       case 'champion': return `Besiege Champions (${prog})`;
+      case 'goal': return `Erlege ${def.count}× ${targetName(def)} insgesamt (${prog})`;
       case 'unique': return def.target ? `Besiege den Weltboss (${prog})` : `Besiege benannte Gegner (${prog})`;
     }
   }

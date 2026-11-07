@@ -880,6 +880,23 @@ function beginQuest(w: World, a: Actor, def: QuestDef): void {
     a.quests[def.id] = { state: 'done', progress: def.count };
     w.events.push({ type: 'questDone', questId: def.id, to: a.id });
   }
+  // Kill-Ziel (Kopfgeld): der Kill-Zähler der Gruppe zählt, schon Erlegtes ist angerechnet
+  if (def.kind === 'goal') syncGoal(w, a, def);
+}
+
+/** Kill-Ziel-Aufgabe auf den Kill-Zähler der Gruppe setzen; erreicht das Ziel, ist sie erfüllt. */
+function syncGoal(w: World, a: Actor, def: QuestDef): void {
+  const st = a.quests[def.id];
+  if (st?.state !== 'active' || !def.group) return;
+  const progress = Math.min(def.count, groupKills(a, def.group));
+  if (progress !== st.progress) {
+    st.progress = progress;
+    w.events.push({ type: 'questProgress', questId: def.id, progress, count: def.count, to: a.id });
+  }
+  if (progress >= def.count) {
+    st.state = 'done';
+    w.events.push({ type: 'questDone', questId: def.id, to: a.id });
+  }
 }
 
 /** Erster Auftrag nur für neue Charaktere: Wer die Ankunftskette schon begonnen hat (alter Spielstand), bekommt ihn nicht mehr. */
@@ -1906,6 +1923,7 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
     }
     if (m.kindId && !m.summoned) for (const b of pl.bounties ?? []) if (b.target === m.kindId && b.progress < b.count) b.progress++;
     if (m.kindId && !m.summoned && pl.kind === 'player') countKill(w, pl, m.kindId);
+    if (m.kindId && !m.summoned && pl.kind === 'player') for (const q of QUESTS) if (q.kind === 'goal' && q.group === lootGroupOf(m.kindId)) syncGoal(w, pl, q);
     for (const q of QUESTS) {
       const st = pl.quests[q.id];
       if (st?.state !== 'active') continue;

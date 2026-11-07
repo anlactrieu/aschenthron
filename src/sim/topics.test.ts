@@ -14,7 +14,8 @@ const build = (seed = 3) => {
   return { w: world, p: getActor(world, playerId)! };
 };
 const hiddenQuests = QUESTS.filter((q) => q.hidden);
-const threads = [...new Set(hiddenQuests.map((q) => q.thread))];
+// Ketten mit mindestens drei Gliedern; die Kopfgelder (Kill-Ziele, kind goal) haben zwei Stufen und stehen in killgoals.test.ts
+const threads = [...new Set(hiddenQuests.filter((q) => q.kind !== 'goal').map((q) => q.thread))];
 
 /** Stellt den Spieler neben den NPC und führt den Befehl aus. */
 const talkTo = (w: World, p: Actor, name: string, cmd: (npcId: number) => Command): void => {
