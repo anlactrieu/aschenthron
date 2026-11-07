@@ -1,3 +1,9 @@
+## LIVE (2026-11-07 ~22:00): Iso-Umbau P9.0–P9.5 auf `main` – NÄCHSTER SCHRITT: Online anspielen, dann /code-review über den P9-Diff
+- **Stand:** `main` = `neuer-look` = f81da7d (Fast-Forward, 31 Commits), Pages-Lauf 42413646858 grün. Vorher lokal: Lint, 540 Tests, Build grün. Online im Browser noch nicht angespielt.
+- **Letzte 3 Entscheidungen:** (1) Nutzer: „bring den Stand online“ = Push `git push origin neuer-look:main neuer-look`, Anspielen danach statt davor. (2) Fast-Forward, weil `origin/main` Vorfahre von `neuer-look` war. (3) Kein HANDOFF-Push mehr nötig, dieser Eintrag liegt nur lokal.
+- **Offen:** Review über ganzen P9-Diff; Sheet-Cache verwirft noch genutzte Texturen (`heroSheet`/`monsterSheet`); Spawn-Silhouette; Frostnova-Band; Mobil-HUD; Wandhöhe/Verdeckung unentschieden; Bake-Skripte (5 Ansichten) nicht neu gelaufen; Pace nur Seed 2024; `BASIC_TEMPO` 1,5/1,35/1,0.
+- **Learnings:** Pages-Workflow (`.github/workflows/pages.yml`) führt `npm test` vor dem Build aus; ein roter Test blockiert das Deployen. Lokaler `main` hinkt `origin/main` hinterher – immer `origin/main` vergleichen.
+
 ## ERLEDIGT (2026-11-07): Iso-Umbau P9.0–P9.5 – NÄCHSTER SCHRITT: Nutzer spielt lokal an, dann Push `main` (pusht der Nutzer selbst)
 - **Stand:** `neuer-look` = ae70cad, Iso 2:1 ist die einzige Ansicht, Schalter und Draufsicht-Code sind gelöscht. Hauptsession geprüft: tsc, Lint, 540 Tests und Build grün. Nicht auf `main`, online läuft noch die Draufsicht. Push: `git push origin neuer-look:main neuer-look` (der Auto-Modus blockiert Pushes auf `main`). Stand der Phasen in SPEC „Umsetzungsstand P9.0“ bis „P9.5“, Übergaben `p9-0-handoff.md` bis `p9-5-handoff.md` und Bilder `p9-5/` in den Notizordnern der Sessions.
 - **Bildzeit (P9.5, Fenster sichtbar, 8 Gegner):** Iso braucht gegenüber der Draufsicht +1,4 ms in der Stadt, +0,6 ms auf den Feldern und +1,3 ms in den Katakomben. Kein Frame über 33 ms. Pace nur Seed 2024: L30 nach 25,8 h, 97 Tode.
