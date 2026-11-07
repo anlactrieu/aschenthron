@@ -745,7 +745,7 @@ Entscheidungen (2026-11-07):
 - **Kräftiger Sound:** satte Einschläge je Waffenart (Klinge, Wucht, Bogen, Magie), lauter bei Kritischen.
 - **Schadenszahlen:** größer, springend, Kritische deutlich hervorgehoben. Weniger, dafür lesbare Zahlen.
 
-## Umsetzungsplan P9 Iso (Plan 2026-11-07, noch NICHT umgesetzt)
+## Umsetzungsplan P9 Iso (Plan 2026-11-07, P9.0 umgesetzt, siehe „Umsetzungsstand P9.0“)
 Grundlage: Probe `scripts/bake-iso-probe.ts` mit `probe/iso/` (`vergleich.png`, `held-richtungen.png`), Aufwandstabelle unter „Ansicht: Probe Draufsicht gegen Iso“.
 
 **Entscheidungen des Nutzers (2026-11-07):**
@@ -845,6 +845,43 @@ Reihenfolge: 4 Runden mit 6 Sessions. Erst P9.0, dann P9.1, P9.2 und P9.3 gleich
   - Ohne Schalter ist das Spiel unverändert.
   - Die Frame-Zeit in Iso liegt höchstens 2 ms (Median) über der Draufsicht.
   - Die Schnittstellen und der Dateibesitz stehen in SPEC unter „Umsetzungsstand P9.0“.
+
+**Umsetzungsstand P9.0 (2026-11-07, Branch `claude/p9-iso-729776`)**
+- **Stand:** abgenommen im Browser mit `?ansicht=iso` (Bilder und Übergabe im Notizordner unter `p9-0/`). tsc, Lint, 525 Tests und Build grün. Die Draufsicht-Probe ist byte-gleich (`1d89d2…`).
+- **Frame-Zeit:** gemessen als Arbeitszeit je Spielschritt (Update plus Render), bei 60 FPS. Die Draufsicht steht in Klammern.
+  - Katakomben mit 13 bis 21 Gegnern: Median 4,5 ms (3,1 ms), p90 5,5 ms (3,6 ms).
+  - Aschenhafen: 2,5 ms (2,0 ms).
+  - In beiden Fällen 0 % der Frames über 33 ms.
+- **Schnittstellen (Vertrag):**
+  - **`iso.ts`:** `ISO`, `TILE_W/H`, `toScreen`/`toTile`. Jede Funktion gibt es als reine Variante mit `iso`-Parameter (`project`, `viewFrom`, `ellipseOf`, `rangeOf` …), damit beide Modi testbar sind.
+  - **Fußpunkt und Tiefe:** `FOOT_DY` (Figuren: Draufsicht 8, Iso 0 auf der Rautenmitte), `standDepth(sy)` (stehende Objekte auf einer Kachel: Draufsicht +24, Iso +8), `FRONT_DY` (Vorderkante der Kachel für Bild-Unterkanten), `footprintColumns(x0, y0, w, h)` (Spalten von 32 px mit `depth`/`back`).
+  - **Richtung:** `viewOf`/`turn`/`facingView`/`sheetView`/`fallbackView`/`mirrors`. Die Ansicht wird aus der Bildschirmrichtung bestimmt. Hat ein Sheet keine Schrägansicht, fällt sie auf vorn bzw. hinten zurück. Seite und Schrägen werden gespiegelt.
+  - **Strecken, Kreise, Bereiche:** `gridStep` (Laufzyklus), `groundEllipse`/`groundSize`, `tileRange`, `mapBounds`, `arrowDirs`/`arrowStep`.
+  - **`isoGround.ts` (P9.2 füllt):**
+    - `IsoGroundSrc` enthält die Kachelfragen aus GameScene: `mat`, `waterDist`, `outside`, `detail`, `isWall`.
+    - `IsoChunkBaker` backt in Etappen in ein Raster von 512×256 (`ISO_CHUNK_W/H`), abgelegt bei `isoChunkOrigin`.
+    - `isoWall(style, open, x, y)` liefert `{ key, w, h, ax, ay, make }`. Der Anker ist die untere Rautenecke. GameScene setzt den Block als Prop mit `standDepth`.
+  - **`isoHouses.ts` (P9.3 füllt):**
+    - `isoHouseParts(hs)` liefert Teile `{ key, make, sx, sy, layer: 'front'|'back', fade: 'roof'|'walls'|'back'|'none', light? }`.
+    - `isoHouseFade(hs, px, py)` liefert die Ziel-Deckkraft je Gruppe.
+    - GameScene schneidet die Teile in Spalten (`footprintColumns`), legt sie in den Hausatlas und blendet weich.
+    - Für Hausringe gibt es in Iso keine Props, die Teile zeichnen sie.
+- **Änderungen am Vertrag (begründet):**
+  1. **`groundEllipse`** gilt nur in Iso. Die Draufsicht zeichnet gestauchte Ellipsen, keine Kreise. `groundSize(w, h)` behält sie dort unverändert und macht in Iso einen 2:1-Bodenkreis gleicher Breite daraus.
+  2. **Spaltentiefe** ist die Vorderkante in der Spaltenmitte, nicht das Maximum der Spalte. Mit dem Maximum hätte eine Figur direkt vor dem Flügel dieselbe Tiefe wie die Wand. So bleiben in beide Richtungen mindestens 8 px Abstand (Test in `iso.test.ts`).
+  3. **Figuren-Sheets backen in P9.0 weiter 3 Ansichten,** in beiden Modi. Die Rigs würden `frontDiag` sonst falsch posieren (`hero.ts:271`), und das Backen kostete +66 %. `figViews(iso)` liefert die Ziel-Liste für P9.1.
+  4. **Der Figuren-Worker bekommt den Modus noch nicht.** `figureWorker.ts` und `monsterSheet.ts` gehören P9.1. P9.1 gibt `ISO` mit und nimmt die Ansichtsliste in den Cache-Schlüssel auf.
+  5. **Häuser haben 3 Ausblend-Gruppen.** Die Rückwände (Innenseiten von Nord- und Westwand) blenden mit aus, wenn sie den Helden verdecken, bleiben aber stehen, wenn er im Haus ist. Ob „verdeckt“ gilt, entscheidet die Bildschirmlage (Fuß hinter der Vorderkante, unter der Dachspitze), nicht eine Kachelbox.
+- **Weitere Regeln aus P9.0:**
+  - **Culling:** Props, Truhen, Akteure und Glitzern werden in Iso über den Kachelbereich des Bildausschnitts gefiltert (`vt`), nicht über ±`VIEW`.
+  - **Verdecker:** Wandblöcke, Bäume und Stadtprops in einem kleinen Fenster vor dem Helden, die seinen Körper überdecken, werden halb durchsichtig (0,45, `updateOcclusion`).
+  - **Kamera:** Die Kamera hat in Iso die Grenze `mapBounds`.
+- **Bekannt und für spätere Phasen:**
+  - Rückstoß bei Treffern: GameScene ~1036/1045 rechnet seit jeher mit Iso-Formeln, also `(dx−dy)·32` und `(dx+dy)·16`. Das bleibt unverändert, in der Draufsicht ist es eine alte Eigenheit.
+  - Türen auf der N- und W-Seite, Schilder und Fensterlicht der Häuser fehlen in Iso (P9.3).
+  - Wandschatten am Boden fehlen in Iso (P9.2).
+  - Zauber-FX, Minimap und die Spiegelung der Wildtiere folgen in P9.4.
+  - Flaches Stadtdekor ist noch ein stehendes Bild (P9.3).
 
 **P9.1 Figuren in 5 Ansichten (Sonnet)**
 - **Inhalt:**
