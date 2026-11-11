@@ -164,6 +164,14 @@ function titleBar(text: string, win: HTMLElement, onClose: () => void, extra: HT
   }
   const x = el('span', 'a-x', '✕');
   x.title = 'Schließen';
+  x.tabIndex = 0;
+  x.setAttribute('role', 'button');
+  x.onkeydown = (ev) => {
+    if (ev.key === 'Enter' || ev.key === ' ') {
+      ev.preventDefault();
+      onClose();
+    }
+  };
   x.onpointerdown = (e) => e.stopPropagation();
   x.onclick = onClose;
   h.append(x);
@@ -195,7 +203,6 @@ const CSS = `
 .a-x:hover{color:#fff;background:#9b2a2a}
 .a-tabs{display:flex;flex-wrap:wrap;gap:2px;margin:0 0 4px}
 .a-tab{flex:1 1 30%;min-width:0;padding:0;text-align:center;cursor:pointer;font-size:16px;line-height:22px}
-.a-tab.on{color:var(--ink)}
 .a-body{padding:6px 8px;overflow-y:auto;max-height:calc(100vh - 200px)}
 .a-sec{margin:12px 0 6px;padding-bottom:3px;border-bottom:1px solid var(--iron);color:var(--title);font-family:var(--pix);letter-spacing:.8px}
 .a-grid{display:grid;gap:3px;grid-template-columns:repeat(${BAG_COLS},46px)}
@@ -242,7 +249,7 @@ const CSS = `
 #hud-tl .clk.day{color:#e8d49a}
 #hud-tl .pbar{height:18px;margin:4px 5px 4px 3px}
 ${BAR_CSS}
-#chronik{pointer-events:none;position:fixed;z-index:4;left:12px;bottom:112px;width:380px;box-sizing:border-box;color:var(--txt);font:16px/1.4 var(--body);background:linear-gradient(90deg,rgba(14,15,18,.88),rgba(14,15,18,.55) 85%,transparent);border-left:2px solid var(--iron);text-shadow:0 1px 2px #000}
+#chronik{pointer-events:none;position:fixed;z-index:4;left:12px;bottom:112px;width:380px;box-sizing:border-box;color:var(--txt);font:16px/1.4 var(--body);background:linear-gradient(90deg,rgba(14,15,18,.92),rgba(14,15,18,.85) 85%,transparent);border-left:2px solid var(--iron);text-shadow:0 1px 2px #000}
 #chronik .chr-hd{display:flex;justify-content:space-between;align-items:center;font-size:14px;color:var(--dim);padding:3px 8px;cursor:pointer;pointer-events:auto;user-select:none;min-height:24px}
 #chronik .chr-ln{padding:0 8px 6px;max-height:9.5em;overflow-y:auto;pointer-events:auto;overscroll-behavior:contain;scrollbar-width:thin}
 #chronik .chr-ln div{margin-top:2px}
@@ -403,6 +410,7 @@ export class Ui {
       this.tracker.style.top = 'max(8px,env(safe-area-inset-top))';
       this.tracker.style.right = 'max(8px,env(safe-area-inset-right))';
       this.bannerEl.style.fontSize = '20px';
+      this.target.style.maxWidth = '36vw';
       Object.assign(this.xpBar.style, { minWidth: '0', width: '100%', height: '12px' });
       this.hud.id = 't-hud';
       this.hotbar.classList.add('t-hot');
@@ -675,7 +683,7 @@ export class Ui {
       row.append(title, goal);
       this.tracker.append(row);
     }
-    if (act.length > shown.length) { const more = el('div', '', `+${act.length - shown.length} weitere (J)`); more.style.cssText = 'opacity:.6;font-size:14px'; this.tracker.append(more); }
+    if (act.length > shown.length) { const more = el('div', '', `+${act.length - shown.length} weitere (J)`); more.style.cssText = 'opacity:.75;font-size:16px'; this.tracker.append(more); }
   }
 
   private updateHud(p: Actor, t?: Actor): void {
@@ -922,7 +930,7 @@ export class Ui {
       const t = templateById(it.templateId);
       const base = t.base?.length ?? 0;
       const q = el('div');
-      q.style.cssText = 'margin-top:4px;font-size:14px';
+      q.style.cssText = 'margin-top:4px;font-size:16px';
       it.affixes.slice(base).forEach((a) => {
         let line: HTMLElement;
         if (it.named || it.unique) {
@@ -953,7 +961,7 @@ export class Ui {
     }
     if (it.sockets?.length) {
       const sk = el('div');
-      sk.style.cssText = 'margin-top:4px;font-size:14px';
+      sk.style.cssText = 'margin-top:4px;font-size:16px';
       for (const g of it.sockets) {
         const line = el('div', '', g ? `◆ ${gemName(g)}: ${gemEffect(g, it.slot)}` : '◇ leerer Sockel');
         line.style.color = g ? `#${GEM_COLOR[g.kind].toString(16).padStart(6, '0')}` : '#7a6a58';
@@ -990,7 +998,7 @@ export class Ui {
       box.append(verdict);
       if (it.power?.id !== equipped.power?.id && (it.power || equipped.power)) {
         const eff = el('div', '', `Effekt: ${equipped.power ? POWER_TEXT[equipped.power.id](equipped.power.value) : 'keiner'} → ${it.power ? POWER_TEXT[it.power.id](it.power.value) : 'keiner'}`);
-        eff.style.cssText = 'color:#e8c888;font-size:14px';
+        eff.style.cssText = 'color:#e8c888;font-size:16px';
         box.append(eff);
       }
       for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
@@ -1145,9 +1153,17 @@ export class Ui {
     const tabs = el('div', 'a-tabs');
     for (const [id, label] of ([['inv', 'Inventar', 'inv'], ['char', 'Charakter', 'char'], ['skills', 'Fertigkeiten', 'skills'], ['quests', 'Aufgaben', 'quests'], ['best', 'Bestiarium', 'bestiary'], ['ach', 'Erfolge', 'ach'], ['set', 'Einstellungen', 'settings']] as [Tab, string, Parameters<typeof keyOf>[0]][]).map(([id, name, act]): [Tab, string] => [id, isTouch ? name : `${name} (${keyLabel(keyOf(act))})`])) {
       const t = el('div', `a-tab${this.tab === id ? ' on' : ''}`, label);
+      t.tabIndex = 0;
+      t.setAttribute('role', 'tab');
       t.onclick = () => {
         this.tab = id;
         this.key = '';
+      };
+      t.onkeydown = (ev) => {
+        if (ev.key === 'Enter' || ev.key === ' ') {
+          ev.preventDefault();
+          t.click();
+        }
       };
       tabs.append(t);
     }
@@ -1163,7 +1179,7 @@ export class Ui {
       this.renderHunts(body, p);
     }
     const toNpc = isTouch && this.sideShown ? [Object.assign(el('span', 'a-x', 'Händler'), { onclick: () => { this.touchMain = false; this.sel = null; this.key = ''; this.layout(); } })] : [];
-    for (const b of toNpc) b.style.cssText = 'font-size:15px;padding:0 10px;display:flex;align-items:center;border-left:1px solid var(--iron)';
+    for (const b of toNpc) b.style.cssText = 'font-size:16px;padding:0 10px;display:flex;align-items:center;border-left:1px solid var(--iron)';
     const title = titleBar(`${p.name}${p.title ? ` „${p.title}“` : ''} · Stufe ${p.level}`, this.main, () => this.toggle(false), toNpc);
     this.main.replaceChildren(...[title, tabs, body, this.selPanel(p)].filter((x): x is HTMLElement => !!x));
   }
@@ -1723,7 +1739,7 @@ export class Ui {
         ...LEGENDARIES.filter((l) => l.source && bosses.has(l.source)).map((l) => ({ id: l.id, level: l.minLevel, item: () => generateLegendary(new Rng(1), -1, l.id), slot: SLOT_NAME[templateById(l.base).slot as EquipSlot] ?? '' })),
       ].sort((a, b) => a.level - b.level);
       const list = el('div');
-      list.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:4px;font-size:14px';
+      list.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:4px;font-size:16px';
       for (const d of drops) {
         if (!found.has(d.id)) {
           list.append(el('span', 'a-note', `??? · ${d.slot} · St. ${d.level}`));
@@ -2129,7 +2145,7 @@ export class Ui {
       if (locked) body.append(el('div', 'a-note', `Weitere Aufgaben (${locked}) folgen, sobald die vorherige erledigt ist.`));
     }
     const toBag = isTouch ? [Object.assign(el('span', 'a-x', 'Rucksack'), { onclick: () => { this.touchMain = true; this.sel = null; this.key = ''; this.layout(); } })] : [];
-    for (const b of toBag) b.style.cssText = 'font-size:15px;padding:0 10px;display:flex;align-items:center;border-left:1px solid var(--iron)';
+    for (const b of toBag) b.style.cssText = 'font-size:16px;padding:0 10px;display:flex;align-items:center;border-left:1px solid var(--iron)';
     const title = titleBar(near.map((n) => n.name).join(' · '), this.side, () => {
       this.sideClosed = near.map((n) => n.id).join(',');
       this.sideShown = false;
