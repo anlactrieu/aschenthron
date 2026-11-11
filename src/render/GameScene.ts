@@ -2216,7 +2216,13 @@ export class GameScene extends Phaser.Scene {
 
   private updateNpcs(time: number): void {
     // Skelett-Figuren: ohne Worker im Spielthread backen, Cache aufräumen (Upload-Budget setzt `draw` zurück)
-    pumpFigures(this, () => this.figuresInUse());
+    const evicted = pumpFigures(this, () => this.figuresInUse());
+    if (evicted.length) {
+      // Ansichten, die noch auf eine eben verworfene Textur zeigen (unsichtbare, aber noch gebrauchte: Zaubereffekt auf Entferntes), auf die leere Textur setzen
+      const gone = new Set(evicted);
+      for (const v of this.actorViews.values()) if (gone.has(v.img.texture.key)) v.img.setTexture('__DEFAULT');
+      for (const img of this.npcViews.values()) if (gone.has(img.texture.key)) img.setTexture('__DEFAULT');
+    }
     const p = this.player();
     const seen = new Set<string>();
     for (const n of this.world.npcs) {
