@@ -23,7 +23,7 @@ import { ART_SCALE, Raster, bytes, toCanvas } from './world/raster';
 import { matOf, warmGround } from './world/ground';
 import { glow, type WallStyle } from './world/props';
 import { DOOR_ICONS, TOWN_GID, WATER_PROP_GIDS, WORLD_TOWN_KEYS, registerTownArt } from './town';
-import { Ui, describeItem, isUpgrade } from './ui';
+import { Ui, describeItem, isUpgrade, type ChronikKind } from './ui';
 import { generateItem, type Item } from '../sim/items';
 import type { Mood } from './music';
 import { AchievementTracker, type Stats } from './achievements';
@@ -999,7 +999,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleEvents(): void {
-    const say = (m: string) => this.ui.say(m);
+    const say = (m: string, kind?: ChronikKind) => this.ui.say(m, kind);
     const w = this.world;
     const fxSeen = new Set<string>();
     for (const e of this.remote ? this.remote.drainEvents() : drainEvents(w)) {
@@ -1017,6 +1017,11 @@ export class GameScene extends Phaser.Scene {
           const spellEl = spellElementOf(e.skill, e.dt);
           // Wirkung am Ziel: Zahl, Blitz, Rückstoß, Ton – bei Geschossen erst beim Einschlag
           const kill = fromPlayer && !!tg && !tg.alive;
+          // Chronik: Treffer ohne Gift-/Brandticks (sonst jede Sekunde eine Zeile)
+          if (e.skill !== 'dot' && e.skill !== 'burn') {
+            if (fromPlayer && tg) say(`Du triffst ${tg.name} für ${e.amount}${e.crit ? ' (kritisch)' : ''}.${kill ? ` ${tg.name} fällt.` : ''}`, 'hit');
+            else if (toPlayer && at) say(`${at.name} trifft dich für ${e.amount}.`, 'dmg');
+          }
           const power: 0 | 1 | 2 = kill ? 2 : e.crit ? 1 : 0;
           const impact = () => {
             this.flash.set(e.targetId, this.now + (power === 0 ? 90 : power === 1 ? 140 : 170) * this.ts);
@@ -1266,10 +1271,10 @@ export class GameScene extends Phaser.Scene {
             this.sfx.legendary();
             this.ui.banner(`${r === 'legendary' ? 'Legendär' : 'Set-Teil'}: ${e.item.name}`, r === 'legendary' ? '#ff8a2a' : '#5fd070');
             this.glow(r === 'legendary' ? 0xff8a2a : 0x5fd070, 0.2, 360);
-            say(`Beute: ${e.item.name}!`);
+            say(`Beute: ${e.item.name}!`, 'find');
           } else if (r === 'rare' || e.item.slot === 'gem') {
             if (r === 'rare') this.sfx.rare();
-            say(`Beute: ${e.item.name}`);
+            say(`Beute: ${e.item.name}`, 'find');
           }
           break;
         }
@@ -1288,10 +1293,10 @@ export class GameScene extends Phaser.Scene {
         }
         case 'pickedUp':
           if (e.item.slot === 'gem') {
-            say(`Edelstein: ${e.item.name}`);
+            say(`Du findest: ${e.item.name}`, 'find');
             this.sfx.gem();
           } else {
-            say(`Erhalten: ${e.item.name} (${describeItem(e.item)})`);
+            say(`Du erhältst: ${e.item.name} (${describeItem(e.item)})`, 'find');
             this.sfx.pickup();
           }
           break;
@@ -1316,7 +1321,7 @@ export class GameScene extends Phaser.Scene {
           // Vignette hängt an der eigenen Stufe: nach dem Aufstieg neu bewerten (ohne erneutes Zonenbanner)
           this.applyVignette(regionAt(w, this.player().x, this.player().y), this.player());
           this.achBump('level', e.level);
-          say(`LEVEL ${e.level}! +5 Attributpunkte (C), +1 Skillpunkt`);
+          say(`Du erreichst Stufe ${e.level}. +5 Attributpunkte (C), +1 Skillpunkt.`, 'level');
           this.sfx.levelUp();
           this.townLife.congratulate(e.level, { time: this.lastTime, player: this.player(), npcs: this.world.npcs });
           const pos = this.bodyPos(this.player());
@@ -1394,7 +1399,12 @@ export class GameScene extends Phaser.Scene {
           break;
         }
         case 'questItem': say(`${e.item} gefunden (${e.progress}/${e.count})`); this.sfx.pickup(); break;
-        case 'talk': this.sfx.quest(); break;
+        case 'talk': {
+          const who = getActor(w, e.npcId) ?? w.npcs.find((n) => n.id === e.npcId);
+          if (who) say(`Du sprichst mit ${who.name}.`, 'talk');
+          this.sfx.quest();
+          break;
+        }
         case 'wildEvent':
           say(e.text);
           this.ui.banner(e.text.split(/[!:.]/)[0] + '!', e.color);

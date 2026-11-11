@@ -34,9 +34,9 @@ html.touch .a-tab{flex:none;padding:0 14px;min-height:44px;display:flex;align-it
 html.touch .a-body{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain}
 html.touch .a-btn{min-height:40px;padding:6px 14px;font-size:16px}
 html.touch .a-doll{max-width:100%}
-html.touch .a-sel{flex:none;max-height:46%;overflow-y:auto;border-top:3px solid #f06733;background:#26221a;padding:8px 10px;font:15px/1.4 var(--ui-font);touch-action:pan-y}
-html.touch .a-sel .a-acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;position:sticky;bottom:-8px;background:#26221a;padding:6px 0 8px;text-transform:none}
-html.touch .a-slot.sel{outline:2px solid #ffd86a;outline-offset:1px}
+html.touch .a-sel{flex:none;max-height:46%;overflow-y:auto;border-top:3px solid var(--iron);background:var(--wood-d);padding:8px 10px;font:15px/1.4 var(--ui-font);touch-action:pan-y}
+html.touch .a-sel .a-acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;position:sticky;bottom:-8px;background:var(--wood-d);padding:6px 0 8px;text-transform:none}
+html.touch .a-slot.sel{outline:2px solid var(--title);outline-offset:1px}
 html.touch .a-x{min-height:44px}
 /* HUD kleiner, Tippflächen bleiben >= 44 px */
 html.touch .pbar{height:18px;margin:4px}
@@ -71,7 +71,7 @@ html.touch .tr-fold>div:first-child .a-btn{display:none}
 html.touch .tr-fold::after{content:'▾ mehr';display:block;font-size:13px;opacity:.7}
 html.touch .tr-open::after{content:'▴ weniger';display:block;font-size:13px;opacity:.7}
 /* Querformat-Hinweis */
-#t-rot{position:fixed;inset:0;z-index:200;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#0b0a0d;color:#e8d9b0;font:20px var(--ui-font);text-align:center;padding:24px}
+#t-rot{position:fixed;inset:0;z-index:200;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#0b0a0d;color:var(--title);font:20px var(--ui-font);text-align:center;padding:24px}
 #t-rot b{font-size:44px}
 @media (orientation:portrait){html.touch #t-rot{display:flex}}
 `;
