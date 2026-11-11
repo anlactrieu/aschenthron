@@ -440,7 +440,7 @@ export function uniqueDef(id: string): UniqueDef | undefined {
 }
 export const UNIQUE_REWARD = 6;
 /** Weltboss-Beute: Anzahl garantierter seltener Gegenstände mit mindestens dieser Affix-Stufe, Edelstein-Mindestqualität */
-export const WORLD_BOSS_LOOT = { rares: 2, minTier: 4, minGem: 2 } as const;
+export const WORLD_BOSS_LOOT = { rares: 2, minGem: 2 } as const;
 
 export function monsterKind(id: string): MonsterKind {
   const k = MONSTERS.find((m) => m.id === id);
@@ -691,8 +691,8 @@ export const NIGHT_NPCS: NightNpc[] = [
 
 /** Gegenstands-Drops: Ausrüstung seltener, Tränke häufiger. Faktor auf die Monster-dropChance. */
 export const GEAR_DROP_FACTOR = 0.35;
-/** Anteil benannter Funde an der Ausrüstungsbeute normaler Monster (P3; Rest: Grundgegenstände) */
-export const NAMED_SHARE = 0.3;
+/** Anteil benannter Funde an der Ausrüstungsbeute normaler Monster (T2b: 1 = jeder Fund hat einen festen Namen; Grundgegenstände nur noch, falls das Stufenband keinen Fund hat) */
+export const NAMED_SHARE = 1;
 export const POTION_DROP_CHANCE = 0.3;
 
 /** Rüstungs-Formel: Schaden * K / (K + Rüstung) */

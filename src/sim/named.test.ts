@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { NAMED } from './named';
-import { AFFIXES, LEGENDARIES, SETS, SLOTS, TEMPLATES, affixRange, generateNamed, templateById, type Stat } from './items';
-import { LOOT_GROUPS, MONSTERS, NAMED_BANDS, bandOf } from './data';
+import { AFFIXES, LEGENDARIES, SETS, SLOTS, TEMPLATES, affixRange, generateItem, generateNamed, namedPool, rollLoot, rollNamed, rollWorldDrop, templateById, type Stat } from './items';
+import { LOOT_GROUPS, MONSTERS, NAMED_BANDS, NAMED_SHARE, bandOf } from './data';
+import { Rng } from './rng';
+import { createWorld, spawnPlayer } from './world';
+import { exportPlayer, importPlayer } from './save';
 
 /** Werte, die benannte Funde tragen dürfen: die Affixe der alten Zufallsbeute und die Zauber-/Heilwerte aus Stufe 6. */
 const BUILD_STATS: Stat[] = ['spellFire', 'spellFrost', 'healPower'];
@@ -63,12 +66,12 @@ describe('benannte Funde (named.ts)', () => {
     }
   });
 
-  it('je Band und Slot zwei bis drei Funde, aus mehreren Gruppen, etwa ein Drittel selten', () => {
+  it('je Band und Slot zwei bis drei Funde (Waffen bis vier), aus mehreren Gruppen, etwa ein Drittel selten', () => {
     for (const band of NAMED_BANDS) {
       for (const slot of SLOTS) {
         const hits = NAMED.filter((d) => d.band === band && templateById(d.base).slot === slot);
         expect(hits.length, `Band ${band}, Slot ${slot}`).toBeGreaterThanOrEqual(2);
-        expect(hits.length, `Band ${band}, Slot ${slot}`).toBeLessThanOrEqual(3);
+        expect(hits.length, `Band ${band}, Slot ${slot}`).toBeLessThanOrEqual(slot === 'weapon' ? 4 : 3);
         expect(new Set(hits.map((d) => d.group)).size, `Band ${band}, Slot ${slot}: gleiche Gruppe`).toBeGreaterThanOrEqual(2);
       }
       const inBand = NAMED.filter((d) => d.band === band);
@@ -87,5 +90,55 @@ describe('benannte Funde (named.ts)', () => {
         expect(a.value, `${d.id} ${a.stat}`).toBeLessThanOrEqual(Math.ceil(Math.max(...peers) * 1.15));
       }
     }
+  });
+
+  it('T2b Abdeckung: jede Stufe 1–35 hat in jedem Slot einen Fund, Waffen in allen drei Klassen (Nahkampf, Bogen, Stab)', () => {
+    const klass = (d: (typeof NAMED)[number]): string => templateById(d.base).kind ?? 'melee';
+    for (let lv = 1; lv <= 35; lv++) {
+      const pool = namedPool(lv);
+      for (const slot of SLOTS) expect(pool.some((d) => templateById(d.base).slot === slot), `Stufe ${lv}, Slot ${slot}`).toBe(true);
+      const kinds = new Set(pool.filter((d) => templateById(d.base).slot === 'weapon').map(klass));
+      for (const k of ['melee', 'bow', 'staff']) expect(kinds.has(k), `Stufe ${lv}, Waffenklasse ${k}`).toBe(true);
+    }
+    for (const band of NAMED_BANDS) {
+      const kinds = new Set(NAMED.filter((d) => d.band === band && templateById(d.base).slot === 'weapon').map(klass));
+      for (const k of ['melee', 'bow', 'staff']) expect(kinds.has(k), `Band ${band}, Waffenklasse ${k}`).toBe(true);
+    }
+  });
+
+  it('T2b feste Beute: NAMED_SHARE = 1, jede Beute und jede Weltboss-Beute ist ein benannter Fund mit festen Werten', () => {
+    expect(NAMED_SHARE).toBe(1);
+    const rng = new Rng(77);
+    let id = 1;
+    for (let lv = 1; lv <= 32; lv++) {
+      for (let i = 0; i < 40; i++) {
+        const loot = rollLoot(rng, () => id++, lv, LOOT_GROUPS[i % LOOT_GROUPS.length]!.id, NAMED_SHARE);
+        expect(loot.named, `Stufe ${lv}: ${loot.name}`).toBeDefined();
+        expect(loot).toEqual(generateNamed(loot.id, loot.named!));
+        const boss = rollWorldDrop(rng, () => id++, lv);
+        expect(boss.named, `Weltboss Stufe ${lv}`).toBeDefined();
+        expect(boss.rarity).toBe('rare');
+        expect(rollNamed(rng, () => id++, lv)).not.toBeNull();
+      }
+    }
+  });
+
+  it('T2b alte Gegenstände mit Zufallsaffixen bleiben im Spielstand gültig: laden, tragen, verkaufen', () => {
+    const w = createWorld(5, { w: 30, h: 30, walkable: new Array(900).fill(true) });
+    const p = spawnPlayer(w, 10, 10);
+    p.level = 30;
+    for (const k of ['kraft', 'gewandtheit', 'ausdauer', 'verstand'] as const) p.attrs[k] = 40;
+    const magic = generateItem(new Rng(3), 1, 'steel_sword', 'magic');
+    const rare = generateItem(new Rng(4), 2, 'ash_mail', 'rare');
+    expect(magic.named).toBeUndefined();
+    expect(rare.affixes.length).toBeGreaterThan(2);
+    p.inventory = [magic];
+    p.equipment = { chest: rare };
+    const json = exportPlayer(p);
+    const w2 = createWorld(5, { w: 30, h: 30, walkable: new Array(900).fill(true) });
+    const q = spawnPlayer(w2, 10, 10);
+    expect(importPlayer(w2, q, json)).toBe(true);
+    expect(q.inventory[0]).toMatchObject({ name: magic.name, rarity: 'magic', affixes: magic.affixes });
+    expect(q.equipment.chest).toMatchObject({ name: rare.name, rarity: 'rare', affixes: rare.affixes });
   });
 });

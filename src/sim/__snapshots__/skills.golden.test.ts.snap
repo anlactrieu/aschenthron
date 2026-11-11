@@ -1947,10 +1947,7 @@ exports[`Skills golden > fireball Rang 1 1`] = `
       "type": "loot",
     },
     {
-      "type": "loot",
-    },
-    {
-      "amount": 247,
+      "amount": 239,
       "attackerId": 1,
       "crit": false,
       "dt": "fire",
@@ -1961,7 +1958,7 @@ exports[`Skills golden > fireball Rang 1 1`] = `
   ],
   "hp": 5000,
   "mana": 4976,
-  "next": 0.28811587928794324,
+  "next": 0.6605600535403937,
   "target": 3,
   "victims": [
     {
@@ -1992,11 +1989,11 @@ exports[`Skills golden > fireball Rang 1 1`] = `
     },
     {
       "burn": {
-        "perSec": 25,
+        "perSec": 24,
         "srcId": 1,
       },
       "dot": null,
-      "hp": 695,
+      "hp": 703,
       "status": {
         "burn": 60,
       },

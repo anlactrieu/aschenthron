@@ -902,11 +902,11 @@ export function boostAffixTiers(rng: Rng, item: Item, minTier: number): void {
   }
 }
 
-/** Weltboss-Ausrüstung: seltenes Stück mit hohen Affix-Stufen. */
-export function rollWorldDrop(rng: Rng, nextId: () => number, level: number, minTier: number): Item {
-  const it = rollDrop(rng, nextId, level, 'rare');
-  boostAffixTiers(rng, it, minTier);
-  return it;
+/** Weltboss-Ausrüstung (T2b): garantiert ein benannter seltener Fund der Stufe, keine Zufallsaffixe. Ohne passenden Fund (Stufe außerhalb der Bänder) ein Grundgegenstand. */
+export function rollWorldDrop(rng: Rng, nextId: () => number, level: number): Item {
+  const pool = namedPool(level).filter((d) => d.rarity === 'rare');
+  if (!pool.length) return rollBase(rng, nextId, level);
+  return generateNamed(nextId(), pool[rng.int(0, pool.length - 1)]!.id);
 }
 
 /** Weltboss-Sonderdrop: Unikat oder Set-Teil passend zur Stufe (60 %), sonst nichts. */
