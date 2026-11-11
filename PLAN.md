@@ -36,6 +36,9 @@ Aschenthron soll sich anfühlen wie T4C / D4O, ohne etwas daraus zu kopieren (Re
 3. **Grafik:** Pixel-Stil bleibt, Stimmung anheben (Wände, Licht, Oberfläche, Textlog). Kein neuer Figurenstil.
 4. **Fernziel:** erst Wiedergeburt, dann zweite Insel.
 
+5. **Wandhöhe (2026-11-11):** 40 (`WALL_H` in `isoWalls.ts`), umgesetzt.
+6. **Oberfläche (2026-11-11):** Variante A „Schiefer und Eisen“, Vorlage `docs/probe/t3-oberflaeche.html` (Klasse `.va`).
+
 Damit ist die offene Entscheidung 7 (Wegweiser) aus `SPEC.md` erledigt. Offen bleiben 6 (Fertigkeiten als trainierte Zahlenwerte) und `BASIC_TEMPO`.
 
 ## Pakete

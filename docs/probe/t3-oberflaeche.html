@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROBE T3 – Oberfläche in Stein</title>
+<!-- PROBE (Wegwerf-Code, nicht Teil des Spiels). Varianten: ?v=a | ?v=b, Ansicht: ?g=pc | ?g=handy -->
+<style>
+@font-face{font-family:'NinjaUi';src:url("/assets/ninja/Ui/Font/NormalFont.ttf") format('truetype')}
+html,body{margin:0;height:100%;background:#050506;overflow:hidden}
+#wrap{position:absolute;inset:0 0 52px 0;display:flex;align-items:center;justify-content:center}
+#stage{position:relative;flex:none;overflow:hidden;background:#0b0a0d url("/probe/wand/wand-40.png") center/cover;image-rendering:pixelated;transform-origin:center}
+#stage::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,transparent 20%,rgba(4,4,8,.55) 75%);pointer-events:none}
+#stage>*{z-index:1}
+
+/* ---------- gemeinsame Maße ---------- */
+.ui{position:absolute;box-sizing:border-box;color:var(--txt);font:16px/1.45 var(--body)}
+.pix{font-family:'NinjaUi',monospace;letter-spacing:.5px;font-synthesis:none}
+.kw{color:var(--link);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;cursor:pointer}
+.bar{position:relative;height:18px;background:#0a0a0c;margin-top:5px}
+.bar i{position:absolute;left:0;top:0;bottom:0}
+.bar b{position:absolute;inset:0;font:13px/18px var(--body);font-weight:600;text-align:center;color:#fff;text-shadow:0 1px 0 #000,0 0 3px #000}
+.hp i{background:linear-gradient(#b8443c,#7a1f22)} .mp i{background:linear-gradient(#4d6fb3,#243c78)}
+#hero{left:12px;top:12px;width:250px;padding:8px;display:flex;gap:10px}
+#hero img{width:64px;height:64px;image-rendering:pixelated;flex:none;background:#101114}
+#hero .n{font-size:18px;color:var(--title);line-height:1.1}
+#hero .s{font-size:14px;color:var(--dim)}
+#hero .c{flex:1;min-width:0}
+#mini{right:12px;top:12px;width:190px;height:120px;padding:0}
+#mini div{position:absolute;inset:6px;background:linear-gradient(135deg,#14181d,#0c0e12)}
+#mini span{position:absolute;left:50%;top:50%;width:70px;height:36px;margin:-18px 0 0 -35px;background:#2c3a2a;transform:rotate(0deg) skewX(-45deg) scaleY(.9);opacity:.8}
+#hot{left:50%;bottom:10px;transform:translateX(-50%);display:flex;gap:4px;padding:6px}
+.sl{width:44px;height:44px;position:relative;box-sizing:border-box}
+.sl em{position:absolute;left:4px;top:1px;font:12px/1 var(--body);font-style:normal;color:var(--dim)}
+.sl.on::after{content:"";position:absolute;inset:9px;border-radius:50%;background:radial-gradient(#d0693a,#5a1d14)}
+#talk{left:50%;top:150px;transform:translateX(-50%);width:560px;padding:0}
+#talk h3{margin:0;padding:9px 16px 7px;font-size:18px;font-weight:400;color:var(--title)}
+#talk .tx{padding:14px 18px 6px}
+#talk p{margin:0 0 10px}
+#talk .me{color:var(--dim);font-style:italic}
+#talk .row{display:flex;gap:8px;padding:6px 18px 14px;flex-wrap:wrap}
+.btn{font:15px/1 var(--body);padding:9px 14px;color:var(--txt);cursor:pointer}
+#log{left:12px;bottom:10px;width:360px}
+#log .hd{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--dim);padding:3px 8px;cursor:pointer}
+#log .ln{padding:0 8px 6px;font-size:15px;line-height:1.4}
+#log .ln div{margin-top:2px}
+#log.zu .ln div:not(:last-child){display:none}
+.dm{color:#e9b0a8}.gd{color:#d8c88a}.sy{color:var(--dim)}.sp{color:#b9c4d6}
+
+/* ---------- Variante A: Schiefer und Eisen ----------
+   Kalter Schiefer, Eisenband mit Nieten in den Ecken, Fließtext in Serifenschrift (Chronik). Glut nur für Stichworte. */
+.va{--body:Charter,'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;--txt:#dcd7ca;--dim:#a39f93;--title:#e6dfcc;--link:#e59a5c}
+.va .pan{background:linear-gradient(#22252a,#1a1c20);border:2px solid #0b0c0e;box-shadow:inset 0 0 0 1px #4a4f57,inset 0 0 0 3px #15171a,0 3px 10px rgba(0,0,0,.6)}
+.va .pan::before,.va .pan::after{content:"";position:absolute;width:5px;height:5px;background:#7b818b;box-shadow:inset -1px -1px 0 #2c3036;top:4px}
+.va .pan::before{left:4px}.va .pan::after{right:4px}
+.va #talk h3{background:#15171a;border-bottom:1px solid #4a4f57;text-align:center}
+.va .bar{border:1px solid #4a4f57}
+.va .sl{background:#121316;border:1px solid #4a4f57;box-shadow:inset 0 2px 4px #000}
+.va .btn{background:#2b2f35;border:1px solid #5a606a;box-shadow:inset 0 1px 0 #6b727d,0 2px 0 #0b0c0e}
+.va #log{background:linear-gradient(90deg,rgba(14,15,18,.86),rgba(14,15,18,.5) 80%,transparent);border-left:2px solid #4a4f57}
+
+/* ---------- Variante B: Basalt und Asche ----------
+   Warmer, fast schwarzer Basalt, gemeißelte Kante statt Rahmen, Fließtext serifenlos, Titel in Aschgold. Log als Steintafel. */
+.vb{--body:'Trebuchet MS','Lucida Grande',Verdana,system-ui,sans-serif;--txt:#e2dcd2;--dim:#a89f94;--title:#cdb67a;--link:#e3c06a}
+.vb .pan{background:#1d1917 repeating-linear-gradient(115deg,rgba(255,255,255,.018) 0 2px,transparent 2px 7px);border:3px solid;border-color:#4b423c #100d0c #100d0c #4b423c;outline:1px solid #070605;box-shadow:inset 0 0 18px rgba(0,0,0,.7),0 3px 10px rgba(0,0,0,.6)}
+.vb #talk h3{border-bottom:2px groove #3a322d;padding-left:18px}
+.vb .bar{border:2px solid;border-color:#100d0c #4b423c #4b423c #100d0c}
+.vb .sl{background:#141110;border:2px solid;border-color:#100d0c #4b423c #4b423c #100d0c}
+.vb .btn{background:#2a2420;border:2px solid;border-color:#5a4f47 #120f0d #120f0d #5a4f47}
+.vb #log{background:#1d1917;border:3px solid;border-color:#4b423c #100d0c #100d0c #4b423c;outline:1px solid #070605}
+.vb #log .hd{border-bottom:1px solid #3a322d}
+
+/* ---------- Handy quer 812×375 ---------- */
+.handy #hero{width:200px;padding:6px;left:8px;top:8px}
+.handy #hero img{width:44px;height:44px}
+.handy #mini{width:120px;height:76px;right:8px;top:8px}
+.handy #talk{top:8px;left:216px;transform:none;width:460px;font-size:16px}
+.handy #talk h3{padding:6px 14px 4px}
+.handy #talk .tx{padding:8px 14px 0;max-height:132px;overflow:auto}
+.handy #talk .row{padding:4px 14px 10px;flex-wrap:nowrap}
+.handy .btn{padding:9px 10px;white-space:nowrap}
+.handy #hot{bottom:6px;left:auto;right:150px;transform:none;gap:3px;padding:4px}
+.handy .sl{width:40px;height:40px}
+.handy .sl:nth-child(n+7){display:none}
+.handy #log{width:200px;left:8px;bottom:6px}
+.handy #log .ln{font-size:14px}
+.handy #pad{display:block}
+#pad{display:none;right:14px;bottom:10px;width:120px;height:120px}
+#pad i{position:absolute;border-radius:50%;background:rgba(30,30,34,.7);border:1px solid #5a606a}
+#pad i:nth-child(1){right:0;bottom:0;width:72px;height:72px}
+#pad i:nth-child(2){right:78px;bottom:8px;width:44px;height:44px}
+#pad i:nth-child(3){right:40px;bottom:78px;width:44px;height:44px}
+
+/* ---------- Umschaltleiste ---------- */
+#sw{position:fixed;left:0;right:0;bottom:0;height:52px;background:#111;border-top:1px solid #333;display:flex;gap:8px;align-items:center;justify-content:center;font:14px system-ui,sans-serif;color:#bbb}
+#sw button{font:inherit;min-height:36px;padding:0 14px;background:#222;color:#ddd;border:1px solid #444;border-radius:4px;cursor:pointer}
+#sw button.on{background:#ddd;color:#111}
+#sw button:focus-visible,.kw:focus-visible,.btn:focus-visible,#log .hd:focus-visible{outline:2px solid #fff;outline-offset:2px}
+</style>
+</head>
+<body>
+<div id="wrap"><div id="stage">
+  <div id="hero" class="ui pan">
+    <img src="/assets/ninja/Actor/Character/Hunter/Faceset.png" alt="">
+    <div class="c"><div class="n pix">Held</div><div class="s">Stufe 12 · 22:40</div>
+      <div class="bar hp"><i style="width:64%"></i><b>212 / 330</b></div>
+      <div class="bar mp"><i style="width:80%"></i><b>48 / 60</b></div></div>
+  </div>
+  <div id="mini" class="ui pan"><div><span></span></div></div>
+
+  <div id="talk" class="ui pan">
+    <h3 class="pix">Torwache Haldor</h3>
+    <div class="tx">
+      <p class="me">Du fragst nach der Glocke.</p>
+      <p>„Dreimal hat sie geläutet, jede Nacht zur selben Stunde. Kein Küster zieht dort am Seil. Geh nach Osten, am <span class="kw" tabindex="0">Totenacker</span> vorbei, bis der Weg in Stein übergeht. Dort steht der <span class="kw" tabindex="0">Turm</span> über den Katakomben.“</p>
+      <p>„Nimm Licht mit. Was dort unten wacht, sieht dich lange, bevor du es siehst.“</p>
+    </div>
+    <div class="row"><span class="btn" tabindex="0">Auftrag annehmen</span><span class="btn" tabindex="0">Etwas anderes fragen</span><span class="btn" tabindex="0">Gehen</span></div>
+  </div>
+
+  <div id="log" class="ui">
+    <div class="hd" tabindex="0" onclick="this.parentNode.classList.toggle('zu')"><span>Chronik</span><span>ein-/ausklappen</span></div>
+    <div class="ln">
+      <div class="sp">Haldor: „Nimm Licht mit.“</div>
+      <div>Du triffst den Gruftwächter für 12.</div>
+      <div class="dm">Der Gruftwächter trifft dich für 18.</div>
+      <div>Du triffst den Gruftwächter für 31. Er zerfällt.</div>
+      <div class="gd">Du findest: Wächterklinge von Sael.</div>
+      <div class="sy">Du erreichst Stufe 12.</div>
+    </div>
+  </div>
+
+  <div id="hot" class="ui pan"></div>
+  <div id="pad" class="ui"><i></i><i></i><i></i></div>
+</div></div>
+
+<div id="sw">
+  <span>Variante</span><button data-v="a">A Schiefer und Eisen</button><button data-v="b">B Basalt und Asche</button>
+  <span style="margin-left:14px">Ansicht</span><button data-g="pc">PC 1280×800</button><button data-g="handy">Handy 812×375</button>
+</div>
+<script>
+const q = new URLSearchParams(location.search);
+let v = q.get('v') === 'b' ? 'b' : 'a', g = q.get('g') === 'handy' ? 'handy' : 'pc';
+const stage = document.getElementById('stage'), hot = document.getElementById('hot');
+for (let i = 0; i < 10; i++) hot.insertAdjacentHTML('beforeend', `<div class="sl${i < 2 ? ' on' : ''}"><em>${(i + 1) % 10}</em></div>`);
+function draw() {
+  const [w, h] = g === 'handy' ? [812, 375] : [1280, 800];
+  stage.className = `v${v} ${g}`;
+  stage.style.width = w + 'px'; stage.style.height = h + 'px';
+  const wrap = document.getElementById('wrap');
+  stage.style.transform = `scale(${Math.min(1, wrap.clientWidth / w, wrap.clientHeight / h)})`;
+  document.querySelectorAll('#sw button').forEach(b => b.classList.toggle('on', b.dataset.v === v || b.dataset.g === g));
+  history.replaceState(null, '', `?v=${v}&g=${g}`);
+}
+document.getElementById('sw').addEventListener('click', e => { const d = e.target.dataset; if (d.v) v = d.v; if (d.g) g = d.g; draw(); });
+addEventListener('resize', draw); draw();
+</script>
+</body>
+</html>
