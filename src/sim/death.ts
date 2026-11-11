@@ -2,7 +2,7 @@ import type { Item } from './items';
 
 /**
  * Todesstrafe gegen Monster (P4), angelehnt an die Server-Einstellungen von The 4th Coming / D4O
- * (Realmud-Server: XP 10 % der Stufen-XP, Gold 10 %, Rucksack 5 %, Ausrüstung 0 %; Quellen in SPEC.md).
+ * (Realmud-Server: XP 10 % der Stufen-XP, Gold 10 %, Rucksack 5 %, Ausrüstung 0 %; Quellen in docs/archiv/SPEC-bis-2026-11-11.md).
  * Abweichungen: sanfte Staffelung für Neulinge, Rucksack-Gegenstände liegen als Leichenhaufen
  * an der Todesstelle (bergbar), Gold ist wie bei T4C verloren, Besitzersperre am Haufen.
  * Alle Werte hängen nur von der Stufe ab (kein Zufall), damit Mehrspieler und Tests deterministisch bleiben.

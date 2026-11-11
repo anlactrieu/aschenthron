@@ -26,7 +26,7 @@ Aschenthron soll sich anfühlen wie T4C / D4O, ohne etwas daraus zu kopieren (Re
 | 4 | Oberfläche in orangem Holz mit Pixelschrift, die in Fließtext schwer lesbar ist; kein mitlaufender Textlog | `src/render/theme.ts`, Gesprächsfenster | 4, 5 |
 | 5 | Nacht ist nur abgedunkelt, kein Lichtkreis um die Figur, Fackeln ohne Nutzen | `src/render/atmosphere.ts` | 5 |
 | 6 | Dungeonwände sind niedrige Blöcke (`WALL_H = 24`), Gänge wirken wie Hecken; Gelände ohne Höhen | `src/render/world/isoWalls.ts` | 2, 5 |
-| 7 | Gegner erscheinen als Schattenriss und ploppen auf; Sheet-Cache verwirft genutzte Texturen | Katakomben-Bild, `HANDOFF.md` „Offen" | 5 |
+| 7 | Gegner erscheinen als Schattenriss und ploppen auf; Sheet-Cache verwirft genutzte Texturen | Katakomben-Bild, `docs/archiv/HANDOFF-bis-2026-11-11.md` „Offen" (Eintrag „LIVE 2026-11-07") | 5 |
 | 8 | Ende bei Stufe 30 auf einer Insel, kein Ziel danach | `MAX_LEVEL = 30` | 3 |
 | 9 | Doku zu groß für Sessions: `HANDOFF.md` 170 KB (wird nach `/clear` automatisch geladen), `SPEC.md` 145 KB | Dateigrößen | Prozess |
 
@@ -42,7 +42,7 @@ Damit ist die offene Entscheidung 7 (Wegweiser) aus `SPEC.md` erledigt. Offen bl
 Regeln für alle: eigener Worktree-Branch von `neuer-look`; Prüfung `npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run build`; alles Sichtbare im Browser ansehen und Bilder in die Übergabe; bei Sim-Änderungen Golden-Snapshots bewusst aktualisieren und `sh tools/pace-all.sh` (8 Seeds) nachmessen, Ziel L30-Median 20 bis 30 h. Kein Push auf `main`. Beim Browser-Test den Spielstand des Nutzers nicht überschreiben (kein `?neu` auf Platz 1).
 
 ### T0 Doku entschlacken (Haiku oder Sonnet, klein)
-- `HANDOFF.md` auf die letzten 3 Einträge und die „Learnings" kürzen, den Rest unverändert nach `docs/archiv/HANDOFF-bis-2026-11-07.md`.
+- `HANDOFF.md` auf die letzten 3 Einträge und die „Learnings" kürzen, den Rest unverändert nach `docs/archiv/HANDOFF-bis-2026-11-11.md`.
 - `SPEC.md`: umgesetzte Pläne (alles vor „Plan: T4C-Charme") nach `docs/archiv/` verschieben, vorn bleiben Vision, Entscheidungen, Rechtliches und ein Verweis auf `PLAN.md`.
 - Fertig, wenn `HANDOFF.md` unter 15 KB liegt und kein Inhalt verloren ist (Zeilenzahl Archiv + Rest = vorher).
 
@@ -84,7 +84,7 @@ Regeln für alle: eigener Worktree-Branch von `neuer-look`; Prüfung `npx tsc --
 - Dateien: `src/sim/data.ts`, `world.ts`, `save.ts`, `quests.ts`, `ui.ts`, Figur in `src/render/hero.ts`.
 
 ### T8 Zweite Insel (später, eigene SPEC)
-- Entspricht P8 in `SPEC.md`. Erst nach T7, mit eigener Klärungsrunde.
+- Entspricht P8 in `SPEC.md` (Details in `docs/archiv/SPEC-bis-2026-11-11.md`). Erst nach T7, mit eigener Klärungsrunde.
 
 ## Reihenfolge
 | Welle | Parallel | Warum so |
