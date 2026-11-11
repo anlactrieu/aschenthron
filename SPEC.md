@@ -511,6 +511,7 @@ Allgemein: je Paket frische Session, Entscheidungen vorher per AskUserQuestion, 
 4. **Gespräche:** Stichworte **nur anklicken**, kein Eintippen.
 5. **Todesstrafe (2026-11-06):** so nah wie möglich an D4O, aber mit unserem System harmonisiert (bestehender Leichenlauf, 5 % der Stufenspanne, gestreckte Kurve aus P3, benannte Beute, Safe-Zonen). Umsetzung in P4: D4O-Regeln recherchieren (Quellen belegt/vermutet trennen), Abweichungen begründen.
 Noch offen: 6 Fertigkeiten, 7 Wegweiser, 8 zweite Insel (siehe unten).
+6. **T4C-Stufe 2 (2026-11-11):** Wegweiser ganz entfernen · Beute gezielt zurückbauen (Truhen, Lichtstrahlen, Zufallsaffixe raus; Sets und Edelsteine bleiben) · Pixel-Stil bleibt, Stimmung anheben · erst Wiedergeburt, dann zweite Insel. Zielbild, Befund und Pakete T0–T8 stehen in `PLAN.md`.
 
 ### Offene Entscheidungen für den Nutzer
 1. **Ansicht:** Draufsicht behalten · auf Iso umbauen (4–6 Sessions, Probe `probe/iso/`) · erst Inhalte (P1–P7), Ansicht später. **Entschieden 2026-11-07: Iso 2:1, Plan unter „Umsetzungsplan P9 Iso“.**
