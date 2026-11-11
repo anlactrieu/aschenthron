@@ -219,4 +219,10 @@ export const NAMED: NamedDef[] = [
   { id: 'n_aschenmantel', name: 'Aschenschleier', base: 'ash_cloak', band: 26, group: 'ember', rarity: 'rare', affixes: [{ stat: 'resFire', value: 14 }, { stat: 'maxHp', value: 56 }, { stat: 'armor', value: 8 }] },
   { id: 'n_knochenbeine', name: 'Knochenbeine', base: 'ash_legs', band: 26, group: 'undead', rarity: 'magic', affixes: [{ stat: 'maxHp', value: 70 }, { stat: 'resFrost', value: 17 }] },
   { id: 'n_hoellenbeine', name: 'Höllenbeine', base: 'ash_legs', band: 26, group: 'demons', rarity: 'magic', affixes: [{ stat: 'resFire', value: 17 }, { stat: 'armor', value: 10 }] },
+  // T2b: Lücken je Waffenklasse (Bogen, Stab) in allen Bändern, damit jeder Wurf einen festen Fund liefert
+  { id: 'n_irrwurzel', name: 'Irrwurzel', base: 'twig_staff', band: 1, group: 'goblins', rarity: 'magic', affixes: [{ stat: 'maxMana', value: 8 }, { stat: 'regen', value: 2 }], lore: 'Sie wächst weiter, solange jemand sie hält.' },
+  { id: 'n_dornensehne', name: 'Dornensehne', base: 'horn_bow', band: 11, group: 'goblins', rarity: 'magic', affixes: [{ stat: 'accuracy', value: 17 }, { stat: 'haste', value: 6 }] },
+  { id: 'n_totenpfeife', name: 'Totenpfeife', base: 'war_bow', band: 16, group: 'undead', rarity: 'rare', affixes: [{ stat: 'accuracy', value: 14 }, { stat: 'crit', value: 4 }, { stat: 'resFrost', value: 10 }], lore: 'Der Wind darin klingt wie ein Name.' },
+  { id: 'n_schwefelsehne', name: 'Schwefelsehne', base: 'dread_bow', band: 21, group: 'demons', rarity: 'magic', affixes: [{ stat: 'damage', value: 12 }, { stat: 'crit', value: 4 }] },
+  { id: 'n_aschenpfeil', name: 'Aschenschwinge', base: 'ash_bow', band: 26, group: 'ember', rarity: 'rare', affixes: [{ stat: 'damage', value: 12 }, { stat: 'crit', value: 4 }, { stat: 'resFire', value: 14 }], lore: 'Kein Pfeil, der ihn verlässt, kommt kalt an.' },
 ];

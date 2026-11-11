@@ -404,7 +404,7 @@ describe('P3: Weltbosse', () => {
     expect(events(w).find((e) => e.type === 'worldBoss')).toMatchObject({ state: 'spawn', name: u.name });
   });
 
-  it('Beute: garantierte Seltene mit T4/T5-Affixen und Edelstein mindestens Qualität 2', () => {
+  it('Beute: garantierte benannte Seltene (feste Werte, keine Zufallsaffixe) und Edelstein mindestens Qualität 2', () => {
     for (const id of ['bog_titan', 'mountain_king', 'abyss_warden']) {
       const { w, p } = arena();
       const u = uniqueDef(id)!;
@@ -415,8 +415,8 @@ describe('P3: Weltbosse', () => {
       const loot = events(w).filter((e) => e.type === 'loot').map((e) => (e.type === 'loot' ? e.item : null)!);
       const rares = loot.filter((i) => i.rarity === 'rare' && i.slot !== 'gem');
       expect(rares.length, id).toBeGreaterThanOrEqual(WORLD_BOSS_LOOT.rares);
-      const boosted = rares.filter((i) => i.slot !== 'potion' && i.affixes.slice(templateById(i.templateId).base?.length ?? 0).every((a) => (a.tier ?? 0) >= WORLD_BOSS_LOOT.minTier));
-      expect(boosted.length, id).toBeGreaterThanOrEqual(WORLD_BOSS_LOOT.rares);
+      const fixed = rares.filter((i) => !!i.named);
+      expect(fixed.length, id).toBeGreaterThanOrEqual(WORLD_BOSS_LOOT.rares);
       const gems = loot.filter((i) => i.slot === 'gem');
       expect(gems.length, id).toBeGreaterThanOrEqual(1);
       expect(Math.min(...gems.map((g) => g.gem!.q)), id).toBeGreaterThanOrEqual(2);

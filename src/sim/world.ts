@@ -1990,7 +1990,7 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
   if (wb?.world) {
     // Weltboss: garantierte seltene Stücke mit hohen Affix-Stufen, bessere Edelsteine, oft Unikat/Set-Teil
     const nid = () => w.nextId++;
-    for (let i = 0; i < WORLD_BOSS_LOOT.rares; i++) drop(rollWorldDrop(w.rng, nid, k.level, WORLD_BOSS_LOOT.minTier));
+    for (let i = 0; i < WORLD_BOSS_LOOT.rares; i++) drop(rollWorldDrop(w.rng, nid, k.level));
     drop(rollGem(w.rng, nid, k.level, WORLD_BOSS_LOOT.minGem));
     if (w.rng.next() < 0.5) drop(rollGem(w.rng, nid, k.level, WORLD_BOSS_LOOT.minGem));
     const wsp = rollWorldSpecial(w.rng, nid, Math.min(k.level + 2, 30));
