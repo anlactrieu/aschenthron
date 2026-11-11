@@ -30,7 +30,7 @@ import { skillCursor } from './icons';
 import { Sfx } from './audio';
 import { Minimap } from './minimap';
 import { isTouch } from './touch';
-import { Atmosphere, isDungeon, LIGHT_DEPTH } from './atmosphere';
+import { Atmosphere, isDungeon, LIGHT_DEPTH, lightFactor } from './atmosphere';
 import { hourOf, NEW_CHAR_HOUR } from '../sim/clock';
 import { syncNpcPresence } from '../sim/night';
 import { Fx, SPELL_ELEMENT, SPELL_THEMES, spellElementOf } from './fx';
@@ -102,6 +102,13 @@ const ZOOM_DEFAULT = 1;
 const ZOOM_MAX_I = ZOOM_STEPS.length - 1;
 /** Stärke der Lichter über der Nachttönung (undimmed wären sie sonst zu grell) */
 const LIGHT_GAIN = 0.55;
+/** Lichtradius einer Laterne oder eines Fensters in Kacheln (für das Licht-Urteil über Gegner) */
+const LANTERN_TILES = 3;
+/** Dunkle Gestalt: Tönungsfarbe (Multiply) bei voller Dunkelheit */
+const shadeTint = (k: number): number => {
+  const c = (full: number): number => Math.round(255 - (255 - full) * Math.min(1, k));
+  return (c(0x2a) << 16) | (c(0x2c) << 8) | c(0x3a);
+};
 const ZOOM_KEY = 'aschenthron.zoom';
 const CHUNK = 16;
 
@@ -1624,7 +1631,7 @@ export class GameScene extends Phaser.Scene {
     this.vignette.style.background = danger
       ? `radial-gradient(ellipse at center,rgba(0,0,0,0) ${dungeon ? 30 : 50}%,rgba(34,0,4,${dungeon ? 0.88 : 0.62}) 100%)`
       : dungeon
-        ? 'radial-gradient(ellipse at center,rgba(8,6,20,.15) 30%,rgba(2,0,10,.82) 100%)'
+        ? 'radial-gradient(ellipse at center,rgba(8,6,20,.08) 30%,rgba(2,0,10,.5) 100%)'
         : 'radial-gradient(ellipse at center,rgba(0,0,0,0) 58%,rgba(0,0,0,.45) 100%)';
     return danger;
   }
@@ -2404,6 +2411,25 @@ export class GameScene extends Phaser.Scene {
     return silhouette(this, monsterKey(a.kindId!), req, false, view) ?? (view === 'side' ? null : silhouette(this, monsterKey(a.kindId!), req));
   }
 
+  /** Wie dunkel eine Gestalt am Boden (Kachel x/y, Bild sx/fy) erscheint: 0 im Licht oder bei Tag, bis 1 weit im Dunkeln */
+  private unlitShade(x: number, y: number, sx: number, fy: number): number {
+    const dark = this.atmo.dark();
+    if (dark < 0.02) return 0;
+    const hp = this.camPos ?? this.player();
+    let lit = lightFactor(Math.hypot(x - hp.x, y - hp.y), this.atmo.lightTiles());
+    if (lit < 1) {
+      for (const l of this.nightLights) {
+        const w = this.night * l.k * (l.follow?.alpha ?? 1);
+        if (w < 0.02) continue;
+        // Bildschirmabstand zum Fuß der Lichtquelle, als Bodenabstand in Kacheln (2:1-Ellipse)
+        const d = Math.hypot(sx - l.img.x, (fy - (l.img.y + 40)) * 2) / (64 / Math.SQRT2);
+        lit = Math.max(lit, w * lightFactor(d, LANTERN_TILES));
+        if (lit >= 1) break;
+      }
+    }
+    return dark * (1 - lit);
+  }
+
   /** Skelett-Figur eines Akteurs (Textur + Sheet), `'wait'` = wird noch gebacken (Schattenriss), `null` = alte Figur (DCSS/Ninja/prozedural) */
   private skelFigure(a: Actor): { key: string; sheet: FigureSheet } | 'wait' | null {
     if (a.kind === 'player') {
@@ -2634,7 +2660,12 @@ export class GameScene extends Phaser.Scene {
       else if (a.status.slow) img.setTint(0x9ac8ff);
       else if (a.dot) img.setTint(0x9aff9a);
       else if (a.enraged) img.setTint(0xff9a8a);
-      else img.clearTint();
+      else {
+        // Außerhalb des Lichts nur eine dunkle Gestalt (Gegner; Lichtkreis, Laternen und Fenster zählen als Licht)
+        const shade = a.kind === 'monster' ? this.unlitShade(pos.x, pos.y, sx, fy) : 0;
+        if (shade > 0.02) img.setTint(shadeTint(shade));
+        else img.clearTint();
+      }
       if (a.resting && this.frame % 40 === 0) {
         this.fx.floatText(sx + 10, fy - 46, 'z', '#bfd8ff', 14, 1400);
         this.fx.sparkle(sx, fy - 14, 0x9fd0ff, 900);
