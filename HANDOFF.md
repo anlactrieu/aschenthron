@@ -1,3 +1,9 @@
+## T2a Truhen und Lichtstrahlen (2026-11-11, Branch `claude/gallant-chebyshev-ea51ad`, nicht gemergt)
+- **Stand:** 98 Truhen -> 13 (7 verschlossene Lagertruhen + 6 versteckte: Roggenfelder, Gruft der Moorhexe, Katakomben, Tiefenmine, Thron der Asche, Aschengrund). `gen_map.py` erzeugt wie bisher und streicht am Ende (`KEEP_CHESTS`), darum Gelände, Monster, Lager, Landmarken byte-gleich. Gerüchte: `TRUHEN` in `topicsData.ts`, Stichwort „truhen“ bei Brandt, Tessa, Pell; Test in `wegweiser.test.ts`. Lichtstrahlen, Aufleuchten, Gem-Funkeln raus; Name nur beim Zeigen (Handy: nahe daneben).
+- **MAP_VERSION nicht erhöht:** Grid und alle Nicht-Truhen-Objekte sind identisch, Truhenzustand steht nicht im Spielstand. Ein Sprung würde nur den Nutzer in die Stadt setzen.
+- **Aufträge:** `q_chests1` 2 Truhen, `q_chests2` 4, `c_pell2` 1 Beutel; `ORTLOS` ohne Truhen.
+- **Offen:** `loot_*`-Einträge in `pixelfx.ts` (und Sheets) jetzt ungenutzt; Pace siehe Übergabe der Session.
+
 ## START HIER (2026-11-11, spät): Welle 1 – T1 und T4 gemergt (f4ba426, 4ce478a), T2b misst noch – NÄCHSTER SCHRITT: T4 im Browser ansehen, T2b abnehmen
 - **Merge-Stand:** `neuer-look` = 4ce478a + dieser Eintrag, lokal, kein Push. Nach beiden Merges von der Hauptsession selbst: tsc, Lint, 546 Tests, Build grün. Im Spiel von der Hauptsession nicht gesehen. Die Angaben „nichts gemergt/noch keine Übergabe" weiter unten in diesem Eintrag sind damit für T1 und T4 überholt; die offenen Punkte zu T4 (Bildzeit, Kreis bei Tag, Kartenrand) gelten weiter. Branches und Worktrees von T1/T4 noch nicht aufgeräumt.
 - **Stand:** `neuer-look` = 4e5e11a, unverändert. Drei Sonnet-Sessions (`claude-sonnet-5-5`) mit eigenem Worktree von `neuer-look` gestartet, noch keine Übergabe da, nichts geprüft:
