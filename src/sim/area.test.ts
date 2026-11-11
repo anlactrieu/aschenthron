@@ -14,7 +14,8 @@ describe('Gebiet „Aschental“: Inhalt und Größe', () => {
     expect(w.grid.w).toBeGreaterThanOrEqual(230);
     expect(w.grid.h).toBeGreaterThanOrEqual(170);
     expect(monsters.length).toBeGreaterThanOrEqual(350);
-    expect(w.chests.length).toBeGreaterThanOrEqual(45);
+    expect(w.chests.length).toBeGreaterThanOrEqual(12); // T2a: Truhen sind selten
+    expect(w.chests.length).toBeLessThanOrEqual(14);
     expect(w.safe.length).toBeGreaterThanOrEqual(2);
     expect(w.towns.length).toBeGreaterThanOrEqual(2);
     const bosses = new Set(monsters.filter((m) => m.boss).map((m) => m.kindId));

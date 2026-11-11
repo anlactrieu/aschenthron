@@ -25,6 +25,36 @@ export interface NpcTopics {
   topics: Record<string, TopicAnswer>;
 }
 
+/**
+ * T2a Truhen-Gerüchte: Es gibt nur noch 13 Truhen (7 verschlossene Lagertruhen, 6 versteckte an festen Orten). Jede wird hier von einem NPC
+ * mit Himmelsrichtung und Landmarke beschrieben. Schlüssel: Regionsname (versteckte Truhe) oder `lager:<Kennung>` (Lagertruhe).
+ * Norden ist oben auf der Karte (kleineres y). Ein Test verlangt für jede Truhe der Karte einen Eintrag.
+ */
+export const TRUHEN: Record<string, { npc: string; ort: string; text: string }> = {
+  'Roggenfelder': { npc: 'Hauptmann Brandt', ort: 'Roggenfelder', text: 'Im Osten der Roggenfelder, weit hinter dem Osttor, liegt unter altem Schutt eine vergrabene Truhe.' },
+  'lager:hofplaenderer': { npc: 'Hauptmann Brandt', ort: 'Lager der Hofplünderer', text: 'Im Lager der Hofplünderer am östlichen Rand der Roggenfelder steht eine verschlossene Truhe. Sie geht erst auf, wenn die Besatzung gefallen ist.' },
+  'lager:spinnenhoehle': { npc: 'Hauptmann Brandt', ort: 'Spinnenhöhle', text: 'In der Spinnenhöhle im Osten des Düsterwalds hüten Spinnen eine verschlossene Truhe.' },
+  'lager:raeuberversteck': { npc: 'Hauptmann Brandt', ort: 'Räuberversteck', text: 'Im Räuberversteck südöstlich des Räuberlagers schließt der Anführer eine Truhe weg, die sich erst nach seinem Fall öffnen lässt.' },
+  'lager:ghulgrube': { npc: 'Hauptmann Brandt', ort: 'Ghulgrube', text: 'In der Ghulgrube im Osten der Moorlande liegt eine Truhe unter den Knochen der Ghule.' },
+  'Gruft der Moorhexe': { npc: 'Wachführerin Tessa', ort: 'Gruft der Moorhexe', text: 'Im hohen Norden, im Westen der Gruft der Moorhexe, steht am Ende der Gänge eine Truhe, die sich die Hexe selbst aufgehoben hat.' },
+  'lager:knochenhain': { npc: 'Wachführerin Tessa', ort: 'Knochenhain', text: 'Im Knochenhain, östlich im Totenacker, wartet eine verschlossene Truhe auf den, der den Hain säubert.' },
+  'Katakomben': { npc: 'Wachführerin Tessa', ort: 'Katakomben', text: 'Im Osten der Katakomben, im letzten Raum hinter den Untoten, steht eine Truhe.' },
+  'lager:trollhoehle': { npc: 'Wachführerin Tessa', ort: 'Trollhöhle', text: 'In der Trollhöhle im Osten des Hochlands liegt die Beute der Trolle in einer verschlossenen Truhe.' },
+  'lager:glutlager': { npc: 'Wachführerin Tessa', ort: 'Glutlager', text: 'Im Glutlager im Südosten der Aschenöde glimmt noch eine verschlossene Truhe zwischen den Zelten.' },
+  'Thron der Asche': { npc: 'Wachführerin Tessa', ort: 'Thron der Asche', text: 'Im Westen vom Thron der Asche, weit im Norden, soll hinter dem Thronsaal eine Truhe stehen.' },
+  'Aschengrund': { npc: 'Wachführerin Tessa', ort: 'Aschengrund', text: 'Im Südosten des Aschengrunds, am äußersten Ende, liegt eine Truhe, die nur wenige je gesehen haben.' },
+  'Tiefenmine': { npc: 'Schatzsucher Pell', ort: 'Tiefenmine', text: 'Östlich des Hochlands, im hintersten Raum der Tiefenmine, steht die einzige Truhe, die ich nie leeren konnte.' },
+};
+/** Welche Truhen ein Truhen-Auftrag nennt (Orte für Auftragsliste und Wegbeschreibung). */
+export const TRUHEN_AUFTRAG: Record<string, string[]> = {
+  q_chests1: ['Roggenfelder', 'lager:hofplaenderer'],
+  q_chests2: ['lager:spinnenhoehle', 'lager:raeuberversteck', 'lager:ghulgrube', 'Gruft der Moorhexe'],
+  c_pell1: ['Tiefenmine', 'Katakomben', 'lager:trollhoehle'],
+};
+function truhenText(npc: string): string[] {
+  return Object.values(TRUHEN).filter((t) => t.npc === npc).map((t) => t.text);
+}
+
 export const NPC_TOPICS: Record<string, NpcTopics> = {
   // ------------------------------------------------------------ Nacht-NPCs (P6, nur nachts da)
   'Hehler Grau': {
@@ -130,8 +160,9 @@ export const NPC_TOPICS: Record<string, NpcTopics> = {
     },
   },
   'Hauptmann Brandt': {
-    open: 'Die Wache sucht Hilfe gegen [[raeuber|Räuber]], [[goblins|Goblins]] und alles, was nachts schreit. Im [[roehricht|Röhricht]] im Osten der Felder soll sich eine Bande eingenistet haben.',
+    open: 'Die Wache sucht Hilfe gegen [[raeuber|Räuber]], [[goblins|Goblins]] und alles, was nachts schreit. Im [[roehricht|Röhricht]] im Osten der Felder soll sich eine Bande eingenistet haben. Und wer [[truhen|Truhen]] sucht, fragt mich.',
     topics: {
+      truhen: { text: truhenText('Hauptmann Brandt') },
       raeuber: { text: ['Im Nordwesten liegt das Räuberlager, geführt von Harkon. Davor streifen Lehrlinge und Wegelagerer durch den Wald. Ohne Rüstung ist das kein Ausflug.'] },
       roehricht: { text: ['Zwischen dem Schilf liegt das Räubernest mit einem Hauptmann und drei Schlägern. Die Händler nehmen lieber den langen Weg um das Röhricht herum. Ich schicke keine Rekruten hin, bevor sie nicht ihren ersten Schlag eingesteckt haben.'] },
       goblins: { text: ['Die Goblins graben, plündern und lieben Feuer. Das Beste gegen sie ist eine breite Straße und ein scharfes Schwert. Wer hundert von ihnen erlegt, dem schulde ich einen Krug.'] },
@@ -218,8 +249,9 @@ export const NPC_TOPICS: Record<string, NpcTopics> = {
     },
   },
   'Wachführerin Tessa': {
-    open: 'Die Wache der Felsenwacht jagt [[anfuehrer|Anführer]] und fürchtet die [[brut|Brut]] der Asche.',
+    open: 'Die Wache der Felsenwacht jagt [[anfuehrer|Anführer]] und fürchtet die [[brut|Brut]] der Asche. Über [[truhen|Truhen]] weiß ich, wo sie liegen.',
     topics: {
+      truhen: { text: truhenText('Wachführerin Tessa') },
       anfuehrer: { text: ['Champions erkennt man an der Aura. Sie sammeln Rudel um sich wie Hirten ihre Schafe. Eins nach dem anderen fällt, wenn man den Anführer zuerst nimmt.'] },
       brut: { text: ['Im Osten, nahe der Aschenöde, sammeln sich Wesen, die nicht dorthin gehören. Etwas ruft sie, und es spricht nicht in Worten.'] },
       ascheneid: {
@@ -297,7 +329,7 @@ export const NPC_TOPICS: Record<string, NpcTopics> = {
     open: 'Frag nach der [[mine|Mine]], den [[truhen|Truhen]] oder den [[spinnen|Spinnen]], die darin hausen.',
     topics: {
       mine: { text: ['Die Tiefenmine hat vierzig Gänge, und ich kenne neununddreißig. Den vierzigsten hat eine Spinne bezogen, die ich nicht kennenlernen will.'] },
-      truhen: { text: ['Wer eine Truhe findet, sollte zuerst horchen. Truhen schweigen nur, wenn nichts drinnen lauert.'] },
+      truhen: { text: ['Wer eine Truhe findet, sollte zuerst horchen. Truhen schweigen nur, wenn nichts drinnen lauert.', ...truhenText('Schatzsucher Pell')] },
       spinnen: { text: ['Webmutter Skarra herrscht im letzten Gang. Wer ihr Netz sieht, hat noch eine Chance. Wer es spürt, keine.'] },
     },
   },

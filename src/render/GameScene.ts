@@ -223,7 +223,6 @@ export class GameScene extends Phaser.Scene {
   private kicks = new Map<number, { x: number; y: number }>();
   private lootBorn = new Map<number, { t: number; dx: number }>();
   /** Lichtstrahl (pixelfx) je Beuteteil ab magisch */
-  private lootBeams = new Map<number, Phaser.GameObjects.Sprite>();
   /** Säule 4: Schattenflammen hinter Bossen in Sichtweite (Glutrot, sobald wütend) */
   private bossAuras = new Map<number, { s: Phaser.GameObjects.Sprite; rage: boolean }>();
   /** Boss-Auftritt: wann ein Boss zuletzt angekündigt wurde (nicht bei jedem erneuten Kontakt) */
@@ -2350,32 +2349,12 @@ export class GameScene extends Phaser.Scene {
       img.setPosition(sx + slide, sy + 2 + arc).setDepth(sy + 4);
       const r = gi.item.rarity;
       const col = { normal: 0xc9c4bd, magic: 0x6f8fff, rare: 0xf2c94c, set: 0x5fd070, legendary: 0xff8a2a }[r];
-      const beamName = r === 'normal' ? undefined : (`loot_${r}` as FxName);
-      let beam = this.lootBeams.get(gi.id);
-      if (beamName && !beam) {
-        // Sheets sind schon je Seltenheit eingefärbt (Kern in der hellsten Seltenheitsfarbe); kein setTint und keine additive
-        // Mischung, sonst wird alles auf hellem Boden weiß.
-        // Startphase je Beutestück versetzt, damit viele Strahlen nicht im Gleichtakt pulsieren.
-        beam = playPixelfx(this, beamName, sx, sy + 4, { depth: sy + 5, alpha: { magic: 0.7, rare: 0.9, set: 0.95, legendary: 1 }[r as 'magic'], from: ((gi.id * 0.37) % 1) * 2.4 });
-        if (beam) this.lootBeams.set(gi.id, beam);
-      }
-      beam?.setPosition(sx, sy + 4).setDepth(sy + 5);
-      if (r !== 'normal' && !beam) {
-        const pulse = r === 'legendary' ? 0.75 + 0.25 * Math.sin(time / 180) : 1;
-        const wide = r === 'legendary' ? 16 : r === 'set' ? 12 : 8;
-        const tall = r === 'legendary' ? 110 : 60;
-        g.fillStyle(col, 0.16 * pulse);
-        g.fillRect(sx - wide, sy - tall, wide * 2, tall);
-        g.fillStyle(col, 0.3 * pulse);
-        g.fillRect(sx - wide / 2, sy - tall, wide, tall);
-        if ((r === 'legendary' || r === 'set') && (this.frame + gi.id) % 40 === 0) this.fx.sparkle(sx, sy - 10, col, 900);
-      }
-      if (gi.item.slot === 'gem' && (this.frame + gi.id) % 36 === 0) this.fx.sparkle(sx, sy - 8, 0x9fe8ff, 800);
-      // Beutenamen in Seltenheitsfarbe: magisch und besser immer in der Nähe, Normales nur nah oder unter dem Mauszeiger
+      // T2a: Beute liegt als kleiner Gegenstand am Boden, ohne Strahl und ohne Blinken. Der Name (in Seltenheitsfarbe) erscheint nur unter dem
+      // Mauszeiger; am Handy, wo es keinen Zeiger gibt, wenn man direkt daneben steht.
       const near = Math.hypot(gi.x - p.x, gi.y - p.y);
       const hov = hoverTile && Math.hypot(gi.x - hoverTile.x, gi.y - hoverTile.y) < 0.9;
-      if (near < 12 && (r !== 'normal' || near < 5 || hov) && k >= 1) {
-        this.label(`l${gi.id}`, (isUpgrade(p, gi.item) ? '▲ ' : '') + gi.item.name, sx, sy - (r === 'legendary' ? 24 : 18), '#' + col.toString(16).padStart(6, '0'), seen, r === 'normal' ? 11 : 12);
+      if ((hov || (isTouch && near < 3)) && k >= 1) {
+        this.label(`l${gi.id}`, (isUpgrade(p, gi.item) ? '▲ ' : '') + gi.item.name, sx, sy - 18, '#' + col.toString(16).padStart(6, '0'), seen, 12);
       }
       if (hov) {
         g.lineStyle(2, col, 0.9);
@@ -2389,8 +2368,6 @@ export class GameScene extends Phaser.Scene {
         img.destroy();
         this.lootViews.delete(id);
         this.lootBorn.delete(id);
-        this.lootBeams.get(id)?.destroy();
-        this.lootBeams.delete(id);
       }
     }
   }

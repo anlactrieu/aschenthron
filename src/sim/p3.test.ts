@@ -212,11 +212,11 @@ describe('P3: Aufgabenketten', () => {
     applyCommand(w, p.id, { type: 'acceptQuest', questId: 'c_pell2' });
     const outside = w.chests.find((c) => regionAt(w, c.x, c.y)?.name !== 'Tiefenmine')!;
     const inside = w.chests.filter((c) => regionAt(w, c.x, c.y)?.name === 'Tiefenmine');
-    expect(inside.length).toBeGreaterThanOrEqual(2);
+    expect(inside.length).toBe(1);
     p.x = outside.x; p.y = outside.y;
     applyCommand(w, p.id, { type: 'openChest', chestId: outside.id });
     expect(p.quests.c_pell2!.progress).toBe(0);
-    for (const c of inside.slice(0, 2)) {
+    for (const c of inside) {
       p.x = c.x; p.y = c.y;
       applyCommand(w, p.id, { type: 'openChest', chestId: c.id });
     }
@@ -297,16 +297,14 @@ describe('P3: neue Zonen und Dungeons', () => {
     expect(regionAt(w, w.start.x, w.start.y)?.name).toBe('Aschenhafen');
   });
 
-  it('Goblinbau: Grix im Bau (nicht mehr im Wald), Goblin-Familie, 3–5 Truhen, erreichbar, Eingang ohne Wächter', () => {
+  it('Goblinbau: Grix im Bau (nicht mehr im Wald), Goblin-Familie, keine Truhe (T2a), erreichbar, Eingang ohne Wächter', () => {
     const grix = w.actors.find((a) => a.kindId === 'goblin_king')!;
     expect(regionAt(w, grix.x, grix.y)?.name).toBe('Goblinbau');
     const mons = inRegion('Goblinbau').filter((m) => m.kindId !== 'goblin_king');
     expect(mons.length).toBeGreaterThanOrEqual(15);
     for (const m of mons) expect(['goblin_scout', 'goblin_archer', 'goblin_warrior', 'goblin_shaman', 'goblin_brute', 'goblin_warlord', 'goblin_chief'], m.kindId).toContain(m.kindId);
     expect(Math.min(...mons.map((m) => m.level))).toBeGreaterThanOrEqual(4);
-    const ch = w.chests.filter((c) => regionAt(w, c.x, c.y)?.name === 'Goblinbau');
-    expect(ch.length).toBeGreaterThanOrEqual(3);
-    expect(ch.length).toBeLessThanOrEqual(5);
+    expect(w.chests.filter((c) => regionAt(w, c.x, c.y)?.name === 'Goblinbau')).toHaveLength(0);
     expect(findPath(w.grid, { x: Math.round(w.start.x), y: Math.round(w.start.y) }, { x: Math.round(grix.x), y: Math.round(grix.y) }).length).toBeGreaterThan(0);
     // keine Wächter im Bossraum (Bot-Schutz: kein Rudel direkt neben Grix)
     expect(w.actors.filter((a) => a.kind === 'monster' && a.id !== grix.id && Math.hypot(a.x - grix.x, a.y - grix.y) < 4).length).toBe(0);
@@ -325,15 +323,13 @@ describe('P3: neue Zonen und Dungeons', () => {
     for (const n of near.values()) expect(n).toBeLessThanOrEqual(3);
   });
 
-  it('Spinnennest: Spinnen, Königin, erreichbar, 3–5 Truhen', () => {
+  it('Spinnennest: Spinnen, Königin, erreichbar, keine Truhe (T2a)', () => {
     const q = w.actors.find((a) => a.kindId === 'spider_queen')!;
     expect(regionAt(w, q.x, q.y)?.name).toBe('Spinnennest');
     const mons = inRegion('Spinnennest').filter((m) => m !== q);
     expect(mons.length).toBeGreaterThanOrEqual(15);
     for (const m of mons) expect(m.kindId && w.actors.length ? ['giant_spider', 'brood_spider', 'web_stalker', 'nest_matron'] : []).toContain(m.kindId);
-    const ch = w.chests.filter((c) => regionAt(w, c.x, c.y)?.name === 'Spinnennest');
-    expect(ch.length).toBeGreaterThanOrEqual(3);
-    expect(ch.length).toBeLessThanOrEqual(5);
+    expect(w.chests.filter((c) => regionAt(w, c.x, c.y)?.name === 'Spinnennest')).toHaveLength(0);
     expect(findPath(w.grid, { x: Math.round(w.start.x), y: Math.round(w.start.y) }, { x: Math.round(q.x), y: Math.round(q.y) }).length).toBeGreaterThan(0);
   });
 
@@ -345,7 +341,7 @@ describe('P3: neue Zonen und Dungeons', () => {
     expect(Math.min(...g.map((m) => m.level))).toBeGreaterThanOrEqual(29);
     expect(Math.max(...g.map((m) => m.level))).toBeLessThanOrEqual(32);
     const ch = w.chests.filter((c) => regionAt(w, c.x, c.y)?.name === 'Aschengrund');
-    expect(ch.length).toBeGreaterThanOrEqual(6);
+    expect(ch).toHaveLength(1);
     expect(ch.every((c) => c.level >= 28 && c.tier !== 'wood')).toBe(true);
     const target = g[0]!;
     expect(findPath(w.grid, { x: Math.round(w.start.x), y: Math.round(w.start.y) }, { x: Math.round(target.x), y: Math.round(target.y) }).length).toBeGreaterThan(0);

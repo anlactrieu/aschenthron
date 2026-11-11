@@ -816,10 +816,10 @@ QUESTS.push(
 );
 
 QUESTS.push(
-  qv('q_chests1', 'Schatzsucher', 'Man munkelt von vergrabenen Truhen auf den Feldern. Öffne 3 Truhen.', 2, 'chest', 3, 2.5),
+  qv('q_chests1', 'Schatzsucher', 'Man munkelt von einer vergrabenen Truhe auf den Feldern. Öffne 2 Truhen.', 2, 'chest', 2, 2.5),
   qv('q_unique1', 'Namenlose Jagd', 'Manche Bestien haben Namen und Gefolge. Erlege einen benannten Gegner (Orange auf der Karte).', 6, 'unique', 1, 6),
   qv('q_champs1', 'Anführer brechen', 'Rudelführer mit besonderer Kraft leiten die Angriffe. Besiege 4 Champions.', 8, 'champion', 4, 2),
-  qv('q_chests2', 'Beutezug', 'Plündere 6 Truhen im Land, in Dungeons oder in der Wildnis.', 10, 'chest', 6, 2.5),
+  qv('q_chests2', 'Beutezug', 'Plündere 4 der wenigen Truhen im Land: verschlossene in Lagern oder versteckte in Dungeons.', 10, 'chest', 4, 2.5),
   qv('q_unique2', 'Legenden der Wildnis', 'Jage 3 benannte Gegner.', 14, 'unique', 3, 5),
   qv('q_champs2', 'Eiserne Anführer', 'Brich die Macht von 8 Champions.', 18, 'champion', 8, 2),
 );
@@ -862,8 +862,8 @@ QUESTS.push(
   chainQ(CHAIN_OATH, 3, { id: 'c_eid3', kind: 'visit', name: 'Hinter der Asche', text: 'Aldric bittet dich, den Aschengrund im Osten der Öde zu betreten und zurückzukehren – er muss wissen, ob das Tor offen ist.', minLevel: 27, requires: 'c_eid2', place: 'Aschengrund', outro: 'Aldric schließt die Augen. „Offen. Wie ich fürchtete.“' }),
   chainQ(CHAIN_OATH, 4, { id: 'c_eid4', kind: 'unique', name: 'Morvaths Schwur', text: 'Aschenfürst Morvath hält die Pforte im Aschengrund. Zerschlage ihn, damit Aldrics Eid erfüllt ist.', minLevel: 28, requires: 'c_eid3', target: 'abyss_warden', reward: 'unique', outro: 'Aldric lächelt zum ersten Mal. „Die Wache … ist vorbei.“' }),
 
-  chainQ(CHAIN_MINE, 2, { id: 'c_pell1', kind: 'chest', name: 'Pells Spürsinn', text: 'Der Schatzsucher Pell hat die Mine kartiert, aber nie Zeit gehabt, alles zu leeren. Öffne 3 Truhen irgendwo im Land.', minLevel: 17, count: 3 }),
-  chainQ(CHAIN_MINE, 2, { id: 'c_pell2', kind: 'bring', name: 'Pells Beutel', text: 'Pell hat seinen Beutel in einer Truhe der Tiefenmine verloren. Finde 2 Beutel in den Truhen dort.', minLevel: 17, requires: 'c_pell1', item: 'Pells Beutel', chestRegion: 'Tiefenmine', count: 2, outro: 'Pell zählt die Münzen mit zitternden Fingern. „Alles da. Fast alles.“' }),
+  chainQ(CHAIN_MINE, 2, { id: 'c_pell1', kind: 'chest', name: 'Pells Spürsinn', text: 'Der Schatzsucher Pell hat die Mine kartiert, aber nie Zeit gehabt, alles zu leeren. Öffne 3 der wenigen Truhen im Land.', minLevel: 17, count: 3 }),
+  chainQ(CHAIN_MINE, 2, { id: 'c_pell2', kind: 'bring', name: 'Pells Beutel', text: 'Pell hat seinen Beutel in der Truhe der Tiefenmine verloren. Finde den Beutel in der Truhe dort.', minLevel: 17, requires: 'c_pell1', item: 'Pells Beutel', chestRegion: 'Tiefenmine', count: 1, outro: 'Pell zählt die Münzen mit zitternden Fingern. „Alles da. Fast alles.“' }),
   chainQ(CHAIN_MINE, 3, { id: 'c_pell3', kind: 'kill', name: 'Die Webmutter', text: 'Hinter dem letzten Gang wartet Webmutter Skarra. Pell traut sich nicht, solange sie lebt.', minLevel: 20, requires: 'c_pell2', target: 'web_mother', reward: 'rare', outro: 'Pell lacht heiser. „Dann gehört die Mine wieder den Lebenden.“' }),
 
   chainQ(CHAIN_WEB, 2, { id: 'c_web1', kind: 'visit', name: 'Das Spinnennest', text: 'Südlich vom Totenacker liegt ein Nest. Haldor will wissen, wie groß es ist. Betritt das Spinnennest.', minLevel: 13, place: 'Spinnennest', outro: 'Haldor zeichnet das Nest in die Karte. „Größer als gedacht.“' }),

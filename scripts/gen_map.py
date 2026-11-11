@@ -929,6 +929,16 @@ landmark("corpse", "Toter Abenteurer", "Aschenöde", 206, 126, "Ritter Aldric ha
 landmark("camp", "Verlassenes Lagerfeuer", "Aschenöde", 214, 100, "Das Feuer brennt nicht mehr. Die Asche hier ist grau wie überall, nur die Spuren sind frisch.")
 print("Landmarken:", len(_LM_TAKEN), file=sys.stderr)
 
+# T2a: Truhen sind selten. Erzeugt wird weiter wie bisher (gleicher Zufallsstrom, damit Monster, Lager und Landmarken unverändert bleiben);
+# erst jetzt bleiben nur die 7 verschlossenen Lagertruhen und diese festen Orte übrig (Kachel x, y): Gehöft-Ruine, Gruft der Moorhexe,
+# Katakomben-Ende, Tiefenmine (Pells Beutel), Thron der Asche, Aschengrund.
+KEEP_CHESTS = {(92, 150), (75, 10), (222, 147), (215, 63), (147, 10), (280, 143)}
+_chests = [o for o in objs if o["type"] == "chest"]
+_keep = [o for o in _chests if prop(o, "camp") or (o["x"] // TS, o["y"] // TS) in KEEP_CHESTS]
+assert len(_keep) == 7 + len(KEEP_CHESTS), "Truhenort fehlt: " + str(sorted(KEEP_CHESTS - {(o["x"] // TS, o["y"] // TS) for o in _keep}))
+objs[:] = [o for o in objs if o["type"] != "chest" or o in _keep]
+CHEST_COUNT.clear(); CHEST_COUNT["fest"] = len(_keep)
+
 data = [g[y][x] for y in range(H) for x in range(W)]
 tmj = {"compressionlevel": -1, "height": H, "width": W, "infinite": False, "orientation": "orthogonal", "renderorder": "right-down",
        "tilewidth": TS, "tileheight": TS, "type": "map", "version": "1.10", "nextlayerid": 3, "nextobjectid": oid[0], "tilesets": [],
