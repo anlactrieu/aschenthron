@@ -1,5 +1,9 @@
 ## T3 fertig auf Branch claude/reverent-neumann-08e490 (2026-11-11, Sonnet)
 - Schiefer-und-Eisen-Theme (reines CSS, `theme.ts`), `--ui-font` ist jetzt die Serifenschrift, `--pix` nur Titel/Namen; Chronik unten links (`#chronik` in `ui.ts`, `say(text, kind)`, max. 60 Zeilen, angehängt statt neu gebaut); Handy-Fenster neben Porträt/Chronik, über der Schnellleiste. Bilder: `docs/t3/`. Offen: Credits-Text nennt noch „Theme Wood“ (`credits.ts`, nicht im Paket).
+- **Stand:** tsc, Lint, 551 Tests, Build grün; Bilder in `docs/t3/`; nichts gepusht/gemergt.
+- **Letzte 3 Entscheidungen:** (1) `--ui-font` auf Serifenschrift umgebogen, `--pix` nur für Titel: ein Eingriff statt 76 Einzelstellen. (2) Eisenband mit Nieten als Mehrfach-Hintergrund statt Pseudo-Elementen, weil `.w-frame` nicht überall `position` hat. (3) Handy-Fenster links neben Porträt/Chronik, 78 px über dem Boden, damit Schnellleiste und Knopfleiste frei bleiben.
+- **Offen:** echtes Gerät/Tastaturfokus im Bild ungeprüft; `credits.ts` „Theme Wood“; Titelbildschirm in `GameScene.ts` hat noch feste Farben.
+- **Learnings:** Inline-`background:` auf `.w-frame` zerstört den Rahmen (Mehrfach-Hintergrund). Fenster-Screenshot kommt einen Schritt zu spät: zweimal aufnehmen. Dev-Test: `sc=__game.scene.scenes.find(s=>s.world)`, `sc.send`, `sc.ui.toggleTab`, Ereignisse per `sc.world.events.push`.
 
 ## START HIER (2026-11-11, ~20:45): Welle 2 gemergt, Nutzer wählt Oberfläche A (Schiefer und Eisen) – NÄCHSTER SCHRITT: T3 als Sonnet-Session (Karte vorgeschlagen), danach abnehmen
 - **Oberfläche entschieden (20:45): Variante A Schiefer und Eisen.** Vorlage committet als `docs/probe/t3-oberflaeche.html` (Klasse `.va`; `public/probe/` ist ignoriert und in Worktrees nicht sichtbar). Bild darin zeigt auf `/probe/wand/wand-40.png` (nur lokal vorhanden).
