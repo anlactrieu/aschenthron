@@ -3,6 +3,9 @@
 - **MAP_VERSION nicht erhöht:** Grid und alle Nicht-Truhen-Objekte sind identisch, Truhenzustand steht nicht im Spielstand. Ein Sprung würde nur den Nutzer in die Stadt setzen.
 - **Aufträge:** `q_chests1` 2 Truhen, `q_chests2` 4, `c_pell2` 1 Beutel; `ORTLOS` ohne Truhen.
 - **Offen:** `loot_*`-Einträge in `pixelfx.ts` (und Sheets) jetzt ungenutzt; Pace siehe Übergabe der Session.
+- **Pace:** vorher L30-Median 21,8 h / 25 Tode, nachher 21,6 h / 21,5 Tode (8 Seeds). Der Pace-Bot öffnet keine Truhen, die Messung ist für T2a blind.
+- **Letzte 3 Entscheidungen:** (1) Truhen erst am Ende von `gen_map.py` streichen, damit der Zufallsstrom und damit Monster, Lager, Landmarken unverändert bleiben. (2) `MAP_VERSION` nicht erhöht (kein Positionsverlust im Spielstand). (3) Gerüchte als zentrale Tabelle `TRUHEN` mit Test statt Streutexten.
+- **Learnings:** `.claude/launch.json` zeigt auf Port 5173 (Nutzer-Spielstand): Dev-Server für Proben von Hand auf 5176 starten. Beute im Test per `world.ground.push({..., expiresAt: null})`, sonst räumt die Sim sie weg.
 
 ## START HIER (2026-11-11, spät): Welle 1 – T1 und T4 gemergt (f4ba426, 4ce478a), T2b misst noch – NÄCHSTER SCHRITT: T4 im Browser ansehen, T2b abnehmen
 - **Merge-Stand:** `neuer-look` = 4ce478a + dieser Eintrag, lokal, kein Push. Nach beiden Merges von der Hauptsession selbst: tsc, Lint, 546 Tests, Build grün. Im Spiel von der Hauptsession nicht gesehen. Die Angaben „nichts gemergt/noch keine Übergabe" weiter unten in diesem Eintrag sind damit für T1 und T4 überholt; die offenen Punkte zu T4 (Bildzeit, Kreis bei Tag, Kartenrand) gelten weiter. Branches und Worktrees von T1/T4 noch nicht aufgeräumt.
