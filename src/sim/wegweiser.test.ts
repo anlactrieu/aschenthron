@@ -1,15 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import mapJson from '../data/aschenthron.json';
 import { buildWorld, type TiledMap } from './tiled';
-import { NPC_LORE, NPC_TOPICS, QUESTS, isGiverOf } from './data';
+import { NPC_LORE, QUESTS, isGiverOf } from './data';
+import { NPC_TOPICS, TRUHEN } from './topicsData';
+import { regionAt } from './world';
 import { stripMarks } from './topics';
 import { questSpeech, questWhere } from './quests';
 import type { World } from './world';
 
 /** T1: Es gibt keine Markierungen mehr. Jeder Auftrag muss sich über Worte finden lassen: Himmelsrichtung plus Landmarke. */
 const DIRECTION = /nördlich|südlich|östlich|westlich|nordöstlich|nordwestlich|südöstlich|südwestlich|\b(?:Nord|Süd|Ost|West)(?:en|osten|westen)?\b|im (?:Norden|Süden|Osten|Westen)/i;
-// Aufträge ohne festen Ort (Zufallsziele überall) – Truhen kommen mit T2a an feste Orte, dann gehören sie hier raus
-const ORTLOS = new Set(['q_chests1', 'q_chests2', 'q_unique1', 'q_unique2', 'q_champs1', 'q_champs2', 'c_pell1', 'c_thr3']);
+// Aufträge ohne festen Ort (Zufallsziele überall); Truhen haben seit T2a feste Orte und stehen nicht mehr hier
+const ORTLOS = new Set(['q_unique1', 'q_unique2', 'q_champs1', 'q_champs2', 'c_thr3']);
 
 const { world: w } = buildWorld(3, mapJson as unknown as TiledMap);
 
@@ -53,5 +55,31 @@ describe('T1 Wegbeschreibung statt Markierung', () => {
       if (!ok) missing.push(`${q.id} (${lms.join(' / ')})`);
     }
     expect(missing).toEqual([]);
+  });
+});
+
+describe('T2a Truhen-Gerüchte', () => {
+  it('jede Truhe der Karte wird mit Himmelsrichtung und Landmarke erwähnt, und der NPC sagt es im Stichwort „truhen“', () => {
+    expect(w.chests.length).toBeGreaterThanOrEqual(12);
+    const missing: string[] = [];
+    for (const c of w.chests) {
+      const key = c.camp ? `lager:${c.camp}` : (regionAt(w, c.x, c.y)?.name ?? '?');
+      const r = TRUHEN[key];
+      if (!r) { missing.push(`${c.x},${c.y} (${key}): kein Gerücht`); continue; }
+      if (!DIRECTION.test(r.text) || !r.text.includes(r.ort)) missing.push(`${c.x},${c.y} (${key}): Richtung oder Landmarke fehlt`);
+      if (!NPC_TOPICS[r.npc]?.topics.truhen?.text.includes(r.text)) missing.push(`${c.x},${c.y} (${key}): ${r.npc} sagt es nicht`);
+      if (!w.npcs.some((n) => n.name === r.npc)) missing.push(`${key}: ${r.npc} fehlt in der Karte`);
+    }
+    expect(missing).toEqual([]);
+    // keine Gerüchte über Truhen, die es nicht gibt
+    const keys = new Set(w.chests.map((c) => (c.camp ? `lager:${c.camp}` : regionAt(w, c.x, c.y)?.name ?? '?')));
+    expect(Object.keys(TRUHEN).filter((k) => !keys.has(k))).toEqual([]);
+  });
+
+  it('Truhen-Aufträge sind erfüllbar: genug Truhen, und die genannten Orte gibt es', () => {
+    for (const q of QUESTS.filter((x) => x.kind === 'chest')) {
+      expect(q.count ?? 1, q.id).toBeLessThanOrEqual(w.chests.length);
+      expect(questWhere(w, q), q.id).not.toBe('');
+    }
   });
 });

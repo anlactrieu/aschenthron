@@ -1,6 +1,6 @@
 import { BEGINNER_ZONE, CHAIN_FIRST, LOOT_GROUPS, QUESTS, lootGroupOf, NPC_KEYS, SHOPS, npcKeyOf, monsterKind, isGiverOf, type QuestDef } from './data';
 import { templateById } from './items';
-import { WEG } from './topicsData';
+import { WEG, TRUHEN, TRUHEN_AUFTRAG } from './topicsData';
 import { firstQuestOpen, regionAt, type Actor, type World } from './world';
 
 /** Kann der Spieler die Aufgabe jetzt annehmen? (Stufe, Vorgänger der Kette abgegeben, noch nicht angenommen) */
@@ -123,6 +123,7 @@ export function questMarks(w: World, p: Actor): QuestMark[] {
 export function questWhere(w: World, def: QuestDef, done = false, p?: Actor): string {
   if (done) return giverLocation(w, def)?.text ?? '';
   if (def.kind === 'champion') return 'Champions in der Wildnis (Gegner mit Aura)';
+  if (def.kind === 'chest') return (TRUHEN_AUFTRAG[def.id] ?? []).map((k) => TRUHEN[k]?.ort).filter(Boolean).join(', ');
   if (def.kind === 'find') {
     const names = new Set<string>();
     for (const f of w.finds) if (f.quest === def.id) names.add(regionAt(w, f.x, f.y)?.name ?? '?');
@@ -162,7 +163,8 @@ export function questSpeech(w: World, def: QuestDef): string {
     const way = WEG[part.trim()];
     if (way) ways.add(way);
   }
-  return [def.text, ...[...ways].slice(0, 2)].join(' ');
+  const truhen = def.kind === 'chest' ? (TRUHEN_AUFTRAG[def.id] ?? []).slice(0, 3).map((k) => TRUHEN[k]?.text).filter((t): t is string => !!t) : [];
+  return [def.text, ...(truhen.length ? truhen : [...ways].slice(0, 2))].join(' ');
 }
 
 /** Name des Quest-Monsters für Anzeigen (z. B. „Sumpfhexe“). */

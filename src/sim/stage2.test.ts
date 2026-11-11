@@ -897,12 +897,12 @@ describe('Abwechslungsreiche Aufgaben', () => {
     p.quests['q_chests1'] = { state: 'active', progress: 0 };
     p.quests['q_champs1'] = { state: 'active', progress: 0 };
     p.quests['q_unique1'] = { state: 'active', progress: 0 };
-    for (let i = 0; i < 3; i++) w.chests.push({ id: w.nextId++, x: 11, y: 10 + i, level: 3, tier: 'wood', opened: false, respawnAt: 0 });
+    for (let i = 0; i < 2; i++) w.chests.push({ id: w.nextId++, x: 11, y: 10 + i, level: 3, tier: 'wood', opened: false, respawnAt: 0 });
     for (const c of w.chests) {
       applyCommand(w, p.id, { type: 'openChest', chestId: c.id });
       run(w, 60);
     }
-    expect(p.quests['q_chests1']).toEqual({ state: 'done', progress: 3 });
+    expect(p.quests['q_chests1']).toEqual({ state: 'done', progress: 2 });
     p.damage = [99999, 99999];
     for (let i = 0; i < 4; i++) {
       const c = spawnMonster(w, 12, 12, 'wolf', { champ: 'swift' });
