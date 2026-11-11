@@ -6,7 +6,7 @@ import { findPath, isWalkable, type Grid } from './path';
 import { exportPlayer, importPlayer } from './save';
 import { validateCommand } from './net';
 import { questAvailable, questChains, questMarks, questWhere } from './quests';
-import { rollDrop, rollUniqueSpecial, rollWorldSpecial, rollGem, templateById } from './items';
+import { rollDrop, rollUniqueSpecial, rollWorldSpecial, rollGem } from './items';
 import { Rng } from './rng';
 import { addNpc, applyCommand, createWorld, drainEvents, getActor, regionAt, spawnMonster, spawnPlayer, tick, TICK_RATE, type Actor, type World } from './world';
 
