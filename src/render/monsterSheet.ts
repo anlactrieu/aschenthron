@@ -24,6 +24,14 @@ export type FigReply = { key: string; sheet: FigureSheet | null };
 
 /** So viele fertige Sheets bleiben im Cache (je ca. 0,5-2,5 MB, 5 statt 3 Ansichten kosten +67 %: darum weniger, der Speicher bleibt wie früher) */
 const KEEP = Math.floor((40 * 3) / FIG_VIEWS.length);
+/**
+ * So lange nach der letzten Anfrage (Gebrauch oder Vorausbacken) gilt ein Sheet als gefragt und fliegt nicht aus dem Cache. Ohne das
+ * wirft der Cache in Gebieten mit mehr Arten im Umkreis als `KEEP` (Katakomben) Vorausgebackenes noch vor dem Erscheinen wieder
+ * hinaus, backt es neu und das Spiel zeigt dauernd Schattenrisse.
+ */
+const WANT_MS = 20000;
+/** Harte Obergrenze für gefragte Sheets (Vielfaches von `KEEP`): darüber fliegen auch gefragte, älteste zuerst */
+const HARD = KEEP * 2;
 /** Backzeit je Spielframe in ms (nur ohne Worker) */
 const BUDGET_MS = 5;
 /** Worker: zwei Kerne bleiben dem Spiel und dem Browser, höchstens drei (jeder lädt die Figurenmodule) */
@@ -34,6 +42,8 @@ const UPLOADS_PER_FRAME = 1;
 type Job = { key: string; req: FigReq; urgent: boolean; done?: (s: FigSource) => void };
 
 const ready = new Map<string, FigSource>();
+/** Zeitpunkt der letzten Anfrage je Schlüssel (`figureTexture`, `prefetchFigure`) */
+const wantedAt = new Map<string, number>();
 /** ohne Skelett-Figur (keine Definition oder Backen schlug fehl): das Spiel zeigt die alte Figur */
 const none = new Set<string>();
 /** nur vorausgebacken für später (NPCs beim Laden): nicht vorab auf die GPU */
@@ -141,6 +151,7 @@ export function uploadSheet(scene: Phaser.Scene, key: string, src: FigSource, ur
  */
 export function figureTexture(scene: Phaser.Scene, key: string, req: FigReq): { key: string; sheet: FigureSheet } | 'wait' | null {
   if (none.has(key)) return null;
+  wantedAt.set(key, performance.now());
   const src = ready.get(key);
   if (src) {
     if (!uploadSheet(scene, key, src)) return 'wait';
@@ -165,6 +176,7 @@ export function figureTexture(scene: Phaser.Scene, key: string, req: FigReq): { 
  * fertig gleich auf die GPU laden (für Arten, die gleich ins Bild kommen).
  */
 export function prefetchFigure(key: string, req: FigReq, ahead = true): void {
+  wantedAt.set(key, performance.now());
   if (ready.has(key) || local.has(key) || none.has(key)) return;
   if (!ahead && !running.has(key) && !queue.some((j) => j.key === key)) noAhead.add(key);
   if (ahead) noAhead.delete(key);
@@ -180,9 +192,9 @@ export function resetFigureBudgets(scene: Phaser.Scene): void {
 
 /**
  * Am Anfang der Figurenpflege: ohne Worker aus der Warteschlange backen, bis das Zeitbudget verbraucht ist,
- * und alte Sheets aus dem Cache werfen.
+ * und alte Sheets aus dem Cache werfen (gibt deren Schlüssel zurück: Ansichten, die noch darauf zeigen, gehören auf eine leere Textur).
  */
-export function pumpFigures(scene: Phaser.Scene, inUse: () => Set<string>, budget = BUDGET_MS): void {
+export function pumpFigures(scene: Phaser.Scene, inUse: () => Set<string>, budget = BUDGET_MS, now = performance.now()): string[] {
   if (local.size) {
     const t0 = performance.now();
     for (const [key, baker] of local) {
@@ -201,18 +213,24 @@ export function pumpFigures(scene: Phaser.Scene, inUse: () => Set<string>, budge
       if (performance.now() - t0 >= budget) break;
     }
   }
+  const evicted: string[] = [];
   if (ready.size > KEEP) {
     const busy = inUse();
     for (const old of [...ready.keys()]) {
       if (ready.size <= KEEP) break;
       // läuft noch der Upload, zeigt das Spiel den Schattenriss: nicht verwerfen (sonst wird die Art gleich neu gebacken)
       if (busy.has(old) || uploading(old)) continue;
+      // gerade erst angefragt (Vorausbacken für den Umkreis): behalten, außer der Cache sprengt die harte Grenze
+      if (ready.size <= HARD && now - (wantedAt.get(old) ?? -Infinity) < WANT_MS) continue;
       ready.delete(old);
+      wantedAt.delete(old);
       noAhead.delete(old);
       cancelUpload(scene, old);
       if (scene.textures.exists(old)) scene.textures.remove(old);
+      evicted.push(old);
     }
   }
+  return evicted;
 }
 
 /** Am Ende jedes Frames: ist das Upload-Budget übrig, ein vorausgebackenes Sheet schon hochladen (dann kostet sein Erscheinen nichts). */

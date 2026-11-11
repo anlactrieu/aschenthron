@@ -34,7 +34,7 @@ import { Atmosphere, isDungeon, LIGHT_DEPTH } from './atmosphere';
 import { hourOf, NEW_CHAR_HOUR } from '../sim/clock';
 import { syncNpcPresence } from '../sim/night';
 import { Fx, SPELL_ELEMENT, SPELL_THEMES, spellElementOf } from './fx';
-import { playPixelfx, registerPixelfx, type FxName } from './pixelfx';
+import { playFrostRing, playPixelfx, registerPixelfx, type FxName } from './pixelfx';
 import { attackFrame, onceFrame, walkFrame, type FigView, type FigureSheet } from './figure';
 import { heroKey, heroLookOf, idleFrame } from './hero';
 import { FIG_SCALE, heroMode, heroTexture, originOf, prefetchHero } from './heroSheet';
@@ -997,7 +997,7 @@ export class GameScene extends Phaser.Scene {
         // pixelfx ist seitlich gezeichnet (flacher Bodenring): der runde Code-Ring zeigt zusätzlich die echte Wirkfläche
         if (once()) {
           this.fx.ring(from.x, this.gy(from, 18), 210, 0x7fd0ff, 460);
-          if (!pfx('frost_nova', feetFrom, { from: 0.4 })) this.fx.burst(from.x, from.y, 0xaee4ff, 520);
+          if (!(feetFrom && playFrostRing(this, feetFrom.x, feetFrom.y, { depth: OVERLAY_DEPTH - 1, from: 0.4 }))) this.fx.burst(from.x, from.y, 0xaee4ff, 520);
           if (e.skill === 'glacial_burst') this.cameras.main.shake(140, 0.005);
         }
         break;
@@ -2216,7 +2216,13 @@ export class GameScene extends Phaser.Scene {
 
   private updateNpcs(time: number): void {
     // Skelett-Figuren: ohne Worker im Spielthread backen, Cache aufräumen (Upload-Budget setzt `draw` zurück)
-    pumpFigures(this, () => this.figuresInUse());
+    const evicted = pumpFigures(this, () => this.figuresInUse());
+    if (evicted.length) {
+      // Ansichten, die noch auf eine eben verworfene Textur zeigen (unsichtbare, aber noch gebrauchte: Zaubereffekt auf Entferntes), auf die leere Textur setzen
+      const gone = new Set(evicted);
+      for (const v of this.actorViews.values()) if (gone.has(v.img.texture.key)) v.img.setTexture('__DEFAULT');
+      for (const img of this.npcViews.values()) if (gone.has(img.texture.key)) img.setTexture('__DEFAULT');
+    }
     const p = this.player();
     const seen = new Set<string>();
     for (const n of this.world.npcs) {

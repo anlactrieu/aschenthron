@@ -81,8 +81,24 @@ export interface PlayOpts {
   blend?: number;
   /** ganzzahlig (wird gerundet), Standard FX_SCALE */
   scale?: number;
+  /** Drehung in Bogenmaß (Bänder entlang der Kanten einer Iso-Raute) */
+  angle?: number;
   /** ab dieser Sekunde abspielen (Vorlauf des Effekts überspringen, wenn der Treffer schon feststeht) */
   from?: number;
+}
+
+/**
+ * Eiszacken der Frostnova als Raute um den Fußpunkt (x, y): das gebackene Band ist seitlich gezeichnet und läge sonst als gerader
+ * Streifen vor der Figur. Vier Bänder entlang der Kanten einer 2:1-Raute (Halbbreite `rx`, Neigung ±26,6°), Maßstab 1, damit sie
+ * (ca. 220 px breit) die Kanten füllen. Gibt zurück, ob der Effekt geladen war.
+ */
+export function playFrostRing(scene: Phaser.Scene, x: number, y: number, o: Omit<PlayOpts, 'angle' | 'scale'>, rx = 180): boolean {
+  const ry = rx / 2;
+  const tilt = Math.atan2(ry, rx);
+  const edges: [number, number, number][] = [[1, -1, tilt], [-1, -1, -tilt], [1, 1, -tilt], [-1, 1, tilt]];
+  let ok = false;
+  for (const [sx, sy, a] of edges) ok = !!playPixelfx(scene, 'frost_nova', x + (sx * rx) / 2, y + (sy * ry) / 2, { ...o, scale: 1, angle: a }) || ok;
+  return ok;
 }
 
 /**
@@ -95,6 +111,7 @@ export function playPixelfx(scene: Phaser.Scene, name: FxName, x: number, y: num
   if (!m || !registerOne(scene, name)) return undefined;
   const s = scene.add.sprite(x, y, key, 0).setOrigin(m.pivot[0] / m.frameSize[0], m.pivot[1] / m.frameSize[1]).setScale(fxScale(o.scale)).setDepth(o.depth).setAlpha(o.alpha ?? 1);
   if (o.flip) s.setFlipX(true);
+  if (o.angle) s.setRotation(o.angle);
   if (o.blend) s.setBlendMode(o.blend);
   s.play({ key, startFrame: Math.min(m.frames - 1, Math.max(0, Math.round((o.from ?? 0) * m.fps))) });
   if (!m.loop) s.once('animationcomplete', () => s.destroy());
