@@ -12,11 +12,8 @@ import { Raster, h3, mix, vnoise, type Rgb } from './raster';
 
 export type WallKind = 'cliff' | 'brick' | 'dungeon';
 
-/**
- * Höhe der Wandseiten in Kunstpixeln (Bildschirm: mal 2). 24 = volle Höhe (1,5 Kacheln), 12 = halbe.
- * Die Entscheidung trifft der Nutzer anhand von `probe/iso/wandhoehe.png`; bis dahin gilt die volle Höhe.
- */
-export const WALL_H = 24;
+/** Höhe der Wandseiten in Kunstpixeln (Bildschirm: mal 2). 40 = 2,5 Kacheln, vom Nutzer am 2026-11-11 aus 24, 40 und 56 gewählt. */
+export const WALL_H = 40;
 /** Breite und Höhe der Kachelraute in Kunstpixeln */
 const W = 32;
 const HD = 16;

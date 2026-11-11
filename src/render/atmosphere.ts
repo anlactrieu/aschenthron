@@ -289,20 +289,29 @@ export class Atmosphere {
     this.draw(dt, rainK, this.cur === 'ash' ? this.k : 0);
   }
 
-  /** Lichtbild mittig auf den Helden (die Kamera folgt ihm), Größe aus dem Lichtradius; deckt immer das ganze Bild */
+  /** Versatz des Helden zur Bildmitte in Weltpixeln: am Kartenrand hält die Kamera an, das Licht bleibt beim Helden */
+  private off = { x: 0, y: 0 };
+  setFocus(dx: number, dy: number): void {
+    this.off.x = Math.round(dx);
+    this.off.y = Math.round(dy);
+    this.placeLight();
+  }
+
+  /** Lichtbild auf den Helden (Bildmitte plus Versatz am Kartenrand), Größe aus dem Lichtradius; deckt immer das ganze Bild */
   private placeLight(): void {
     const W = this.scene.scale.width;
     const H = this.scene.scale.height;
     const zoom = this.scene.cameras.main.zoom || 1;
-    const key = `${W}|${H}|${zoom}|${this.lightTiles()}`;
+    const { x: ox, y: oy } = this.off;
+    const key = `${W}|${H}|${zoom}|${this.lightTiles()}|${ox}|${oy}`;
     if (key === this.placeKey) return;
     this.placeKey = key;
     const rx = (this.lightTiles() * 64) / Math.SQRT2; // Bodenkreis, Halbachse waagerecht in Weltpixeln
     const holeR = (TEX / 2) * HOLE_FRAC;
-    const need = Math.max((W / 2 / zoom + 60) / (TEX / 2), (H / 2 / zoom + 60) / ((TEX / 2) * LIGHT_SQUASH));
+    const need = Math.max((W / 2 / zoom + 60 + Math.abs(ox)) / (TEX / 2), (H / 2 / zoom + 60 + Math.abs(oy)) / ((TEX / 2) * LIGHT_SQUASH));
     const sx = Math.max(rx / holeR, need);
-    // Füße des Helden liegen 22 px unter der Bildmitte (GameScene: centerOn(sy + FOOT_DY - 22))
-    this.tint.setPosition(W / 2, H / 2 + 22).setScale(sx, sx * LIGHT_SQUASH);
+    // Füße des Helden liegen 22 px unter dem Kameraziel (GameScene: centerOn(sy + FOOT_DY - 22))
+    this.tint.setPosition(W / 2 + ox, H / 2 + 22 + oy).setScale(sx, sx * LIGHT_SQUASH);
   }
 
   private draw(dt: number, rainK: number, ashK: number): void {

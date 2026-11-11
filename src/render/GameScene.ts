@@ -12,6 +12,7 @@ import {
 } from '../sim/world';
 import { isWalkable } from '../sim/path';
 import { ARROW_DIRS, arrowStep, facingView, fallbackView, FOOT_DY, footprintColumns, FRONT_DY, gridStep, groundSize, mapBounds, mirrors, sheetView, standDepth, tileRange, toScreen, toTile, turn, type TileRange } from './iso';
+import { WALL_H } from './world/isoWalls';
 import { IsoChunkBaker, isoChunkOrigin, ISO_CHUNK_H, ISO_CHUNK_W, isoWall, OCCLUDER_ALPHA, type IsoGroundSrc } from './isoGround';
 import { isoPropKey, propAnchor } from './isoTownArt';
 import { isoHouseFade, isoHouseParts, isoTownProp, type IsoFade, type IsoHousePart } from './isoHouses';
@@ -1505,6 +1506,8 @@ export class GameScene extends Phaser.Scene {
     const { sx, sy } = toScreen(cp.x, cp.y);
     const cam = this.cameras.main;
     cam.centerOn(Math.round(sx), Math.round(sy + FOOT_DY - 22));
+    // Am Kartenrand hält die Kamera an: dem Lichtkreis sagen, wie weit der Held von der Bildmitte weg ist
+    this.atmo.setFocus(Math.round(sx) - (cam.scrollX + cam.width / 2), Math.round(sy + FOOT_DY - 22) - (cam.scrollY + cam.height / 2));
     // Scroll auf ganze Bildschirmpixel (bei Zoom 1.5 sonst 1,5-px-Sprünge, Flimmern beim Laufen); Zoom dreht um die Bildmitte
     const z = cam.zoom;
     const cx = (cam.width * (z - 1)) / 2;
@@ -1964,9 +1967,11 @@ export class GameScene extends Phaser.Scene {
       const w = this.world.grid.w;
       const px = Math.round(p.x);
       const py = Math.round(p.y);
-      for (let dy = -1; dy <= 5; dy++) {
-        for (let dx = -1; dx <= 5; dx++) {
-          if (dx + dy < 1 || dx + dy > 6 || Math.abs(dx - dy) > 4) continue;
+      // höhere Wände (Probe T5) ragen weiter nach oben: je 8 Kunstpixel eine Kachelreihe mehr prüfen
+      const far = 5 + Math.ceil((WALL_H - 24) / 8);
+      for (let dy = -1; dy <= far; dy++) {
+        for (let dx = -1; dx <= far; dx++) {
+          if (dx + dy < 1 || dx + dy > far + 1 || Math.abs(dx - dy) > 4) continue;
           const img = this.props.get((py + dy) * w + px + dx);
           if (!img || img.depth <= v.img.depth) continue;
           if (Phaser.Geom.Rectangle.Overlaps(body, img.getBounds())) fade.add(img);
