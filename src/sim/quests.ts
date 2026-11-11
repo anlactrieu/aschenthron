@@ -1,5 +1,6 @@
 import { BEGINNER_ZONE, CHAIN_FIRST, LOOT_GROUPS, QUESTS, lootGroupOf, NPC_KEYS, SHOPS, npcKeyOf, monsterKind, isGiverOf, type QuestDef } from './data';
 import { templateById } from './items';
+import { WEG } from './topicsData';
 import { firstQuestOpen, regionAt, type Actor, type World } from './world';
 
 /** Kann der Spieler die Aufgabe jetzt annehmen? (Stufe, Vorgänger der Kette abgegeben, noch nicht angenommen) */
@@ -152,6 +153,16 @@ export function questWhere(w: World, def: QuestDef, done = false, p?: Actor): st
     }
   }
   return [...names].join(', ');
+}
+
+/** Was der Auftraggeber sagt: Auftragstext plus Wegbeschreibung (Himmelsrichtung, Landmarke); die einzige Ortsangabe, es gibt keine Zielmarken. */
+export function questSpeech(w: World, def: QuestDef): string {
+  const ways = new Set<string>();
+  for (const part of questWhere(w, def).split(/,\s*|\s*\(|\)/)) {
+    const way = WEG[part.trim()];
+    if (way) ways.add(way);
+  }
+  return [def.text, ...[...ways].slice(0, 2)].join(' ');
 }
 
 /** Name des Quest-Monsters für Anzeigen (z. B. „Sumpfhexe“). */

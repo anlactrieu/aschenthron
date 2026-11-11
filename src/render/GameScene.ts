@@ -2,10 +2,10 @@ import Phaser from 'phaser';
 import mapJson from '../data/aschenthron.json';
 import { assignHotbar, hotbarFor } from './hotbar';
 import { buildWorld, type TiledMap } from '../sim/tiled';
-import { CHAIN_FIRST, DMG_COLOR, STATUS_COLOR, isGiverOf, monsterKind, npcKeyOf, questById, QUESTS, SHOPS, SKILLS, STATUS_IDS } from '../sim/data';
+import { DMG_COLOR, STATUS_COLOR, isGiverOf, monsterKind, npcKeyOf, questById, SHOPS, SKILLS, STATUS_IDS } from '../sim/data';
 import { LANDMARK_TOPICS } from '../sim/topicsData';
 import { THREAT_COLOR, THREAT_TEXT, threatOf } from '../sim/threat';
-import { giverLocation, nextStep, type NextStep, questAvailable, questMarks, type QuestMark } from '../sim/quests';
+import { questAvailable } from '../sim/quests';
 import { exportPlayer, importPlayer } from '../sim/save';
 import {
   applyCommand, carriedWeight, carryCapacity, drainEvents, getActor, maxHpOf, maxManaOf, regionAt, tick, TICK_RATE, type Actor, type Chest, type Command, type Npc, type World,
@@ -182,8 +182,6 @@ export class GameScene extends Phaser.Scene {
   private npcDir = new Map<number, { x: number; y: number; flip: boolean; side: boolean; up: boolean; iv?: FigView; movingUntil: number; dist?: number }>();  private chestViews = new Map<number, Phaser.GameObjects.Image>();
   private flash = new Map<number, number>();
   private acc = 0;
-  private step: NextStep | null = null;
-  private lastHint = 0;
   private lastBoard = -1e9;
   private zoneMood: Mood = 'town';
   private achv = new AchievementTracker();
@@ -197,7 +195,6 @@ export class GameScene extends Phaser.Scene {
   private autosave = 0;
   private lastSavedHint = 0;
   /** Letzter Zeitpunkt, an dem der Spieler lief oder kämpfte (für Erinnerungen bei Leerlauf) */
-  private lastActivity = 0;
   private lastAutoPick = 0;
   /** Beute-IDs, die schon einmal automatisch angesteuert wurden (kein Dauerversuch bei vollem Rucksack) */
   private autoTried = new Map<number, number>();
@@ -210,7 +207,6 @@ export class GameScene extends Phaser.Scene {
   private atmo!: Atmosphere;
   private townLife!: TownLife;
   private wildlife!: Wildlife;
-  private marks: QuestMark[] = [];
   private gfxGround!: Phaser.GameObjects.Graphics;
   private gfxShimmer!: Phaser.GameObjects.Graphics;
   private lastShimmer = -1000;
@@ -819,26 +815,6 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /** Wer keine laufende Aufgabe hat, bekommt alle 90 s einen Hinweis auf die nächste mögliche. */
-  private idleHint(time: number): void {
-    if (this.remote || this.frame % 60 !== 0 || time - this.lastHint < 90000) return;
-    const p = this.player();
-    if (Object.values(p.quests).some((q) => q.state !== 'turned')) {
-      // Aufgabe läuft, aber lange nichts getan: den nächsten Schritt wiederholen
-      this.lastHint = time;
-      const idle = time - this.lastActivity > 60000;
-      if (idle && this.step) this.ui.say(`Nächster Schritt: ${this.step.text}`);
-      return;
-    }
-    // Neulinge: zuerst der erste Auftrag bei Joren, nicht die erste freie Aufgabe der Liste
-    const open = (q: (typeof QUESTS)[number]) => !p.quests[q.id] && questAvailable(p, q);
-    const next = QUESTS.find((q) => q.chain === CHAIN_FIRST && open(q)) ?? QUESTS.find(open);
-    this.lastHint = time;
-    if (!next) return;
-    const loc = giverLocation(this.world, next);
-    this.ui.say(`Keine laufende Aufgabe. Neu: „${next.name}“${loc ? ` – ${loc.text}` : ''}.`);
-  }
-
   /** Zähler für Erfolge (nur Einzelspieler); neue Erfolge werden eingeblendet. */
   private achBump(key: keyof Stats, by = 1): void {
     if (this.remote) return;
@@ -867,7 +843,6 @@ export class GameScene extends Phaser.Scene {
     this.now = time;
     this.frameDt = Math.min(100, Math.max(1, dt));
     this.stepFreeze();
-    this.idleHint(time);
     if (this.remote && time - this.lastBoard > 15000) {
       this.lastBoard = time;
       this.remote.requestBoard();
@@ -895,10 +870,6 @@ export class GameScene extends Phaser.Scene {
           this.ui.say('Das Spiel speichert von selbst. Mit F5 legst du einen eigenen Stand ab, mit F9 lädst du ihn wieder.');
         }
       }
-    }
-    {
-      const me = this.player();
-      if (me && (me.path.length > 0 || me.targetId !== null)) this.lastActivity = time;
     }
     if (settings().autoPickup && time - this.lastAutoPick > 250) {
       this.lastAutoPick = time;
@@ -1533,46 +1504,8 @@ export class GameScene extends Phaser.Scene {
     cam.scrollX = (Math.round(cam.scrollX * z + cx) - cx) / z;
     const cy = (cam.height * (z - 1)) / 2;
     cam.scrollY = (Math.round(cam.scrollY * z + cy) - cy) / z;
-    if (this.frame % 30 === 0) {
-      this.marks = questMarks(this.world, p);
-      this.step = nextStep(this.world, p);
-      this.ui.step = this.step;
-    }
-    if (this.frame % 6 === 0) this.minimap.draw(p.x, p.y, this.marks);
-    this.updateCompass(g, p, time);
+    if (this.frame % 6 === 0) this.minimap.draw(p.x, p.y);
     this.updateRegion(p);
-  }
-
-  /** Pfeil um die Figur zum nächsten Aufgabenziel (erst ab 10 Feldern Abstand); Entfernung daneben. */
-  private updateCompass(g: Phaser.GameObjects.Graphics, p: Actor, time: number): void {
-    const seen = new Set<string>();
-    let best: { x: number; y: number; done: boolean } | null = null;
-    let bd = Infinity;
-    if (this.step?.x !== undefined && this.step.y !== undefined) {
-      best = { x: this.step.x, y: this.step.y, done: this.step.kind === 'turnin' };
-      bd = Math.hypot(best.x - p.x, best.y - p.y);
-    } else for (const m of this.marks) {
-      const d = Math.hypot(m.x - p.x, m.y - p.y);
-      if (d < bd) { bd = d; best = m; }
-    }
-    if (best && bd > 10) {
-      const me = toScreen(this.dispPos(p).x, this.dispPos(p).y);
-      const to = toScreen(best.x, best.y);
-      const ang = Math.atan2(to.sy - me.sy, to.sx - me.sx);
-      const r = 78 + Math.sin(time / 260) * 3;
-      const cx = me.sx + Math.cos(ang) * r;
-      const cy = me.sy + FOOT_DY - 22 + Math.sin(ang) * r;
-      const col = best.done ? 0x6fe08a : 0xffe45a;
-      g.fillStyle(col, 0.9);
-      g.lineStyle(1.5, 0x000000, 0.9);
-      const tip = { x: cx + Math.cos(ang) * 9, y: cy + Math.sin(ang) * 9 };
-      const l = { x: cx + Math.cos(ang + 2.5) * 7, y: cy + Math.sin(ang + 2.5) * 7 };
-      const rr = { x: cx + Math.cos(ang - 2.5) * 7, y: cy + Math.sin(ang - 2.5) * 7 };
-      g.fillTriangle(tip.x, tip.y, l.x, l.y, rr.x, rr.y);
-      g.strokeTriangle(tip.x, tip.y, l.x, l.y, rr.x, rr.y);
-      this.label('z-compass', `${Math.round(bd)}`, cx, cy + 14, best.done ? '#6fe08a' : '#ffe45a', seen, 11);
-    }
-    this.cleanLabels(seen, ['z']);
   }
 
   /** Glitzern auf Wasser und pulsierende Lava (nur Darstellung, unter Props und Akteuren). */

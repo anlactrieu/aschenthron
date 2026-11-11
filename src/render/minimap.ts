@@ -1,5 +1,4 @@
 import type { World } from '../sim/world';
-import type { QuestMark } from '../sim/quests';
 import { uniqueDef } from '../sim/data';
 import { isTouch } from './touch';
 import { NINJA_BASE } from './ninja';
@@ -122,7 +121,7 @@ export class Minimap {
     this.syncHeight();
   }
 
-  draw(px: number, py: number, marks: QuestMark[] = []): void {
+  draw(px: number, py: number): void {
     if (!this.visible) return;
     const { w: gw, h: gh } = this.w.grid;
     // Rasterkoordinate -> Kartenpixel als Raute (Streifenmitte der Kachel)
@@ -155,19 +154,6 @@ export class Minimap {
         c.fillStyle = '#e04030';
         c.fillRect(X(a.x, a.y) - 2, Y(a.x, a.y) - 2, 4, 4);
       }
-    }
-    // Aufgabenziele: gelbe Rauten (grün = abgeben)
-    for (const m of marks) {
-      c.fillStyle = m.done ? '#6fe08a' : '#ffe45a';
-      c.beginPath();
-      c.moveTo(X(m.x, m.y), Y(m.x, m.y) - 5);
-      c.lineTo(X(m.x, m.y) + 4, Y(m.x, m.y));
-      c.lineTo(X(m.x, m.y), Y(m.x, m.y) + 5);
-      c.lineTo(X(m.x, m.y) - 4, Y(m.x, m.y));
-      c.closePath();
-      c.fill();
-      c.strokeStyle = '#000';
-      c.stroke();
     }
     c.fillStyle = '#ffffff';
     c.fillRect(X(px, py) - 2, Y(px, py) - 2, 5, 5);

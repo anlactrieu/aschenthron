@@ -13,6 +13,12 @@
   - **Läuft:** Prüflauf auf Wegwerf-Kombination `neuer-look`+T1+T4 im Scratchpad-Worktree `probe-merge` (Hintergrundtask bsfvmw6hr); danach Worktree mit `git worktree remove` entfernen. Nichts gemergt.
   - **Learning:** `source_branch: "neuer-look"` bei `start_session` garantiert die Basis nicht; nach dem Start `git merge-base` je Branch prüfen.
 
+## T1 Wegweiser entfernt (2026-11-11, Branch `claude/t1-wegweiser-296317`, e965c96, gemergt nach `neuer-look`)
+- **Stand:** Feld „Nächster Schritt“, Pfeil, Zielrauten (Welt, Minimap), Leerlauf-Hinweise weg. tsc, Lint, 542 Tests, Build grün. Browser: „Erste Schritte“ ohne Markierung durchgespielt.
+- **Letzte 3 Entscheidungen:** (1) Wegbeschreibung als Tabelle `WEG` (`topicsData.ts`) plus `questSpeech()` (`quests.ts`), angezeigt in `ui.ts` (`questCard`, NPC-Angebot); `data.ts` blieb unberührt (T2b). (2) Stadtziele: keine Wegzeile, Test deckt sie über `NPC_LORE['Hafenmeister Joren']`. (3) `nextStep`/`questTarget`/`questMarks` bleiben für Pace-Bot und Tests.
+- **Offen:** Ausnahmeliste `ORTLOS` in `src/sim/wegweiser.test.ts` leeren, sobald T2a Truhen an feste Orte setzt; `questMarks` löschen, wenn `p3`/`newbie`-Tests angepasst sind; Richtungen in `WEG` sind aus Kartenkoordinaten abgeleitet, nicht im Spiel gegengelesen.
+- **Learnings:** Verdecktes Browser-Fenster läuft kaum Ticks: Sim per `scene.update(t, 50)` in Schleife treiben. Gitterkompass: Norden = kleineres y. BSD-`sed` im Bash-Tool brach mit „bad flag“ ab, Edit nutzen.
+
 ## ERLEDIGT (2026-11-11, abends): T4C-Stufe 2 – Welle 0 gemergt – danach Welle 1 gestartet (T1, T2b, T4)
 - **Lies zuerst:** `PLAN.md` (Zielbild mit 5 Säulen, Befund, Pakete T0–T8, Wellen, Modellzuteilung). `SPEC.md` nur bei Bedarf.
 - **Stand:** T0 und T6 sind am 2026-11-11 nach `neuer-look` gemergt (lokal, kein Push; `main`/`origin` unverändert bei a97cb37): 5627f7a `PLAN.md` + Entscheidungen, 23d5b41 Phaser-4-Skills (20 Stück, `.claude/skills`, Quelle `phaserjs/phaser` 02d8931, Eintrag in `~/.claude/skills/skills-lock.json`).
