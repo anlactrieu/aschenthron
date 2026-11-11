@@ -168,6 +168,7 @@ export class Atmosphere {
   private k = 0;
   private colorKey = '';
   private veilKey = '';
+  private placeKey = '';
   private rainSent = -1;
   private mix = { indoor: 0, town: 0 };
   private fixedHour: number | null;
@@ -293,6 +294,9 @@ export class Atmosphere {
     const W = this.scene.scale.width;
     const H = this.scene.scale.height;
     const zoom = this.scene.cameras.main.zoom || 1;
+    const key = `${W}|${H}|${zoom}|${this.lightTiles()}`;
+    if (key === this.placeKey) return;
+    this.placeKey = key;
     const rx = (this.lightTiles() * 64) / Math.SQRT2; // Bodenkreis, Halbachse waagerecht in Weltpixeln
     const holeR = (TEX / 2) * HOLE_FRAC;
     const need = Math.max((W / 2 / zoom + 60) / (TEX / 2), (H / 2 / zoom + 60) / ((TEX / 2) * LIGHT_SQUASH));
