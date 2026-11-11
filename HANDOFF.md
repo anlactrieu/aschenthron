@@ -1,3 +1,8 @@
+## ERLEDIGT (2026-11-11): T0 Doku entschlacken – NÄCHSTER SCHRITT: Nutzer-Okay, Branch `claude/t0-doku-03ef25` nach `neuer-look` mergen
+- **Stand:** `HANDOFF.md` 13 KB, `SPEC.md` 8,5 KB. Volltexte byte-gleich in `docs/archiv/HANDOFF-bis-2026-11-11.md` und `docs/archiv/SPEC-bis-2026-11-11.md`. Verweise in `README.md`, `PLAN.md`, `src/sim/death.ts` angepasst. Kein Push.
+- **Letzte 3 Entscheidungen:** (1) Learnings nach Themen verdichtet statt wortgleich (wären sonst 18 KB, Ziel <15 KB). (2) SPEC behält nur Vision, Entscheidungen, Rechtliches, Stack, Prozess und drei Unterabschnitte des T4C-Charme-Plans. (3) Archivname `…-11-11` (PLAN.md nannte `…-11-07`, korrigiert).
+- **Offen:** `area.test.ts`/`newbie.test.ts` reißen unter Last (T6 parallel) Zeitgrenzen, allein grün.
+
 ## PLAN (2026-11-11): T4C-Stufe 2 – NÄCHSTER SCHRITT: Nutzer-Okay, dann Welle 0 (T0 Doku entschlacken, T6 Mängel) als Sessions starten
 - **Stand:** Nur Planung. Neu `PLAN.md` (Zielbild mit 5 Säulen, Befund, Pakete T0–T8, Wellen, Modellzuteilung), ein Verweis in `SPEC.md` unter „Entscheidungen des Nutzers". Beides uncommittet auf `neuer-look`. Spiel unverändert, keine Tests nötig. Keine Session gestartet.
 - **Letzte 3 Entscheidungen (Nutzer, per AskUserQuestion):** (1) Wegweiser ganz entfernen, ohne Schalter (T4C hatte keine). (2) Beute gezielt zurückbauen: Truhen 98 → ~12 versteckte, Lichtstrahlen und Zufallsaffixe raus, Sets und Edelsteine bleiben (Sammelziele). (3) Pixel-Stil bleibt, Stimmung anheben; Fernziel erst Wiedergeburt, dann zweite Insel (Wiedergeburt braucht keine neue Karte).
