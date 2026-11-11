@@ -133,7 +133,7 @@ const fixedLoot = (i: Item): boolean => {
 };
 
 describe('P3 Beute: benannt und fest', () => {
-  it('normale Monsterbeute hat nie Zufallsaffixe; etwa 30 % benannte Funde, die Gruppe bevorzugt', () => {
+  it('normale Monsterbeute hat nie Zufallsaffixe; T2b: jeder Fund ist benannt, die Gruppe bevorzugt', () => {
     const rng = new Rng(11);
     let id = 1;
     let named = 0;
@@ -147,8 +147,7 @@ describe('P3 Beute: benannt und fest', () => {
         if (NAMED.find((d) => d.id === it.named)!.group === 'goblins') own++;
       }
     }
-    expect(named / N).toBeGreaterThan(0.25);
-    expect(named / N).toBeLessThan(0.35);
+    expect(named / N).toBe(1);
     expect(own / named).toBeGreaterThan(0.35);
     expect(own).toBeLessThan(named);
   });
