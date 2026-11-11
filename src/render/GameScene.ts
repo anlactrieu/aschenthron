@@ -34,7 +34,7 @@ import { Atmosphere, isDungeon, LIGHT_DEPTH } from './atmosphere';
 import { hourOf, NEW_CHAR_HOUR } from '../sim/clock';
 import { syncNpcPresence } from '../sim/night';
 import { Fx, SPELL_ELEMENT, SPELL_THEMES, spellElementOf } from './fx';
-import { playPixelfx, registerPixelfx, type FxName } from './pixelfx';
+import { playFrostRing, playPixelfx, registerPixelfx, type FxName } from './pixelfx';
 import { attackFrame, onceFrame, walkFrame, type FigView, type FigureSheet } from './figure';
 import { heroKey, heroLookOf, idleFrame } from './hero';
 import { FIG_SCALE, heroMode, heroTexture, originOf, prefetchHero } from './heroSheet';
@@ -997,7 +997,7 @@ export class GameScene extends Phaser.Scene {
         // pixelfx ist seitlich gezeichnet (flacher Bodenring): der runde Code-Ring zeigt zusätzlich die echte Wirkfläche
         if (once()) {
           this.fx.ring(from.x, this.gy(from, 18), 210, 0x7fd0ff, 460);
-          if (!pfx('frost_nova', feetFrom, { from: 0.4 })) this.fx.burst(from.x, from.y, 0xaee4ff, 520);
+          if (!(feetFrom && playFrostRing(this, feetFrom.x, feetFrom.y, { depth: OVERLAY_DEPTH - 1, from: 0.4 }))) this.fx.burst(from.x, from.y, 0xaee4ff, 520);
           if (e.skill === 'glacial_burst') this.cameras.main.shake(140, 0.005);
         }
         break;
