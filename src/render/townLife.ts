@@ -751,7 +751,7 @@ export class TownLife {
     const sh = groundSize(r.def.look === 'res_child' || r.def.look === 'res_child2' ? 20 : 26);
     this.shadow.fillEllipse(sx, fy + 1, sh.w, sh.h);
     if (r.torch) {
-      const hx = sx + (r.side ? (r.flip ? -14 : 14) : 13);
+      const hx = sx + (mirrors(v3) ? (r.flip ? -14 : 14) : 13);
       const hy = fy - r.top * 0.42;
       const fl = r.torch.img;
       fl.setFrame(Math.floor(c.time / 140) % 2 ? 'torch_1' : 'torch_0').setOrigin(0.5, 1).setPosition(hx, hy).setDepth(fy + 1).setVisible(r.alpha > 0.1);
