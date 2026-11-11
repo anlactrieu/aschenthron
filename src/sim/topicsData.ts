@@ -56,7 +56,7 @@ export const NPC_TOPICS: Record<string, NpcTopics> = {
     open: 'Frag mich nach dem [[hafen|Hafen]], den [[wege|Wegen]] aus der Stadt oder dem [[nebel|Nebel]], der abends vom Wasser kommt. Die Fischer reden außerdem über ein [[wolfsrudel|Wolfsrudel]].',
     topics: {
       hafen: { text: ['Aschenhafen lebt von dem, was die Schiffe nicht mehr bringen. Früher kamen Gewürze und Wolle, heute Flüchtlinge und Schmuggelware. Beides lade ich ab, ohne Fragen: Ein Hafenmeister, der Fragen stellt, lebt nicht lange.'] },
-      wege: { text: ['Nach Osten führt die Handelsstraße zur [[felsenwacht|Felsenwacht]], ein langer Marsch durch Wald und Moor. Im Norden liegen die Roggenfelder, im Westen der Düsterwald. Bleib auf den Wegen, bis du Stufe zehn erreicht hast.'] },
+      wege: { text: ['Nach Osten führt die Handelsstraße zur [[felsenwacht|Felsenwacht]], ein langer Marsch durch Wald und Moor. Im Osten, gleich hinter dem Osttor, liegen die Roggenfelder, im Norden der Düsterwald. Bleib auf den Wegen, bis du Stufe zehn erreicht hast.'] },
       wolfsrudel: { text: ['Im Wolfsbau im Nordosten der Felder, wo sie an den Wald stoßen, hat sich ein Rudel Schreckenswölfe eingegraben. Zwei Fischer sind dort einmal abgekommen, einer kam zurück. Wer vor Stufe zehn dort hineingeht, taugt nicht mehr zum Erzählen.'] },
       nebel: { text: ['Der Nebel kriecht seit dem Fall des Throns vom Wasser her. Die Fischer behaupten, er rieche nach Asche. Ich behaupte, er riecht nach Fisch, und bin trotzdem froh, wenn die Laternen brennen.'] },
       felsenwacht: { text: ['Die Felsenwacht ist unsere Schwesterstadt im Osten, eine Festung am Bergpass. Dort sitzt, wer mit Waffen mehr zu tun hat als mit Netzen. Wenn du Neuigkeiten willst, frag [[haldor|Haldor]] am Tor.'] },
@@ -341,4 +341,34 @@ export const LANDMARK_TOPICS: Record<string, string> = {
   lm19: 'mine',
   lm20: 'pforte',
   lm24: 'thron',
+};
+
+/**
+ * T1 Wegbeschreibungen: Ohne Zielmarken sagt der Auftraggeber selbst, wo das Ziel liegt (Himmelsrichtung plus Landmarke).
+ * Schlüssel ist der Ortsname, wie ihn `questWhere` liefert (Region oder Lager). Eigene Texte; Norden ist oben auf der Karte.
+ */
+export const WEG: Record<string, string> = {
+  'Aschenhafen': 'In Aschenhafen liegt das Lehrhaus nördlich der Hauptstraße und der Hafenmeister am Wasser im Süden.',
+  'Anfängerfelder vor Aschenhafen': 'Die Anfängerfelder vor Aschenhafen liegen östlich von Aschenhafen, gleich hinter dem Osttor.',
+  'Roggenfelder': 'Die Roggenfelder liegen östlich von Aschenhafen, hinter dem Osttor und der Handelsstraße.',
+  'Lager der Hofplünderer': 'Das Lager liegt am östlichen Rand der Roggenfelder.',
+  'Düsterwald': 'Der Düsterwald beginnt nördlich von Aschenhafen und zieht sich bis zum Räuberlager.',
+  'Spinnenhöhle': 'Die Höhle liegt im Osten des Düsterwalds, ein Stück nördlich der Roggenfelder.',
+  'Räuberlager': 'Das Räuberlager liegt weit im Norden, jenseits des Düsterwalds.',
+  'Räuberversteck': 'Das Nebenlager liegt südöstlich des Räuberlagers, nahe der Waldstraße.',
+  'Goblinbau': 'Der Goblinbau liegt im äußersten Nordwesten, nördlich des Räuberlagers.',
+  'Moorlande': 'Die Moorlande liegen nordöstlich von Aschenhafen, östlich des Düsterwalds, unterhalb der Felsenwacht.',
+  'Ghulgrube': 'Die Grube liegt im Osten der Moorlande.',
+  'Gruft der Moorhexe': 'Die Gruft der Moorhexe liegt im hohen Norden, nordwestlich der Moorlande.',
+  'Totenacker': 'Der Totenacker liegt weit im Osten, südlich der Moorlande.',
+  'Knochenhain': 'Der Hain liegt im Osten des Totenackers.',
+  'Spinnennest': 'Das Spinnennest liegt im Süden, südlich vom Totenacker.',
+  'Katakomben': 'Die Katakomben liegen östlich vom Totenacker.',
+  'Hochland': 'Das Hochland liegt im Nordosten, östlich der Felsenwacht.',
+  'Trollhöhle': 'Die Höhle liegt im Osten des Hochlands.',
+  'Tiefenmine': 'Die Tiefenmine liegt im äußersten Nordosten, östlich des Hochlands.',
+  'Thron der Asche': 'Der Thron der Asche liegt im Norden, nördlich des Hochlands.',
+  'Aschenöde': 'Die Aschenöde liegt im fernen Osten, östlich der Moorlande.',
+  'Glutlager': 'Das Lager liegt im Südosten der Aschenöde.',
+  'Aschengrund': 'Der Aschengrund liegt am östlichen Ende der Aschenöde.',
 };

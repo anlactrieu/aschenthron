@@ -13,7 +13,7 @@ import { itemIcon, potionIcon, skillIcon, statusIcon } from './icons';
 import { ACTIONS, actionFor, keyLabel, keyOf, rebind, resetKeys, setCapturing, setSetting, settings } from './settings';
 import type { AchievementTracker } from './achievements';
 import { ACHIEVEMENTS } from './achievements';
-import { type NextStep, giverLocation, questAvailable, questChains, questWhere, targetName } from '../sim/quests';
+import { questAvailable, questChains, questSpeech, targetName } from '../sim/quests';
 import { answerOf, canAsk, hasTopics, keywordLabel, openKeys, splitMarks } from '../sim/topics';
 import { greeting, gameHour } from './talk';
 import { clockText, hourOf, isNightHour } from '../sim/clock';
@@ -303,8 +303,6 @@ export class Ui {
   private sideClosed = '';
   /** Geöffnetes Gesprächsthema (nur Anzeige; die Sim lernt es über `askTopic`) */
   private topicView: { npcId: number; key: string } | null = null;
-  /** Nächster Schritt (von der Szene alle 0,5 s gesetzt) */
-  step: NextStep | null = null;
   private bannerTimer = 0;
   private hintEl = el('div', '', 'Gespeichert');
   private hintTimer = 0;
@@ -626,29 +624,13 @@ export class Ui {
     const act = QUESTS.filter((q) => p.quests[q.id] && p.quests[q.id]!.state !== 'turned');
     act.sort((a, b) => Number(p.quests[b.id]!.state === 'done') - Number(p.quests[a.id]!.state === 'done'));
     const shown = act.slice(0, 3);
-    const step = this.step;
-    const key = JSON.stringify([shown.map((q) => [q.id, p.quests[q.id]]), step?.text, this.trackerOpen]);
+    const key = JSON.stringify([shown.map((q) => [q.id, p.quests[q.id]]), this.trackerOpen]);
     if (key === this.trackerKey) return;
     this.trackerKey = key;
     this.tracker.replaceChildren();
     this.tracker.classList.toggle('tr-fold', isTouch && !this.trackerOpen);
     this.tracker.classList.toggle('tr-open', isTouch && this.trackerOpen);
-    this.tracker.style.display = shown.length || step ? 'block' : 'none';
-    if (step) {
-      const row = el('div');
-      row.style.cssText = 'margin:0 0 6px;padding-bottom:5px;border-bottom:1px solid #6b5a48';
-      const head = el('div', '', '▶ Nächster Schritt');
-      head.style.cssText = 'font-weight:bold;color:#ffcf6a;font-size:14px;letter-spacing:.5px';
-      const txt = el('div', '', step.text);
-      row.append(head, txt);
-      if (step.x !== undefined && step.y !== undefined) {
-        const go = el('button', 'a-btn', 'Hinlaufen');
-        go.style.cssText = 'margin-top:4px;font-size:13px;padding:2px 8px;cursor:pointer';
-        go.onclick = () => this.send({ type: 'moveTo', x: Math.round(step.x!), y: Math.round(step.y!) });
-        row.append(go);
-      }
-      this.tracker.append(row);
-    }
+    this.tracker.style.display = shown.length ? 'block' : 'none';
     for (const q of shown) {
       const done = p.quests[q.id]!.state === 'done';
       const row = el('div');
@@ -658,8 +640,6 @@ export class Ui {
       const goal = el('div', '', done ? 'Fertig – beim Auftraggeber abgeben' : this.questGoal(q, p));
       goal.style.opacity = '.85';
       row.append(title, goal);
-      const where = questWhere(w, q, done);
-      if (where) { const wh = el('div', '', where); wh.style.cssText = 'opacity:.6;font-size:14px'; row.append(wh); }
       this.tracker.append(row);
     }
     if (act.length > shown.length) { const more = el('div', '', `+${act.length - shown.length} weitere (J)`); more.style.cssText = 'opacity:.6;font-size:14px'; this.tracker.append(more); }
@@ -1651,9 +1631,7 @@ export class Ui {
     const st = p.quests[def.id]!;
     const c = el('div', 'a-card');
     c.style.display = 'block';
-    c.append(el('div', '', def.name), el('div', 'a-note', def.text), el('div', 'a-note', this.questGoal(def, p)));
-    const where = w ? questWhere(w, def, st.state === 'done') : '';
-    if (where) c.append(el('div', 'a-note', `${st.state === 'done' ? 'Abgabe' : 'Ort'}: ${where}`));
+    c.append(el('div', '', def.name), el('div', 'a-note', w ? questSpeech(w, def) : def.text), el('div', 'a-note', this.questGoal(def, p)));
     const bar = el('div', 'a-bar');
     const f = el('div');
     f.style.cssText = `width:${Math.min(100, (st.progress / def.count) * 100)}%;background:${st.state === 'done' ? '#6fe08a' : '#d8a24a'}`;
@@ -1748,7 +1726,7 @@ export class Ui {
       body.append(el('div', 'a-sec', `${chain.name} · Kapitel ${Math.min(done + (cur ? 1 : 0), chain.quests.length)}/${chain.quests.length}`));
       if (cur) body.append(this.questCard(cur, p, w));
       else if (done === chain.quests.length) body.append(el('div', 'a-note', 'Abgeschlossen.'));
-      else if (next) body.append(el('div', 'a-note', `Nächstes Kapitel „${next.name}“ ab Stufe ${next.minLevel}${next.requires ? ' – beim Auftraggeber abholen' : ''}${w && giverLocation(w, next) ? `: ${giverLocation(w, next)!.text}` : ''}.`));
+      else if (next) body.append(el('div', 'a-note', `Nächstes Kapitel „${next.name}“ ab Stufe ${next.minLevel}${next.requires ? ' – beim Auftraggeber abholen' : ''}.`));
     }
   }
 
@@ -2068,7 +2046,7 @@ export class Ui {
         t.style.fontWeight = 'bold';
         c.append(t);
         if (def.chain) c.append(el('div', 'a-note', `Kette: ${def.chain}`));
-        c.append(el('div', 'a-note', def.text), el('div', 'a-note', `Belohnung: ${questXp(def.minLevel, def.xp)} XP, ${def.gold} Gold${def.reward ? (def.reward === 'unique' ? ', Unikat/Set-Teil' : ', benannter Fund') : ''}`));
+        c.append(el('div', 'a-note', this.lastW ? questSpeech(this.lastW, def) : def.text), el('div', 'a-note', `Belohnung: ${questXp(def.minLevel, def.xp)} XP, ${def.gold} Gold${def.reward ? (def.reward === 'unique' ? ', Unikat/Set-Teil' : ', benannter Fund') : ''}`));
         if (def.reward && st?.state !== 'turned') {
           const names = questRewardChoices(def).map((it) => it.name);
           const pv = el('div', 'a-note', `Zu holen: ${names.join(' · ')}`);
