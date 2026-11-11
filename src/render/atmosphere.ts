@@ -9,7 +9,11 @@ import { DUNGEON_REGIONS } from '../sim/clock';
  *   Fläche mit Multiply-Mischung in der Szene färbt die Welt (Dämmerung warm, Nacht bläulich dunkel, Morgen warm).
  *   Sie liegt bei `LIGHT_DEPTH - 1`: Fenster- und Laternenlicht (additiv, Tiefe `LIGHT_DEPTH`) liegt darüber und
  *   wird nicht mitgedimmt.
- * - Dungeons ignorieren den Zyklus (konstante Dunkelheit über den Vignetten-Verlauf der Szene), Städte bleiben heller.
+ * - Dungeons ignorieren den Zyklus (konstante Dunkelheit: `DUNGEON_AMBIENT`), Städte bleiben heller.
+ * - Lichtkreis (T4): die Dunkelheit ist ein Bild mit weichem Alpha-Loch (Multiply, Tönung = Umgebungsfarbe), mittig auf dem
+ *   Helden. Der Kreis liegt als Kreis auf dem Boden (in der Iso-Ansicht eine 2:1-Ellipse). Radius: `lightRadius` (eine Stelle,
+ *   dort greift später die Fackel der Nebenhand: `Atmosphere.lightBonus`). Gegner außerhalb des Lichts tönt GameScene dunkel
+ *   (`lightFactor`, gleiche Kurve wie das Loch im Bild).
  * - Wetter je Außenzone, wechselt per Zufall alle ca. 3,5 Minuten (aus der Uhr abgeleitet, daher ohne Speicherstand):
  *   Regen (Moorlande, selten Aschenhafen-Umland), Nebel (Moorlande, Totenacker), Ascheflocken (Aschenöde, Aschengrund).
  * Testparameter: `?stunde=22` (feste Uhrzeit; im Einzelspieler setzt GameScene sie auch in der Sim, online gilt sie nur für das Bild), `?wetter=regen|nebel|asche|klar`.
@@ -36,10 +40,13 @@ export const DAY_MS = 24 * 60 * 1000;
 /** Wetterwechsel-Takt */
 export const WEATHER_SLOT_MS = 3.5 * 60 * 1000;
 
+/** Nacht außerhalb des Lichts (T4: deutlich dunkler als vorher 96/108/168) */
+const NIGHT: [number, number, number] = [50, 58, 98];
+
 /** Farbverlauf des Tages: Stunde → Multiplikationsfarbe (255 = unverändert). */
 const KEYS: [number, [number, number, number]][] = [
-  [0, [96, 108, 168]], [4.5, [96, 108, 168]], [6.5, [255, 200, 156]], [8.5, [255, 255, 255]],
-  [17, [255, 255, 255]], [19, [255, 180, 132]], [20.5, [132, 120, 170]], [22, [96, 108, 168]], [24, [96, 108, 168]],
+  [0, NIGHT], [4.5, NIGHT], [6.5, [255, 200, 156]], [8.5, [255, 255, 255]],
+  [17, [255, 255, 255]], [19, [255, 180, 132]], [20.5, [116, 104, 150]], [22, NIGHT], [24, NIGHT],
 ];
 
 export function dayColor(hour: number): [number, number, number] {
@@ -63,6 +70,43 @@ export function dayColor(hour: number): [number, number, number] {
 export const DARK_GRADE: readonly [number, number, number] = [0.92, 0.9, 0.94];
 /** Wie weit Städte zum ungetönten Bild aufgehellt werden (vorher 0.4: Stadt wirkte bunt und hell). */
 const TOWN_LIFT = 0.12;
+
+/** Umgebungsfarbe in Dungeons (vorher nur Vignette; die Tageszeit greift dort nicht) */
+export const DUNGEON_AMBIENT: readonly [number, number, number] = [72, 70, 96];
+
+/** Lichtradius des Helden in Kacheln (Bodenkreis) draußen/Stadt und im Dungeon. */
+export const LIGHT_TILES = 6.5;
+export const LIGHT_TILES_DUNGEON = 6;
+/** Anteil des Radius mit vollem Licht, danach weicher Übergang bis zum Rand */
+const LIGHT_CORE = 0.45;
+/** Wie stark die Umgebungsfarbe im Kern noch durchschlägt (0 = Kern ungedimmt) */
+const LIGHT_FLOOR = 0.35;
+/** Höhe/Breite des Lichtkreises im Bild: ein Bodenkreis ist in der Iso-Ansicht eine 2:1-Ellipse */
+export const LIGHT_SQUASH = 0.5;
+
+/**
+ * Einzige Stelle für die Größe des Lichtkreises (in Kacheln). `bonus` ist für Lichtquellen am Helden vorgesehen:
+ * die Fackel der Nebenhand (nach T2b) übergibt hier ihren Zuschlag (siehe `Atmosphere.lightBonus`).
+ */
+export const lightRadius = (dungeon: boolean, bonus = 0): number => (dungeon ? LIGHT_TILES_DUNGEON : LIGHT_TILES) + Math.max(0, bonus);
+
+/** Licht an einem Punkt im Abstand `dist` zum Mittelpunkt einer Lichtquelle mit Radius `radius` (gleiche Einheit): 1 voll, 0 dunkel, weich dazwischen. */
+export function lightFactor(dist: number, radius: number): number {
+  if (radius <= 0) return 0;
+  const t = (dist / radius - LIGHT_CORE) / (1 - LIGHT_CORE);
+  if (t <= 0) return 1;
+  if (t >= 1) return 0;
+  return 1 - t * t * (3 - 2 * t);
+}
+
+/** Wie dunkel die Umgebung ist: 0 bei Tag (fast ungetönt), 1 bei Nacht und im Dungeon. Aus der Multiplikationsfarbe (0–255). */
+export function darkness(rgb: readonly [number, number, number]): number {
+  const lum = (rgb[0] * 0.3 + rgb[1] * 0.59 + rgb[2] * 0.11) / 255;
+  return Math.max(0, Math.min(1, (0.88 - lum) / 0.5));
+}
+
+/** Alphawert des Lichtlochs bei Abstand `r` vom Mittelpunkt (in Radien): 1 = volle Umgebungsfarbe, `LIGHT_FLOOR` = Kern. */
+const holeAlpha = (r: number): number => 1 - (1 - LIGHT_FLOOR) * lightFactor(r, 1);
 
 const hash32 = (n: number): number => {
   let t = (n + 0x9e3779b9) >>> 0;
@@ -90,8 +134,30 @@ interface Particle {
   s: number;
 }
 
+/** Kantenlänge der Lichttextur; das Loch füllt nur den Mittelteil (`HOLE_FRAC` der halben Kantenlänge), der Rest ist volle Dunkelheit */
+const TEX = 1024;
+const HOLE_FRAC = 0.1;
+
+function holeCanvas(): HTMLCanvasElement {
+  const c = document.createElement('canvas');
+  c.width = c.height = TEX;
+  const x = c.getContext('2d')!;
+  const half = TEX / 2;
+  const g = x.createRadialGradient(half, half, 0, half, half, half);
+  const n = 32;
+  for (let i = 0; i <= n; i++) {
+    const r = i / n; // in Lochradien
+    g.addColorStop((i / n) * HOLE_FRAC, `rgba(255,255,255,${holeAlpha(r).toFixed(3)})`);
+  }
+  g.addColorStop(HOLE_FRAC + 0.001, 'rgba(255,255,255,1)');
+  g.addColorStop(1, 'rgba(255,255,255,1)');
+  x.fillStyle = g;
+  x.fillRect(0, 0, TEX, TEX);
+  return c;
+}
+
 export class Atmosphere {
-  private tint: Phaser.GameObjects.Rectangle;
+  private tint: Phaser.GameObjects.Image;
   private veil: HTMLDivElement;
   private gfx: Phaser.GameObjects.Graphics;
   private drops: Particle[] = [];
@@ -109,8 +175,10 @@ export class Atmosphere {
   /** Uhr der Sim (Spielstunde); ohne Quelle Echtzeit */
   source: (() => number) | null = null;
   private t = 0;
+  /** Zuschlag auf den Lichtradius in Kacheln (Fackel der Nebenhand: dort eintragen) */
+  lightBonus = 0;
   /** Debug: aktuelle Werte (lesbar über window.__game) */
-  state = { hour: 12, weather: 'clear' as Weather, k: 0, color: '255,255,255' };
+  state = { hour: 12, weather: 'clear' as Weather, k: 0, color: '255,255,255', dark: 0 };
 
   constructor(private scene: Phaser.Scene, private sfx: Sfx) {
     const q = new URLSearchParams(location.search);
@@ -118,8 +186,9 @@ export class Atmosphere {
     this.fixedHour = h && Number.isFinite(Number(h)) ? Number(h) : null;
     const w = q.get('wetter');
     this.fixedWeather = w ? ({ regen: 'rain', nebel: 'fog', asche: 'ash', klar: 'clear' } as Record<string, Weather>)[w] ?? null : null;
-    // Riesig und mittig: bei Zoom 0.5 muss die Fläche trotz Kamerazoom das ganze Bild decken
-    this.tint = scene.add.rectangle(0, 0, 40000, 40000, 0xffffff).setScrollFactor(0).setBlendMode(MULTIPLY).setDepth(LIGHT_DEPTH - 1);
+    // Dunkelheit mit Lichtloch (Multiply): riesig, damit sie bei kleinem Zoom das ganze Bild deckt; weiche Ränder (nicht Nearest)
+    if (!scene.textures.exists('atmo_dark')) scene.textures.addCanvas('atmo_dark', holeCanvas())?.setFilter(0);
+    this.tint = scene.add.image(0, 0, 'atmo_dark').setScrollFactor(0).setBlendMode(MULTIPLY).setDepth(LIGHT_DEPTH - 1);
     this.veil = document.createElement('div');
     this.veil.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2;opacity:0;background:radial-gradient(ellipse at center,rgba(160,176,170,.16) 20%,rgba(150,166,160,.42) 100%)';
     document.body.append(this.veil);
@@ -136,6 +205,16 @@ export class Atmosphere {
     const [r, g, b] = dayColor(this.hour());
     const lum = (r * 0.3 + g * 0.59 + b * 0.11) / 255;
     return Math.max(0, Math.min(1, (1 - lum) * 1.8 - 0.05));
+  }
+
+  /** Aktueller Lichtradius des Helden in Kacheln */
+  lightTiles(): number {
+    return lightRadius(this.zone === 'indoor', this.lightBonus);
+  }
+
+  /** Dunkelheit der Umgebung 0–1 (gleitend, gilt für Nacht und Dungeon) */
+  dark(): number {
+    return this.state.dark;
   }
 
   setRegion(name: string): void {
@@ -177,17 +256,18 @@ export class Atmosphere {
 
     // Farb-Overlay (nur bei sichtbarer Änderung neu gesetzt)
     const [r0, g0, b0] = dayColor(hour);
-    // Innenräume (Dungeons) haben ihre Dunkelheit schon über Vignette/Tönung: Grundton nur außen und in der Stadt
+    // Dungeons: eigene Umgebungsfarbe statt Tageszeit (die Dunkelheit kommt aus dem Lichtbild, nicht mehr aus der Vignette allein)
     const grade = 1 - this.mix.indoor;
-    const [r, g, b] = [r0 * (1 - grade * (1 - DARK_GRADE[0])), g0 * (1 - grade * (1 - DARK_GRADE[1])), b0 * (1 - grade * (1 - DARK_GRADE[2]))];
-    const lift = Math.min(1, this.mix.indoor + this.mix.town * TOWN_LIFT);
+    const day = [r0 * (1 - grade * (1 - DARK_GRADE[0])), g0 * (1 - grade * (1 - DARK_GRADE[1])), b0 * (1 - grade * (1 - DARK_GRADE[2]))];
+    const [r, g, b] = day.map((c, k) => c! + (DUNGEON_AMBIENT[k]! - c!) * this.mix.indoor) as [number, number, number];
+    const lift = this.mix.town * TOWN_LIFT;
     const rain = 1 - 0.14 * rainK;
     const out = [r, g, b].map((c) => Math.round((c + (255 - c) * lift) * rain));
     const q = out.map((c) => Math.min(255, Math.round(c / 2) * 2));
     const ck = q.join(',');
     if (ck !== this.colorKey) {
       this.colorKey = ck;
-      this.tint.setFillStyle((q[0]! << 16) | (q[1]! << 8) | q[2]!);
+      this.tint.setTint((q[0]! << 16) | (q[1]! << 8) | q[2]!);
     }
     const fogK = this.cur === 'fog' ? this.k : 0;
     const vk = (Math.round(fogK * 25) / 25).toFixed(2);
@@ -195,8 +275,8 @@ export class Atmosphere {
       this.veilKey = vk;
       this.veil.style.opacity = vk;
     }
-    this.tint.setPosition(this.scene.scale.width / 2, this.scene.scale.height / 2);
-    this.state = { hour, weather: this.cur, k: this.k, color: ck };
+    this.placeLight();
+    this.state = { hour, weather: this.cur, k: this.k, color: ck, dark: darkness(q as [number, number, number]) };
 
     // Regenrauschen: nur bei spürbarer Änderung an den Ton melden
     const rs = Math.round(rainK * 20);
@@ -206,6 +286,19 @@ export class Atmosphere {
     }
 
     this.draw(dt, rainK, this.cur === 'ash' ? this.k : 0);
+  }
+
+  /** Lichtbild mittig auf den Helden (die Kamera folgt ihm), Größe aus dem Lichtradius; deckt immer das ganze Bild */
+  private placeLight(): void {
+    const W = this.scene.scale.width;
+    const H = this.scene.scale.height;
+    const zoom = this.scene.cameras.main.zoom || 1;
+    const rx = (this.lightTiles() * 64) / Math.SQRT2; // Bodenkreis, Halbachse waagerecht in Weltpixeln
+    const holeR = (TEX / 2) * HOLE_FRAC;
+    const need = Math.max((W / 2 / zoom + 60) / (TEX / 2), (H / 2 / zoom + 60) / ((TEX / 2) * LIGHT_SQUASH));
+    const sx = Math.max(rx / holeR, need);
+    // Füße des Helden liegen 22 px unter der Bildmitte (GameScene: centerOn(sy + FOOT_DY - 22))
+    this.tint.setPosition(W / 2, H / 2 + 22).setScale(sx, sx * LIGHT_SQUASH);
   }
 
   private draw(dt: number, rainK: number, ashK: number): void {
