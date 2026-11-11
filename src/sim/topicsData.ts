@@ -348,7 +348,6 @@ export const LANDMARK_TOPICS: Record<string, string> = {
  * Schlüssel ist der Ortsname, wie ihn `questWhere` liefert (Region oder Lager). Eigene Texte; Norden ist oben auf der Karte.
  */
 export const WEG: Record<string, string> = {
-  'Aschenhafen': 'In Aschenhafen liegt das Lehrhaus nördlich der Hauptstraße und der Hafenmeister am Wasser im Süden.',
   'Anfängerfelder vor Aschenhafen': 'Die Anfängerfelder vor Aschenhafen liegen östlich von Aschenhafen, gleich hinter dem Osttor.',
   'Roggenfelder': 'Die Roggenfelder liegen östlich von Aschenhafen, hinter dem Osttor und der Handelsstraße.',
   'Lager der Hofplünderer': 'Das Lager liegt am östlichen Rand der Roggenfelder.',

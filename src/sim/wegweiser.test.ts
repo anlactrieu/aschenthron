@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import mapJson from '../data/aschenthron.json';
 import { buildWorld, type TiledMap } from './tiled';
-import { NPC_TOPICS, QUESTS, isGiverOf } from './data';
+import { NPC_LORE, NPC_TOPICS, QUESTS, isGiverOf } from './data';
 import { stripMarks } from './topics';
 import { questSpeech, questWhere } from './quests';
 import type { World } from './world';
@@ -44,6 +44,11 @@ describe('T1 Wegbeschreibung statt Markierung', () => {
     for (const q of QUESTS) {
       if (ORTLOS.has(q.id)) continue;
       const lms = landmarks(w, q.id);
+      // Ziele in der Stadt erklärt Joren in seiner Begrüßung („Nördlich der Straße: das Lehrhaus …“)
+      if (lms.every((l) => l === 'Aschenhafen' || w.npcs.some((n) => n.name === l))) {
+        if (!DIRECTION.test(NPC_LORE['Hafenmeister Joren']!.join(' '))) missing.push(`${q.id} (Stadt)`);
+        continue;
+      }
       const ok = corpus(q.id).some((s) => DIRECTION.test(s) && lms.some((l) => s.includes(l)));
       if (!ok) missing.push(`${q.id} (${lms.join(' / ')})`);
     }
