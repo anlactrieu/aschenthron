@@ -14,7 +14,7 @@ import { ACTIONS, actionFor, keyLabel, keyOf, rebind, resetKeys, setCapturing, s
 import type { AchievementTracker } from './achievements';
 import { ACHIEVEMENTS } from './achievements';
 import { questAvailable, questChains, questSpeech, targetName } from '../sim/quests';
-import { answerOf, canAsk, hasTopics, keywordLabel, openKeys, splitMarks } from '../sim/topics';
+import { answerOf, canAsk, hasTopics, keywordLabel, openKeys, splitMarks, stripMarks } from '../sim/topics';
 import { greeting, gameHour } from './talk';
 import { clockText, hourOf, isNightHour } from '../sim/clock';
 import { closedMessage, isShop } from '../sim/night';
@@ -164,6 +164,14 @@ function titleBar(text: string, win: HTMLElement, onClose: () => void, extra: HT
   }
   const x = el('span', 'a-x', '✕');
   x.title = 'Schließen';
+  x.tabIndex = 0;
+  x.setAttribute('role', 'button');
+  x.onkeydown = (ev) => {
+    if (ev.key === 'Enter' || ev.key === ' ') {
+      ev.preventDefault();
+      onClose();
+    }
+  };
   x.onpointerdown = (e) => e.stopPropagation();
   x.onclick = onClose;
   h.append(x);
@@ -190,20 +198,19 @@ function titleBar(text: string, win: HTMLElement, onClose: () => void, extra: HT
 const CSS = `
 .a-win{position:fixed;display:none;z-index:10;user-select:none;max-height:calc(100vh - 24px - 2*var(--bw));box-shadow:0 8px 24px rgba(0,0,0,.6)}
 @media (max-width:1000px){.a-win{zoom:.76}}
-.a-win h3{margin:0 0 4px;padding:2px 8px 0;font:18px/1.2 var(--ui-font);letter-spacing:.5px;color:var(--ink);display:flex;align-items:center;justify-content:space-between;cursor:move;touch-action:none}
-.a-x{cursor:pointer;color:var(--ink);padding:0 6px;margin:0 -2px 0 8px;font:18px/1.2 var(--ui-font)}
+.a-win h3{margin:0 0 4px;padding:3px 8px;font-size:18px;line-height:1.3;display:flex;align-items:center;justify-content:space-between;cursor:move;touch-action:none}
+.a-x{cursor:pointer;color:var(--txt);padding:0 8px;margin:0 -4px 0 8px;font:18px/1.3 var(--body);min-width:24px;text-align:center}
 .a-x:hover{color:#fff;background:#9b2a2a}
 .a-tabs{display:flex;flex-wrap:wrap;gap:2px;margin:0 0 4px}
-.a-tab{flex:1 1 30%;min-width:0;padding:0;text-align:center;cursor:pointer;font-size:15px;line-height:18px;border-width:3px 3px 5px;border-image-width:3px 3px 5px}
-.a-tab.on{color:var(--ink)}
+.a-tab{flex:1 1 30%;min-width:0;padding:0;text-align:center;cursor:pointer;font-size:16px;line-height:22px}
 .a-body{padding:6px 8px;overflow-y:auto;max-height:calc(100vh - 200px)}
-.a-sec{margin:12px 0 6px;padding-bottom:3px;border-bottom:2px solid var(--wood-l);color:var(--gold);letter-spacing:.8px}
+.a-sec{margin:12px 0 6px;padding-bottom:3px;border-bottom:1px solid var(--iron);color:var(--title);font-family:var(--pix);letter-spacing:.8px}
 .a-grid{display:grid;gap:3px;grid-template-columns:repeat(${BAG_COLS},46px)}
 .a-slot{position:relative;width:46px;height:46px}
 .a-slot.item{cursor:grab}
 .a-slot img,.hb img{width:100%;height:100%;image-rendering:pixelated;position:absolute;left:0;top:0;pointer-events:none;object-fit:contain}
-.a-slot .n{position:absolute;right:0;bottom:-2px;font:14px/1 var(--ui-font);color:#fff;text-shadow:-1px 0 #000,1px 0 #000,0 -1px #000,0 1px #000;pointer-events:none}
-.a-slot .l{position:absolute;left:0;top:-3px;font:11px/1 var(--ui-font);letter-spacing:0;white-space:nowrap;color:#fff;text-shadow:-1px 0 #131b1b,1px 0 #131b1b,0 -1px #131b1b,0 1px #131b1b;pointer-events:none}
+.a-slot .n{position:absolute;right:0;bottom:-2px;font:600 14px/1 var(--body);color:#fff;text-shadow:-1px 0 #000,1px 0 #000,0 -1px #000,0 1px #000;pointer-events:none}
+.a-slot .l{position:absolute;left:0;top:-3px;font:600 12px/1 var(--body);letter-spacing:0;white-space:nowrap;color:#fff;text-shadow:-1px 0 #131b1b,1px 0 #131b1b,0 -1px #131b1b,0 1px #131b1b;pointer-events:none}
 .a-slot.ok{box-shadow:inset 0 0 0 2px #5fd070,0 0 8px #5fd070}
 .a-slot.bad{box-shadow:inset 0 0 0 2px #d04a3a}
 .a-drop.ok{outline:2px dashed #5fd070;outline-offset:-3px;background:rgba(95,208,112,.08)}
@@ -211,38 +218,48 @@ const CSS = `
 @keyframes hbNew{0%,100%{box-shadow:0 0 0 0 rgba(176,122,222,0)}50%{box-shadow:0 0 12px 4px rgba(176,122,222,.9)}}
 .hb.hb-new{animation:hbNew .7s ease-in-out 4}
 @keyframes xpPulse{0%,100%{box-shadow:0 0 0 0 rgba(216,162,74,0)}50%{box-shadow:0 0 10px 3px rgba(216,162,74,.85)}}
-.a-btn{padding:0 8px;cursor:pointer;font:15px/20px var(--ui-font)}
+.a-btn{padding:2px 10px;cursor:pointer;font:16px/20px var(--body)}
 .a-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:3px 0}
-.a-note{font-size:15px;color:var(--dim)}
-.a-card{border:2px solid var(--ink);background:var(--wood-d);box-shadow:inset 0 0 0 2px #5a4e34;padding:6px 8px;margin:5px 0;display:flex;gap:8px;align-items:center}
+.a-note{font-size:16px;color:var(--dim)}
+.a-card{border:1px solid var(--iron);background:var(--wood-d);box-shadow:inset 0 0 0 1px var(--ink);padding:6px 8px;margin:5px 0;display:flex;gap:8px;align-items:center}
 .a-card img{width:36px;height:36px;image-rendering:pixelated;flex:none}
-.a-bar{height:10px;background:#1d1810;border:2px solid var(--ink);position:relative}
+.a-bar{height:10px;background:#0a0a0c;border:1px solid var(--iron);position:relative}
 .a-bar>div{height:100%}
-.a-doll{position:relative;width:324px;height:196px;margin:0 auto;background:radial-gradient(ellipse at 50% 60%,#5a5238 0%,#2d2a1f 75%);border:2px solid var(--ink);box-shadow:inset 0 0 0 2px #5a4e34}
+.a-doll{position:relative;width:324px;height:196px;margin:0 auto;background:radial-gradient(ellipse at 50% 60%,#33373e 0%,#15171a 80%);border:1px solid var(--iron);box-shadow:inset 0 0 0 1px var(--ink)}
 .a-doll .a-slot{position:absolute}
 .a-doll img.me{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:104px;image-rendering:pixelated;opacity:.95;pointer-events:none;object-fit:initial}
-.a-win input[type=range]{accent-color:#f06733}
-.a-win select{background:var(--wood-d);color:var(--txt);border:2px solid var(--ink);font-size:16px}
-.a-win input[type=text],.a-win input:not([type]){background:var(--wood-d);color:var(--txt);border:2px solid var(--ink)}
+.a-win input[type=range]{accent-color:#9aa1ad}
+.a-win select{background:var(--wood-d);color:var(--txt);border:1px solid var(--iron);font-size:16px}
+.a-win input[type=text],.a-win input:not([type]){background:var(--wood-d);color:var(--txt);border:1px solid var(--iron);font-size:16px}
 .hb{position:relative;width:52px;flex:0 1 auto;min-width:30px;height:52px;cursor:pointer}
-.hb .k{position:absolute;left:-3px;top:-5px;font:14px/1 var(--ui-font);color:#fff;text-shadow:-1px 0 #000,1px 0 #000,0 -1px #000,0 1px #000}
+.hb .k{position:absolute;left:-3px;top:-5px;font:600 14px/1 var(--body);color:#fff;text-shadow:-1px 0 #000,1px 0 #000,0 -1px #000,0 1px #000}
 .hb .cd{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.62)}
-.hb .c{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:20px var(--ui-font);color:#fff;text-shadow:-1px 0 #000,1px 0 #000,0 -1px #000,0 1px #000}
+.hb .c{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:20px var(--body);color:#fff;text-shadow:-1px 0 #000,1px 0 #000,0 -1px #000,0 1px #000}
 .hb.armed{box-shadow:inset 0 0 0 3px var(--gold),0 0 10px var(--gold)}
 .hb.nomana img{filter:grayscale(.8) brightness(.6)}
-.hb .cnt{position:absolute;right:-2px;bottom:-5px;font:14px/1 var(--ui-font);color:#fff;text-shadow:-1px 0 #000,1px 0 #000,0 -1px #000,0 1px #000}
+.hb .cnt{position:absolute;right:-2px;bottom:-5px;font:600 14px/1 var(--body);color:#fff;text-shadow:-1px 0 #000,1px 0 #000,0 -1px #000,0 1px #000}
 /* unten: Leben | Schnellleiste + XP | Mana */
 .hud>.pbar{width:150px;flex:0 1 auto;min-width:84px;margin-bottom:34px}
 #hud-tl{position:fixed;left:12px;top:12px;z-index:5;display:flex;align-items:stretch;gap:0;pointer-events:none}
-#hud-tl .face{width:76px;height:76px;image-rendering:pixelated;display:block;background:#17120f;box-shadow:inset 0 0 0 1px #4b3f3a}
+#hud-tl .face{width:76px;height:76px;image-rendering:pixelated;display:block;background:#101114;box-shadow:inset 0 0 0 1px var(--iron)}
 #hud-tl .hdr{display:flex;flex-direction:column;justify-content:center;min-width:168px;padding:0 4px 0 8px;gap:0}
-#hud-tl .nm{font-size:20px;line-height:1.1;color:var(--gold);text-shadow:0 2px var(--ink);max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#hud-tl .nm{font-family:var(--pix);font-size:20px;line-height:1.1;color:var(--title);text-shadow:0 2px var(--ink);max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #hud-tl .lv{font-size:16px;line-height:1.1;color:var(--txt);margin-bottom:2px}
 #hud-tl .clk{font-size:14px;line-height:1.1;color:#b8c4e8;text-shadow:0 1px var(--ink)}
 #hud-tl .clk.day{color:#e8d49a}
 #hud-tl .pbar{height:18px;margin:4px 5px 4px 3px}
 ${BAR_CSS}
+#chronik{pointer-events:none;position:fixed;z-index:4;left:12px;bottom:112px;width:380px;box-sizing:border-box;color:var(--txt);font:16px/1.4 var(--body);background:linear-gradient(90deg,rgba(14,15,18,.92),rgba(14,15,18,.85) 85%,transparent);border-left:2px solid var(--iron);text-shadow:0 1px 2px #000}
+#chronik .chr-hd{display:flex;justify-content:space-between;align-items:center;font-size:14px;color:var(--dim);padding:3px 8px;cursor:pointer;pointer-events:auto;user-select:none;min-height:24px}
+#chronik .chr-ln{padding:0 8px 6px;max-height:9.5em;overflow-y:auto;pointer-events:auto;overscroll-behavior:contain;scrollbar-width:thin}
+#chronik .chr-ln div{margin-top:2px}
+#chronik.zu .chr-ln{max-height:none;overflow:hidden;pointer-events:none}
+#chronik.zu .chr-ln div:not(:last-child){display:none}
+.c-dmg{color:var(--dmg-in)}.c-find{color:var(--gain)}.c-talk{color:var(--speech)}.c-sys{color:var(--dim)}.c-level{color:var(--title);font-weight:700}
 `;
+
+export type ChronikKind = 'sys' | 'hit' | 'dmg' | 'talk' | 'find' | 'level';
+const CHRONIK_MAX = 60;
 
 type Tab = 'inv' | 'char' | 'skills' | 'quests' | 'best' | 'ach' | 'set';
 type BagFilter = 'all' | 'weapon' | 'armor' | 'potion' | 'other';
@@ -296,7 +313,10 @@ export class Ui {
   private target = el('div');
   private statusBar = el('div');
   private statusKey = '';
+  /** Chronik unten links: Kopf zum Ein-/Ausklappen plus Zeilen (angehängt, höchstens CHRONIK_MAX) */
   private toast = el('div');
+  private chrLines = el('div', 'chr-ln');
+  private chrHead = el('div', 'chr-hd');
   private bannerEl = el('div');
   private tracker = el('div');
   private trackerKey = '';
@@ -307,8 +327,6 @@ export class Ui {
   private hintEl = el('div', '', 'Gespeichert');
   private hintTimer = 0;
   private tip = el('div');
-  private msgs: string[] = [];
-  private toastTimer = 0;
   private key = '';
   private hotKey = '';
   private armedId: string | null = null;
@@ -367,7 +385,7 @@ export class Ui {
     this.hotbar.style.cssText = 'display:flex;gap:4px;pointer-events:auto;min-height:56px;align-items:flex-end;justify-content:center';
     this.xpBar.style.cssText = 'width:100%;min-width:300px;position:relative;height:16px;box-sizing:border-box';
     this.xpFill.style.cssText = 'background:linear-gradient(180deg,#ffe27a 0 2px,#e8b832 2px calc(100% - 3px),#9a7a1a calc(100% - 3px))';
-    this.xpText.style.cssText = 'position:absolute;inset:-2px 4px 0;text-align:center;font:14px var(--ui-font);color:#fff;text-shadow:-1px 0 #131b1b,1px 0 #131b1b,0 -1px #131b1b,0 1px #131b1b;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+    this.xpText.style.cssText = 'position:absolute;inset:-2px 4px 0;text-align:center;font:600 14px var(--body);color:#fff;text-shadow:-1px 0 #131b1b,1px 0 #131b1b,0 -1px #131b1b,0 1px #131b1b;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
     this.xpBar.append(this.xpFill, this.xpText);
     this.statusBar.style.cssText = 'display:flex;gap:4px;min-height:20px;pointer-events:none';
     mid.append(this.statusBar, this.hotbar, this.xpBar);
@@ -376,23 +394,23 @@ export class Ui {
     this.buildPortrait();
 
     this.target.className = 'w-frame';
-    this.target.style.cssText = 'position:fixed;z-index:4;left:50%;top:8px;transform:translateX(-50%);--bw:6px;font:15px var(--ui-font);padding:0 8px;display:none;text-align:center;min-width:160px;max-width:min(560px,60vw)';
-    this.toast.style.cssText = 'position:fixed;z-index:4;left:12px;bottom:112px;width:420px;color:#f1e6c8;font:15px/1.3 var(--ui-font);pointer-events:none;text-shadow:0 1px 2px #000,0 0 4px #000';
-    this.tracker.style.cssText = 'position:fixed;right:12px;top:calc(var(--mm-h) + 12px);max-width:260px;text-align:right;color:#f1e6c8;font:15px var(--ui-font);text-shadow:0 1px 4px #000,0 0 2px #000;background:rgba(29,24,16,.7);border-right:3px solid #f06733;padding:6px 10px;pointer-events:auto;z-index:5;display:none';
-    this.bannerEl.style.cssText = 'position:fixed;left:50%;top:70px;transform:translateX(-50%);color:#e8d9b0;font:28px var(--ui-font);text-shadow:0 2px 8px #000,0 0 2px #000;letter-spacing:1.5px;opacity:0;transition:opacity .6s;pointer-events:none;z-index:6;text-align:center';
+    this.target.style.cssText = 'position:fixed;z-index:4;left:50%;top:8px;transform:translateX(-50%);--bw:6px;font:16px var(--body);padding:2px 8px;display:none;text-align:center;min-width:160px;max-width:min(560px,60vw)';
+    this.buildChronik();
+    this.tracker.style.cssText = 'position:fixed;right:12px;top:calc(var(--mm-h) + 12px);max-width:260px;text-align:right;color:var(--txt);font:16px var(--body);text-shadow:0 1px 4px #000,0 0 2px #000;background:rgba(21,23,26,.82);border-right:3px solid var(--iron);padding:6px 10px;pointer-events:auto;z-index:5;display:none';
+    this.bannerEl.style.cssText = 'position:fixed;left:50%;top:70px;transform:translateX(-50%);color:var(--title);font:28px var(--pix);text-shadow:0 2px 8px #000,0 0 2px #000;letter-spacing:1.5px;opacity:0;transition:opacity .6s;pointer-events:none;z-index:6;text-align:center';
     this.tip.className = 'w-frame tipbox';
-    this.tip.style.cssText = 'position:fixed;z-index:50;max-width:290px;--bw:8px;background:#26221a;font:14px/1.4 var(--ui-font);padding:4px 6px;pointer-events:none;display:none;box-shadow:0 4px 16px #000';
-    this.hintEl.style.cssText = 'position:fixed;left:12px;top:calc(var(--tl-h) + 20px);z-index:5;color:#a8d8a0;font:14px var(--ui-font);text-shadow:0 1px 3px #000;opacity:0;transition:opacity .5s;pointer-events:none';
+    this.tip.style.cssText = 'position:fixed;z-index:50;max-width:290px;--bw:8px;font:16px/1.45 var(--body);padding:4px 6px;pointer-events:none;display:none;box-shadow:0 4px 16px #000';
+    this.hintEl.style.cssText = 'position:fixed;left:12px;top:calc(var(--tl-h) + 20px);z-index:5;color:#a8d8a0;font:16px var(--body);text-shadow:0 1px 3px #000;opacity:0;transition:opacity .5s;pointer-events:none';
     if (isTouch) {
       this.tracker.onclick = (e) => {
         if ((e.target as HTMLElement).closest('button')) return;
         this.trackerOpen = !this.trackerOpen;
         this.trackerKey = '';
       };
-      Object.assign(this.toast.style, { width: '26vw', bottom: '84px', font: '13px/1.25 var(--ui-font)' });
       this.tracker.style.top = 'max(8px,env(safe-area-inset-top))';
       this.tracker.style.right = 'max(8px,env(safe-area-inset-right))';
       this.bannerEl.style.fontSize = '20px';
+      this.target.style.maxWidth = '36vw';
       Object.assign(this.xpBar.style, { minWidth: '0', width: '100%', height: '12px' });
       this.hud.id = 't-hud';
       this.hotbar.classList.add('t-hot');
@@ -471,7 +489,7 @@ export class Ui {
     this.armedId = id;
   }
 
-  banner(text: string, color = '#e8d9b0'): void {
+  banner(text: string, color = '#e6dfcc'): void {
     this.bannerEl.textContent = text;
     this.bannerEl.style.color = color;
     this.bannerEl.style.opacity = '1';
@@ -479,15 +497,44 @@ export class Ui {
     this.bannerTimer = window.setTimeout(() => (this.bannerEl.style.opacity = '0'), 2800);
   }
 
-  say(m: string): void {
-    this.msgs.push(m);
-    this.msgs = this.msgs.slice(isTouch ? -3 : -6);
-    this.toast.replaceChildren(...this.msgs.map((t) => el('div', '', t)));
-    // Handy: Meldungen verschwinden nach einigen Sekunden, sonst blockieren sie dauerhaft die linke Bildschirmseite
-    if (isTouch) {
-      window.clearTimeout(this.toastTimer);
-      this.toastTimer = window.setTimeout(() => this.say2(), 6000);
-    }
+  /** Chronik anlegen: eingeklappt am Handy, sonst offen. */
+  private buildChronik(): void {
+    this.toast.id = 'chronik';
+    if (isTouch) this.toast.classList.add('zu');
+    const lbl = el('span', '', 'Chronik');
+    const tog = el('span', '', '');
+    const sync = (): void => {
+      const zu = this.toast.classList.contains('zu');
+      tog.textContent = zu ? '▸ ausklappen' : '▾ einklappen';
+      this.chrHead.setAttribute('aria-expanded', String(!zu));
+      if (!zu) this.chrLines.scrollTop = this.chrLines.scrollHeight;
+    };
+    this.chrHead.append(lbl, tog);
+    this.chrHead.tabIndex = 0;
+    this.chrHead.setAttribute('role', 'button');
+    const flip = (): void => {
+      this.toast.classList.toggle('zu');
+      sync();
+    };
+    this.chrHead.onclick = flip;
+    this.chrHead.onkeydown = (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        flip();
+      }
+    };
+    this.chrLines.setAttribute('role', 'log');
+    this.chrLines.setAttribute('aria-live', 'polite');
+    this.toast.append(this.chrHead, this.chrLines);
+    sync();
+  }
+
+  /** Eine Zeile in die Chronik hängen (nie neu aufbauen: Anhängen, alte vorne abschneiden). */
+  say(m: string, kind: ChronikKind = 'sys'): void {
+    const d = el('div', `c-${kind}`, m);
+    this.chrLines.append(d);
+    while (this.chrLines.childElementCount > CHRONIK_MAX) this.chrLines.firstElementChild?.remove();
+    this.chrLines.scrollTop = this.chrLines.scrollHeight;
   }
 
   /** Gerahmtes Hinweisfenster (Holzrahmen, Pixelschrift) mit „Verstanden“; ersetzt lange Willkommenstexte im Meldungsprotokoll. */
@@ -495,7 +542,7 @@ export class Ui {
     const win = el('div', 'w-frame');
     win.style.cssText = 'position:fixed;z-index:6;left:50%;top:22%;transform:translateX(-50%);width:min(440px,86vw);padding:6px 12px 10px;--bw:10px;pointer-events:auto';
     const h = el('div', '', title);
-    h.style.cssText = 'color:var(--gold);font-size:22px;margin-bottom:6px;text-align:center';
+    h.style.cssText = 'color:var(--title);font-family:var(--pix);font-size:22px;margin-bottom:6px;text-align:center';
     win.append(h, ...lines.map((t) => {
       const d = el('div', '', t);
       d.style.cssText = 'margin:6px 0;line-height:1.3';
@@ -506,12 +553,6 @@ export class Ui {
     ok.onclick = () => win.remove();
     win.append(ok);
     document.body.append(win);
-  }
-
-  private say2(): void {
-    this.msgs.shift();
-    this.toast.replaceChildren(...this.msgs.map((t) => el('div', '', t)));
-    if (this.msgs.length) this.toastTimer = window.setTimeout(() => this.say2(), 2500);
   }
 
   /* -------------------------------------------------------------- HUD */
@@ -642,7 +683,7 @@ export class Ui {
       row.append(title, goal);
       this.tracker.append(row);
     }
-    if (act.length > shown.length) { const more = el('div', '', `+${act.length - shown.length} weitere (J)`); more.style.cssText = 'opacity:.6;font-size:14px'; this.tracker.append(more); }
+    if (act.length > shown.length) { const more = el('div', '', `+${act.length - shown.length} weitere (J)`); more.style.cssText = 'opacity:.75;font-size:16px'; this.tracker.append(more); }
   }
 
   private updateHud(p: Actor, t?: Actor): void {
@@ -889,7 +930,7 @@ export class Ui {
       const t = templateById(it.templateId);
       const base = t.base?.length ?? 0;
       const q = el('div');
-      q.style.cssText = 'margin-top:4px;font-size:13px';
+      q.style.cssText = 'margin-top:4px;font-size:16px';
       it.affixes.slice(base).forEach((a) => {
         let line: HTMLElement;
         if (it.named || it.unique) {
@@ -920,7 +961,7 @@ export class Ui {
     }
     if (it.sockets?.length) {
       const sk = el('div');
-      sk.style.cssText = 'margin-top:4px;font-size:13px';
+      sk.style.cssText = 'margin-top:4px;font-size:16px';
       for (const g of it.sockets) {
         const line = el('div', '', g ? `◆ ${gemName(g)}: ${gemEffect(g, it.slot)}` : '◇ leerer Sockel');
         line.style.color = g ? `#${GEM_COLOR[g.kind].toString(16).padStart(6, '0')}` : '#7a6a58';
@@ -946,7 +987,7 @@ export class Ui {
       const a = this.statsOf(it);
       const b = this.statsOf(equipped);
       const h = el('div', '', `Verglichen mit: ${equipped.name}`);
-      h.style.cssText = 'margin-top:6px;border-top:1px solid #4b3f3a;padding-top:4px;opacity:.7';
+      h.style.cssText = 'margin-top:6px;border-top:1px solid var(--iron);padding-top:4px;opacity:.7';
       box.append(h);
       // Gesamturteil: grobe Wertung beider Stücke (Effekte zählen mit ihrer Stärke)
       const sa = gearScore(it);
@@ -957,7 +998,7 @@ export class Ui {
       box.append(verdict);
       if (it.power?.id !== equipped.power?.id && (it.power || equipped.power)) {
         const eff = el('div', '', `Effekt: ${equipped.power ? POWER_TEXT[equipped.power.id](equipped.power.value) : 'keiner'} → ${it.power ? POWER_TEXT[it.power.id](it.power.value) : 'keiner'}`);
-        eff.style.cssText = 'color:#e8c888;font-size:13px';
+        eff.style.cssText = 'color:#e8c888;font-size:16px';
         box.append(eff);
       }
       for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
@@ -1112,9 +1153,17 @@ export class Ui {
     const tabs = el('div', 'a-tabs');
     for (const [id, label] of ([['inv', 'Inventar', 'inv'], ['char', 'Charakter', 'char'], ['skills', 'Fertigkeiten', 'skills'], ['quests', 'Aufgaben', 'quests'], ['best', 'Bestiarium', 'bestiary'], ['ach', 'Erfolge', 'ach'], ['set', 'Einstellungen', 'settings']] as [Tab, string, Parameters<typeof keyOf>[0]][]).map(([id, name, act]): [Tab, string] => [id, isTouch ? name : `${name} (${keyLabel(keyOf(act))})`])) {
       const t = el('div', `a-tab${this.tab === id ? ' on' : ''}`, label);
+      t.tabIndex = 0;
+      t.setAttribute('role', 'tab');
       t.onclick = () => {
         this.tab = id;
         this.key = '';
+      };
+      t.onkeydown = (ev) => {
+        if (ev.key === 'Enter' || ev.key === ' ') {
+          ev.preventDefault();
+          t.click();
+        }
       };
       tabs.append(t);
     }
@@ -1130,7 +1179,7 @@ export class Ui {
       this.renderHunts(body, p);
     }
     const toNpc = isTouch && this.sideShown ? [Object.assign(el('span', 'a-x', 'Händler'), { onclick: () => { this.touchMain = false; this.sel = null; this.key = ''; this.layout(); } })] : [];
-    for (const b of toNpc) b.style.cssText = 'font-size:15px;padding:0 10px;display:flex;align-items:center;border-left:1px solid #4b3f3a';
+    for (const b of toNpc) b.style.cssText = 'font-size:16px;padding:0 10px;display:flex;align-items:center;border-left:1px solid var(--iron)';
     const title = titleBar(`${p.name}${p.title ? ` „${p.title}“` : ''} · Stufe ${p.level}`, this.main, () => this.toggle(false), toNpc);
     this.main.replaceChildren(...[title, tabs, body, this.selPanel(p)].filter((x): x is HTMLElement => !!x));
   }
@@ -1583,7 +1632,7 @@ export class Ui {
         const bar = hotbarFor(p);
         const sel = document.createElement('select');
         sel.title = 'Platz auf der Schnellleiste';
-        sel.style.cssText = 'background:#1a1620;color:#fff;border:1px solid #4b3f3a;border-radius:3px;margin-left:8px';
+        sel.style.cssText = 'background:#1a1620;color:#fff;border:1px solid var(--iron);border-radius:3px;margin-left:8px';
         const none = document.createElement('option');
         none.value = '';
         none.textContent = 'Leiste: –';
@@ -1690,7 +1739,7 @@ export class Ui {
         ...LEGENDARIES.filter((l) => l.source && bosses.has(l.source)).map((l) => ({ id: l.id, level: l.minLevel, item: () => generateLegendary(new Rng(1), -1, l.id), slot: SLOT_NAME[templateById(l.base).slot as EquipSlot] ?? '' })),
       ].sort((a, b) => a.level - b.level);
       const list = el('div');
-      list.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:4px;font-size:13px';
+      list.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:4px;font-size:16px';
       for (const d of drops) {
         if (!found.has(d.id)) {
           list.append(el('span', 'a-note', `??? · ${d.slot} · St. ${d.level}`));
@@ -1889,7 +1938,7 @@ export class Ui {
         const s = this.slotEl(fake);
         const block = buyBlock(p, id);
         const price = el('div', 'n', block ? `Stufe ${reqOfTemplate(t).level}` : `${buyPrice(id)}g`);
-        price.style.color = !block && p.gold >= buyPrice(id) ? '#ffd84a' : '#ff7a6a';
+        price.style.color = !block && p.gold >= buyPrice(id) ? 'var(--gain)' : '#ff7a6a';
         if (block) {
           s.style.opacity = '0.55';
           s.title = block;
@@ -1921,7 +1970,7 @@ export class Ui {
     if (merchants.length) {
       const sell = el('div', 'a-card a-drop');
       sell.dataset.drop = 'sell';
-      sell.style.cssText += ';justify-content:center;height:46px;border-style:dashed;color:#ffd84a';
+      sell.style.cssText += ';justify-content:center;height:46px;border-style:dashed;color:var(--gain)';
       sell.textContent = 'Zum Verkaufen Gegenstand hierher ziehen';
       body.append(sell);
       const bulk = el('div', 'a-note');
@@ -2096,7 +2145,7 @@ export class Ui {
       if (locked) body.append(el('div', 'a-note', `Weitere Aufgaben (${locked}) folgen, sobald die vorherige erledigt ist.`));
     }
     const toBag = isTouch ? [Object.assign(el('span', 'a-x', 'Rucksack'), { onclick: () => { this.touchMain = true; this.sel = null; this.key = ''; this.layout(); } })] : [];
-    for (const b of toBag) b.style.cssText = 'font-size:15px;padding:0 10px;display:flex;align-items:center;border-left:1px solid #4b3f3a';
+    for (const b of toBag) b.style.cssText = 'font-size:16px;padding:0 10px;display:flex;align-items:center;border-left:1px solid var(--iron)';
     const title = titleBar(near.map((n) => n.name).join(' · '), this.side, () => {
       this.sideClosed = near.map((n) => n.id).join(',');
       this.sideShown = false;
@@ -2118,8 +2167,7 @@ export class Ui {
         continue;
       }
       const ask = canAsk(n.name, part.key, p.topics);
-      const b = el(ask ? 'button' : 'span', 'a-kw', part.label);
-      b.style.cssText += `;color:#ffd84a;font:inherit;font-style:normal;border:0;border-bottom:1px dotted #ffd84a;background:rgba(255,216,74,.1);padding:0 3px;margin:0 1px;${ask ? 'cursor:pointer' : 'opacity:.7'}`;
+      const b = el(ask ? 'button' : 'span', ask ? 'a-kw' : 'a-kw off', part.label);
       if (ask) b.onclick = () => this.askTopic(n, part.key);
       out.append(b);
     }
@@ -2128,6 +2176,10 @@ export class Ui {
 
   private askTopic(n: Npc, key: string): void {
     this.topicView = { npcId: n.id, key };
+    // Antwort in die Chronik (nur, wenn der Spieler sie wirklich hört: bekannt und weit genug)
+    const ans = answerOf(n.name, key);
+    const p = this.lastP;
+    if (ans && p && canAsk(n.name, key, p.topics) && p.level >= (ans.minLevel ?? 1)) for (const t of ans.text) this.say(`${n.name}: „${stripMarks(t)}“`, 'talk');
     this.send({ type: 'askTopic', npcId: n.id, topic: key });
     this.key = '';
   }
@@ -2142,9 +2194,9 @@ export class Ui {
     if (view) {
       const ans = answerOf(n.name, view);
       const card = el('div');
-      card.style.cssText = 'margin-top:6px;padding:6px 8px;border-left:3px solid #ffd84a;background:rgba(255,216,74,.06)';
+      card.style.cssText = 'margin-top:6px;padding:6px 8px;border-left:3px solid var(--link);background:rgba(229,154,92,.06)';
       const hd = el('div', '', `„${keywordLabel(view)}“`);
-      hd.style.cssText = 'color:#ffd84a;font-weight:bold;margin-bottom:3px';
+      hd.style.cssText = 'color:var(--link);font-weight:bold;margin-bottom:3px';
       card.append(hd);
       if (!ans) card.append(el('i', 'a-note', `${n.name} weiß darüber nichts.`));
       else if (!canAsk(n.name, view, p.topics)) card.append(el('i', 'a-note', 'Von diesem Stichwort hast du noch nie gehört.'));
@@ -2172,7 +2224,7 @@ export class Ui {
       for (const k of heard) {
         const knows = !!answerOf(n.name, k);
         const b = el('button', 'a-kw', keywordLabel(k));
-        b.style.cssText += `;margin:2px 4px 0 0;color:#ffd84a;font:inherit;border:1px solid #6a5a2a;background:rgba(255,216,74,.1);padding:0 6px;cursor:pointer;${knows ? '' : 'opacity:.55'}`;
+        b.style.cssText += `;margin:2px 4px 0 0;${knows ? '' : 'opacity:.6'}`;
         b.onclick = () => (knows ? this.askTopic(n, k) : ((this.topicView = { npcId: n.id, key: k }), (this.key = '')));
         row.append(b);
       }
@@ -2192,7 +2244,7 @@ export class Ui {
     row.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px';
     for (const k of p.topics) {
       const chip = el('span', 'a-note', keywordLabel(k));
-      chip.style.cssText += ';color:#ffd84a;border:1px solid #6a5a2a;padding:0 6px;border-radius:3px';
+      chip.style.cssText += ';color:var(--link);border:1px solid var(--iron);padding:0 6px';
       row.append(chip);
     }
     body.append(row, el('div', 'a-note', 'Tipp: Stichworte aus einem Gespräch kannst du bei jedem anderen unter „Gehörtes ansprechen“ erfragen.'));

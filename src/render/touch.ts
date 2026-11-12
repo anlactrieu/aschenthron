@@ -20,9 +20,9 @@ html.touch #game{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh}
 html.touch canvas{display:block}
 html.touch .hb,html.touch .pbar,html.touch .a-tab,html.touch .a-tabs,html.touch .a-slot,html.touch .a-x,html.touch .a-btn{touch-action:manipulation}
 html.touch input,html.touch textarea{-webkit-user-select:text;user-select:text}
-/* Fenster: rechts, volle Höhe, Spielwelt links bleibt sichtbar; nicht verschiebbar, dafür einklappbar */
-html.touch{--bw:6px;--cw:4px;--tl-h:58px}
-html.touch .a-win{zoom:1;position:fixed;display:none;flex-direction:column;top:max(6px,env(safe-area-inset-top))!important;bottom:max(6px,env(safe-area-inset-bottom));right:max(6px,env(safe-area-inset-right))!important;left:auto!important;width:min(560px,max(60vw,430px))!important;max-width:calc(100vw - 12px);max-height:none;font-size:16px}
+/* Fenster: rechts neben Porträt und Chronik, links der Bedienleiste, über der Schnellleiste; nicht verschiebbar, dafür einklappbar */
+html.touch{--bw:6px;--cw:3px;--tl-h:58px;--tl-gap:max(8px,env(safe-area-inset-left))}
+html.touch .a-win{zoom:1;position:fixed;display:none;flex-direction:column;top:max(6px,env(safe-area-inset-top))!important;bottom:78px;right:auto!important;left:calc(var(--tl-gap) + 182px)!important;width:calc(100vw - var(--tl-gap) - 182px - 92px - max(8px,env(safe-area-inset-right)) - 2*var(--bw))!important;max-width:none;max-height:none;font-size:16px}
 html.touch .a-win.a-min{bottom:auto}
 html.touch .a-win.a-min>*:not(h3){display:none!important}
 html.touch .a-win h3{cursor:default;padding:0 0 0 10px;min-height:44px;flex:none}
@@ -30,13 +30,14 @@ html.touch .a-win h3 .a-x{display:flex;align-items:center;justify-content:center
 html.touch .a-win h3 .a-x.a-fold{border-left:2px solid var(--ink)}
 html.touch .a-tabs{flex-wrap:nowrap;overflow-x:auto;flex:none;scrollbar-width:none}
 html.touch .a-tabs::-webkit-scrollbar{display:none}
-html.touch .a-tab{flex:none;padding:0 14px;min-height:44px;display:flex;align-items:center;white-space:nowrap;font-size:15px}
+html.touch .a-tab{flex:none;padding:0 14px;min-height:44px;display:flex;align-items:center;white-space:nowrap;font-size:16px}
 html.touch .a-body{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain}
 html.touch .a-btn{min-height:40px;padding:6px 14px;font-size:16px}
+html.touch .a-kw{min-height:40px;padding:8px 4px;box-sizing:border-box}
 html.touch .a-doll{max-width:100%}
-html.touch .a-sel{flex:none;max-height:46%;overflow-y:auto;border-top:3px solid #f06733;background:#26221a;padding:8px 10px;font:15px/1.4 var(--ui-font);touch-action:pan-y}
-html.touch .a-sel .a-acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;position:sticky;bottom:-8px;background:#26221a;padding:6px 0 8px;text-transform:none}
-html.touch .a-slot.sel{outline:2px solid #ffd86a;outline-offset:1px}
+html.touch .a-sel{flex:none;max-height:46%;overflow-y:auto;border-top:3px solid var(--iron);background:var(--wood-d);padding:8px 10px;font:16px/1.4 var(--ui-font);touch-action:pan-y}
+html.touch .a-sel .a-acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;position:sticky;bottom:-8px;background:var(--wood-d);padding:6px 0 8px;text-transform:none}
+html.touch .a-slot.sel{outline:2px solid var(--title);outline-offset:1px}
 html.touch .a-x{min-height:44px}
 /* HUD kleiner, Tippflächen bleiben >= 44 px */
 html.touch .pbar{height:18px;margin:4px}
@@ -57,6 +58,11 @@ html.touch .t-hot{flex-wrap:wrap;justify-content:center;gap:2px!important}
 html.touch .hb .k{font-size:12px}
 html.touch .hb .c{font-size:15px}
 html.touch .hb .cnt{font-size:13px}
+/* Chronik: linke Spalte unter Porträt und Karte, über Leben-Leiste; eingeklappt eine Zeile */
+html.touch #chronik{left:var(--tl-gap);bottom:52px;width:174px;font-size:16px;line-height:1.3}
+html.touch #chronik .chr-hd{min-height:40px;padding:0 8px;font-size:14px}
+html.touch #chronik .chr-ln{max-height:7em}
+html.touch #chronik.zu .chr-ln{max-height:none}
 /* Bedienleiste unten rechts */
 #t-bar{position:fixed;z-index:8;right:max(8px,env(safe-area-inset-right));bottom:max(8px,env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:flex-end;gap:6px}
 #t-bar .t-btn,#t-menu .t-btn{min-width:48px;min-height:48px;padding:0 10px;font:16px var(--ui-font);touch-action:manipulation}
@@ -71,7 +77,7 @@ html.touch .tr-fold>div:first-child .a-btn{display:none}
 html.touch .tr-fold::after{content:'▾ mehr';display:block;font-size:13px;opacity:.7}
 html.touch .tr-open::after{content:'▴ weniger';display:block;font-size:13px;opacity:.7}
 /* Querformat-Hinweis */
-#t-rot{position:fixed;inset:0;z-index:200;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#0b0a0d;color:#e8d9b0;font:20px var(--ui-font);text-align:center;padding:24px}
+#t-rot{position:fixed;inset:0;z-index:200;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#0b0a0d;color:var(--title);font:20px var(--ui-font);text-align:center;padding:24px}
 #t-rot b{font-size:44px}
 @media (orientation:portrait){html.touch #t-rot{display:flex}}
 `;

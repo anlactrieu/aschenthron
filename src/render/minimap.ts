@@ -1,7 +1,6 @@
 import type { World } from '../sim/world';
 import { uniqueDef } from '../sim/data';
 import { isTouch } from './touch';
-import { NINJA_BASE } from './ninja';
 
 /** Farben je gid, aus der Palette der Code-Welt (world/ground.ts, props.ts, houses.ts), eine Stufe heller für die kleine Karte */
 const COLORS: Record<number, string> = {
@@ -47,8 +46,9 @@ export class Minimap {
     b.imageSmoothingEnabled = true;
     b.imageSmoothingQuality = 'high';
     b.drawImage(big, 0, 0, this.base.width, this.base.height);
+    this.view.classList.add('w-frame');
     Object.assign(this.view.style, {
-      position: 'fixed', right: '12px', top: '12px', border: '10px solid transparent', borderImage: `url("${NINJA_BASE}Ui/Theme/Theme%20Wood/nine_path_panel.png") 5 / 10px stretch`, background: '#0a1220', backgroundClip: 'padding-box',
+      position: 'fixed', right: '12px', top: '12px',
       imageRendering: 'pixelated', opacity: '0.88', pointerEvents: 'none', zIndex: '3',
     } as Partial<CSSStyleDeclaration>);
     document.body.appendChild(this.view);
@@ -64,8 +64,7 @@ export class Minimap {
       this.view.style.right = 'auto';
       this.view.style.left = 'max(8px,env(safe-area-inset-left))';
       this.view.style.top = 'calc(max(8px,env(safe-area-inset-top)) + var(--tl-h) + 4px)';
-      this.view.style.borderWidth = '6px';
-      this.view.style.borderImageWidth = '6px';
+      this.view.style.setProperty('--bw', '6px');
       this.view.style.pointerEvents = 'auto';
       this.view.onclick = () => {
         if (this.sizeIdx === 2) this.sizeIdx = 0;
