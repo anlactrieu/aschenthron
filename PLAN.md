@@ -39,6 +39,9 @@ Aschenthron soll sich anfühlen wie T4C / D4O, ohne etwas daraus zu kopieren (Re
 5. **Wandhöhe (2026-11-11):** 40 (`WALL_H` in `isoWalls.ts`), umgesetzt.
 6. **Oberfläche (2026-11-11):** Variante A „Schiefer und Eisen“, Vorlage `docs/probe/t3-oberflaeche.html` (Klasse `.va`).
 
+7. **Grundsatz (2026-11-12, gilt für alles Künftige):** Es soll sich nach T4C anfühlen, aber besser, modern und für heutige Spieler. Bewährtes übernehmen, nichts erzwingen, kein Klon. Jedes neue System muss zum ganzen Spiel passen.
+8. **Wiedergeburt (2026-11-12, ersetzt den ersten Teil von 4):** keine Rückkehr auf Stufe 1, keine Flügel. Der Nutzer hat die Entscheidung der Hauptsession übergeben; Begründung und Ersatz stehen unter T7. Reihenfolge bleibt: erst T7, dann zweite Insel.
+
 Damit ist die offene Entscheidung 7 (Wegweiser) aus `SPEC.md` erledigt. Offen bleiben 6 (Fertigkeiten als trainierte Zahlenwerte) und `BASIC_TEMPO`.
 
 ## Pakete
@@ -81,10 +84,18 @@ Regeln für alle: eigener Worktree-Branch von `neuer-look`; Prüfung `npx tsc --
 - Sheet-Cache verwirft genutzte Texturen (`heroSheet.ts`, `monsterSheet.ts`), Aufploppen frischer Gegner, gerades Band der Frostnova, dazu ein `/code-review` über den ganzen P9-Diff.
 - Fertig, wenn ein Schwarmtod mit 8 Gegnern ohne Einfrieren läuft und die Review-Befunde behoben oder begründet abgelehnt sind.
 
-### T7 Wiedergeburt (Regeln: Hauptsession mit Nutzer; Umsetzung: Sonnet, Skill `tdd`)
-- Prinzip: Auf Stufe 30 kann man nach einer Auftragskette neu bei Stufe 1 beginnen, mit dauerhaftem Bonus und einem sichtbaren Zeichen an der Figur. Eigenes Motiv aus der Aschenthron-Welt (zum Beispiel ein Aschenmal oder Glutkranz), keine Flügel.
-- Vorher mit dem Nutzer klären (`AskUserQuestion`, Ergebnis hier eintragen): was bleibt (Ausrüstung, Gold, Fertigkeiten, Notizbuch), Höhe des Bonus, Zahl der Wiedergeburten, Titel.
-- Dateien: `src/sim/data.ts`, `world.ts`, `save.ts`, `quests.ts`, `ui.ts`, Figur in `src/render/hero.ts`.
+### T7 Nachspiel „Die Asche ruft“ statt Wiedergeburt (Regeln entschieden 2026-11-12; Umsetzung: Sonnet, Skill `tdd`)
+- **Warum keine Rückkehr auf Stufe 1:** Ein Durchgang dauert im Median rund 22 h. Die Welt ist handgebaut und lebt vom Entdecken über Worte (kein Wegweiser, 13 versteckte Truhen, feste Beute): beim zweiten Mal ist alles bekannt, es bliebe reine Wiederholung. In T4C trug die Wiedergeburt, weil andere Spieler den Status sahen und Attributpunkte knapp waren; hier gibt es Umlernen gegen Gold schon. Erzwungenes Neuspielen bewährt sich nur bei zufälliger Welt oder Beute, beides wurde hier bewusst abgebaut.
+- **Was aus der Wiedergeburt bleibt (der bewährte Kern):** ein Ziel nach Stufe 30, ein Grund, alte Orte neu zu besuchen, ein sichtbares Zeichen.
+- **Regeln:**
+  1. Auslöser: Tod des Aschenkönigs (`ash_king`). Stufe 30 bleibt die Grenze, nichts wird zurückgesetzt, kein Attributbonus.
+  2. Danach erwachen die 7 übrigen Bosse (`goblin_king` bis `web_mother`) an ihren Orten neu, auf Stufe 30 und mit je einer zusätzlichen Fähigkeit. Jeder trägt genau einen eigenen benannten Fund (7 neue Einträge in `named.ts`, Stufe 30, quer über die Slots). Erwachte Bosse erscheinen nur für Figuren, die den König besiegt haben; im Mehrspieler entscheidet der Angreifer mit dem höchsten Stand.
+  3. Auffinden nur über Worte: Maren bekommt das Stichwort „asche“, je Boss ein Gerücht mit Himmelsrichtung und Landmarke bei einem passenden NPC (Muster `TRUHEN` in `topicsData.ts`, Test wie `wegweiser.test.ts`). Neue Auftragskette „Die Asche ruft“ (7 Schritte, Reihenfolge frei, `hidden` für den Auto-Start).
+  4. Zeichen: Aschenmal, glimmende Risse an der Figur, sichtbar ab dem Sieg über den König, voll ausgeprägt nach allen 7. Nachts schwach leuchtend. Kein Kranz, keine Flügel.
+  5. Titel: „Erbe der Asche“ (König besiegt), „Der die Asche zum Schweigen brachte“ (alle 7). Eintrag ins Bestiarium je erwachtem Boss.
+- **Bewusst nicht:** höhere Stufengrenze, härtere Gesamtwelt, Punktebonus, Vererbung an neue Figuren. Das meiste davon gehört, wenn überhaupt, zur zweiten Insel.
+- Dateien: `src/sim/data.ts`, `named.ts`, `world.ts`, `save.ts`, `quests.ts`, `topicsData.ts`, `ui.ts`, Figur in `src/render/hero.ts`.
+- Fertig, wenn ein Stufe-30-Stand nach dem König alle 7 erwachten Bosse über Gerüchte findet, das Zeichen im Browser gesehen wurde und alte Spielstände unverändert laden. Pace bis Stufe 30 darf sich nicht verschieben (keine neuen Zufallswürfe vor dem Königstod).
 
 ### T8 Zweite Insel (später, eigene SPEC)
 - Entspricht P8 in `SPEC.md` (Details in `docs/archiv/SPEC-bis-2026-11-11.md`). Erst nach T7, mit eigener Klärungsrunde.
