@@ -1,4 +1,4 @@
-import { monsterKind, migrateXpV1, XP_VERSION, milestonePoints, ATTR_KEYS, MAP_VERSION, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, questById, skillById, totalXpFor, LOOT_GROUPS, LEVEL_TITLES } from './data';
+import { monsterKind, migrateXpV1, XP_VERSION, milestonePoints, ATTR_KEYS, MAP_VERSION, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, questById, skillById, totalXpFor, LOOT_GROUPS, LEVEL_TITLES, ASH_KING, ASH_TITLES, AWAKENED } from './data';
 import { NAMED } from './named';
 import { KEYWORDS } from './topics';
 import { isWalkable } from './path';
@@ -7,7 +7,7 @@ import { maxHpOf, maxManaOf, type Actor, type World } from './world';
 
 const KEYS = [
   'x', 'y', 'hp', 'mana', 'level', 'xp', 'statPoints', 'attrs', 'gold', 'skills', 'inventory', 'equipment', 'stash', 'maxHp', 'quests', 'skillRanks', 'skillPoints', 'freeRespec', 'spec', 'bounties', 'bountyDay',
-  'kills', 'found', 'titles', 'title', 'topics',
+  'kills', 'found', 'titles', 'title', 'topics', 'ash',
 ] as const;
 
 
@@ -134,12 +134,22 @@ export function importPlayer(w: World, p: Actor, json: string): boolean {
     const knownFind = (id: unknown): id is string => typeof id === 'string' && (NAMED.some((d) => d.id === id) || LEGENDARIES.some((d) => d.id === id));
     const owned = [...p.inventory, ...p.stash, ...Object.values(p.equipment)].map((i) => i!.named ?? i!.unique);
     p.found = [...new Set([...(Array.isArray(s.found) ? s.found : []), ...owned].filter(knownFind))];
-    const allTitles = new Set([...Object.values(LEVEL_TITLES), ...LOOT_GROUPS.flatMap((g) => g.titles)]);
+    const allTitles = new Set([...Object.values(LEVEL_TITLES), ...LOOT_GROUPS.flatMap((g) => g.titles), ...ASH_TITLES]);
     p.titles = [...new Set(Array.isArray(s.titles) ? s.titles.filter((t): t is string => typeof t === 'string' && allTitles.has(t)) : [])];
     for (const [lv, t] of Object.entries(LEVEL_TITLES)) if (p.level >= Number(lv) && !p.titles.includes(t)) p.titles.push(t);
     p.title = typeof s.title === 'string' && p.titles.includes(s.title) ? s.title : undefined;
     // P2: Stichworte aus Gesprächen (Altstände: leer; Unbekanntes fällt weg)
     p.topics = [...new Set(Array.isArray(s.topics) ? s.topics.filter((t): t is string => typeof t === 'string' && KEYWORDS.has(t)) : [])];
+    // T7: Aschenmal. Nur bekannte Kennungen; die erwachten Bosse zählen nur mit dem König. Wer ihn schon vor dem Nachspiel erlegt hat (Kills), bekommt das Mal nachgetragen.
+    const ashIds = new Set([ASH_KING, ...AWAKENED.map((d) => d.id)]);
+    const ash = [...new Set(Array.isArray(s.ash) ? s.ash.filter((t): t is string => typeof t === 'string' && ashIds.has(t)) : [])];
+    if ((p.kills.ash_king ?? 0) > 0 && !ash.includes(ASH_KING)) ash.push(ASH_KING);
+    p.ash = ash.includes(ASH_KING) ? [ASH_KING, ...ash.filter((t) => t !== ASH_KING)] : undefined;
+    if (p.ash) {
+      if (!p.titles.includes(ASH_TITLES[0])) p.titles.push(ASH_TITLES[0]);
+      if (p.ash.length === AWAKENED.length + 1 && !p.titles.includes(ASH_TITLES[1])) p.titles.push(ASH_TITLES[1]);
+      if (!p.topics.includes('asche')) p.topics.push('asche');
+    }
     p.skillCd = {};
     p.path = [];
     p.targetId = null;

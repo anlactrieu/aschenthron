@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import mapJson from '../data/aschenthron.json';
 import { buildWorld, type TiledMap } from './tiled';
 import { isWalkable, findPath } from './path';
-import { MONSTERS, MAX_LEVEL, QUESTS, monsterKind } from './data';
+import { MONSTERS, MAX_LEVEL, QUESTS, monsterKind, baseKindOf } from './data';
 import { applyCommand, getActor, inSafeZone, tick } from './world';
 
 const { world: w, playerId } = buildWorld(7, mapJson as unknown as TiledMap);
@@ -80,7 +80,7 @@ describe('Gebiet „Aschental“: Inhalt und Größe', () => {
 
   it('Questkette deckt Level 1–28 ab, alle Ziele existieren auf der Karte', () => {
     const kinds = new Set(monsters.map((m) => m.kindId));
-    for (const q of QUESTS) if (q.kind === 'kill') expect(kinds.has(q.target), q.id).toBe(true);
+    for (const q of QUESTS) if (q.kind === 'kill') expect(kinds.has(baseKindOf(q.target)), q.id).toBe(true);
     expect(Math.min(...QUESTS.map((q) => q.minLevel))).toBe(1);
     expect(Math.max(...QUESTS.map((q) => q.minLevel))).toBeGreaterThanOrEqual(28);
     expect(MONSTERS.length).toBeGreaterThanOrEqual(20);

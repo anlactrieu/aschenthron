@@ -146,6 +146,8 @@ export interface NamedDef {
   sockets?: 0 | 1 | 2;
   /** kurzer Flavor-Satz für Tooltip und Bestiarium */
   lore?: string;
+  /** T7: Kennung der erwachten Bossart, die ihn als einzigen Fund trägt; solche Funde liegen nie im Zufallstopf (`namedPool`) */
+  boss?: string;
 }
 
 export const TEMPLATES: ItemTemplate[] = [
@@ -735,7 +737,7 @@ export function generateNamed(id: number, defId: string): Item {
 
 /** Benannte Funde, die bei dieser Stufe fallen können: aktuelles und voriges Stufenband. */
 export function namedPool(level: number): NamedDef[] {
-  return NAMED.filter((d) => d.band <= level && d.band >= level - 9);
+  return NAMED.filter((d) => !d.boss && d.band <= level && d.band >= level - 9);
 }
 /** Funde der eigenen Beute-Gruppe fallen so viel öfter als die übrigen des Bands (Gruppe prägt die Beute, jeder Slot bleibt erreichbar). */
 export const NAMED_GROUP_WEIGHT = 4;

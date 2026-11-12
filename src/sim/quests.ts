@@ -1,4 +1,4 @@
-import { BEGINNER_ZONE, CHAIN_FIRST, LOOT_GROUPS, QUESTS, lootGroupOf, NPC_KEYS, SHOPS, npcKeyOf, monsterKind, isGiverOf, type QuestDef } from './data';
+import { BEGINNER_ZONE, CHAIN_FIRST, LOOT_GROUPS, QUESTS, lootGroupOf, NPC_KEYS, SHOPS, npcKeyOf, monsterKind, isGiverOf, baseKindOf, type QuestDef } from './data';
 import { templateById } from './items';
 import { WEG, TRUHEN, TRUHEN_AUFTRAG } from './topicsData';
 import { firstQuestOpen, regionAt, type Actor, type World } from './world';
@@ -76,7 +76,7 @@ export function questTarget(w: World, p: Actor, def: QuestDef, done: boolean): {
       const c = w.camps.find((x) => x.id === def.target);
       return c ? { x: Math.round(c.x + c.w / 2), y: Math.round(c.y + c.h / 2) } : undefined;
     }
-    case 'kill': return nearest((a) => a.kindId === def.target);
+    case 'kill': return nearest((a) => !!a.kindId && baseKindOf(a.kindId) === baseKindOf(def.target));
     case 'goal': return nearest((a) => !!a.kindId && lootGroupOf(a.kindId) === def.group);
     case 'buy': {
       const n = sellerOf(w, p, def.target);
@@ -144,10 +144,10 @@ export function questWhere(w: World, def: QuestDef, done = false, p?: Actor): st
     if (n) return `${n.name} (${regionAt(w, n.x, n.y)?.name ?? '?'})`;
   } else if (def.chain === CHAIN_FIRST && def.kind === 'kill') names.add(BEGINNER_ZONE.name); else if (def.kind === 'bring' && def.chestRegion) names.add(def.chestRegion);
   else {
-    const kinds = def.kind === 'bring' ? def.monsters ?? [] : def.kind === 'kill' ? [def.target] : def.kind === 'goal' ? LOOT_GROUPS.find((g) => g.id === def.group)?.monsters ?? [] : [];
+    const kinds = def.kind === 'bring' ? def.monsters ?? [] : def.kind === 'kill' ? [baseKindOf(def.target)] : def.kind === 'goal' ? LOOT_GROUPS.find((g) => g.id === def.group)?.monsters ?? [] : [];
     for (const a of w.actors) {
       if (a.kind !== 'monster' || !a.home) continue;
-      const hit = def.kind === 'unique' ? !!def.target && a.unique === def.target : !!a.kindId && kinds.includes(a.kindId);
+      const hit = def.kind === 'unique' ? !!def.target && a.unique === def.target : !!a.kindId && kinds.includes(def.kind === 'kill' ? baseKindOf(a.kindId) : a.kindId);
       const r = hit ? regionAt(w, a.home.x, a.home.y) : undefined;
       if (r) names.add(r.name);
       if (names.size >= 3) break;
