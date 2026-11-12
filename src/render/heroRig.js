@@ -237,6 +237,34 @@ function axes(x, y) {
 }
 const lerp3 = (a, b, u) => add(a, mul(sub(b, a), u));
 
+// Aschenthron T7: Aschenmal – glimmende Risse (Teil `crack`, im Spiel Glut) auf Brust und Armen; `gear.ash` = Stufe 1–8 (König, dann je erwachter Boss ein Riss mehr)
+const ASH_CRACKS = [
+  [[0.1, 0.7], [0.3, 0.4], [0.2, 0.1], [0.45, -0.2]],
+  [[0.85, 0.55], [1.0, 0.25], [0.9, 0.0]],
+  [[-0.4, 0.35], [-0.2, 0.1], [-0.35, -0.15]],
+  [[0.6, 0.2], [0.55, -0.1], [0.7, -0.35]],
+  [[-0.9, 0.5], [-0.7, 0.2], [-0.85, -0.1]],
+];
+function drawAshMark(S, gear, at, k, tk, wk, bk) {
+  const stage = Math.min(8, gear.ash), C = S.B.chest;
+  // Brustfläche: Mitte und Halbachsen wie die Brust (Rippenkorb: etwas schmaler)
+  const c0 = gear.ribs ? [0, 0.6 * tk, 0] : [0.3 * k, 0.8 * tk, 0];
+  const R0 = gear.ribs ? [3.8 * k, 3.2 * tk, 5.9 * wk] : [4.0 * k * Math.max(1, bk * 0.9), 4.3 * tk, 6.6 * wk];
+  const onChest = (a, b) => at("chest", add(c0, [R0[0] * Math.cos(b) * Math.cos(a) * 1.04, R0[1] * Math.sin(b) * 1.04, R0[2] * Math.cos(b) * Math.sin(a) * 1.04]));
+  const lines = Math.min(ASH_CRACKS.length, 1 + Math.floor(stage * 0.55));
+  for (const line of ASH_CRACKS.slice(0, lines)) for (let j = 0; j + 1 < line.length; j++) {
+    const [a0, b0] = line[j], [a1, b1] = line[j + 1];
+    for (let u = 0; u <= 1.001; u += 0.25) sphere(onChest(a0 + (a1 - a0) * u, b0 + (b1 - b0) * u), 0.55 * k, PART.crack, 0);
+  }
+  // Unterarme: ab Stufe 4 der nahe, ab Stufe 6 auch der ferne Arm; Stufe 8 zusätzlich am Hals
+  const arms = [];
+  if (stage >= 4) arms.push(S.armN);
+  if (stage >= 6) arms.push(S.armF);
+  for (const A of arms) for (const u of [0.3, 0.5, 0.7]) sphere(lerp3(A.joint, A.end, u), 0.5 * k, PART.crack, 0);
+  if (stage >= 8) for (let u = 0; u <= 1.001; u += 0.5) sphere(add(S.B.neck.t, mv(S.B.neck.R, [1.2 * k, 0.5 * k + u * 1.2 * k, 0.8 * k])), 0.4 * k, PART.crack, 0);
+  void C;
+}
+
 function drawBody(S) {
   const { B, armN, armF, legN, legF, sN, sF, hipN, hipF, turn } = S, F_ = (name) => B[name];
   const k = BODY.size, tk = k * BODY.torso, wk = k * BODY.width, hk = k * BODY.head, lk = k * BODY.limb, bk = BODY.belly;
@@ -261,6 +289,7 @@ function drawBody(S) {
     ellipsoid(at("chest", [0.3 * k, 0.8 * tk, 0]), C.R, [4.0 * k * Math.max(1, bk * 0.9), 4.3 * tk, 6.6 * wk], PART.chest, 0);
   }
   if (bk > 1.05 && !gear.ribs) ellipsoid(at("waist", [1.2 * k * bk, -0.6 * k, 0]), C.R, [3.4 * k * bk, 3.4 * k, 4.6 * wk], PART.belly, 0);
+  if (gear.ash) drawAshMark(S, gear, at, k, tk, wk, bk);
   sweep(F_("neck").t, add(F_("neck").t, mv(F_("head").R, [0, 1.6 * hk, 0])), 1.7 * lk * BODY.neck ** 0.3, 1.5 * lk, PART.neck, 1);
   const H = F_("head"), hr = (v) => mv(H.R, v), atH = (v) => add(H.t, hr(v));
   const back = hr([1, 0, 0])[2];

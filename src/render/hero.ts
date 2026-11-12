@@ -45,6 +45,8 @@ export interface HeroLook {
   quiver: boolean;
   /** Seltenheit 0 normal … 4 legendär von Helm, Rumpf, Waffe */
   rar: [number, number, number];
+  /** T7 Aschenmal: Stufe 1–8 (glimmende Risse); fehlt ohne Mal, dann bleibt das Bild wie zuvor */
+  ash?: number;
 }
 
 const has = (re: RegExp, id: string): boolean => re.test(id);
@@ -109,11 +111,12 @@ export function heroLookOf(look: Look): HeroLook {
     cloak: i.cloak ? i.cloak.replace(/_cloak$/, '') : '',
     quiver: look.quiver,
     rar: [look.rar.head, look.rar.chest, look.rar.weapon],
+    ...(look.ash ? { ash: look.ash } : {}),
   };
 }
 
 export function heroKey(h: HeroLook): string {
-  return `hero_${h.armor}${h.robe ? 'R' : ''}_${h.helm}${h.helmMat}_${h.gloves}${h.legs}_${h.weapon}${h.twoHand && h.weapon !== 'greatsword' ? '2' : ''}${h.weapon === 'staff' ? h.weaponTier : ''}_${h.shield}${h.cloak}${h.quiver ? 'Q' : ''}_${h.rar.join('')}`;
+  return `hero_${h.armor}${h.robe ? 'R' : ''}_${h.helm}${h.helmMat}_${h.gloves}${h.legs}_${h.weapon}${h.twoHand && h.weapon !== 'greatsword' ? '2' : ''}${h.weapon === 'staff' ? h.weaponTier : ''}_${h.shield}${h.cloak}${h.quiver ? 'Q' : ''}_${h.rar.join('')}${h.ash ? `A${h.ash}` : ''}`;
 }
 
 /* ------------------------------------------------ Posen (Bildschirm-Pixel bei 1x, y negativ = oben, Blick nach rechts) */
@@ -262,6 +265,7 @@ export function heroPose(anim: HeroAnim, view: HeroView, i: number, h: HeroLook,
   const gear: HeroGear = {
     helm: h.helm, pauldron: !h.robe && (h.armor === 'iron' || h.armor === 'dread' || h.armor === 'ash' || h.armor === 'bone'),
     robe: h.robe, cloak: !!h.cloak, quiver: h.quiver, shield: h.shield, crest: h.rar[0] >= 2 && h.helm >= 2 && h.helm <= 4,
+    ...(h.ash ? { ash: h.ash } : {}),
   };
   const pose: RigPose = { ...base, weapon: anim === 'die' && i >= 2 ? undefined : RIG_WEAPON[h.weapon], gear, mark: !h.robe };
   const acc = ACCENT[h.rar[2]];
@@ -332,6 +336,8 @@ export const ACCENT: (Ramp | undefined)[] = [
   [0xffb066, 0xff8a2a, 0xc8601a, 0x8a4010, 0x562608],
 ];
 const ORBS: number[][] = [[0x9ad0ff, 0x4a7ac8], [0x8ae0ff, 0x3a8ab8], [0xc0a0ff, 0x6a48c8], [0x8af0e8, 0x2a9a90], [0xffb060, 0xc8601a], [0xd890ff, 0x8a3ac8]];
+/** Glut der Aschenmal-Risse (hell -> dunkel, Naht) */
+export const ASH_GLOW: Ramp = [0xfff0a0, 0xffb040, 0xff7a1a, 0xc8501a, 0x7a2a0c];
 const OUTLINE = 0x0c0a0e;
 const MARK_COL = 0xc8a048; // Gürtelschnalle/Brustmarke: Bronze
 
@@ -377,6 +383,7 @@ function materials(h: HeroLook): Record<number, Ramp> {
   set(['shield'], h.shield === 1 ? MAT.wood : h.shield === 3 ? MAT.tabard : MAT.iron);
   set(['shieldRim'], h.shield === 1 ? MAT.iron : MAT.chain);
   set(['shieldBoss'], MAT.iron);
+  if (h.ash) set(['crack'], ASH_GLOW);
   return m;
 }
 

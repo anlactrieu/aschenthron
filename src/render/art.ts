@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import type { MonsterFamily } from '../sim/data';
+import { baseKindOf, type MonsterFamily } from '../sim/data';
 import type { Actor } from '../sim/world';
 import { handsOf, templateById } from '../sim/items';
 import { sprite } from './sprites';
@@ -561,7 +561,7 @@ function actorCanvas(key: string, build: (x: Ctx) => void, scale: number): HTMLC
 export const BIPED = new Set<MonsterFamily>(['humanoid', 'undead', 'ghoul', 'demon']);
 
 function spriteMonster(id: string, boss: boolean, frame: number, profile: boolean): HTMLCanvasElement | null {
-  const def = MONSTER_SPRITES[id];
+  const def = MONSTER_SPRITES[baseKindOf(id)]; // T7: erwachte Bosse zeigen das Bild ihrer Grundart
   const img = def ? sprite(def.file) : null;
   if (!def || !img) return null;
   const scale = boss ? Math.max(SPRITE_SCALE.boss, def.scale ?? 0) : def.scale ?? SPRITE_SCALE.normal;
@@ -614,6 +614,8 @@ export interface Look {
   rar: { head: number; chest: number; weapon: number };
   /** Nahkampfwaffe mit beiden Händen geführt (`handsOf` der Sim: `Item.hands` vor Vorlage, auch bei benannten Funden) */
   twoHand?: boolean;
+  /** T7 Aschenmal: Stufe 1–8 (0/fehlt = keins) */
+  ash?: number;
   /** Vorlagen-IDs der sichtbaren Ausrüstung (für die Sprite-Ebenen), leer = nichts angelegt */
   ids: { chest: string; legs: string; feet: string; hands: string; head: string; cloak: string; weapon: string; offhand: string };
 }
@@ -637,6 +639,7 @@ export function lookOf(a: Actor): Look {
     twoHand: !!a.equipment.weapon && !kind && handsOf(a.equipment.weapon) === 2,
     robe: !!a.equipment.chest && a.equipment.chest.templateId.includes('robe'),
     quiver: a.equipment.offhand?.off === 'arrows',
+    ...(a.ash?.length ? { ash: a.ash.length } : {}),
     shield: a.equipment.offhand?.off === 'shield' ? tierOf(templateById(a.equipment.offhand.templateId).minLevel) : -1,
     ids: {
       chest: a.equipment.chest?.templateId ?? '', legs: a.equipment.legs?.templateId ?? '', feet: a.equipment.feet?.templateId ?? '',

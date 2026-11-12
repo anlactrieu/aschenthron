@@ -5,6 +5,7 @@
  * (`monsterRig.js`). Bosse sind größer per Proportion (`size`), nicht per Skalierung, und behalten die goldene Kontur.
  * Reine Daten und Rechnung ohne DOM (Node-Kontaktbögen `scripts/bake-monsters.ts`, Tests, Browser `monsterSheet.ts`).
  */
+import { AWAKENED } from '../sim/data';
 import { cycleLength, type FigAnim, type FigureSpec, type FigView, type Ramp } from './figure';
 import { ACCENT, CLOAKS, heroPose, MAT, SHEAR_REACH, type Gait, type HeroLook, type HeroWeapon } from './hero';
 import { PART, posed, type HeroGear, type RigBody, type RigPose } from './heroRig.js';
@@ -225,6 +226,21 @@ export const MONSTER_DEFS: Record<string, MonsterDef> = {
   web_stalker: spider(0x3a4a3a, 1.1, { mark: true, legLen: 1.2 }),
   nest_matron: spider(0x5a3a5a, 1.2, { mark: true }),
 };
+
+/**
+ * T7 erwachte Bosse: gleiche Gestalt wie die Grundart, aber größer, mit Glutaugen und glimmenden Rissen (Zweibeiner: Aschenmal-Risse
+ * wie beim Helden, Golem: Glut statt Stein in den Rissen, Spinnen: Glutmarken).
+ */
+function awakened(d: MonsterDef): MonsterDef {
+  const ember = 0xffa040;
+  if (d.rig === 'beast') return { ...d, eye: ember, body: { ...d.body, size: (d.body.size ?? 1) * 1.07 }, pal: { ...d.pal, mark: LAVA } };
+  return {
+    ...d, eye: ember, body: { ...d.body, size: (d.body.size ?? 1) * 1.07 },
+    gear: d.gear?.golem ? d.gear : { ...d.gear, ash: 8 },
+    pal: { ...d.pal, crack: LAVA },
+  };
+}
+for (const a of AWAKENED) MONSTER_DEFS[a.id] = awakened(MONSTER_DEFS[a.base]!);
 
 export function monsterDef(id: string): MonsterDef | undefined {
   return MONSTER_DEFS[id];

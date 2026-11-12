@@ -252,7 +252,7 @@ describe('T7 Spieler: Tod des Königs, Zeichen, Titel', () => {
   });
 
   it('alter Spielstand ohne Feld „ash“ lädt wie zuvor (kein Zeichen, keine neuen Titel oder Stichworte)', () => {
-    const { w, p } = build(3, false);
+    const { p } = build(3, false);
     L30(p);
     p.kills = { goblin: 3 };
     const old = JSON.parse(exportPlayer(p));
@@ -265,7 +265,7 @@ describe('T7 Spieler: Tod des Königs, Zeichen, Titel', () => {
   });
 
   it('alter Stand, der den König schon erlegt hat (Kills), bekommt das Zeichen beim Laden nachgetragen', () => {
-    const { w, p } = build(3, false);
+    const { p } = build(3, false);
     L30(p);
     p.kills = { ash_king: 1 };
     const old = JSON.parse(exportPlayer(p));

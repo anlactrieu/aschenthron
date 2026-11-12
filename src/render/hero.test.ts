@@ -6,7 +6,7 @@ import { generateItem } from '../sim/items';
 import { Rng } from '../sim/rng';
 import { createWorld, spawnPlayer } from '../sim/world';
 import type { Grid } from '../sim/path';
-import { bakeHero, HERO_ANIMS, HERO_CYCLE_PX, HERO_FRAME, HERO_STANCE, HERO_STRIDE, HERO_WIND_FRAMES, heroKey, heroLookOf, type HeroLook, type HeroWeapon } from './hero';
+import { ASH_GLOW, bakeHero, HERO_ANIMS, HERO_CYCLE_PX, HERO_FRAME, HERO_STANCE, HERO_STRIDE, HERO_WIND_FRAMES, heroKey, heroLookOf, type HeroLook, type HeroWeapon } from './hero';
 
 const sum = (d: Uint8ClampedArray): number => {
   let h = 0;
@@ -118,5 +118,43 @@ describe('Skelett-Held', () => {
     // Leder späterer Stufen sieht anders aus als das erste Wams
     expect(heroLookOf({ ...look, chest: 4, ids: { ...ids, chest: 'dread_leather' } }).armor).toBe('leatherDread');
     expect(heroLookOf({ ...look, chest: 0, ids: { ...ids, chest: 'leather_vest' } }).armor).toBe('leather');
+  });
+});
+
+describe('T7 Aschenmal am Helden', () => {
+  /** Pixel in den hellen Glutfarben der Risse (`ASH_GLOW`) im Stehbild von vorn */
+  const glow = (h: HeroLook): number => {
+    const s = bakeHero(h, ['front']);
+    const f = s.frames['idle_front_0']!;
+    const cols = new Set(ASH_GLOW.slice(0, 3));
+    let n = 0;
+    for (let y = f.y; y < f.y + s.frame.h; y++) for (let x = f.x; x < f.x + s.frame.w; x++) {
+      const i = (y * s.w + x) * 4;
+      if (s.data[i + 3]! > 0 && cols.has((s.data[i]! << 16) | (s.data[i + 1]! << 8) | s.data[i + 2]!)) n++;
+    }
+    return n;
+  };
+
+  it('ohne Mal bleibt Schlüssel und Bild wie zuvor; mit Mal ändern sich beide', () => {
+    expect(heroKey({ ...KNIGHT })).toBe(heroKey({ ...KNIGHT, ash: undefined }));
+    expect(heroKey({ ...KNIGHT, ash: 1 })).not.toBe(heroKey(KNIGHT));
+    expect(sum(bakeHero(KNIGHT, ['front']).data)).not.toBe(sum(bakeHero({ ...KNIGHT, ash: 1 }, ['front']).data));
+  });
+
+  it('Risse werden mit jeder Stufe mehr, voll ausgeprägt bei acht', () => {
+    const counts = [0, 1, 4, 8].map((a) => glow({ ...KNIGHT, ash: a || undefined }));
+    expect(counts[0]).toBe(0);
+    expect(counts[1]).toBeGreaterThan(0);
+    expect(counts[2]!).toBeGreaterThan(counts[1]!);
+    expect(counts[3]!).toBeGreaterThan(counts[2]!);
+  });
+
+  it('lookOf und heroLookOf tragen die Stufe aus der Sim', () => {
+    const grid: Grid = { w: 20, h: 20, walkable: new Array(400).fill(true) };
+    const w = createWorld(3, grid);
+    const p = spawnPlayer(w, 5, 5);
+    expect(heroLookOf(lookOf(p)).ash).toBeUndefined();
+    p.ash = ['ash_king', 'goblin_king_ash'];
+    expect(heroLookOf(lookOf(p)).ash).toBe(2);
   });
 });

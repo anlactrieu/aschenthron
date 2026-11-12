@@ -176,6 +176,9 @@ export class GameScene extends Phaser.Scene {
   private roofs: { img: Phaser.GameObjects.Image; house: House; fade?: IsoFade }[] = [];
   /** Fenster- und Laternenlicht, Deckkraft = Nacht-Faktor der Atmosphäre */
   private nightLights: { img: Phaser.GameObjects.Image; k: number; follow?: Phaser.GameObjects.Image }[] = [];
+  /** T7: schwaches Glühen der Aschenmal-Risse nachts und in Dungeons (ein Lichtbild je Spieler mit Mal) */
+  private ashGlows = new Map<number, Phaser.GameObjects.Image>();
+  private ashSeen = new Set<number>();
   private night = 0;
   /** Türbilder an Nord-/Ost-/Westseite liegen über dem Dach und blenden mit ihm aus */
   private playerId = 0;
@@ -1255,7 +1258,7 @@ export class GameScene extends Phaser.Scene {
             }
             this.sfx.kill();
             this.achBump('kills');
-            if (dead?.boss) { this.achBump('bosses'); if (dead.kindId === 'ash_king') { this.achBump('king'); this.ui.banner('Der Aschenkönig ist gefallen – Aschental atmet auf.', '#ffd23a'); this.sfx.fanfare(); } say(`${dead.name} besiegt.`); }
+            if (dead?.boss) { this.achBump('bosses'); if (dead.kindId === 'ash_king') { this.achBump('king'); this.ui.banner('Der Aschenkönig ist gefallen – doch die Asche ruft.', '#ffd23a'); this.sfx.fanfare(); } say(`${dead.name} besiegt.`); }
           }
           break;
         }
@@ -2490,10 +2493,23 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  /** T7 Aschenmal: warmes Glimmen auf Brusthöhe, nur im Dunkeln (Nacht oder Dungeon), stärker mit jeder Stufe; Kreisbild, ADD-Mischung */
+  private ashGlow(a: Actor, x: number, y: number, depth: number): void {
+    let g = this.ashGlows.get(a.id);
+    if (!g) {
+      g = this.add.image(x, y, ensureTexture(this, 'ash_mark_glow', () => toCanvas(glow(18, 0xff8a2a, 150)))).setBlendMode(Phaser.BlendModes.ADD);
+      this.ashGlows.set(a.id, g);
+    }
+    const dark = Math.max(this.night, isDungeon(this.regionName) ? 1 : 0);
+    g.setPosition(x, y).setDepth(depth + 0.5).setAlpha(dark * (0.06 + 0.03 * (a.ash?.length ?? 0))).setVisible(dark > 0.02);
+    this.ashSeen.add(a.id);
+  }
+
   private updateActors(time: number, p: Actor, g: Phaser.GameObjects.Graphics): void {
     if (this.frame % 20 === 1) this.prefetchNear(p);
     const seen = new Set<string>();
     const active = new Set<number>();
+    this.ashSeen.clear();
     for (const a of this.world.actors) {
       let view = this.actorViews.get(a.id);
       const near = this.inView(a.x, a.y);
@@ -2605,6 +2621,7 @@ export class GameScene extends Phaser.Scene {
         // DCSS-Monster blicken von Haus aus nach links; nur die vorab gespiegelte Seitenansicht (Zweibeiner) blickt nach rechts
         fig ? (fig.dir ? (fig.all || mirrors(shownView)) && view.flip : view.flip) : a.kind === 'monster' && !(view.side && BIPED.has(monsterKind(a.kindId!).family)) ? !view.flip : view.flip,
       );
+      if (a.kind === 'player' && a.alive && a.ash?.length) this.ashGlow(a, sx + ox, fy + oy + bob - 22, fy);
       if (!shown) continue;
       if (!a.alive && skel) {
         // Skelett-Figur: eigenes Sterbebild (liegt am Ende), Monster verblassen erst danach
@@ -2728,6 +2745,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
     for (const [id, v] of this.actorViews) if (!active.has(id)) v.img.setVisible(false);
+    for (const [id, gl] of this.ashGlows) if (!this.ashSeen.has(id)) gl.setVisible(false);
     this.updateBossAuras(p);
     // Figuren, die es in der Welt nicht mehr gibt (entfernte Beschwörungen, gegangene Spieler): Bild und Zwischenspeicher freigeben
     if (this.frame % 120 === 0) {

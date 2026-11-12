@@ -2,6 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     { "name": "aschenthron", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev", "--", "--port", "5173"], "port": 5173 },
-    { "name": "aschenthron-probe", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev", "--", "--port", "5174", "--strictPort"], "port": 5174 }
+    { "name": "aschenthron-probe", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev", "--", "--port", "5174", "--strictPort"], "port": 5174 },
+    { "name": "aschenthron-t7", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev", "--", "--port", "5177", "--strictPort"], "port": 5177 }
   ]
 }
