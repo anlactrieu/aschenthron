@@ -10,7 +10,7 @@ import { answerOf, marksOf, stripMarks } from './topics';
 import { exportPlayer, importPlayer } from './save';
 import { actorFromLite, makeSnapshot } from './net';
 import { questSpeech, questWhere } from './quests';
-import { applyCommand, ashStage, drainEvents, getActor, isMarked, regionAt, spawnMonster, tick, TICK_RATE, type Actor, type Command, type World } from './world';
+import { addPlayer, applyCommand, ashStage, drainEvents, getActor, isMarked, regionAt, spawnMonster, tick, TICK_RATE, type Actor, type Command, type World } from './world';
 
 const map = mapJson as unknown as TiledMap;
 const build = (seed = 3, keepMonsters = true) => {
@@ -291,37 +291,77 @@ describe('T7 Spieler: Tod des Königs, Zeichen, Titel', () => {
 
 describe('T7 Welt: erwachte Bosse erscheinen nur für Gezeichnete', () => {
   const homeOf = (w: World, base: string) => w.actors.find((a) => a.kind === 'monster' && a.home && (a.kindId === base || baseKindOf(a.kindId!) === base) && !a.summonedBy)!;
+  const run = (w: World, sec = 3) => { for (let i = 0; i < TICK_RATE * sec; i++) tick(w); };
+  /** stellt die Figur in Sichtweite-Nähe des Bosses, aber außerhalb von Aggro und Kampf */
+  const near = (p: Actor, boss: Actor, d = 20) => { p.x = boss.home!.x + d; p.y = boss.home!.y; p.path = []; p.targetId = null; };
+  const town = (w: World, p: Actor) => { p.x = w.start.x; p.y = w.start.y; p.path = []; };
 
-  it('ohne Zeichen bleibt die Welt wie sie war; mit Zeichen werden die sieben Bosse am selben Ort zu ihrer erwachten Form', () => {
+  it('ohne Zeichen bleibt die Welt wie sie war, auch wenn jemand neben dem Boss steht', () => {
     const { w, p } = build();
-    const before = BASES.map((b) => ({ id: homeOf(w, b).id, home: { ...homeOf(w, b).home! }, kind: homeOf(w, b).kindId }));
-    for (let i = 0; i < TICK_RATE * 3; i++) tick(w);
+    const before = BASES.map((b) => ({ id: homeOf(w, b).id, kind: homeOf(w, b).kindId }));
+    for (const b of BASES) { near(p, homeOf(w, b)); run(w, 2); }
     for (const b of before) expect(getActor(w, b.id)!.kindId).toBe(b.kind);
+  });
+
+  it('mit Zeichen werden die sieben Bosse in der Nähe der Figur am selben Ort zu ihrer erwachten Form, in der Ferne bleiben sie Grundform', () => {
+    const { w, p } = build();
     p.ash = [ASH_KING];
-    for (let i = 0; i < TICK_RATE * 3; i++) tick(w);
+    p.maxHp = p.hp = 1e7;
+    const before = BASES.map((b) => ({ id: homeOf(w, b).id, home: { ...homeOf(w, b).home! }, kind: homeOf(w, b).kindId! }));
+    // Gezeichnete in der Stadt: weit weg von allen Bossen, nichts ändert sich
+    town(w, p);
+    run(w);
+    for (const b of before) expect(getActor(w, b.id)!.kindId, b.kind).toBe(b.kind);
     for (const b of before) {
       const m = getActor(w, b.id)!;
-      expect(awakenedOf(b.kind!)?.id, b.kind).toBe(m.kindId);
+      near(p, m);
+      run(w, 2);
+      expect(awakenedOf(b.kind)?.id, b.kind).toBe(m.kindId);
       expect(m.level).toBe(30);
       expect(m.name).toBe(monsterKind(m.kindId!).name);
       expect(m.home).toEqual(b.home);
       expect(m.boss).toBe(true);
       expect(m.hp).toBe(m.maxHp);
       expect(m.abilities.length).toBe(monsterKind(m.kindId!).abilities!.length);
+      // zieht die Figur fort, schläft der ruhende Boss wieder ein
+      town(w, p);
+      run(w, 2);
+      expect(m.kindId, `${b.kind} nach dem Weggehen`).toBe(b.kind);
     }
     // der König selbst bleibt der König
+    near(p, w.actors.find((a) => a.kindId === ASH_KING)!);
+    run(w, 2);
     expect(w.actors.find((a) => a.kindId === ASH_KING)).toBeDefined();
-    // das Zeichen weg (anderer Spieler im Mehrspieler): sie schlafen wieder ein
-    p.ash = undefined;
-    for (let i = 0; i < TICK_RATE * 3; i++) tick(w);
-    for (const b of before) expect(getActor(w, b.id)!.kindId).toBe(b.kind);
   });
 
-  it('ein erschlagener Boss kehrt nach der Wartezeit als erwachte Form zurück (nur mit Zeichen)', () => {
+  it('Mehrspieler: ein Ungezeichneter allein sieht nur die Grundform; erst ein Gezeichneter in Reichweite weckt den Boss', () => {
     const { w, p } = build();
+    const q = addPlayer(w, 'Zweiter');
+    q.maxHp = q.hp = 1e7;
     p.ash = [ASH_KING];
     const m = homeOf(w, 'goblin_king');
-    for (let i = 0; i < TICK_RATE * 2; i++) tick(w);
+    near(q, m);
+    town(w, p);
+    run(w);
+    expect(m.kindId).toBe('goblin_king');
+    expect(m.level).toBe(10);
+    near(p, m);
+    run(w);
+    expect(m.kindId).toBe('goblin_king_ash');
+    expect(m.level).toBe(30);
+    // der Gezeichnete geht, der Ungezeichnete bleibt: wieder Grundform (kämpft keiner)
+    town(w, p);
+    run(w);
+    expect(m.kindId).toBe('goblin_king');
+  });
+
+  it('ein erschlagener Boss kehrt nach der Wartezeit als erwachte Form zurück (nur mit Zeichen in der Nähe)', () => {
+    const { w, p } = build();
+    p.ash = [ASH_KING];
+    p.maxHp = p.hp = 1e7;
+    const m = homeOf(w, 'goblin_king');
+    near(p, m);
+    run(w, 2);
     expect(m.kindId).toBe('goblin_king_ash');
     m.alive = false;
     m.hp = 0;
@@ -331,8 +371,16 @@ describe('T7 Welt: erwachte Bosse erscheinen nur für Gezeichnete', () => {
     expect(m.kindId).toBe('goblin_king_ash');
     // ohne Zeichen kommt die Grundform zurück
     p.ash = undefined;
-    for (let i = 0; i < TICK_RATE * 2; i++) tick(w);
+    run(w, 2);
     expect(m.kindId).toBe('goblin_king');
+    m.alive = false;
+    m.hp = 0;
+    m.diedAt = w.tick;
+    for (let i = 0; i < m.respawnTicks + 5; i++) tick(w);
+    expect(m.kindId).toBe('goblin_king');
+    // Gezeichnete weit weg beim Wiedererscheinen: Grundform
+    p.ash = [ASH_KING];
+    town(w, p);
     m.alive = false;
     m.hp = 0;
     m.diedAt = w.tick;

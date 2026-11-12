@@ -2450,8 +2450,10 @@ function regen(w: World, p: Actor): void {
   p.mana = Math.min(mmax, p.mana + (0.02 + (p.attrs.willenskraft - 10) * 0.005 + (safe ? 0.2 : 0)) * boost * (1 + attrBonus(p, 'willenskraft') / 100) * (1 + passiveSum(p, 'manaRegen') / 100));
 }
 
-/** T7: Läuft eine Figur mit Aschenmal in der Welt, zeigen sich die sieben Bosse in ihrer erwachten Form (im Mehrspieler genügt eine). */
-const wantsAwake = (w: World): boolean => w.actors.some((a) => a.kind === 'player' && isMarked(a));
+/** T7: Umkreis um den Platz eines Bosses (Felder), in dem das Aschenmal die Form bestimmt; größer als Sichtweite im Netz, Aggro- und Schlafabstand, damit die Form feststeht, bevor jemand den Boss sieht. */
+export const ASH_REACH = 45;
+/** T7: Zeigt sich der Boss am Platz `home` in erwachter Form? Ja, sobald eine Figur mit Aschenmal in der Nähe ist (im Mehrspieler zählt der höchste Stand in Reichweite; Ungezeichnete allein sehen nur die Grundform). */
+const wantsAwakeAt = (w: World, home: Pt): boolean => w.actors.some((a) => a.kind === 'player' && isMarked(a) && Math.hypot(a.x - home.x, a.y - home.y) <= ASH_REACH);
 
 /** Wechselt Art und Werte eines Bosses (Grundform <-> erwachte Form); Heimat, Kennung und Wartezeit bleiben. */
 function setForm(w: World, m: Actor, kindId: string): void {
@@ -2463,26 +2465,25 @@ function setForm(w: World, m: Actor, kindId: string): void {
   });
 }
 
-/** T7: Form eines Bosses beim Wiedererscheinen (Grundform oder erwacht, je nach Zeichen in der Welt) */
-function awakeFormOf(w: World, kindId: string): string {
-  const base = baseKindOf(kindId);
-  return wantsAwake(w) ? awakenedOf(base)?.id ?? kindId : base;
+/** T7: Form eines Bosses beim Wiedererscheinen (Grundform oder erwacht, je nach Zeichen in der Nähe seines Platzes) */
+function awakeFormOf(w: World, m: Actor): string {
+  const base = baseKindOf(m.kindId!);
+  return m.home && wantsAwakeAt(w, m.home) ? awakenedOf(base)?.id ?? m.kindId! : base;
 }
 
-/** T7: ruhende Bosse (steht still, voll bei Kräften) wechseln jede Sekunde in die Form, die zur Welt passt; Kämpfende und Tote später (Wiedererscheinen). */
+/** T7: ruhende Bosse (steht still, voll bei Kräften) wechseln jede Sekunde in die Form, die zum Spieler in der Nähe passt; Kämpfende und Tote später (Wiedererscheinen). */
 function syncAwakened(w: World): void {
-  const awake = wantsAwake(w);
   for (const m of w.actors) {
-    if (m.kind !== 'monster' || !m.alive || !m.kindId || !m.boss || m.summonedBy !== undefined || m.unique || m.campId) continue;
+    if (m.kind !== 'monster' || !m.alive || !m.kindId || !m.boss || !m.home || m.summonedBy !== undefined || m.unique || m.campId) continue;
     if (m.targetId !== null || m.path.length > 0 || m.hp < m.maxHp || m.enraged) continue;
-    const want = awake ? awakenedOf(m.kindId)?.id : AWAKENED.some((d) => d.id === m.kindId) ? baseKindOf(m.kindId) : undefined;
-    if (want) setForm(w, m, want);
+    const want = awakeFormOf(w, m);
+    if (want !== m.kindId) setForm(w, m, want);
   }
 }
 
 function reviveMonster(w: World, m: Actor): void {
   if (m.boss && m.kindId) {
-    const form = awakeFormOf(w, m.kindId);
+    const form = awakeFormOf(w, m);
     if (form !== m.kindId) setForm(w, m, form);
   }
   // Helfer vom letzten Mal verschwinden, sonst häufen sie sich über Respawns
