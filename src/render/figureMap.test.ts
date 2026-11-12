@@ -1,12 +1,13 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { MONSTERS } from '../sim/data';
+import { AWAKENED, MONSTERS } from '../sim/data';
 import { NPC_NAME_SPRITES } from './spriteMap';
 import { NINJA_MONSTERS, NINJA_NPC_NAMES, figureLists, ninjaFigurePaths, ninjaMonsterDef, ninjaNpcDef } from './figureMap';
 import { ninjaFigureCanvas, ninjaHeroCanvas } from './ninjaFigures';
 
-const ids = MONSTERS.map((m) => m.id);
+// T7: erwachte Bosse zeigen das Bild ihrer Grundart und haben keine eigene Zuordnung
+const ids = MONSTERS.map((m) => m.id).filter((id) => !AWAKENED.some((a) => a.id === id));
 
 describe('Figuren-Zuordnung (Ninja Adventure, CC0)', () => {
   it('jede Monsterart hat eine Ninja-Zuordnung, keine unbekannten IDs', () => {
@@ -25,7 +26,7 @@ describe('Figuren-Zuordnung (Ninja Adventure, CC0)', () => {
     const mix = figureLists('mix', ids);
     expect(Math.abs(mix.ninja.length - mix.dcss.length)).toBeLessThanOrEqual(2);
     expect(figureLists('mix', ids)).toEqual(mix);
-    const bosses = MONSTERS.filter((m) => m.boss).map((m) => m.id);
+    const bosses = MONSTERS.filter((m) => m.boss).map((m) => m.id).filter((id) => ids.includes(id));
     const nb = bosses.filter((id) => ninjaMonsterDef(id, 'mix')).length;
     expect(nb).toBe(Math.ceil(bosses.length / 2));
   });

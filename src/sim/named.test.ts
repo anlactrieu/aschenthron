@@ -16,6 +16,9 @@ function groupBands(group: string): Set<number> {
   return new Set(g.monsters.map((id) => bandOf(MONSTERS.find((m) => m.id === id)!.level)));
 }
 
+/** Zufallstopf: ohne die sieben Bossfunde der erwachten Bosse (T7, `ash.test.ts`) */
+const POOL = NAMED.filter((d) => !d.boss);
+
 describe('benannte Funde (named.ts)', () => {
   it('IDs und Namen sind eindeutig und kollidieren nicht mit Vorlagen, Unikaten, Sets', () => {
     const ids = NAMED.map((d) => d.id);
@@ -27,7 +30,7 @@ describe('benannte Funde (named.ts)', () => {
   });
 
   it('jeder Fund ist gültig: Vorlage, Slot, Band, Gruppe, Wertezahl, Wertebereich', () => {
-    for (const d of NAMED) {
+    for (const d of POOL) {
       const t = templateById(d.base);
       expect(t.slot === 'potion' || t.slot === 'gem', d.id).toBe(false);
       expect(t.off === 'arrows', `${d.id}: keine Pfeile`).toBe(false);
@@ -69,12 +72,12 @@ describe('benannte Funde (named.ts)', () => {
   it('je Band und Slot zwei bis drei Funde (Waffen bis vier), aus mehreren Gruppen, etwa ein Drittel selten', () => {
     for (const band of NAMED_BANDS) {
       for (const slot of SLOTS) {
-        const hits = NAMED.filter((d) => d.band === band && templateById(d.base).slot === slot);
+        const hits = POOL.filter((d) => d.band === band && templateById(d.base).slot === slot);
         expect(hits.length, `Band ${band}, Slot ${slot}`).toBeGreaterThanOrEqual(2);
         expect(hits.length, `Band ${band}, Slot ${slot}`).toBeLessThanOrEqual(slot === 'weapon' ? 4 : 3);
         expect(new Set(hits.map((d) => d.group)).size, `Band ${band}, Slot ${slot}: gleiche Gruppe`).toBeGreaterThanOrEqual(2);
       }
-      const inBand = NAMED.filter((d) => d.band === band);
+      const inBand = POOL.filter((d) => d.band === band);
       const rare = inBand.filter((d) => d.rarity === 'rare').length;
       expect(rare / inBand.length, `Band ${band}: Anteil selten`).toBeGreaterThanOrEqual(0.25);
       expect(rare / inBand.length, `Band ${band}: Anteil selten`).toBeLessThanOrEqual(0.45);
@@ -82,8 +85,8 @@ describe('benannte Funde (named.ts)', () => {
   });
 
   it('kein Fund-Wert liegt über dem Höchstwert der ersten 66 Funde seines Bands (+15 %), kein Ausreißer nach oben', () => {
-    const old = NAMED.slice(0, 66);
-    for (const d of NAMED.slice(66)) {
+    const old = POOL.slice(0, 66);
+    for (const d of POOL.slice(66)) {
       for (const a of d.affixes) {
         const peers = old.filter((o) => o.band === d.band).flatMap((o) => o.affixes.filter((x) => x.stat === a.stat).map((x) => x.value));
         if (!peers.length) continue;
@@ -101,7 +104,7 @@ describe('benannte Funde (named.ts)', () => {
       for (const k of ['melee', 'bow', 'staff']) expect(kinds.has(k), `Stufe ${lv}, Waffenklasse ${k}`).toBe(true);
     }
     for (const band of NAMED_BANDS) {
-      const kinds = new Set(NAMED.filter((d) => d.band === band && templateById(d.base).slot === 'weapon').map(klass));
+      const kinds = new Set(POOL.filter((d) => d.band === band && templateById(d.base).slot === 'weapon').map(klass));
       for (const k of ['melee', 'bow', 'staff']) expect(kinds.has(k), `Band ${band}, Waffenklasse ${k}`).toBe(true);
     }
   });

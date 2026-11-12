@@ -5,6 +5,7 @@ import {
   ATTR_KEYS, ATTR_NAME, xpToNext, questXp, SPECS, SPEC_LEVEL, MAX_LEVEL, MAX_SKILL_RANK, SKILL_POINTS_PER_LEVEL, SKILL_POINTS_START, rankCooldown, rankDamage, skillReq, skillRankOf, ACTIVE_POWER, rankLevelReq, rankMana, rankPrice, respecPrice, SAFE_REGEN, FIELD_REGEN, START_STAT_POINTS, STAT_POINTS_PER_LEVEL,
   monsterKind, CALL_RANGE, CALL_COOLDOWN, FLEE_HP, FLEE_TICKS, npcKeyOf, isGiverOf, lootGroupOf, LOOT_GROUPS, KILL_GOALS, LEVEL_TITLES, type LootGroup, CHAMPION_MODS, CHAMPION_REWARD, UNIQUE_REWARD, uniqueDef, type Ability, skillById, totalXpFor, SHOPS, ARMOR_K, QUESTS, questById, GEAR_DROP_FACTOR, NAMED_SHARE, POTION_DROP_CHANCE, type AttrKey,
   BEGINNER_ZONE, CHAIN_FIRST, DANGER_PACK, GUARD, FAMILY_RES, MELEE_SKILL_KRAFT_SCALE, MAX_RES, SLOW_FACTOR, STATUS_IDS, PASSIVE_CAP, DMG_NAME, type DmgType, type StatusId, type SkillDef, type PassiveKey,
+  AWAKENED, ASH_KING, ASH_TITLES, awakenedOf, baseKindOf,
   ATTR_THRESHOLD, ATTR_THRESHOLD_2, ATTR_THRESHOLD_BONUS, LEVEL_MILESTONES, milestonePoints, WILL_RES_PER_2, WILL_STATUS_PER_POINT, WILL_STATUS_CAP, GEM_MIN_LEVEL, GEM_DROP, GEM_SOCKET_COST, WORLD_BOSS_LOOT, type QuestDef,
 } from './data';
 import { EFFECTS, cleanse, controlDr, dispel, mergeStatus } from './effects';
@@ -173,6 +174,8 @@ export interface Actor {
   /** Spieler (P3): verdiente Titel und der gezeigte */
   titles?: string[];
   title?: string;
+  /** Spieler (T7): Aschenmal – `ash_king` nach dem Sieg über den Aschenkönig, danach die erwachten Bosse, die er besiegt hat (dauerhaft, gespeichert) */
+  ash?: string[];
   /** Spieler: gerade gelesene Teleport-Schriftrolle (Wirkzeit, Abbruch bei Bewegung oder Treffer) */
   tele?: { at: number; from: number; x: number; y: number; town: string; itemId: number };
   /** Monster: frühester Tick für den nächsten Schutz-/Bannzauber */
@@ -1311,7 +1314,7 @@ function execCommand(w: World, actorId: number, cmd: Command): void {
       if (!n || n.away || Math.hypot(n.x - a.x, n.y - a.y) > NPC_RANGE) return fail(w, 'Zu weit entfernt.');
       const ans = answerOf(n.name, cmd.topic);
       if (!ans) return fail(w, `${n.name} weiß nichts darüber.`);
-      if (!canAsk(n.name, cmd.topic, a.topics)) return fail(w, 'Dieses Stichwort kennst du noch nicht.');
+      if (!canAsk(n.name, cmd.topic, a.topics) || (ans.needs === 'ash' && !isMarked(a))) return fail(w, 'Dieses Stichwort kennst du noch nicht.');
       w.events.push({ type: 'talk', npcId: n.id, to: a.id });
       // zu schwach: der NPC weicht aus, man merkt sich nur das Stichwort
       if (a.level < (ans.minLevel ?? 1)) {
@@ -1945,12 +1948,15 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
       }
     }
     if (m.kindId && !m.summoned) for (const b of pl.bounties ?? []) if (b.target === m.kindId && b.progress < b.count) b.progress++;
-    if (m.kindId && !m.summoned && pl.kind === 'player') countKill(w, pl, m.kindId);
+    if (m.kindId && !m.summoned && pl.kind === 'player') {
+      countKill(w, pl, m.kindId);
+      ashKill(w, pl, m.kindId);
+    }
     if (goals && pl.kind === 'player') for (const q of goals) syncGoal(w, pl, q);
     for (const q of QUESTS) {
       const st = pl.quests[q.id];
       if (st?.state !== 'active') continue;
-      const matches = q.kind === 'kill' ? q.target === m.kindId : q.kind === 'champion' ? !!m.champ : q.kind === 'unique' ? !!m.unique && (!q.target || q.target === m.unique) : false;
+      const matches = q.kind === 'kill' ? q.target === m.kindId || (!!m.kindId && q.target === baseKindOf(m.kindId)) : q.kind === 'champion' ? !!m.champ : q.kind === 'unique' ? !!m.unique && (!q.target || q.target === m.unique) : false;
       if (matches) {
         st.progress++;
         w.events.push({ type: 'questProgress', questId: q.id, progress: st.progress, count: q.count, to: pl.id });
@@ -1980,8 +1986,10 @@ function onMonsterDeath(w: World, killer: Actor, m: Actor): void {
   };
   // P3: Beute ist fest – Grundgegenstände und benannte Funde der Beute-Gruppe; Zufallsaffixe nur noch bei Weltbossen
   const lid = () => w.nextId++;
+  // T7: ein erwachter Boss trägt genau seinen eigenen benannten Fund (feste Beute, kein Wurf)
+  const awakened = AWAKENED.find((d) => d.id === m.kindId);
   if (k.boss || w.rng.next() <= k.dropChance * GEAR_DROP_FACTOR) {
-    drop(k.boss ? (rollNamed(w.rng, lid, k.level, group, true) ?? rollBase(w.rng, lid, k.level, 0.6)) : rollLoot(w.rng, lid, k.level, group, NAMED_SHARE, WEAPON_SHARE_MONSTER));
+    drop(awakened ? generateNamed(lid(), awakened.named) : k.boss ? (rollNamed(w.rng, lid, k.level, group, true) ?? rollBase(w.rng, lid, k.level, 0.6)) : rollLoot(w.rng, lid, k.level, group, NAMED_SHARE, WEAPON_SHARE_MONSTER));
   }
   if (w.rng.next() <= POTION_DROP_CHANCE) drop(rollPotion(w.rng, () => w.nextId++, k.level));
   if (k.level >= GEM_MIN_LEVEL && w.rng.next() < (k.boss ? GEM_DROP.boss : m.unique ? GEM_DROP.unique : m.champ ? GEM_DROP.champion : GEM_DROP.normal)) drop(rollGem(w.rng, () => w.nextId++, k.level));
@@ -2137,6 +2145,28 @@ export function groupKills(a: Actor, group: LootGroup | string): number {
   return g ? g.monsters.reduce((n, id) => n + (a.kills?.[id] ?? 0), 0) : 0;
 }
 
+/** T7: trägt die Figur das Aschenmal (Aschenkönig besiegt)? */
+export const isMarked = (a: Actor): boolean => !!a.ash?.includes(ASH_KING);
+/** T7: Stufe des Aschenmals 0–8 (König plus erwachte Bosse); bei fremden Spielern aus dem Netz rekonstruiert */
+export const ashStage = (a: Actor): number => a.ash?.length ?? 0;
+
+/** T7: Tod des Aschenkönigs setzt das Aschenmal; danach zählen die erwachten Bosse. Keine Zufallswürfe, nur Spielerzustand. */
+function ashKill(w: World, a: Actor, kindId: string): void {
+  if (kindId === ASH_KING) {
+    if (isMarked(a)) return;
+    a.ash = [ASH_KING];
+    note(w, a, 'Die Asche des Königs brennt sich in deine Haut: ein glimmendes Mal. Chronistin Maren will wissen, was du gesehen hast.');
+    awardTitle(w, a, ASH_TITLES[0], 'Aschenkönig besiegt');
+    learnTopics(w, a, ['asche']);
+    return;
+  }
+  const d = AWAKENED.find((x) => x.id === kindId);
+  if (!d || !isMarked(a) || a.ash!.includes(d.id)) return;
+  a.ash!.push(d.id);
+  note(w, a, `${monsterKind(d.id).name} liegt in Asche. Das Mal auf deiner Haut glimmt heller (${a.ash!.length - 1}/${AWAKENED.length}).`);
+  if (a.ash!.length === AWAKENED.length + 1) awardTitle(w, a, ASH_TITLES[1], 'alle sieben erwachten Bosse besiegt');
+}
+
 /** Kill zählen; bei 100 und 500 Kills der Gruppe gibt es Titel, bei 500 dazu Händlerware. */
 function countKill(w: World, a: Actor, kindId: string): void {
   a.kills ??= {};
@@ -2268,6 +2298,7 @@ export function tick(w: World): void {
   w.ground = w.ground.filter((g) => g.expiresAt === null || g.expiresAt > w.tick);
   const players = w.actors.filter((x) => x.kind === 'player' && x.alive);
   if (w.npcWander) npcWanderStep(w, players);
+  if (w.tick % TICK_RATE === 0) syncAwakened(w);
   if (w.tick % 10 === 0) for (const pl of players) checkVisits(w, pl);
   if (w.tick % TICK_RATE === 0 && w.npcWander) for (const pl of players) wildEvents(w, pl);
   // kämpfende Straßenwachen (P5) halten die Monster in ihrer Nähe wach, sonst kämpften sie gegen Schlafende
@@ -2419,7 +2450,42 @@ function regen(w: World, p: Actor): void {
   p.mana = Math.min(mmax, p.mana + (0.02 + (p.attrs.willenskraft - 10) * 0.005 + (safe ? 0.2 : 0)) * boost * (1 + attrBonus(p, 'willenskraft') / 100) * (1 + passiveSum(p, 'manaRegen') / 100));
 }
 
+/** T7: Umkreis um den Platz eines Bosses (Felder), in dem das Aschenmal die Form bestimmt; größer als Sichtweite im Netz, Aggro- und Schlafabstand, damit die Form feststeht, bevor jemand den Boss sieht. */
+export const ASH_REACH = 45;
+/** T7: Zeigt sich der Boss am Platz `home` in erwachter Form? Ja, sobald eine Figur mit Aschenmal in der Nähe ist (im Mehrspieler zählt der höchste Stand in Reichweite; Ungezeichnete allein sehen nur die Grundform). */
+const wantsAwakeAt = (w: World, home: Pt): boolean => w.actors.some((a) => a.kind === 'player' && isMarked(a) && Math.hypot(a.x - home.x, a.y - home.y) <= ASH_REACH);
+
+/** Wechselt Art und Werte eines Bosses (Grundform <-> erwachte Form); Heimat, Kennung und Wartezeit bleiben. */
+function setForm(w: World, m: Actor, kindId: string): void {
+  if (m.abilities.includes('summon') || m.abilities.includes('raise')) dismissSummons(w, m);
+  const k = monsterKind(kindId);
+  Object.assign(m, {
+    kindId, name: k.name, level: k.level, hp: k.hp, maxHp: k.hp, damage: k.damage, speed: k.speed, attackCooldown: k.attackCooldown, aggroRange: k.aggroRange,
+    boss: !!k.boss, abilities: [...(k.abilities ?? [])], summonKind: k.summonKind, dmgType: k.dmgType ?? 'physical', enraged: false, summoned: false, chargeUntil: 0,
+  });
+}
+
+/** T7: Form eines Bosses beim Wiedererscheinen (Grundform oder erwacht, je nach Zeichen in der Nähe seines Platzes) */
+function awakeFormOf(w: World, m: Actor): string {
+  const base = baseKindOf(m.kindId!);
+  return m.home && wantsAwakeAt(w, m.home) ? awakenedOf(base)?.id ?? m.kindId! : base;
+}
+
+/** T7: ruhende Bosse (steht still, voll bei Kräften) wechseln jede Sekunde in die Form, die zum Spieler in der Nähe passt; Kämpfende und Tote später (Wiedererscheinen). */
+function syncAwakened(w: World): void {
+  for (const m of w.actors) {
+    if (m.kind !== 'monster' || !m.alive || !m.kindId || !m.boss || !m.home || m.summonedBy !== undefined || m.unique || m.campId) continue;
+    if (m.targetId !== null || m.path.length > 0 || m.hp < m.maxHp || m.enraged) continue;
+    const want = awakeFormOf(w, m);
+    if (want !== m.kindId) setForm(w, m, want);
+  }
+}
+
 function reviveMonster(w: World, m: Actor): void {
+  if (m.boss && m.kindId) {
+    const form = awakeFormOf(w, m);
+    if (form !== m.kindId) setForm(w, m, form);
+  }
   // Helfer vom letzten Mal verschwinden, sonst häufen sie sich über Respawns
   if (m.abilities.includes('summon')) dismissSummons(w, m);
   m.alive = true;

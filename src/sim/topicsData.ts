@@ -17,6 +17,8 @@ export interface TopicAnswer {
   quest?: string;
   /** Zusatz, sobald der Auftrag abgegeben ist */
   done?: string;
+  /** T7: nur für Figuren mit dem Aschenmal (Aschenkönig besiegt); sonst weicht der NPC aus */
+  needs?: 'ash';
 }
 
 export interface NpcTopics {
@@ -194,6 +196,10 @@ export const NPC_TOPICS: Record<string, NpcTopics> = {
     topics: {
       chronik: { text: ['Seit dem Fall des Throns schreibe ich jede Nacht eine Seite. Manche Kapitel sind zu dunkel, um sie zu Ende zu bringen.'] },
       zeugen: { text: ['Zeugen sind selten geworden. Der Eremit im Moor, der Ritter in der Asche, der Schatzsucher in der Mine: Alle haben gesehen, was ich nicht sehen durfte.'] },
+      asche: {
+        needs: 'ash',
+        text: ['Seit der König gefallen ist, regt sich die Asche. Sie wärmt, was begraben lag: Die Fürsten, die du schon einmal erschlagen hast, stehen wieder auf, größer als zuvor und mit etwas Eigenem in den Händen. Man hört von [[ruf_goblin|Grix]] im Goblinbau, von [[ruf_raeuber|Harkon]] im Räuberlager, von [[ruf_knochen|Morrik]] bei den Katakomben, von [[ruf_moor|Veshra]] im Moor, vom [[ruf_stein|Kohlenkoloss]] in der Mine, von [[ruf_spinne|Vyrra]] im Nest und von [[ruf_netz|Skarra]] in den Tiefen. Frag die, die dort waren, wo genau.'],
+      },
       siegelring: {
         minLevel: 20,
         tooLow: 'Aldrics Ring ist eine Geschichte für später. Die Öde frisst Schwächere, als du es bist. Komm wieder, wenn du dort bestehst.',
@@ -355,6 +361,23 @@ for (const sp of KILL_GOAL_SPECS) {
   const low = (who: string) => `${who} winkt ab. „Dafür bist du noch zu unerfahren. Komm später wieder.“`;
   b.topics[k1] = { text: [sp.bid1], minLevel: sp.lv, tooLow: low(sp.b), quest: killGoalQuestId(sp.group, 1) };
   a.topics[k2] = { text: [`${sp.bid2} Man nennt es: [[${k2}|${sp.label2}]].`], minLevel: sp.lv, tooLow: low(sp.a), quest: killGoalQuestId(sp.group, 2) };
+}
+
+/**
+ * T7 Gerüchte über die erwachten Bosse (Stichwort `key` aus Marens „asche“): je Boss ein NPC, der Himmelsrichtung (Lage in der Region,
+ * Norden ist kleineres y) und Landmarke (`ort` = Regionsname) nennt und den versteckten Auftrag gibt. `ash.test.ts` prüft die Richtung an der Karte.
+ */
+export const ASCHE_RUF: Record<string, { key: string; npc: string; ort: string; richtung: string; quest: string; text: string; done: string }> = {
+  goblin_king_ash: { key: 'ruf_goblin', npc: 'Jägerin Ysa', ort: 'Goblinbau', richtung: 'Nordwesten', quest: 'h_ruf_goblin_king', text: 'Im Nordwesten des Goblinbaus, ganz hinten im Nordwesten der Welt, glimmt Grix wieder. Die Asche hat ihm Kohlen in die Krone gesteckt. Wenn du ihn ein zweites Mal erschlagen willst: Der Weg führt durch den Bau.', done: 'Grix ist Asche. Dieses Mal bleibt er es.' },
+  bandit_lord_ash: { key: 'ruf_raeuber', npc: 'Hauptmann Brandt', ort: 'Räuberlager', richtung: 'Norden', quest: 'h_ruf_bandit_lord', text: 'Im Norden des Räuberlagers, wo Harkon früher thronte, glüht seine Kette wieder. Er hat mehr Männer als zuvor, sagen die Händler. Geh vorsichtig oder gar nicht.', done: 'Harkon ist erledigt. Ich glaube dir das erst, wenn die Händler es sagen.' },
+  bone_lord_ash: { key: 'ruf_knochen', npc: 'Wachführerin Tessa', ort: 'Katakomben', richtung: 'Nordosten', quest: 'h_ruf_bone_lord', text: 'Im Nordosten der Katakomben, hinter dem letzten Gang, hört man Morrik wieder atmen. Nachts steigen die Toten schneller aus den Gräbern. Wer ihn zum Schweigen bringt, schläft ruhiger.', done: 'Morrik ruht. Die Wachen atmen auf.' },
+  bog_queen_ash: { key: 'ruf_moor', npc: 'Eremit Olm', ort: 'Gruft der Moorhexe', richtung: 'Nordwesten', quest: 'h_ruf_bog_queen', text: 'Im Nordwesten der Gruft der Moorhexe, wo ich sie damals zuletzt gesehen habe, leuchtet es grün und rot zugleich. Veshra kehrt zurück. Ich sehe sie in jedem Irrlicht.', done: 'Veshra ist fort. Das Moor schweigt, und es schweigt richtig.' },
+  stone_colossus_ash: { key: 'ruf_stein', npc: 'Schatzsucher Pell', ort: 'Tiefenmine', richtung: 'Mitte', quest: 'h_ruf_stone_colossus', text: 'In der Mitte der Tiefenmine, im großen Gewölbe, steht wieder der Koloss, und aus seinen Rissen leuchtet es. Ich habe ihn schon einmal erlebt, ein zweites Mal überlebe ich ihn nicht.', done: 'Der Koloss ist Schotter. Endlich.' },
+  spider_queen_ash: { key: 'ruf_spinne', npc: 'Torwache Haldor', ort: 'Spinnennest', richtung: 'Nordosten', quest: 'h_ruf_spider_queen', text: 'Im Nordosten des Spinnennests, südlich vom Totenacker, spinnt Vyrra neue Fäden, und sie glimmen. Seit Nächten träume ich davon.', done: 'Vyrra ist tot. Dann stimmen meine Träume nicht mehr.' },
+  web_mother_ash: { key: 'ruf_netz', npc: 'Späher Ruven', ort: 'Tiefenmine', richtung: 'Nordwesten', quest: 'h_ruf_web_mother', text: 'Im Nordwesten der Tiefenmine, hinter dem letzten Gang, hängt wieder ein Netz, so groß wie ein Zelt, und es glüht. Skarra ist zurück.', done: 'Skarra ist gefallen. Dann ist die Asche wohl still.' },
+};
+for (const r of Object.values(ASCHE_RUF)) {
+  NPC_TOPICS[r.npc]!.topics[r.key] = { needs: 'ash', text: [r.text], quest: r.quest, done: r.done };
 }
 
 

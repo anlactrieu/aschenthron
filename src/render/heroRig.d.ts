@@ -30,6 +30,8 @@ export interface HeroGear {
   golem?: number;
   /** Skelett: Rippen statt Brust */
   ribs?: boolean;
+  /** Aschenmal (T7): Stufe 1–8, glimmende Risse auf Brust und Armen (Teil `crack`) */
+  ash?: number;
 }
 /** Körperbau (alles 1 = der Held); `size` skaliert Figur, Posen und Waffe */
 export interface RigBody {

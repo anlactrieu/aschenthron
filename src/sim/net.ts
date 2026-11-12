@@ -1,4 +1,4 @@
-import { ATTR_KEYS, STATUS_IDS, type StatusId } from './data';
+import { ASH_KING, ATTR_KEYS, AWAKENED, STATUS_IDS, type StatusId } from './data';
 import { EQUIP_SLOT_LIST } from './items';
 import { isWalkable } from './path';
 import type { Actor, Command, GameEvent, GroundItem, World } from './world';
@@ -89,6 +89,8 @@ export interface ActorLite {
   unique?: string;
   /** nur Spieler: gewählter Titel (über dem Kopf) */
   title?: string;
+  /** nur Spieler (T7): Stufe des Aschenmals 1–8 (sichtbares Zeichen an der Figur), fehlt ohne Mal */
+  ash?: number;
   /** Statuseffekte (Verlangsamung, Betäubung, Brand, Gift) für Farbton und Symbole */
   st?: (StatusId | 'poison')[];
   /** nur Spieler: angelegte Ausrüstung für die Optik */
@@ -128,6 +130,7 @@ export function makeSnapshot(w: World, you: Actor, events: GameEvent[]): Snapsho
       id: a.id, kind: a.kind, kindId: a.kindId, name: a.name, x: a.x, y: a.y, hp: a.hp, maxHp: a.maxHp, alive: a.alive,
       boss: a.boss, enraged: a.enraged, level: a.level, targetId: a.targetId, diedAt: a.diedAt, pk: a.pkUntil > w.tick, champ: a.champ, unique: a.unique, st: statusList(a),
       title: a.kind === 'player' ? a.title : undefined,
+      ash: a.kind === 'player' && a.ash?.length ? a.ash.length : undefined,
       equipment: a.kind === 'player' ? a.equipment : undefined,
     });
   }
@@ -156,6 +159,7 @@ export function actorFromLite(l: ActorLite, tick: number): Actor {
     statPoints: 0, attrs: { kraft: 10, gewandtheit: 10, ausdauer: 10, verstand: 10, willenskraft: 10 }, mana: 0, gold: 0, skills: [], skillRanks: {}, skillPoints: 0,
     skillCd: {}, quests: {}, inventory: [], equipment: l.equipment ?? {}, stash: [], pickupId: null, chestId: null, resting: false, stuck: 0, diedAt: l.diedAt,
     boss: l.boss, enraged: l.enraged, autoAttack: true, repathAt: 0, dot: l.st?.includes('poison') ? { perSec: 1, until: tick + 1e6, srcId: 0 } : null, status: Object.fromEntries((l.st ?? []).filter((x) => x !== 'poison').map((x) => [x, tick + 1e6])), burn: null, dmgType: 'physical', healAt: 0, raiseAt: 0, lastHitAt: -9999, packId: 0, abilities: [], abilityAt: 0, chargeAt: 0, chargeUntil: 0, summoned: false, respawnTicks: 0, rewardMult: 1, champ: l.champ, unique: l.unique, title: l.title, pkUntil: l.pk ? tick + 1e6 : 0,
+    ...(l.ash ? { ash: Array.from({ length: l.ash }, (_, i) => (i === 0 ? ASH_KING : AWAKENED[i - 1]?.id ?? '')) } : {}),
     attackedBy: null, damagers: {},
   };
 }

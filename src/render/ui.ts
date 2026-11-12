@@ -1,8 +1,8 @@
 import { assignHotbar, HOTBAR_SLOTS, hotbarFor } from './hotbar';
-import { skillReq, SPECS, SPEC_LEVEL, NPC_ROLE, npcKeyOf, ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_2, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, STATUS_IDS, SCHOOL_NAME, schoolOf, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, questXp, MAX_LEVEL, monsterKind, uniqueDef, LOOT_GROUPS, KILL_GOALS, UNIQUES, MONSTERS, NPC_LORE, NPC_TOPICS, isGiverOf, type QuestDef, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
+import { skillReq, SPECS, SPEC_LEVEL, NPC_ROLE, npcKeyOf, ATTR_KEYS, ATTR_NAME, ATTR_THRESHOLD, ATTR_THRESHOLD_2, ATTR_THRESHOLD_BONUS, WILL_RES_PER_2, STATUS_IDS, SCHOOL_NAME, schoolOf, SKILLS, SHOPS, QUESTS, MAX_SKILL_RANK, questById, rankLevelReq, rankPrice, respecPrice, totalXpFor, questXp, MAX_LEVEL, monsterKind, uniqueDef, LOOT_GROUPS, KILL_GOALS, UNIQUES, MONSTERS, AWAKENED, ASH_KING, NPC_LORE, NPC_TOPICS, isGiverOf, type QuestDef, FAMILY_RES, DMG_NAME, DMG_COLOR, STATUS_NAME, STATUS_COLOR, type SkillDef, type MonsterFamily, type DmgType, type StatusId } from '../sim/data';
 import { NAMED } from '../sim/named';
 import { Rng } from '../sim/rng';
-import { LEGENDARIES, POWER_TEXT, TEMPLATES, SETS, TIER_COLOR, GEM_COLOR, affixRange, generateLegendary, generateNamed, gemAffix, gemName, handsOf, itemAffixes, itemReq, reqOfTemplate, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
+import { LEGENDARIES, POWER_TEXT, TEMPLATES, SETS, TIER_COLOR, GEM_COLOR, affixRange, generateLegendary, generateNamed, namedById, gemAffix, gemName, handsOf, itemAffixes, itemReq, reqOfTemplate, setById, templateById, weaponSpeedOf, type EquipSlot, type GemInfo, type Item } from '../sim/items';
 import {
   NPC_RANGE, TICK_RATE, activeSetBonuses, craftCost, armorOf, attackCooldownOf, buyBlock, buyPrice, carriedWeight, carryCapacity, hitDamageRange,
   bulkSellable, sellPrice, critChance, attrBonus, equipSlotFor, socketCost, maxHpOf, maxManaOf, missingReq, nearNpc, shopNear, trainerTeaches, powerOf, resistOf, type Actor, type Command, type Npc, type World,
@@ -1719,7 +1719,7 @@ export class Ui {
   private renderBestiary(body: HTMLElement, p: Actor): void {
     const found = new Set(p.found ?? []);
     const seenAll = LOOT_GROUPS.reduce((n, g) => n + NAMED.filter((d) => d.group === g.id && found.has(d.id)).length, 0);
-    body.append(el('div', 'a-sec', `Bestiarium · ${seenAll}/${NAMED.length} Funde`));
+    body.append(el('div', 'a-sec', `Bestiarium · ${seenAll}/${NAMED.filter((d) => !d.boss).length} Funde`));
     body.append(el('div', 'a-note', `Name und Werte eines Funds zeigen sich erst, wenn du ihn einmal aufgehoben hast. ${KILL_GOALS[0]} Kills einer Gruppe: Titel. ${KILL_GOALS[1]}: zweiter Titel, und die Händler führen deine gefundenen Stücke dieser Gruppe.`));
     for (const g of LOOT_GROUPS) {
       const kills = groupKills(p, g.id);
@@ -1756,6 +1756,37 @@ export class Ui {
       if (drops.length) c.append(list);
       body.append(c);
     }
+    if (p.ash?.includes(ASH_KING)) this.renderAshBestiary(body, p, found);
+  }
+
+  /** T7: Eintrag je erwachtem Boss (Name und eigener Fund erst nach dem Sieg), sichtbar erst mit dem Aschenmal. */
+  private renderAshBestiary(body: HTMLElement, p: Actor, found: Set<string>): void {
+    const done = AWAKENED.filter((d) => p.ash!.includes(d.id)).length;
+    const c = el('div', 'a-card');
+    c.style.display = 'block';
+    const head = el('div', '', `Die Asche ruft · ${done}/${AWAKENED.length} erwachte Bosse besiegt`);
+    head.style.fontWeight = 'bold';
+    c.append(head, el('div', 'a-note', 'Der Aschenkönig ist gefallen, und die Fürsten von einst stehen wieder auf. Wo, erzählt Chronistin Maren (Stichwort „Asche“) und wer ihr zuhört.'));
+    const list = el('div');
+    list.style.cssText = 'display:flex;flex-direction:column;gap:4px;margin-top:4px;font-size:16px';
+    for (const d of AWAKENED) {
+      const row = el('div');
+      row.style.cssText = 'display:flex;flex-wrap:wrap;gap:2px 10px';
+      const seen = p.ash!.includes(d.id) || (p.kills?.[d.id] ?? 0) > 0;
+      row.append(el('span', seen ? '' : 'a-note', seen ? `✔ ${monsterKind(d.id).name} (St. 30): ${p.kills?.[d.id] ?? 0}×` : `??? (erwacht: ${monsterKind(d.base).name})`));
+      if (found.has(d.named)) {
+        const it = generateNamed(-1, d.named);
+        const sp = el('span', '', it.name);
+        sp.style.color = RARITY_COLOR[it.rarity];
+        sp.style.cursor = 'help';
+        sp.onmouseenter = (ev) => this.showTip(it, equippedFor(p, it), ev);
+        sp.onmouseleave = () => (this.tip.style.display = 'none');
+        row.append(sp);
+      } else row.append(el('span', 'a-note', `??? · ${SLOT_NAME[templateById(namedById(d.named).base).slot as EquipSlot] ?? ''} · St. 30`));
+      list.append(row);
+    }
+    c.append(list);
+    body.append(c);
   }
 
   private renderQuests(body: HTMLElement, p: Actor): void {
@@ -1763,7 +1794,7 @@ export class Ui {
     const chained = new Set(questChains().flatMap((c) => c.quests.map((q) => q.id)));
     const active = QUESTS.filter((q) => !chained.has(q.id) && p.quests[q.id] && p.quests[q.id]!.state !== 'turned');
     body.append(el('div', 'a-sec', 'Aufgaben'));
-    body.append(el('div', 'a-note', 'Endziel: Besiege den Aschenkönig auf dem Thron der Asche (ab Stufe 28).'));
+    body.append(el('div', 'a-note', p.ash?.includes(ASH_KING) ? 'Der Aschenkönig ist gefallen. Doch die Asche ruft: Sprich mit Chronistin Maren über die „Asche“.' : 'Endziel: Besiege den Aschenkönig auf dem Thron der Asche (ab Stufe 28).'));
     if (!active.length) body.append(el('div', 'a-note', 'Keine. Questgeber (gelbes ! über dem Kopf) stehen in den Städten.'));
     for (const q of active) body.append(this.questCard(q, p, w));
     this.renderNotebook(body, p);

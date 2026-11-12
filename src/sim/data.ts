@@ -352,6 +352,50 @@ export const MONSTERS: MonsterKind[] = [
   mk('ash_king', 'Aschenkönig', 30, 'demon', 0xd86a2a, { boss: true, speed: 0.085, abil: ['slam', 'summon', 'charge'], summon: 'imp' }),
 ];
 
+/**
+ * T7 Nachspiel „Die Asche ruft“: Nach dem Tod des Aschenkönigs erwachen die übrigen sieben Bosse als eigene Arten auf Stufe 30,
+ * mit den Fähigkeiten der Grundart plus genau einer (`extra`) und je einem eigenen benannten Fund (`named`, `NAMED` mit `boss`).
+ * Sie erscheinen zur Laufzeit am Platz des ursprünglichen Bosses (`world.ts`, `syncAwakened`), die Karte bleibt unberührt.
+ */
+export const ASH_KING = 'ash_king';
+/** Titel: König besiegt / alle sieben erwachten Bosse besiegt */
+export const ASH_TITLES = ['Erbe der Asche', 'Der die Asche zum Schweigen brachte'] as const;
+export interface AwakenedDef {
+  id: string;
+  base: string;
+  name: string;
+  /** die eine zusätzliche Fähigkeit gegenüber der Grundart */
+  extra: Ability;
+  /** Beschwörung der erwachten Form (stärker als die der Grundart) */
+  summon?: string;
+  /** Kennung des eigenen benannten Funds in `NAMED` */
+  named: string;
+}
+export const AWAKENED: AwakenedDef[] = [
+  { id: 'goblin_king_ash', base: 'goblin_king', name: 'Grix Aschenkrone', extra: 'charge', summon: 'goblin_warlord', named: 'n_kohlenzepter' },
+  { id: 'bandit_lord_ash', base: 'bandit_lord', name: 'Harkon Glutkette', extra: 'summon', summon: 'bandit_captain', named: 'n_zollkette' },
+  { id: 'bone_lord_ash', base: 'bone_lord', name: 'Morrik Aschenhauch', extra: 'raise', summon: 'bone_knight', named: 'n_letzter_atem' },
+  { id: 'bog_queen_ash', base: 'bog_queen', name: 'Veshra Moorglut', extra: 'ward', summon: 'ghoul_alpha', named: 'n_moorfeuerschleier' },
+  { id: 'stone_colossus_ash', base: 'stone_colossus', name: 'Kohlenkoloss', extra: 'summon', summon: 'iron_golem', named: 'n_kolossherz' },
+  { id: 'spider_queen_ash', base: 'spider_queen', name: 'Vyrra Aschenseide', extra: 'slam', summon: 'web_stalker', named: 'n_aschseidenstulpen' },
+  { id: 'web_mother_ash', base: 'web_mother', name: 'Skarra Glutgespinst', extra: 'poisonBite', summon: 'nest_matron', named: 'n_glutgespinst' },
+];
+const emberOf = (c: number): number => {
+  const mix = (a: number, b: number) => Math.round(a * 0.6 + b * 0.4);
+  return (mix((c >> 16) & 255, 0xd8) << 16) | (mix((c >> 8) & 255, 0x6a) << 8) | mix(c & 255, 0x2a);
+};
+for (const d of AWAKENED) {
+  const b = MONSTERS.find((m) => m.id === d.base)!;
+  const k = mk(d.id, d.name, 30, b.family, emberOf(b.color), { boss: true, abil: [...(b.abilities ?? []), d.extra], summon: d.summon, dt: b.dmgType });
+  MONSTERS.push({ ...k, speed: b.speed });
+}
+/** Grundart einer Monsterart: bei einer erwachten Form der ursprüngliche Boss, sonst sie selbst */
+export const baseKindOf = (id: string): string => AWAKENED.find((d) => d.id === id)?.base ?? id;
+/** Erwachte Form eines Bosses (nur die sieben, nicht der König) */
+export const awakenedOf = (baseId: string): AwakenedDef | undefined => AWAKENED.find((d) => d.base === baseId);
+/** Kennung des versteckten Auftrags („Die Asche ruft“) zu einer erwachten Art */
+export const ashQuestId = (awakenedId: string): string => `h_ruf_${baseKindOf(awakenedId)}`;
+
 /** Beute-Gruppen: eine Tabelle für benannte Funde, Kill-Zähler und Bestiarium (`family` taugt nicht, `humanoid` mischt Goblins, Räuber und Hexen). */
 export type LootGroup = 'rats' | 'hounds' | 'goblins' | 'bandits' | 'spiders' | 'bog' | 'undead' | 'golems' | 'worms' | 'ember' | 'demons';
 export interface LootGroupDef {
@@ -910,6 +954,20 @@ QUESTS.push(
   hiddenQ(THREAD_SIEGEL, 2, { id: 'h_asche1', kind: 'bring', name: 'Verbrannte Seiten', text: 'Maren braucht 5 verbrannte Chronikseiten, die in der Aschenöde treiben. Die Wesen dort tragen sie mit sich.', minLevel: 20, giver: 'Chronistin Maren', item: 'Verbrannte Seiten', monsters: ['ash_walker', 'cinder_wisp', 'imp', 'night_stalker'], chance: 0.35, count: 5, teaches: ['valdor'], outro: 'Maren fügt die Seiten zusammen. „Ein Name steht darauf, dick durchgestrichen: Valdor. Frag Ruven nach [[valdor|Valdor]].“' }),
   hiddenQ(THREAD_SIEGEL, 3, { id: 'h_asche2', kind: 'unique', name: 'Schreckensritter Valdor', text: 'Späher Ruven bittet dich, Schreckensritter Valdor in der Aschenöde zu erschlagen und sein Wappen zu bringen.', minLevel: 24, giver: 'Späher Ruven', target: 'dread_valdor', teaches: ['ascheneid'], outro: 'Ruven wiegt das Wappen in der Hand. „Sein Eid ist gebrochen. Was bleibt von seinen Rittern? Frag Tessa nach dem [[ascheneid|Ascheneid]].“' }),
   hiddenQ(THREAD_SIEGEL, 3.5, { id: 'h_asche3', kind: 'kill', name: 'Die Todesritter', text: 'Wachführerin Tessa bittet dich, 3 Todesritter zu erschlagen, die ohne Valdor führerlos durch die Öde ziehen.', minLevel: 25, giver: 'Wachführerin Tessa', target: 'death_knight', count: 3, reward: 'unique', outro: 'Tessa schreibt deinen Namen ins Wachbuch. „Der Eid ist erfüllt. Fast.“' }),
+);
+
+// T7: „Die Asche ruft“ – sieben Aufträge in freier Reihenfolge, erst nach dem Sieg über den Aschenkönig zu bekommen (Stichwort „asche“ bei Maren)
+export const THREAD_ASCHE = 'Die Asche ruft';
+const ashStep = (d: AwakenedDef, giver: string, name: string, text: string, outro: string): QuestDef =>
+  hiddenQ(THREAD_ASCHE, 3, { id: ashQuestId(d.id), kind: 'kill', name, text, minLevel: 30, giver, target: d.id, outro });
+QUESTS.push(
+  ashStep(AWAKENED[0]!, 'Jägerin Ysa', 'Grix erwacht', 'Die Asche hat Grix aus dem Goblinbau geweckt, größer und rastloser als zuvor. Erschlage ihn ein zweites Mal, diesmal für immer.', 'Ysa tritt die letzte Glut aus. „Der Wald ist still. Das erste Mal seit Jahren.“'),
+  ashStep(AWAKENED[1]!, 'Hauptmann Brandt', 'Harkons Rückkehr', 'Im Räuberlager geht wieder ein Fürst um, die Ketten glühend, die Gefolgschaft zahlreicher. Bring Harkon zur Ruhe.', 'Brandt nickt schwer. „Die Straße gehört wieder den Reisenden. Und uns.“'),
+  ashStep(AWAKENED[2]!, 'Wachführerin Tessa', 'Morriks Hauch', 'In den Katakomben atmet der Knochenfürst Morrik wieder, und mit jedem Atemzug stehen die Toten auf. Lösche den Hauch.', 'Tessa schreibt es ins Wachbuch. „Die Katakomben schweigen. Wer dort liegt, bleibt liegen.“'),
+  ashStep(AWAKENED[3]!, 'Eremit Olm', 'Veshras Glut', 'Im Norden brennt die Gruft der Moorhexe ohne Feuer. Veshra ist zurück. Olm bittet dich, ihr Ende zu vollenden.', 'Olm lächelt zum ersten Mal. „Jetzt ruht sie. Das Moor atmet wieder.“'),
+  ashStep(AWAKENED[4]!, 'Schatzsucher Pell', 'Der Kohlenkoloss', 'Der Steinkoloss steht wieder in der Tiefenmine, aus seinen Rissen leuchtet Glut. Pell traut sich nicht hinein. Du schon.', 'Pell schüttelt den Staub aus den Haaren. „Die Mine ist leer. Endlich wirklich leer.“'),
+  ashStep(AWAKENED[5]!, 'Torwache Haldor', 'Vyrras Seide', 'Vyrra spinnt wieder im Spinnennest, die Fäden glimmen. Haldor will sie nicht noch einmal in seinen Träumen sehen.', 'Haldor schweigt lange. „Diesmal schlafe ich vielleicht.“'),
+  ashStep(AWAKENED[6]!, 'Späher Ruven', 'Skarras Gespinst', 'Skarra hat ihr Netz in der Tiefenmine neu gewoben, mit glühenden Fäden. Ruven rechnet nicht damit, dass sie diesmal fällt, bis du es tust.', 'Ruven pfeift leise. „Das war die Letzte. Die Asche ist still.“'),
 );
 
 // Ankunftskette für neue Spieler: ein Rundgang, bei dem jede Rolle der Stadt einmal erklärt wird (reine Gesprächsaufgaben, kleine Belohnung)

@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { MONSTERS } from '../sim/data';
+import { AWAKENED, MONSTERS } from '../sim/data';
 import { TEMPLATES } from '../sim/items';
 import { SKILLS } from '../sim/data';
 import { ITEM_SPRITES, MONSTER_SPRITES, PLAYER_LAYERS, SKILL_SPRITES, allSpritePaths } from './spriteMap';
@@ -23,7 +23,8 @@ describe('Sprite-Zuordnung (DCSS, CC0)', () => {
   });
 
   it('alle Monsterarten haben ein Sprite', () => {
-    expect(MONSTERS.filter((m) => !MONSTER_SPRITES[m.id]).map((m) => m.id)).toEqual([]);
+    // T7: erwachte Bosse zeigen das Bild ihrer Grundart
+    expect(MONSTERS.filter((m) => !MONSTER_SPRITES[m.id] && !AWAKENED.some((a) => a.id === m.id)).map((m) => m.id)).toEqual([]);
   });
 
   it('Sprite-Lader ist in Node import-sicher (kein Image): Fallback, kein Absturz', async () => {

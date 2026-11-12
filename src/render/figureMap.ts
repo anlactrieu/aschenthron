@@ -11,6 +11,7 @@
  * Der Held hat einen eigenen Schalter (`?held=skelett|dcss`, `heroSheet.ts`).
  * Pfade relativ zu `public/assets/ninja/` (siehe `NINJA_BASE` in ninja.ts).
  */
+import { baseKindOf } from '../sim/data';
 
 export type FigMode = 'skelett' | 'mix' | 'ninja' | 'dcss';
 export const FIG_MODES: FigMode[] = ['skelett', 'dcss', 'mix', 'ninja'];
@@ -195,9 +196,10 @@ const mixSet = ((): Set<string> => {
 /** Ninja-Figur der Monsterart im gewählten Modus (`undefined` = DCSS-Sprite). */
 export function ninjaMonsterDef(id: string, m: FigMode = figureMode()): NinjaMon | undefined {
   if (!usesNinja(m)) return undefined;
-  const d = NINJA_MONSTERS[id];
+  const vid = baseKindOf(id); // T7: erwachte Bosse zeigen das Bild ihrer Grundart (kein Einfluss auf die Mix-Verteilung)
+  const d = NINJA_MONSTERS[vid];
   if (!d) return undefined;
-  return m === 'ninja' || mixSet.has(id) ? d : undefined;
+  return m === 'ninja' || mixSet.has(vid) ? d : undefined;
 }
 
 /** Für die Konsolenausgabe: welche Arten sind in diesem Modus Ninja, welche DCSS. */
