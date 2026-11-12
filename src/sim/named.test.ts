@@ -30,14 +30,17 @@ describe('benannte Funde (named.ts)', () => {
   });
 
   it('jeder Fund ist gültig: Vorlage, Slot, Band, Gruppe, Wertezahl, Wertebereich', () => {
-    for (const d of POOL) {
+    for (const d of NAMED) {
       const t = templateById(d.base);
       expect(t.slot === 'potion' || t.slot === 'gem', d.id).toBe(false);
       expect(t.off === 'arrows', `${d.id}: keine Pfeile`).toBe(false);
       expect(NAMED_BANDS as readonly number[]).toContain(d.band);
       expect(Math.abs(t.minLevel - d.band), `${d.id}: Vorlage ${t.id} Stufe ${t.minLevel} passt nicht zu Band ${d.band}`).toBeLessThanOrEqual(5);
-      expect(LOOT_GROUPS.some((g) => g.id === d.group), `${d.id}: Gruppe ${d.group}`).toBe(true);
-      expect(groupBands(d.group).has(d.band), `${d.id}: Gruppe ${d.group} jagt nicht im Band ${d.band}`).toBe(true);
+      // Bossfunde der erwachten Bosse (T7) gehören keiner Beute-Gruppe an, alles andere gilt für sie genauso
+      if (!d.boss) {
+        expect(LOOT_GROUPS.some((g) => g.id === d.group), `${d.id}: Gruppe ${d.group}`).toBe(true);
+        expect(groupBands(d.group).has(d.band), `${d.id}: Gruppe ${d.group} jagt nicht im Band ${d.band}`).toBe(true);
+      }
       expect(d.affixes.length, d.id).toBe(d.rarity === 'rare' ? 3 : 2);
       expect(new Set(d.affixes.map((a) => a.stat)).size, `${d.id}: Werte doppelt`).toBe(d.affixes.length);
       for (const a of d.affixes) {
